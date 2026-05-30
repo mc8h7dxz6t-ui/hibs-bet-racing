@@ -28,6 +28,7 @@ load_env() {
 
 raceform_db() {
   local db="${RACEFORM_DB_PATH:-${HOME}/raceform.db}"
+  db="${db/#\~/$HOME}"
   if [[ ! -f "${db}" ]]; then
     echo "ERROR: raceform.db not found at ${db} (set RACEFORM_DB_PATH in .env)" >&2
     return 1
