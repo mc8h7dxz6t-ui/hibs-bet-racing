@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Status — {{ product_name }}{% endblock %}
+
+{% block extra_css %}
+.fi-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px;}
+@media(max-width:900px){.fi-grid{grid-template-columns:1fr;}}
+.fi-chart{background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:12px;padding:12px;overflow-x:auto;}
+.fi-hint{font-size:0.82em;color:#cbd5e1;margin:8px 0;line-height:1.5;}
+.gauge-steam{color:#86efac;font-weight:700;}
+.gauge-drift{color:#fca5a5;font-weight:700;}
+.gauge-abort{background:rgba(239,68,68,0.15);}
+{% endblock %}
+
+{% block content %}
+<section class="card">
+    <div class="card-head"><h2>Data sources</h2></div>
+    <div class="card-body" style="padding:16px;">
+        <p style="margin-bottom:12px;">
+            <span class="pill {% if health.racing_api %}ok{% else %}warn{% endif %}">Racing API</span>
+            <span class="pill {% if health.racing_post %}ok{% else %}warn{% endif %}">Racing Post</span>
+            <span class="pill {% if health.matchbook %}ok{% else %}warn{% endif %}">Matchbook</span>
+            <span class="pill {% if health.raceform_path %}ok{% else %}warn{% endif %}">Kaggle raceform.db</span>
+            {% if ranker_loaded %}<span class="pill ok">Ranker artifact</span>{% else %}<span class="pill warn">No ranker</span>{% endif %}
+        </p>
+        <div class="stat-grid">
+            <div class="stat-card"><div class="stat-label">DB</div><div class="stat-value">{% if health.db_ok %}OK{% else %}Missing{% endif %}</div></div>
+            <div class="stat-card"><div class="stat-label">Card runners</div><div class="stat-value">{{ health.runners_loaded }}</div></div>
+            <div class="stat-card"><div class="stat-label">Scored</div><div class="stat-value">{{ health.scores_loaded }}</div></div>
+        </div>
+    </div>
+</section>
+
+<section class="card">
+    <div class="card-head"><h2>Feature-Impact Tracker</h2></div>
+    <div class="card-body" style="padding:16px;">
+        {% if feature_impact %}
+        <p class="fi-hint">
+            Method: <strong>{{ feature_impact.method }}</strong>
+            · Generated {{ (feature_impact.generated_at or '')[:19]|replace('T',' ') }} UTC
+            {% if feature_impact.holdout and feature_impact.holdout.place_auc %}
+            · Holdout place AUC <strong>{{ feature_impact.holdout.place_auc }}</strong>
+            · Winner AUC <strong>{{ feature_impact.holdout.winner_auc }}</strong>
+            {% endif %}
+        </p>
+        <div class="fi-grid">
+            <div class="fi-chart">
+                {% if feature_impact.svg_available %}
+                <img src="{{ url_for('feature_impact_svg') }}" alt="Feature importance chart" style="max-width:100%;height:auto;">
+                {% else %}
+                <p class="fi-hint">Chart missing — re-run <code>hibs-racing train-ranker</code></p>
+                {% endif %}
+            </div>
+            <div>
+                <h3 style="font-size:0.9em;margin-bottom:8px;color:var(--muted);">Group lift (gain %)</h3>
+                <table>
+                    <thead><tr><th>Block</th><th>Lift</th><th>SHAP</th></tr></thead>
+                    <tbody>
+                    {% for group, info in (feature_impact.group_lift or {}).items() %}
+                    <tr>
+                        <td>{{ group }}</td>
+                        <td class="num">{{ info.gain_lift_pct }}%</td>
+                        <td class="num">{% if info.shap_lift_pct %}{{ info.shap_lift_pct }}%{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                <h3 style="font-size:0.9em;margin:14px 0 8px;color:var(--muted);">Top drivers</h3>
+                <p class="fi-hint">{{ feature_impact.top_drivers | join(', ') }}</p>
+                {% if feature_impact.tuning_hints %}
+                <h3 style="font-size:0.9em;margin:14px 0 8px;color:var(--muted);">Tuning hints</h3>
+                <ul class="fi-hint">{% for h in feature_impact.tuning_hints %}<li>{{ h }}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <p class="fi-hint">No feature impact artifacts yet. Run <code>hibs-racing build-matrix && hibs-racing train-ranker</code> — chart exports automatically.</p>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card">
+    <div class="card-head">
+        <h2>Market drift gauges</h2>
+        <button type="button" class="btn btn-secondary" id="btn-poll-drift">Poll Matchbook</button>
+    </div>
+    <div class="card-body" style="padding:16px;">
+        <p class="fi-hint">Δ = Odds<sub>now</sub> − Odds<sub>20m ago</sub>. Polls every 2 min within 20 min of off. Steam → scale Kelly; drift ≥ abort threshold → safety gate.</p>
+        <div class="port-scroll" style="overflow-x:auto;">
+            <table class="port-table">
+                <thead>
+                    <tr><th>Horse</th><th>Off</th><th>Now</th><th>20m</th><th>Δ</th><th>Dir</th><th>Gate</th><th>Kelly×</th><th>Value</th></tr>
+                </thead>
+                <tbody id="drift-gauge-body">
+                {% for g in market_gauges %}
+                <tr class="{% if g.gate == 'abort' %}gauge-abort{% endif %}">
+                    <td>{{ g.horse_name }}</td>
+                    <td>{{ g.off_time or '—' }}</td>
+                    <td>{{ g.odds_now or '—' }}</td>
+                    <td>{{ g.odds_20m_ago or '—' }}</td>
+                    <td>{% if g.drift_delta is not none %}{{ '%+.2f'|format(g.drift_delta) }}{% else %}—{% endif %}</td>
+                    <td class="{% if g.direction == 'steam' %}gauge-steam{% elif g.direction == 'drift' %}gauge-drift{% endif %}">{{ g.direction }}</td>
+                    <td>{{ g.gate }}</td>
+                    <td>{{ g.kelly_multiplier }}</td>
+                    <td>{% if g.value_flag %}★{% else %}—{% endif %}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9">No pre-race gauges — fetch cards and run <code>hibs-racing poll-odds</code> within 20 min of off.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function driftMonitor(){
+    const body = document.getElementById('drift-gauge-body');
+    if (!body) return;
+
+    const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const fmtDelta = (v) => (v == null ? '—' : (v >= 0 ? '+' : '') + Number(v).toFixed(2));
+    const dirClass = (d) => d === 'steam' ? 'gauge-steam' : d === 'drift' ? 'gauge-drift' : '';
+
+    function render(gauges){
+        if (!gauges.length){
+            body.innerHTML = '<tr><td colspan="9">No pre-race gauges — fetch cards and run poll within 20 min of off.</td></tr>';
+            return;
+        }
+        body.innerHTML = gauges.map(g => `
+            <tr class="${g.gate === 'abort' ? 'gauge-abort' : ''}">
+                <td>${esc(g.horse_name)}</td>
+                <td>${esc(g.off_time || '—')}</td>
+                <td>${g.odds_now ?? '—'}</td>
+                <td>${g.odds_20m_ago ?? '—'}</td>
+                <td>${fmtDelta(g.drift_delta)}</td>
+                <td class="${dirClass(g.direction)}">${esc(g.direction)}</td>
+                <td>${esc(g.gate)}</td>
+                <td>${g.kelly_multiplier ?? '—'}</td>
+                <td>${g.value_flag ? '★' : '—'}</td>
+            </tr>`).join('');
+    }
+
+    async function refresh(poll){
+        try {
+            const r = await fetch('/api/market-steam' + (poll ? '?poll=1' : ''));
+            const j = await r.json();
+            render(j.gauges || []);
+        } catch (_) {}
+    }
+
+    document.getElementById('btn-poll-drift')?.addEventListener('click', async () => {
+        const btn = document.getElementById('btn-poll-drift');
+        btn.disabled = true;
+        try { await refresh(true); }
+        catch (_) { alert('Poll failed'); }
+        finally { btn.disabled = false; }
+    });
+
+    setInterval(() => refresh(true), 120000);
+})();
+</script>
+{% endblock %}

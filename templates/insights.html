@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Insights — {{ product_name }}{% endblock %}
+
+{% block extra_css %}
+.insights-hero{
+    display:grid;grid-template-columns:minmax(0,1fr) minmax(200px,280px);gap:16px;
+    margin-bottom:16px;padding:18px;border-radius:16px;
+    background:linear-gradient(135deg,rgba(0,122,51,0.24),rgba(6,14,24,0.95));
+    border:1px solid rgba(183,247,200,0.22);
+}
+.insights-hero h1{font-family:'Orbitron',monospace;color:var(--hibs-neon);font-size:1.2em;letter-spacing:0.06em;margin-bottom:8px;}
+.insights-hero p{color:var(--muted);font-size:0.88em;line-height:1.55;max-width:720px;}
+.insights-hero img{width:100%;max-height:220px;object-fit:contain;opacity:0.92;filter:drop-shadow(0 8px 20px rgba(0,0,0,0.35));}
+.pick-card{
+    background:var(--card);border:1px solid var(--border);border-radius:14px;
+    margin-bottom:14px;overflow:hidden;
+}
+.pick-card-head{
+    display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+    padding:14px 16px;border-bottom:1px solid var(--border);
+    background:rgba(0,122,51,0.1);
+}
+.pick-rank{font-family:'Orbitron',monospace;color:var(--gold);font-size:1.4em;font-weight:900;min-width:42px;}
+.pick-title{font-size:1.05em;font-weight:700;flex:1;}
+.pick-body{padding:14px 16px 16px;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:860px){.insights-hero{grid-template-columns:1fr;}.pick-body{grid-template-columns:1fr;}}
+.pick-metrics{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+.pick-metrics .pill{font-size:0.78em;}
+.pick-reasons{margin:0;padding-left:1.1em;font-size:0.84em;line-height:1.55;color:#cbd5e1;}
+.pick-reasons li{margin-bottom:6px;}
+.method-box{
+    font-size:0.78em;color:var(--muted);padding:12px;border-radius:10px;
+    background:rgba(0,0,0,0.22);border:1px dashed var(--border);line-height:1.5;
+}
+.method-box strong{color:var(--neon-value);}
+{% endblock %}
+
+{% block content %}
+<div class="window-banner">
+    <strong>Engine insights</strong>
+    <span>Top {{ pick_count or 10 }} place angles · next {{ window_hours or 24 }}h · one pick per race max</span>
+    {% if scoring_method %}<span class="pill ok">{{ scoring_method }} model</span>{% endif %}
+</div>
+
+<section class="insights-hero">
+    <div>
+        <h1>Best 10 picks — explained</h1>
+        <p>
+            Ranked by blended place score (65% Harville place probability + 35% jockey–trainer combo prior).
+            Each card below shows <strong>why</strong> the engine selected this runner, backed by your raceform DB,
+            NLP sectional tags, course/distance priors and live odds where loaded.
+        </p>
+        {% if feature_impact and feature_impact.top_drivers %}
+        <p style="margin-top:10px;font-size:0.82em;color:var(--muted);">
+            Current ranker drivers: {{ feature_impact.top_drivers|join(', ') }}.
+            {% if feature_impact.holdout and feature_impact.holdout.top1_hit_rate %}
+            Holdout top-1: {{ (feature_impact.holdout.top1_hit_rate * 100)|round(1) }}%.
+            {% endif %}
+        </p>
+        {% endif %}
+    </div>
+    <img src="{{ url_for('static', filename=hibs_hero_horse|default('hero_horse.png')) }}" alt="" aria-hidden="true">
+</section>
+
+{% if not top_picks %}
+<div class="banner error">No qualifying picks in the next {{ window_hours or 24 }}h window. Run <strong>Refresh 24h</strong> once cards and scores are loaded.</div>
+{% else %}
+
+{% for r in top_picks %}
+<article class="pick-card" id="pick-{{ r.day_rank }}">
+    <div class="pick-card-head">
+        <span class="pick-rank">#{{ r.day_rank or loop.index }}</span>
+        <div class="pick-title">{{ r.horse_name }}</div>
+        {% if r.value_flag %}<span class="value-flag">VALUE</span>{% endif %}
+        <span class="pill">{{ r.off_time or '—' }} · {{ r.course or '' }}</span>
+        <span class="pill">{{ r.race_name or '' }}</span>
+    </div>
+    <div class="pick-body">
+        <div>
+            <div class="pick-metrics">
+                <span class="pill"><strong>{{ (r.model_place_prob or 0)|fmt_pct }}</strong> place</span>
+                <span class="pill">combo {{ r.combo_bayes_place|fmt_num }}</span>
+                <span class="pill">score {{ r.place_score|fmt_num }}</span>
+                {% if r.win_decimal %}<span class="pill">win {{ r.win_decimal|fmt_num(1) }}</span>{% endif %}
+                {% if r.offered_place_decimal %}<span class="pill">place {{ r.offered_place_decimal|fmt_num(1) }}</span>{% endif %}
+                {% if r.ew_combined_ev is not none %}<span class="pill">EW EV {{ r.ew_combined_ev|fmt_num }}</span>{% endif %}
+            </div>
+            <p style="font-size:0.88em;color:var(--neon-value);margin-bottom:10px;">{{ r.pick_summary or r.engine_opinion or '' }}</p>
+            <ul class="pick-reasons">
+                {% for reason in r.pick_reasons or [] %}
+                <li>{{ reason }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="method-box">
+            <strong>How this conclusion was made</strong>
+            <ul class="pick-reasons" style="margin-top:8px;">
+                <li><strong>Ranker / heuristic score</strong> — {{ r.scoring_method or scoring_method or 'model' }} ranks the full field on ~36 features (OR/RPR vs field, NLP pace, jockey/trainer/CD priors).</li>
+                <li><strong>Place probability</strong> — Harville formula converts win probs to top-3 chance within the race.</li>
+                <li><strong>Combo prior</strong> — point-in-time Bayesian place rate for this jockey+trainer pair from ingested results (no leakage).</li>
+                {% if r.jockey_bayes_place %}<li><strong>Jockey</strong> — {{ r.jockey or '—' }} place prior {{ (r.jockey_bayes_place or 0)|fmt_pct }}{% if r.jockey_place_90d %} ({{ (r.jockey_place_90d or 0)|fmt_pct }} last 90d){% endif %}.</li>{% endif %}
+                {% if r.trainer_bayes_place %}<li><strong>Trainer/yard</strong> — {{ r.trainer or '—' }} {{ (r.trainer_bayes_place or 0)|fmt_pct }}{% if r.trainer_place_90d %} ({{ (r.trainer_place_90d or 0)|fmt_pct }} 90d){% endif %}.</li>{% endif %}
+                {% if r.nlp_pace_rank and r.nlp_pace_rank == r.nlp_pace_rank %}<li><strong>Pace NLP</strong> — sectional rank #{{ r.nlp_pace_rank|fmt_num(1) }} in this race from parsed running comments.</li>{% endif %}
+                {% if r.card_comment %}<li><strong>RP card</strong> — "{{ (r.card_comment[:100] + '…') if r.card_comment|length > 100 else r.card_comment }}"</li>{% endif %}
+            </ul>
+            <p style="margin-top:10px;"><a href="{{ url_for('index') }}#racecard-shell" style="color:var(--accent);">View full racecard →</a></p>
+        </div>
+    </div>
+</article>
+{% endfor %}
+
+{% endif %}
+
+<p class="data-note">Picks require min field size 3, combo place ≥35% and model place ≥45% (see ingest/config.yaml monitor). No synthetic runners or odds — empty fields mean the feed or refresh has not loaded yet.</p>
+{% endblock %}

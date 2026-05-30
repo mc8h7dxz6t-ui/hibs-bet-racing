@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ product_name }}{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename=hibs_badge_harp) }}" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --hibs-green:#007A33;
+            --hibs-green-dark:#052e16;
+            --hibs-navy:#0a1628;
+            --hibs-navy-deep:#060e18;
+            --hibs-neon:#b7f7c8;
+            --neon-value:#a7f3d0;
+            --card:rgba(16,32,24,0.92);
+            --border:rgba(190,220,205,0.16);
+            --gold:#f6d889;
+            --accent:#c5f5d4;
+            --text:#f8fafc;
+            --muted:#94a3b8;
+            --radius-md:12px;
+            --shadow-md:0 10px 32px rgba(0,0,0,0.32);
+        }
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{
+            font-family:'Inter',sans-serif;
+            background:var(--hibs-navy-deep);
+            color:var(--text);
+            min-height:100vh;
+            padding:12px;
+            background-image:
+                radial-gradient(ellipse at 12% 40%,rgba(0,122,51,0.12) 0%,transparent 48%),
+                radial-gradient(ellipse at 88% 12%,rgba(0,122,51,0.16) 0%,transparent 42%);
+        }
+        body::before{
+            content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.045;
+            background:url('{{ url_for('static', filename=hibs_badge_harp) }}') repeat;
+            background-size:88px 88px;
+        }
+        body::after{
+            content:'';position:fixed;right:-40px;bottom:0;width:min(420px,42vw);height:min(320px,38vh);
+            z-index:0;pointer-events:none;opacity:0.14;
+            background:url('{{ url_for('static', filename=hibs_hero_horse|default('hero_horse.png')) }}') no-repeat right bottom/contain;
+            filter:drop-shadow(0 8px 24px rgba(0,0,0,0.4));
+        }
+        .ref-page{max-width:1680px;margin:0 auto;position:relative;z-index:1;}
+        .site-top{
+            display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+            padding:14px 18px;margin-bottom:16px;
+            background:linear-gradient(135deg,rgba(0,122,51,0.22),rgba(6,14,24,0.92));
+            border:1px solid var(--border);border-radius:var(--radius-md);
+            box-shadow:var(--shadow-md);
+        }
+        .site-top-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+        .site-crest-wrap{display:flex;align-items:flex-end;gap:4px;}
+        .site-crest{border-radius:8px;filter:drop-shadow(0 2px 10px rgba(0,0,0,0.45));}
+        .site-crest-harp{opacity:0.92;margin-bottom:2px;}
+        .site-wordmark{font-family:'Orbitron',monospace;font-weight:900;font-size:1.15em;color:var(--hibs-neon);letter-spacing:0.08em;}
+        .site-tagline{font-size:0.78em;color:var(--muted);margin-top:2px;}
+        .site-links{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
+        .site-links a{
+            color:var(--text);text-decoration:none;padding:8px 12px;border-radius:8px;
+            border:1px solid transparent;font-size:0.88em;font-weight:600;white-space:nowrap;
+        }
+        .site-links a:hover,.site-links a.active{background:rgba(0,122,51,0.22);border-color:var(--border);}
+        .nav-more{position:relative;}
+        .nav-more summary{
+            list-style:none;cursor:pointer;padding:8px 12px;border-radius:8px;font-size:0.88em;font-weight:600;color:var(--text);
+        }
+        .nav-more summary::-webkit-details-marker{display:none;}
+        .nav-more[open] summary{background:rgba(0,122,51,0.22);border:1px solid var(--border);}
+        .nav-more-menu{
+            position:absolute;right:0;top:calc(100% + 6px);min-width:160px;z-index:50;
+            background:rgba(8,18,14,0.98);border:1px solid var(--border);border-radius:10px;
+            padding:6px;box-shadow:0 12px 32px rgba(0,0,0,0.45);
+        }
+        .nav-more-menu a{display:block;padding:8px 12px;border-radius:6px;}
+        @media(max-width:860px){
+            .site-links .nav-primary-only{display:none;}
+            .nav-more{display:block;}
+        }
+        @media(min-width:861px){
+            .nav-more{display:none;}
+        }
+        .btn{
+            background:linear-gradient(135deg,#007A33,#055a28);
+            color:#fff;border:1px solid rgba(183,247,200,0.25);
+            padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.88em;
+        }
+        .btn:hover{filter:brightness(1.08);}
+        .btn-secondary{background:rgba(255,255,255,0.06);}
+        .pill{
+            display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;
+            font-size:0.78em;border:1px solid var(--border);color:var(--muted);
+        }
+        .pill.ok{color:#86efac;border-color:rgba(134,239,172,0.35);}
+        .pill.warn{color:#fcd34d;border-color:rgba(252,211,77,0.35);}
+        .banner{
+            padding:10px 14px;border-radius:var(--radius-md);margin-bottom:14px;
+            border:1px solid var(--border);background:rgba(0,122,51,0.12);
+        }
+        .banner.error{background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.35);}
+        .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;}
+        .stat-card{
+            background:var(--card);border:1px solid var(--border);border-radius:var(--radius-md);
+            padding:12px 14px;
+        }
+        .stat-label{font-size:0.72em;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;}
+        .stat-value{font-size:1.35em;font-weight:700;margin-top:4px;color:var(--hibs-neon);font-family:'Orbitron',monospace;}
+        .card{
+            background:var(--card);border:1px solid var(--border);border-radius:var(--radius-md);
+            margin-bottom:14px;overflow:hidden;
+        }
+        .card-head{
+            padding:12px 14px;border-bottom:1px solid var(--border);
+            display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;
+        }
+        .card-head h2{font-size:1em;font-weight:700;}
+        .card-body{padding:0;}
+        table{width:100%;border-collapse:collapse;font-size:0.86em;}
+        th,td{padding:8px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.05);}
+        th{color:var(--muted);font-size:0.72em;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;}
+        tr:hover td{background:rgba(0,122,51,0.08);}
+        .num{font-variant-numeric:tabular-nums;}
+        .strong{color:var(--gold);font-weight:700;}
+        .value-flag{background:rgba(246,216,137,0.15);color:var(--gold);padding:2px 8px;border-radius:999px;font-size:0.75em;font-weight:700;}
+        .hero-panel{
+            background:linear-gradient(135deg,rgba(0,122,51,0.28),rgba(6,14,24,0.95));
+            border:1px solid rgba(183,247,200,0.25);border-radius:16px;
+            margin-bottom:16px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,0.35);
+        }
+        .hero-head{
+            display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+            padding:14px 16px;border-bottom:1px solid var(--border);
+        }
+        .hero-head h2{font-family:'Orbitron',monospace;color:var(--hibs-neon);font-size:1rem;letter-spacing:0.06em;}
+        .hero-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;padding:14px;}
+        .hero-pick{
+            background:rgba(0,0,0,0.22);border:1px solid var(--border);border-radius:12px;padding:12px;
+            position:relative;
+        }
+        .hero-rank{
+            position:absolute;top:10px;right:10px;font-family:'Orbitron',monospace;
+            color:var(--gold);font-size:0.85em;font-weight:700;
+        }
+        .hero-horse{font-weight:700;font-size:1.02em;margin-bottom:4px;padding-right:28px;}
+        .hero-meta{font-size:0.78em;color:var(--muted);line-height:1.45;}
+        .hero-prob{font-family:'Orbitron',monospace;color:var(--hibs-neon);font-size:1.25em;margin-top:8px;}
+        .hero-explain{
+            margin-top:10px;padding-top:8px;border-top:1px dashed rgba(255,255,255,0.1);
+            font-size:0.76em;color:#cbd5e1;line-height:1.45;
+        }
+        .hero-explain ul{margin:6px 0 0 1em;padding:0;}
+        .hero-explain li{margin-bottom:4px;}
+        .monitor-bar{
+            display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+            font-size:0.78em;color:var(--muted);padding:8px 16px 12px;
+        }
+        .site-footer{
+            margin-top:24px;padding:14px;text-align:center;color:var(--muted);font-size:0.78em;
+            border-top:1px solid var(--border);
+        }
+        .footer-crest{vertical-align:middle;margin-right:6px;opacity:0.85;}
+        .hibs-heritage-strip{display:flex;gap:4px;opacity:0.85;}
+        .window-banner{
+            display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+            padding:10px 14px;margin-bottom:14px;border-radius:var(--radius-md);
+            background:linear-gradient(90deg,rgba(0,122,51,0.14),rgba(6,14,24,0.6));
+            border:1px solid var(--border);font-size:0.82em;color:var(--muted);
+        }
+        .window-banner strong{color:var(--hibs-neon);font-family:'Orbitron',monospace;}
+        .rp-comment{font-size:0.78em;color:#cbd5e1;line-height:1.4;max-width:280px;}
+        .engine-opinion{font-size:0.78em;color:var(--neon-value);line-height:1.45;max-width:300px;}
+        .data-note{font-size:0.72em;color:var(--muted);margin-top:12px;padding:10px 14px;border-top:1px dashed var(--border);}
+        .card-toolbar{
+            display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px;
+            padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-md);
+        }
+        .card-toolbar label{font-size:0.78em;color:var(--muted);font-weight:600;}
+        .card-toolbar select{
+            background:rgba(0,0,0,0.35);color:var(--text);border:1px solid var(--border);
+            border-radius:8px;padding:8px 10px;font-size:0.88em;min-width:220px;
+        }
+        .meeting-drawer,.race-drawer{border-top:1px solid var(--border);}
+        .meeting-drawer:first-of-type{border-top:none;}
+        .meeting-drawer > summary,.race-drawer > summary{
+            list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;
+            gap:10px;flex-wrap:wrap;user-select:none;
+        }
+        .meeting-drawer > summary::-webkit-details-marker,.race-drawer > summary::-webkit-details-marker{display:none;}
+        .meeting-drawer > summary:hover,.race-drawer > summary:hover{background:rgba(0,122,51,0.08);}
+        .meeting-drawer[open] > summary,.race-drawer[open] > summary{
+            background:rgba(0,122,51,0.12);border-bottom:1px solid var(--border);
+        }
+        .meeting-course{font-weight:700;font-size:1.02em;color:var(--hibs-neon);font-family:'Orbitron',monospace;letter-spacing:0.04em;}
+        .meeting-meta{font-size:0.78em;color:var(--muted);}
+        .race-drawer > summary{background:rgba(0,0,0,0.12);padding-left:22px;}
+        .race-time{
+            font-family:'Orbitron',monospace;color:var(--gold);font-weight:700;min-width:52px;
+        }
+        .race-name{flex:1;font-weight:600;font-size:0.92em;}
+        .race-chip{font-size:0.72em;}
+        .race-leader{color:var(--hibs-neon);font-size:0.82em;font-weight:600;}
+        .race-body{padding:0 14px 12px 22px;}
+        .race-insights{
+            margin:10px 0 12px;padding:12px 14px;border-radius:10px;
+            background:rgba(0,122,51,0.1);border:1px dashed rgba(183,247,200,0.22);
+        }
+        .race-insights h3{font-size:0.78em;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:8px;}
+        .race-insights ul{margin:0 0 10px 1.1em;font-size:0.82em;line-height:1.5;color:#cbd5e1;}
+        .race-insights li{margin-bottom:4px;}
+        .insight-picks{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;}
+        .insight-pick{
+            background:rgba(0,0,0,0.22);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:0.8em;
+        }
+        .insight-pick strong{color:var(--gold);}
+        .insight-pick .meta{color:var(--muted);font-size:0.92em;margin-top:4px;}
+        .runner-top td{background:rgba(0,122,51,0.06);}
+        .runner-value td{background:rgba(246,216,137,0.06);}
+        .gate-abort td{background:rgba(239,68,68,0.12)!important;}
+        .gate-scale td{background:rgba(134,239,172,0.08)!important;}
+        .method-badge{
+            font-size:0.68em;padding:2px 8px;border-radius:999px;font-weight:700;
+            border:1px solid rgba(183,247,200,0.3);color:var(--hibs-neon);
+        }
+        .method-badge.heuristic{color:#fcd34d;border-color:rgba(252,211,77,0.35);}
+        .sys-strip{
+            display:flex;flex-wrap:wrap;gap:8px;padding:8px 16px 0;font-size:0.75em;
+        }
+        .drift-steam{color:#86efac;font-weight:700;}
+        .drift-out{color:#fca5a5;font-weight:700;}
+        .meeting-panel[hidden]{display:none!important;}
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+<div class="ref-page">
+    <header class="site-top">
+        <div class="site-top-left">
+            {% from '_hibs_brand.html' import site_crests, heritage_strip %}
+            {{ site_crests() }}
+            <div>
+                <div class="site-wordmark">{{ product_name }}</div>
+                <div class="site-tagline">{{ product_tagline }}</div>
+            </div>
+            {{ heritage_strip() }}
+        </div>
+        <nav class="site-links">
+            <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Cards</a>
+            <a href="{{ url_for('insights_page') }}" class="nav-primary-only {% if request.endpoint == 'insights_page' %}active{% endif %}">Insights</a>
+            <a href="{{ url_for('portfolio_page') }}" class="nav-primary-only {% if request.endpoint == 'portfolio_page' %}active{% endif %}">Portfolio</a>
+            <a href="{{ url_for('tracker_page') }}" class="nav-primary-only {% if request.endpoint == 'tracker_page' %}active{% endif %}">Tracker</a>
+            <a href="{{ url_for('tips_page') }}" class="nav-primary-only {% if request.endpoint == 'tips_page' %}active{% endif %}">Tips</a>
+            <details class="nav-more">
+                <summary>Menu ▾</summary>
+                <div class="nav-more-menu">
+                    <a href="{{ url_for('insights_page') }}">Insights</a>
+                    <a href="{{ url_for('portfolio_page') }}">Portfolio</a>
+                    <a href="{{ url_for('tracker_page') }}">Tracker</a>
+                    <a href="{{ url_for('tips_page') }}">Tips</a>
+                    <a href="{{ url_for('backtest_page') }}">Backtest</a>
+                    <a href="{{ url_for('status_page') }}">Status</a>
+                    <a href="{{ hibs_bet_url }}/" target="_blank" rel="noopener">hibs-bet ↗</a>
+                </div>
+            </details>
+            <a href="{{ url_for('backtest_page') }}" class="nav-primary-only {% if request.endpoint == 'backtest_page' %}active{% endif %}">Backtest</a>
+            <a href="{{ url_for('status_page') }}" class="nav-primary-only {% if request.endpoint == 'status_page' %}active{% endif %}">Status</a>
+            <a href="{{ hibs_bet_url }}/" class="nav-primary-only" target="_blank" rel="noopener">hibs-bet ↗</a>
+        </nav>
+        <div class="site-top-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            {% if ranker_loaded %}<span class="pill ok">Ranker live</span>{% else %}<span class="pill warn">No ranker</span>{% endif %}
+            <button type="button" class="btn" id="btn-refresh" title="Fetch next 24h GB+IRE cards, score with LightGBM, pull odds">Refresh 24h</button>
+        </div>
+    </header>
+    <div class="sys-strip" id="sys-strip">
+        {% if health is defined %}
+        <span class="pill {% if health.matchbook %}ok{% else %}warn{% endif %}">Matchbook {% if health.matchbook %}ready{% else %}no creds{% endif %}</span>
+        <span class="pill {% if health.racing_api %}ok{% else %}warn{% endif %}">Racing API</span>
+        {% endif %}
+        {% if scoring_method is defined and scoring_method %}
+        <span class="pill">Scoring: <strong>{{ scoring_method }}</strong></span>
+        {% endif %}
+    </div>
+    {% include '_portfolio_bar.html' %}
+    {% block content %}{% endblock %}
+    <footer class="site-footer">
+        {% from '_hibs_brand.html' import footer_crest %}
+        {{ footer_crest() }}
+        {{ product_name }} — {{ product_tagline }} | Gamble Responsibly | 18+
+    </footer>
+</div>
+<script>
+document.getElementById('btn-refresh')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-refresh');
+    btn.disabled = true; btn.textContent = 'Fetching…';
+    try {
+        const r = await fetch('/api/refresh?source=racing_api&window=24&odds_source=auto', {method:'POST'});
+        const j = await r.json();
+        if (j.ok) location.reload();
+        else alert(j.error || 'Refresh failed');
+    } catch (e) { alert('Refresh failed'); }
+    finally { btn.disabled = false; btn.textContent = 'Refresh 24h'; }
+});
+
+(function autoMonitor(){
+    const mount = document.getElementById('hero-top-places');
+    const stamp = document.getElementById('monitor-updated');
+    const pollSec = Number(mount?.dataset.pollSeconds || 300);
+    if (!mount) return;
+    const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    async function tick(refresh=false) {
+        try {
+            const r = await fetch('/api/monitor' + (refresh ? '?refresh=1' : ''));
+            const j = await r.json();
+            if (stamp && j.updated_at) stamp.textContent = 'Updated ' + j.updated_at.replace('T',' ').slice(0,19) + ' UTC';
+            const ledger = j.ledger || {};
+            const bar = document.getElementById('monitor-ledger-bar');
+            if (bar) {
+                bar.innerHTML = [
+                    ['Paper P&L', ledger.total_pnl != null ? (ledger.total_pnl >= 0 ? '+' : '') + ledger.total_pnl.toFixed(2) + 'u' : '—'],
+                    ['Place hit', ledger.place_hit_pct != null ? ledger.place_hit_pct + '%' : (ledger.strike_rate != null ? Math.round(ledger.strike_rate*100)+'%' : '—')],
+                    ['Value hit', ledger.value_pick_strike_pct != null ? ledger.value_pick_strike_pct + '%' : '—'],
+                    ['Open', ledger.open_bets ?? 0],
+                ].map(([k,v]) => '<span class="pill">' + k + ': <strong>' + v + '</strong></span>').join('');
+            }
+            if (!j.top_places?.length) return;
+            mount.innerHTML = j.top_places.map(p => {
+                const reasons = (p.pick_reasons || []).map(r => `<li>${esc(r)}</li>`).join('');
+                return `
+                <div class="hero-pick">
+                    <div class="hero-rank">#${p.day_rank}</div>
+                    <div class="hero-horse">${esc(p.horse_name)}</div>
+                    <div class="hero-meta">${esc(p.off_time)} ${esc(p.course)}<br>${esc(p.jockey)} · ${esc(p.trainer)}</div>
+                    <div class="hero-prob">${Math.round((p.model_place_prob||0)*100)}% place</div>
+                    <div class="hero-meta">combo ${(p.combo_bayes_place||0).toFixed(2)} · score ${(p.place_score||0).toFixed(2)}</div>
+                    <div class="hero-explain"><strong>Why</strong><ul>${reasons}</ul></div>
+                </div>`;
+            }).join('');
+        } catch (_) {}
+    }
+    tick(false);
+    setInterval(() => tick(false), pollSec * 1000);
+})();
+</script>
+<script src="{{ url_for('static', filename='racing_ui.js') }}" defer></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

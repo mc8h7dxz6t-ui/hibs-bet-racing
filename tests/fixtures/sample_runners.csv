@@ -1,0 +1,24 @@
+race_id,race_date,horse_id,finish_pos,comment,course,region,race_type,distance_f,going,field_size,sp_decimal
+R001,2024-03-15,H001,1,"Made all, quickened clear inside final furlong",Ascot,GB,flat,8.0,Good,10,4.5
+R001,2024-03-15,H002,2,"Held up, smooth headway 2f out, stayed on strongly",Ascot,GB,flat,8.0,Good,10,8.0
+R001,2024-03-15,H003,5,"Prominent, weakened inside final furlong",Ascot,GB,flat,8.0,Good,10,12.0
+R002,2024-04-02,H002,3,"Held up in rear, headway 2f out, ran on well",York,GB,flat,7.0,Good To Firm,12,11.0
+R002,2024-04-02,H004,1,"Led, pressed leader early, kept on well",York,GB,flat,7.0,Good To Firm,12,6.0
+R002,2024-04-02,H005,8,"Hampered early, short of room 2f out, no extra",York,GB,flat,7.0,Good To Firm,12,15.0
+R003,2024-04-20,H002,2,"Smooth headway 2f out, quickened to lead inside final furlong",Newmarket,GB,flat,6.0,Good,9,7.5
+R003,2024-04-20,H006,4,"Held up, faded inside final furlong",Newmarket,GB,flat,6.0,Good,9,9.0
+R004,2024-05-10,H002,1,"Made all, finished strongly",Chester,GB,flat,5.0,Soft,8,5.0
+R004,2024-05-10,H007,3,"Towards rear, stayed on well late",Chester,GB,flat,5.0,Soft,8,14.0
+R005,2024-06-01,H001,4,"Held up, headway 3f out, tired final furlong",Epsom,GB,flat,10.0,Good,11,10.0
+R005,2024-06-01,H002,2,"Prominent, quickened well, ran on strongly",Epsom,GB,flat,10.0,Good,11,8.5
+R005,2024-06-01,H008,6,"Denied clear run 2f out, kept on",Epsom,GB,flat,10.0,Good,11,20.0
+R006,2024-07-12,H002,3,"In rear, smooth headway 2f out, no extra",Goodwood,GB,flat,7.0,Good,10,9.0
+R006,2024-07-12,H009,1,"Led, quickened clear",Goodwood,GB,flat,7.0,Good,10,4.0
+R007,2024-08-05,H002,2,"Held up, picked up well, finished fast",Sandown,GB,flat,8.0,Good To Soft,9,7.0
+R007,2024-08-05,H010,5,"One paced, weakened final furlong",Sandown,GB,flat,8.0,Good To Soft,9,16.0
+R008,2024-09-01,H002,1,"Disputed lead, quickened to lead 1f out",Kempton,GB,aw,6.0,Standard,8,6.5
+R008,2024-09-01,H011,4,"Held up, bumped 2f out, ran on well",Kempton,GB,aw,6.0,Standard,8,12.0
+R009,2024-10-15,H002,4,"Prominent early, faded inside final furlong",Doncaster,GB,flat,8.0,Soft,12,8.0
+R009,2024-10-15,H012,2,"Held up, headway 2f out, stayed on strongly",Doncaster,GB,flat,8.0,Soft,12,11.0
+R010,2024-11-02,H002,2,"Smooth headway 2f out, ran on well",Ascot,GB,flat,7.0,Heavy,10,9.5
+R010,2024-11-02,H013,6,"Led too soon, weakened",Ascot,GB,flat,7.0,Heavy,10,5.5

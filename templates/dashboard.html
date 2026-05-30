@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}Cards — {{ product_name }}{% endblock %}
+
+{% block extra_css %}
+.hero-panel{margin-bottom:14px;}
+.hero-panel > .hero-grid-wrap{max-height:0;overflow:hidden;transition:max-height .35s ease;}
+.hero-panel.is-open > .hero-grid-wrap{max-height:2400px;}
+.hero-toggle{
+    background:none;border:none;color:var(--hibs-neon);cursor:pointer;font-size:0.78em;
+    font-weight:600;padding:4px 8px;border-radius:6px;
+}
+.hero-toggle:hover{background:rgba(0,122,51,0.15);}
+.meetings-shell{border-radius:14px;overflow:hidden;}
+.meetings-toolbar{
+    position:sticky;top:8px;z-index:20;
+    display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;
+    padding:14px 16px;background:linear-gradient(180deg,rgba(10,28,20,0.98),rgba(10,28,20,0.92));
+    border-bottom:1px solid var(--border);backdrop-filter:blur(8px);
+}
+.meetings-toolbar h2{
+    flex:1 1 100%;font-family:'Orbitron',monospace;font-size:0.95em;color:var(--hibs-neon);
+    letter-spacing:0.06em;margin-bottom:2px;
+}
+.ctrl-group{display:flex;flex-direction:column;gap:4px;min-width:160px;flex:1 1 180px;}
+.ctrl-group label{font-size:0.68em;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;font-weight:700;}
+.ctrl-select{
+    appearance:none;-webkit-appearance:none;
+    background:rgba(0,0,0,0.45) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2394a3b8' d='M1 1l5 5 5-5'/%3E%3C/svg%3E") no-repeat right 12px center;
+    color:var(--text);border:1px solid rgba(183,247,200,0.2);border-radius:10px;
+    padding:10px 36px 10px 12px;font-size:0.9em;font-weight:600;cursor:pointer;width:100%;
+}
+.ctrl-select:hover,.ctrl-select:focus{border-color:rgba(183,247,200,0.45);outline:none;}
+.toolbar-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-left:auto;}
+.meeting-panel{display:none;animation:fadeIn .25s ease;}
+.meeting-panel.is-active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.meeting-header{
+    padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+    background:rgba(0,122,51,0.08);border-bottom:1px solid var(--border);
+}
+.meeting-header .meeting-course{font-size:1.05em;}
+.race-nav-strip{
+    display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);
+    background:rgba(0,0,0,0.15);
+}
+.race-tab{
+    background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--text);
+    border-radius:999px;padding:6px 12px;font-size:0.78em;font-weight:600;cursor:pointer;
+    font-family:'Orbitron',monospace;transition:background .15s,border-color .15s;
+}
+.race-tab:hover{background:rgba(0,122,51,0.15);}
+.race-tab.is-active{background:rgba(0,122,51,0.28);border-color:rgba(183,247,200,0.35);color:var(--hibs-neon);}
+.race-tab.has-value{border-color:rgba(246,216,137,0.45);}
+.meeting-drawer > summary::after,.race-drawer > summary::after{
+    content:'';width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);
+    transform:rotate(45deg);margin-left:auto;transition:transform .2s;flex-shrink:0;
+}
+.meeting-drawer[open] > summary::after,.race-drawer[open] > summary::after{transform:rotate(-135deg);margin-top:4px;}
+.race-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+@media(max-width:720px){
+    .meetings-toolbar{position:relative;top:0;}
+    .toolbar-actions{width:100%;margin-left:0;}
+}
+{% endblock %}
+
+{% block content %}
+<div class="window-banner">
+    <strong>Next {{ window_hours or 24 }}h</strong>
+    <span>UK &amp; Ireland racecards · meetings sorted by first race time</span>
+    {% if card_dates %}
+    <span class="pill">{{ card_dates|join(' · ') }}</span>
+    {% endif %}
+    {% if scoring_method %}<span class="pill ok">Engine: {{ scoring_method }}</span>{% endif %}
+</div>
+
+<section class="hero-panel is-open" id="hero-monitor">
+    <div class="hero-head">
+        <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <h2>Quick picks</h2>
+                <a href="{{ url_for('insights_page') }}" class="hero-toggle" style="text-decoration:none;">Full insights →</a>
+            </div>
+            <div class="monitor-bar" id="monitor-ledger-bar">
+                {% if monitor and monitor.ledger %}
+                <span class="pill">Paper P&L: <strong>{{ '%+.2f'|format(monitor.ledger.total_pnl) }}u</strong></span>
+                <span class="pill">Place hit:
+                    <strong>{% if monitor.ledger.place_hit_pct %}{{ monitor.ledger.place_hit_pct }}%{% elif monitor.ledger.strike_rate %}{{ '%.0f'|format(monitor.ledger.strike_rate * 100) }}%{% else %}—{% endif %}</strong>
+                </span>
+                <span class="pill">Value hit:
+                    <strong>{% if monitor.ledger.value_pick_strike_pct %}{{ monitor.ledger.value_pick_strike_pct }}%{% else %}—{% endif %}</strong>
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        <span class="pill" id="monitor-updated">
+            {% if monitor %}Updated {{ (monitor.updated_at or '')[:19]|replace('T',' ') }} UTC{% endif %}
+        </span>
+    </div>
+    <div class="hero-grid-wrap">
+        <div class="hero-grid" id="hero-top-places" data-poll-seconds="{{ monitor.poll_seconds if monitor else 300 }}">
+            {% for r in top_picks %}
+            <div class="hero-pick">
+                <div class="hero-rank">#{{ r.day_rank or loop.index }}</div>
+                <div class="hero-horse">{{ r.horse_name }}</div>
+                <div class="hero-meta">{{ r.off_time or '—' }} {{ r.course or '' }}<br>{{ r.jockey or '—' }} · {{ r.trainer or '—' }}</div>
+                <div class="hero-prob">{{ (r.model_place_prob or 0)|fmt_pct }}</div>
+                <div class="hero-meta">combo {{ r.combo_bayes_place|fmt_num }} · score {{ r.place_score|fmt_num }}</div>
+                {% if r.pick_reasons %}
+                <div class="hero-explain"><strong>Why</strong><ul>{% for reason in r.pick_reasons %}<li>{{ reason }}</li>{% endfor %}</ul></div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="hero-pick" style="grid-column:1/-1;"><div class="hero-meta">No card loaded — click <strong>Refresh card</strong>.</div></div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+{% if runner_count == 0 %}
+<div class="banner error">No card in DB for the next {{ window_hours or 24 }}h. Click <strong>Refresh 24h</strong> in the header.</div>
+{% else %}
+<div class="stat-grid">
+    <div class="stat-card"><div class="stat-label">Date</div><div class="stat-value">{{ card_date or '—' }}</div></div>
+    <div class="stat-card"><div class="stat-label">Meetings</div><div class="stat-value">{{ meetings|length }}</div></div>
+    <div class="stat-card"><div class="stat-label">Races</div><div class="stat-value">{{ race_count }}</div></div>
+    <div class="stat-card"><div class="stat-label">Value flags</div><div class="stat-value">{{ value_count }}</div></div>
+</div>
+
+{% if meetings %}
+<section class="card meetings-shell" id="racecard-shell">
+    <div class="meetings-toolbar">
+        <h2>Racecard · next {{ window_hours or 24 }}h</h2>
+        <div class="ctrl-group">
+            <label for="meeting-select">Meeting</label>
+            <select id="meeting-select" class="ctrl-select" aria-label="Select meeting">
+                {% for meeting in meetings %}
+                <option value="{{ meeting.slug }}" {% if loop.first %}selected{% endif %}
+                    data-hint="{{ meeting.race_count }} races · {{ meeting.runner_count }} runners{% if meeting.value_count %} · {{ meeting.value_count }} value{% endif %}">
+                    {{ meeting.label }} · {{ meeting.card_date }} · {{ meeting.first_off }}–{{ meeting.last_off }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="ctrl-group" style="flex:2 1 240px;">
+            <label for="meeting-hint">Meeting insight</label>
+            <div id="meeting-hint" class="pill" style="min-height:38px;align-items:center;">Select a meeting — full field odds, RP comments &amp; engine view below</div>
+        </div>
+        <div class="ctrl-group">
+            <label for="race-select">Race</label>
+            <select id="race-select" class="ctrl-select" aria-label="Select race"></select>
+        </div>
+        <div class="toolbar-actions">
+            {% if scoring_method %}
+            <span class="method-badge {% if scoring_method != 'ranker' %}heuristic{% endif %}" title="Scoring engine">{{ scoring_method }}</span>
+            {% endif %}
+            <span class="pill">{{ runner_count }} runners</span>
+            {% if value_count %}<span class="pill warn">{{ value_count }} value</span>{% endif %}
+            <button type="button" class="btn btn-secondary" id="btn-expand-races">Expand all</button>
+            <button type="button" class="btn btn-secondary" id="btn-collapse-races">Collapse</button>
+        </div>
+    </div>
+
+    {% for meeting in meetings %}
+    {% set meeting_first = loop.first %}
+    <div class="meeting-panel {% if meeting_first %}is-active{% endif %}" id="meeting-{{ meeting.slug }}" data-meeting="{{ meeting.slug }}" {% if not meeting_first %}hidden{% endif %}>
+        <div class="meeting-header">
+            <span class="meeting-course">{{ meeting.course }}</span>
+            <span class="pill">{{ meeting.race_count }} races</span>
+            <span class="pill">{{ meeting.runner_count }} runners</span>
+            {% if meeting.value_count %}<span class="pill warn">{{ meeting.value_count }} value</span>{% endif %}
+            <span class="meeting-meta">{{ meeting.first_off }} – {{ meeting.last_off }}</span>
+        </div>
+        <div class="race-nav-strip" role="tablist" aria-label="Races at {{ meeting.course }}">
+            {% for race in meeting.races %}
+            <button type="button" class="race-tab {% if race.value_count %}has-value{% endif %} {% if loop.first and meeting_first %}is-active{% endif %}"
+                data-target="race-{{ meeting.slug }}-{{ race.race_slug }}"
+                data-off="{{ race.off_time or '' }}">
+                {{ race.off_time or '?' }}{% if race.value_count %} ★{% endif %}
+            </button>
+            {% endfor %}
+        </div>
+        <div class="card-body">
+            {% for race in meeting.races %}
+            <details class="race-drawer"
+                id="race-{{ meeting.slug }}-{{ race.race_slug }}"
+                data-off="{{ race.off_time or '' }}">
+                <summary>
+                    <span class="race-time">{{ race.off_time or '—' }}</span>
+                    <span class="race-name">{{ race.race_name or 'Race' }}</span>
+                    {% if race.race_class %}<span class="pill race-chip">{{ race.race_class }}</span>{% endif %}
+                    {% if race.going %}<span class="pill race-chip">{{ race.going }}</span>{% endif %}
+                    {% if race.insights and race.insights.top_pick %}
+                    <span class="race-leader">{{ race.insights.top_pick.horse_name }} · {{ (race.insights.top_pick.model_place_prob or 0)|fmt_pct }}</span>
+                    {% endif %}
+                    {% if race.value_count %}<span class="value-flag">VALUE×{{ race.value_count }}</span>{% endif %}
+                </summary>
+                <div class="race-body">
+                    {% if race.insights %}
+                    <div class="race-insights">
+                        <h3>Race insights</h3>
+                        <ul>{% for bullet in race.insights.bullets %}<li>{{ bullet }}</li>{% endfor %}</ul>
+                        {% if race.insights.top_picks %}
+                        <div class="insight-picks">
+                            {% for pick in race.insights.top_picks %}
+                            <div class="insight-pick">
+                                <strong>{{ pick.horse_name }}</strong>
+                                {% if pick.value_flag %}<span class="value-flag">VALUE</span>{% endif %}
+                                <div class="meta">{{ (pick.model_place_prob or 0)|fmt_pct }} place · combo {{ pick.combo_bayes_place|fmt_num }}</div>
+                                {% if pick.pick_summary %}<div class="meta">{{ pick.pick_summary }}</div>{% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    <div class="race-table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>OR</th>
+                                    <th>Form</th><th>Win</th><th>Place</th><th>Δ</th>
+                                    <th>RP comment</th><th>Engine view</th>
+                                    <th>Place%</th><th>Combo</th><th>EV</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in race.runners %}
+                                {% set g = r.market_gauge %}
+                                <tr class="{% if g and g.gate == 'abort' %}gate-abort{% elif g and g.gate == 'scale_up' %}gate-scale{% elif r.value_flag %}runner-value{% elif loop.index <= 3 %}runner-top{% endif %}">
+                                    <td class="num">{{ loop.index }}</td>
+                                    <td class="strong">{{ r.horse_name }}{% if r.draw %} <span class="pill" style="font-size:0.7em;">({{ r.draw }})</span>{% endif %}{% if r.value_flag %} <span class="value-flag">VALUE</span>{% endif %}</td>
+                                    <td>{{ r.jockey or '—' }}</td>
+                                    <td>{{ r.trainer or '—' }}</td>
+                                    <td class="num">{% if r.official_rating is not none and r.official_rating == r.official_rating %}{{ r.official_rating|int }}{% else %}—{% endif %}</td>
+                                    <td class="num" title="RP form figures">{{ r.form_string or '—' }}</td>
+                                    <td class="num strong">{% if g and g.odds_now %}{{ g.odds_now|fmt_num(1) }}{% elif r.win_decimal %}{{ r.win_decimal|fmt_num(1) }}{% else %}—{% endif %}</td>
+                                    <td class="num">{% if r.offered_place_decimal %}{{ r.offered_place_decimal|fmt_num(1) }}{% else %}—{% endif %}</td>
+                                    <td class="num {% if g and g.direction == 'steam' %}drift-steam{% elif g and g.direction == 'drift' %}drift-out{% endif %}">
+                                        {% if g and g.drift_delta is not none %}{{ '%+.2f'|format(g.drift_delta) }}{% else %}—{% endif %}
+                                    </td>
+                                    <td class="rp-comment" title="{{ r.card_comment or '' }}">{{ r.rp_comment_short or '—' }}</td>
+                                    <td class="engine-opinion" title="{% for reason in r.engine_reasons or [] %}{{ reason }} {% endfor %}">{{ r.engine_opinion or '—' }}</td>
+                                    <td class="num">{{ (r.model_place_prob or 0)|fmt_pct }}</td>
+                                    <td class="num">{{ r.combo_bayes_place|fmt_num }}</td>
+                                    <td class="num">{{ r.ew_combined_ev|fmt_num }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</section>
+{% endif %}
+{% endif %}
+
+<p class="data-note">All scores, odds, comments and explanations come from your ingested raceform history, live card feed and Matchbook/Oddschecker prices — nothing is fabricated. Refresh 24h pulls GB + IRE today and tomorrow, then re-scores with the full ranker feature set.</p>
+{% endblock %}

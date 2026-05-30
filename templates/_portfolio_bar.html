@@ -1,0 +1,57 @@
+{# Cross-sport portfolio summary — fetches /api/portfolio/summary #}
+<div id="hibs-portfolio-bar" class="hibs-portfolio-bar" data-api-url="{{ portfolio_api_url | default('/api/portfolio/summary') }}">
+    <div class="hibs-portfolio-inner">
+        <span class="hibs-portfolio-label">Portfolio</span>
+        <span class="hibs-portfolio-stat" id="pf-combined">—</span>
+        <span class="hibs-portfolio-meta">combined P&amp;L</span>
+        <span class="hibs-portfolio-divider">|</span>
+        <span class="hibs-portfolio-pill" id="pf-football">⚽ —</span>
+        <span class="hibs-portfolio-pill" id="pf-racing">🏇 —</span>
+        <a class="hibs-portfolio-link" href="{{ portfolio_full_url | default('/portfolio') }}">Details →</a>
+    </div>
+</div>
+<style>
+.hibs-portfolio-bar{
+    margin-bottom:14px;padding:10px 14px;border-radius:12px;
+    border:1px solid rgba(183,247,200,0.22);
+    background:linear-gradient(90deg,rgba(0,122,51,0.18),rgba(6,14,24,0.85));
+    font-size:0.82em;
+}
+.hibs-portfolio-inner{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;}
+.hibs-portfolio-label{font-family:'Orbitron',monospace;color:#b7f7c8;font-weight:700;letter-spacing:0.06em;}
+.hibs-portfolio-stat{font-family:'Orbitron',monospace;font-size:1.15em;font-weight:700;color:#86efac;}
+.hibs-portfolio-stat.neg{color:#fca5a5;}
+.hibs-portfolio-meta{color:#94a3b8;font-size:0.85em;}
+.hibs-portfolio-divider{color:rgba(148,163,184,0.35);}
+.hibs-portfolio-pill{
+    padding:3px 10px;border-radius:999px;border:1px solid rgba(148,163,184,0.2);
+    color:#cbd5e1;font-size:0.88em;
+}
+.hibs-portfolio-link{margin-left:auto;color:#b7f7c8;text-decoration:none;font-weight:600;}
+.hibs-portfolio-link:hover{text-decoration:underline;}
+</style>
+<script>
+(function(){
+    const bar = document.getElementById('hibs-portfolio-bar');
+    if (!bar) return;
+    const url = bar.dataset.apiUrl;
+    const fmt = (v) => v == null ? '—' : ((v >= 0 ? '+' : '') + Number(v).toFixed(2) + 'u');
+    async function refresh(){
+        try {
+            const r = await fetch(url, {credentials:'same-origin'});
+            const j = await r.json();
+            const comb = document.getElementById('pf-combined');
+            const fb = document.getElementById('pf-football');
+            const rc = document.getElementById('pf-racing');
+            if (comb) {
+                comb.textContent = fmt(j.combined_pnl_units);
+                comb.classList.toggle('neg', j.combined_pnl_units != null && j.combined_pnl_units < 0);
+            }
+            if (fb) fb.textContent = '⚽ ' + fmt(j.football_pnl_units);
+            if (rc) rc.textContent = '🏇 ' + fmt(j.racing_pnl_units);
+        } catch (_) {}
+    }
+    refresh();
+    setInterval(refresh, 120000);
+})();
+</script>

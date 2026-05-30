@@ -1,0 +1,36 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Credentials & local IDE
+.env
+.DS_Store
+.idea/
+.vscode/
+
+# Feature store & heavy data (never commit live DB)
+data/*.sqlite
+data/*.sqlite-journal
+data/parquet/
+data/raw/
+*.parquet
+
+# Generated model weights (keep lgbm_ranker_features.json tracked)
+data/models/*.txt
+data/models/feature_impact.json
+data/models/feature_impact.svg
+
+# Automation logs
+logs/
+
+# Vendor scrape cache
+vendor/rpscrape/.git/
+vendor/rpscrape/data/
+vendor/rpscrape/.cache/
+
+# Optional: large local raceform copy
+raceform.db

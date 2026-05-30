@@ -1,0 +1,101 @@
+# Backfill config — run on Mac or tiny VPS, not /opt/hibs-bet football box.
+
+region: GB
+race_types:
+  - flat
+  # - jumps
+  # - aw
+
+date_range:
+  start: "2024-05-09"
+  end: "2024-05-15"
+
+paths:
+  raw_csv_dir: data/raw
+  parquet_dir: data/parquet
+  db_path: data/feature_store.sqlite
+  model_dir: data/models
+
+ingest:
+  # Required CSV columns (map aliases in csv_loader if your export differs)
+  required_columns:
+    - race_id
+    - race_date
+    - horse_id
+    - finish_pos
+    - comment
+  optional_columns:
+    - course
+    - region
+    - race_type
+    - distance_f
+    - going
+    - field_size
+    - sp_decimal
+
+nlp:
+  min_comment_length: 8
+  target_tag_coverage: 0.90
+
+backtest:
+  train_end: "2026-04-30"
+  test_start: "2026-05-01"
+  place_cutoff_default: 3
+
+ranker:
+  combo_alpha: 8.0
+  min_rows: 500
+  min_races: 50
+  model_file: lgbm_ranker.txt
+  feature_file: lgbm_ranker_features.json
+  scoring_mode: auto  # auto | ranker | heuristic
+  production_scoring_mode: ranker  # enforced when HIBS_RACING_PRODUCTION=1
+
+paper:
+  min_place_ev: 0.05
+  min_combo_bayes_place: 0.22
+  default_place_fraction: 0.25
+  default_places: 3
+  default_stake: 1.0
+
+cards:
+  default_region: gb
+  fetch_timeout_sec: 120
+
+monitor:
+  top_n: 10
+  min_field_size: 3
+  min_combo_place: 0.35
+  min_model_place_prob: 0.45
+  one_per_race: true
+  auto_refresh_seconds: 300
+  card_source: racing_api
+  card_day: 1
+  window_hours: 24
+
+oddschecker:
+  enabled: true
+  base_url: https://www.oddschecker.com
+  default_source: auto          # auto | oddschecker | csv | none
+  auto_scrape: false              # when auto + no embedded prices, try Oddschecker
+  retail_only: true               # exclude Betfair/Matchbook exchange columns
+  default_place_fraction: 0.25
+  default_places: 3
+  request_pause_sec: 1.5
+
+matchbook:
+  enabled: true
+  api_base: https://api.matchbook.com/edge/rest
+  sport_id: 24735152712200        # Horse Racing
+  default_source: auto
+  auto_fetch: true                  # try Matchbook in auto mode when creds set
+  default_place_fraction: 0.25
+  default_places: 3
+  poll_seconds: 120                 # market steam/drift polling interval
+  pre_race_window_mins: 20          # only poll within N mins of off
+  drift_reference_mins: 20          # Δ = odds_now - odds_20m_ago
+  drift_abort_delta: 4.0            # abort value pick if Δ >= +4.0
+  steam_kelly_multiplier: 1.25      # scale Kelly when steam detected
+  steam_threshold_pct: 8.0          # shorten by ≥8% → steam trigger
+  drift_threshold_pct: 10.0         # lengthen by ≥10% → drift trigger
+  steam_min_odds: 1.5

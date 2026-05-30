@@ -1,0 +1,159 @@
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from hibs_racing.config import load_config, ranker_feature_path, ranker_model_path
+from hibs_racing.features.ranker_matrix import ranker_feature_columns
+
+
+def _resolve_paths(
+    model_path: str | Path | None,
+    feature_json_path: str | Path | None,
+    config_path: Path | None,
+) -> tuple[Path, Path]:
+    cfg = load_config(config_path)
+    mp = Path(model_path) if model_path else ranker_model_path(cfg)
+    fp = Path(feature_json_path) if feature_json_path else ranker_feature_path(cfg)
+    return mp, fp
+
+
+def _load_feature_cols(feature_json_path: Path) -> list[str]:
+    payload = json.loads(feature_json_path.read_text(encoding="utf-8"))
+    if isinstance(payload, list):
+        return payload
+    return list(payload.get("features") or ranker_feature_columns())
+
+
+def _build_feature_matrix(race_df: pd.DataFrame, feature_cols: list[str]) -> pd.DataFrame:
+    x = pd.DataFrame(index=race_df.index)
+    for col in feature_cols:
+        if col in race_df.columns:
+            x[col] = pd.to_numeric(race_df[col], errors="coerce").fillna(0.0)
+        else:
+            x[col] = 0.0
+    return x
+
+
+def attach_win_probs(race_df: pd.DataFrame, *, score_col: str = "model_raw_score") -> pd.DataFrame:
+    """Per-race softmax: raw ranker/heuristic scores → model_win_prob."""
+    out = race_df.copy()
+    scores = pd.to_numeric(out[score_col], errors="coerce").fillna(0.0)
+    max_scores = scores.groupby(out["race_id"], sort=False).transform("max")
+    exp_score = np.exp(scores - max_scores)
+    sum_exp = exp_score.groupby(out["race_id"], sort=False).transform("sum")
+    field_size = out.groupby("race_id", sort=False)[score_col].transform("count")
+    out["exp_score"] = exp_score
+    out["model_win_prob"] = np.where(sum_exp > 0, exp_score / sum_exp, 1.0 / field_size)
+    out["model_score"] = scores
+    return out
+
+
+def run_legacy_heuristic(race_df: pd.DataFrame, reason: str = "") -> pd.DataFrame:
+    """Backup scoring protocol utilizing the original weighted formula."""
+    out = race_df.copy()
+    out["model_raw_score"] = (
+        out["combo_bayes_place"].fillna(0) * 2.0
+        + out["sectional_composite"].fillna(0) * 1.5
+        + out["hidden_potential"].fillna(0) * 0.02
+        + out["finishing_burst_level"].fillna(0) * 0.25
+        + out["or_vs_field"].fillna(0) * 0.01
+        + out["combo_vs_field"].fillna(0) * 1.5
+        + out.get("jockey_bayes_place", pd.Series(0, index=out.index)).fillna(0) * 0.75
+        + out.get("trainer_bayes_place", pd.Series(0, index=out.index)).fillna(0) * 0.75
+        + out.get("jockey_vs_field", pd.Series(0, index=out.index)).fillna(0) * 1.0
+        + out.get("trainer_vs_field", pd.Series(0, index=out.index)).fillna(0) * 1.0
+    )
+    out["scoring_method"] = "heuristic"
+    out["scoring_fallback_reason"] = reason or "Legacy heuristic"
+    return attach_win_probs(out)
+
+
+def apply_scoring_production_guard(
+    *,
+    model_path: Path,
+    feature_path: Path,
+    scoring_mode: str = "ranker",
+) -> None:
+    """
+    Fail fast in production when ranker-only mode is configured but artifacts are absent.
+    Prevents silent fallback to uncalibrated heuristic scores on live cards.
+    """
+    if scoring_mode != "ranker":
+        return
+    missing: list[str] = []
+    if not model_path.exists() or model_path.stat().st_size == 0:
+        missing.append(str(model_path))
+    if not feature_path.exists() or feature_path.stat().st_size == 0:
+        missing.append(str(feature_path))
+    if missing:
+        raise FileNotFoundError(
+            "CRITICAL: LightGBM ranker artifacts are missing or empty: "
+            + ", ".join(missing)
+            + ". Aborting daily execution loop to prevent uncalibrated heuristic scores. "
+            "Run: hibs-racing build-matrix && hibs-racing train-ranker"
+        )
+
+
+def apply_scoring(
+    race_df: pd.DataFrame,
+    *,
+    model_path: str | Path | None = None,
+    feature_json_path: str | Path | None = None,
+    config_path: Path | None = None,
+) -> pd.DataFrame:
+    """
+    LightGBM LambdaRank inference on today's race field.
+    Falls back safely to legacy heuristic if artifacts or dependencies are missing (auto mode).
+    """
+    cfg = load_config(config_path)
+    mode = cfg.get("ranker", {}).get("scoring_mode", "auto")
+    if os.environ.get("HIBS_RACING_PRODUCTION", "").strip() in {"1", "true", "yes"}:
+        mode = cfg.get("ranker", {}).get("production_scoring_mode", "ranker")
+    mp, fp = _resolve_paths(model_path, feature_json_path, config_path)
+
+    apply_scoring_production_guard(model_path=mp, feature_path=fp, scoring_mode=mode)
+
+    if mode == "heuristic":
+        return run_legacy_heuristic(race_df, reason="scoring_mode=heuristic")
+
+    if not os.path.exists(mp) or not os.path.exists(fp):
+        if mode == "ranker":
+            raise FileNotFoundError(
+                f"ranker scoring_mode=ranker but artifacts missing: model={mp}, features={fp}"
+            )
+        return run_legacy_heuristic(race_df, reason="Model artifacts missing")
+
+    try:
+        import lightgbm as lgb
+
+        feature_cols = _load_feature_cols(fp)
+        if not feature_cols:
+            raise ValueError("Feature JSON empty")
+
+        x_live = _build_feature_matrix(race_df, feature_cols)
+        bst = lgb.Booster(model_file=str(mp))
+        model_features = bst.feature_name()
+        if model_features and list(model_features) != feature_cols:
+            feature_cols = list(model_features)
+            x_live = _build_feature_matrix(race_df, feature_cols)
+
+        out = race_df.copy()
+        out["model_raw_score"] = bst.predict(x_live)
+        out["scoring_method"] = "ranker"
+        out["scoring_fallback_reason"] = ""
+        return attach_win_probs(out)
+
+    except ImportError as exc:
+        if mode == "ranker":
+            raise ImportError('Install ranker extras: pip install -e ".[ranker]"') from exc
+        return run_legacy_heuristic(race_df, reason=f"Inference execution failure: {exc}")
+
+    except (OSError, Exception) as exc:
+        if mode == "ranker":
+            raise RuntimeError(f"Ranker inference failed: {exc}") from exc
+        return run_legacy_heuristic(race_df, reason=f"Inference execution failure: {exc}")
