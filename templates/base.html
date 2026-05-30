@@ -41,10 +41,10 @@
             background-size:88px 88px;
         }
         body::after{
-            content:'';position:fixed;right:-40px;bottom:0;width:min(420px,42vw);height:min(320px,38vh);
-            z-index:0;pointer-events:none;opacity:0.14;
+            content:'';position:fixed;right:-24px;bottom:0;width:min(380px,40vw);height:min(300px,36vh);
+            z-index:0;pointer-events:none;opacity:0.16;
             background:url('{{ url_for('static', filename=hibs_hero_horse|default('hero_horse.png')) }}') no-repeat right bottom/contain;
-            filter:drop-shadow(0 8px 24px rgba(0,0,0,0.4));
+            filter:drop-shadow(0 8px 24px rgba(0,0,0,0.35));
         }
         .ref-page{max-width:1680px;margin:0 auto;position:relative;z-index:1;}
         .site-top{
@@ -53,11 +53,23 @@
             background:linear-gradient(135deg,rgba(0,122,51,0.22),rgba(6,14,24,0.92));
             border:1px solid var(--border);border-radius:var(--radius-md);
             box-shadow:var(--shadow-md);
+            position:relative;overflow:hidden;isolation:isolate;
         }
-        .site-top-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-        .site-crest-wrap{display:flex;align-items:flex-end;gap:4px;}
+        .site-top::before{
+            content:'';position:absolute;right:2%;top:50%;transform:translateY(-50%);
+            width:min(120px,22vw);height:min(120px,22vw);pointer-events:none;z-index:0;
+            background:url('{{ url_for('static', filename=hibs_racing_logo|default('badge_hibs_racing_oval.png')) }}') center/contain no-repeat;
+            opacity:0.11;filter:grayscale(15%);
+        }
+        .site-top-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:relative;z-index:1;}
+        .site-top-actions,.site-links{position:relative;z-index:1;}
+        .site-crest-wrap{display:flex;align-items:center;gap:8px;flex-shrink:0;}
         .site-crest{border-radius:8px;filter:drop-shadow(0 2px 10px rgba(0,0,0,0.45));}
-        .site-crest-harp{opacity:0.92;margin-bottom:2px;}
+        .site-crest-oval{
+            height:52px;width:52px;object-fit:contain;border-radius:50%;
+            box-shadow:0 0 0 2px rgba(183,247,200,0.15),0 4px 16px rgba(0,0,0,0.35);
+        }
+        .site-crest-harp-mini{opacity:0.88;filter:drop-shadow(0 1px 6px rgba(0,0,0,0.4));}
         .site-wordmark{font-family:'Orbitron',monospace;font-weight:900;font-size:1.15em;color:var(--hibs-neon);letter-spacing:0.08em;}
         .site-tagline{font-size:0.78em;color:var(--muted);margin-top:2px;}
         .site-links{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
@@ -98,6 +110,7 @@
         }
         .pill.ok{color:#86efac;border-color:rgba(134,239,172,0.35);}
         .pill.warn{color:#fcd34d;border-color:rgba(252,211,77,0.35);}
+        .pill.muted{color:#94a3b8;border-color:rgba(148,163,184,0.25);}
         .banner{
             padding:10px 14px;border-radius:var(--radius-md);margin-bottom:14px;
             border:1px solid var(--border);background:rgba(0,122,51,0.12);
@@ -233,14 +246,89 @@
         .drift-steam{color:#86efac;font-weight:700;}
         .drift-out{color:#fca5a5;font-weight:700;}
         .meeting-panel[hidden]{display:none!important;}
+        /* Novice UX translation layer */
+        .bankroll-bar{
+            display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;
+            margin:0 16px 12px;padding:10px 14px;border-radius:10px;
+            background:rgba(0,122,51,0.12);border:1px solid rgba(183,247,200,0.22);font-size:0.85em;
+        }
+        .bankroll-bar label{font-weight:700;color:var(--hibs-neon);font-size:0.78em;text-transform:uppercase;letter-spacing:0.06em;}
+        .bankroll-bar input{
+            width:110px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);
+            background:rgba(0,0,0,0.35);color:var(--text);font-weight:600;
+        }
+        .bankroll-bar .bankroll-hint{color:var(--muted);font-size:0.78em;}
+        .tip-term{
+            border-bottom:1px dashed rgba(148,163,184,0.65);cursor:help;position:relative;
+        }
+        .tip-term:focus{outline:1px solid var(--hibs-neon);}
+        .tip-term[data-tip]:hover::after,.tip-term[data-tip]:focus::after{
+            content:attr(data-tip);position:absolute;left:0;top:calc(100% + 6px);z-index:40;
+            min-width:200px;max-width:280px;padding:8px 10px;border-radius:8px;font-size:0.72em;font-weight:400;
+            text-transform:none;letter-spacing:0;line-height:1.45;color:#e2e8f0;
+            background:rgba(8,18,14,0.98);border:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,0.45);
+            white-space:normal;
+        }
+        .risk-badge{
+            display:inline-block;font-size:0.68em;font-weight:700;padding:2px 8px;border-radius:999px;
+            margin-left:6px;vertical-align:middle;white-space:nowrap;
+        }
+        .risk-low{color:#86efac;border:1px solid rgba(134,239,172,0.4);background:rgba(134,239,172,0.12);}
+        .risk-mid{color:#fcd34d;border:1px solid rgba(252,211,77,0.35);background:rgba(252,211,77,0.1);}
+        .risk-high{color:#fca5a5;border:1px solid rgba(252,165,165,0.35);background:rgba(252,165,165,0.1);}
+        .stake-cash-hint{display:block;font-size:0.72em;color:var(--neon-value);margin-top:3px;font-weight:600;}
+        .slip-copy-btn{
+            background:rgba(0,0,0,0.35);border:1px solid var(--border);color:var(--text);
+            border-radius:8px;padding:4px 10px;font-size:0.72em;cursor:pointer;margin-left:6px;
+        }
+        .slip-copy-btn:hover{border-color:rgba(183,247,200,0.45);color:var(--hibs-neon);}
+        .smart-picks-hero{
+            margin-bottom:16px;padding:16px 18px;border-radius:16px;
+            border:1px solid rgba(246,216,137,0.35);
+            background:linear-gradient(135deg,rgba(246,216,137,0.12),rgba(0,122,51,0.18));
+            position:relative;overflow:hidden;isolation:isolate;
+        }
+        .smart-picks-hero h2{font-family:'Orbitron',monospace;color:var(--gold);font-size:1.05em;margin-bottom:6px;}
+        .smart-picks-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:12px;}
+        .smart-pick-card{
+            background:rgba(0,0,0,0.28);border:1px solid var(--border);border-radius:12px;padding:14px;
+        }
+        .smart-pick-card .sp-horse{font-weight:700;font-size:1.05em;color:var(--hibs-neon);}
+        .smart-pick-card .sp-meta{font-size:0.8em;color:var(--muted);margin:6px 0;}
+        /* Brand accents — decorative only, zero layout impact */
+        .brand-horse-watermark,.brand-logo-watermark{
+            position:absolute;pointer-events:none;z-index:0;background:center/contain no-repeat;
+        }
+        .brand-horse-watermark{opacity:0.14;filter:drop-shadow(0 6px 18px rgba(0,0,0,0.35));}
+        .brand-logo-watermark{opacity:0.1;filter:grayscale(20%);}
+        .brand-horse-watermark--corner-br{
+            right:-12px;bottom:-16px;width:min(160px,38%);height:min(140px,70%);max-height:160px;
+        }
+        .brand-horse-watermark--corner-tr{
+            right:-8px;top:-12px;width:min(120px,32%);height:min(100px,55%);max-height:120px;opacity:0.12;
+        }
+        .brand-logo-watermark--corner-tl{
+            left:-10px;top:-10px;width:min(90px,28%);height:min(90px,50%);max-height:90px;
+        }
+        .brand-panel-framed{
+            position:relative;overflow:hidden;isolation:isolate;
+        }
+        .brand-panel-framed > *:not(.brand-horse-watermark):not(.brand-logo-watermark){position:relative;z-index:1;}
+        @media(max-width:720px){
+            .site-crest-oval{height:44px;width:44px;}
+            .site-crest-harp-mini{width:22px;height:22px;}
+            .site-top::before{opacity:0.07;width:88px;height:88px;}
+            body::after{opacity:0.1;width:min(260px,55vw);}
+            .brand-horse-watermark--corner-br{width:min(120px,42%);opacity:0.1;}
+        }
         {% block extra_css %}{% endblock %}
     </style>
 </head>
 <body>
 <div class="ref-page">
+    {% from '_hibs_brand.html' import site_crests, heritage_strip %}
     <header class="site-top">
         <div class="site-top-left">
-            {% from '_hibs_brand.html' import site_crests, heritage_strip %}
             {{ site_crests() }}
             <div>
                 <div class="site-wordmark">{{ product_name }}</div>
@@ -278,11 +366,20 @@
     <div class="sys-strip" id="sys-strip">
         {% if health is defined %}
         <span class="pill {% if health.matchbook %}ok{% else %}warn{% endif %}">Matchbook {% if health.matchbook %}ready{% else %}no creds{% endif %}</span>
+        {% if health.betfair_enabled %}
+        <span class="pill {% if health.betfair_configured %}ok{% else %}warn{% endif %}">Betfair {% if health.betfair_configured %}ready{% else %}no creds{% endif %}</span>
+        {% endif %}
         <span class="pill {% if health.racing_api %}ok{% else %}warn{% endif %}">Racing API</span>
         {% endif %}
         {% if scoring_method is defined and scoring_method %}
         <span class="pill">Scoring: <strong>{{ scoring_method }}</strong></span>
         {% endif %}
+    </div>
+    <div class="bankroll-bar" id="bankroll-bar">
+        <label for="bankroll-input">My betting bankroll</label>
+        <span>£</span>
+        <input type="number" id="bankroll-input" min="0" step="10" placeholder="500" aria-label="Total betting bankroll in pounds">
+        <span class="bankroll-hint" id="bankroll-hint">Set your bankroll to see recommended stakes in cash (1 unit = 1% of bankroll).</span>
     </div>
     {% include '_portfolio_bar.html' %}
     {% block content %}{% endblock %}
@@ -329,6 +426,9 @@ document.getElementById('btn-refresh')?.addEventListener('click', async () => {
             if (!j.top_places?.length) return;
             mount.innerHTML = j.top_places.map(p => {
                 const reasons = (p.pick_reasons || []).map(r => `<li>${esc(r)}</li>`).join('');
+                const bankroll = window.HibsNoviceUX?.readBankroll?.();
+                const cash = bankroll != null && window.HibsNoviceUX?.stakeCash ? window.HibsNoviceUX.stakeCash(1, 1) : null;
+                const stakeLine = cash != null ? `<div class="stake-cash-hint">Suggested stake: £${cash.toFixed(2)}</div>` : '';
                 return `
                 <div class="hero-pick">
                     <div class="hero-rank">#${p.day_rank}</div>
@@ -336,9 +436,11 @@ document.getElementById('btn-refresh')?.addEventListener('click', async () => {
                     <div class="hero-meta">${esc(p.off_time)} ${esc(p.course)}<br>${esc(p.jockey)} · ${esc(p.trainer)}</div>
                     <div class="hero-prob">${Math.round((p.model_place_prob||0)*100)}% place</div>
                     <div class="hero-meta">combo ${(p.combo_bayes_place||0).toFixed(2)} · score ${(p.place_score||0).toFixed(2)}</div>
+                    ${stakeLine}
                     <div class="hero-explain"><strong>Why</strong><ul>${reasons}</ul></div>
                 </div>`;
             }).join('');
+            window.HibsNoviceUX?.applyStakeHints?.(mount);
         } catch (_) {}
     }
     tick(false);

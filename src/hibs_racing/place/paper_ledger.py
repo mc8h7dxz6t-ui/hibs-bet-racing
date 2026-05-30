@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from hibs_racing.config import db_path, load_config
@@ -193,6 +194,75 @@ def _find_finish_pos(
     return None
 
 
+def bet_verification_hash(
+    bet_id: str,
+    created_at: str,
+    runner_id: str,
+    offered_win: float | None,
+    stake_units: float,
+) -> str:
+    payload = f"{bet_id}|{created_at}|{runner_id}|{offered_win}|{stake_units}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _closing_sp_for_runner(
+    conn,
+    *,
+    finish_pos: int,
+    race_id: str,
+    card_date: str,
+    horse_name: str | None,
+    runner_id: str,
+    course: str | None = None,
+    off_time: str | None = None,
+    race_natural_key: str | None = None,
+) -> float | None:
+    """Best-effort SP decimal from ingested results for CLV audit."""
+    slug = runner_id.split(":", 1)[-1] if ":" in runner_id else _horse_slug(horse_name or "")
+    target_name = _normalize_horse(horse_name) if horse_name else ""
+    natural_key = race_natural_key or generate_natural_key(card_date, course, off_time)
+
+    def _sp_from_rows(rows: list[tuple]) -> float | None:
+        for pos, horse, sp in rows:
+            if int(pos) != finish_pos:
+                continue
+            if horse and (_horse_slug(str(horse)) == slug or (target_name and _normalize_horse(str(horse)) == target_name)):
+                try:
+                    val = float(sp)
+                    return val if val > 1.0 else None
+                except (TypeError, ValueError):
+                    return None
+        return None
+
+    if natural_key:
+        rows = conn.execute(
+            """
+            SELECT finish_pos, horse_id, sp_decimal FROM runners
+            WHERE race_natural_key = ? AND finish_pos IS NOT NULL AND sp_decimal IS NOT NULL
+            """,
+            (natural_key,),
+        ).fetchall()
+        sp = _sp_from_rows(rows)
+        if sp is not None:
+            return sp
+
+    rows = conn.execute(
+        """
+        SELECT finish_pos, horse_id, sp_decimal FROM runners
+        WHERE race_id = ? AND race_date = ? AND finish_pos IS NOT NULL AND sp_decimal IS NOT NULL
+        """,
+        (race_id, card_date),
+    ).fetchall()
+    return _sp_from_rows(rows)
+
+
+def _date_cutoff(days: int | None) -> str | None:
+    if days is None:
+        return None
+    start = datetime.now(timezone.utc) - timedelta(days=max(1, int(days)))
+    return start.replace(microsecond=0).isoformat()
+
+
 def settle_paper_bets(database: Path | None = None) -> dict:
     """Match open paper bets to ingested results and record P&L."""
     cfg = load_config()
@@ -244,13 +314,30 @@ def settle_paper_bets(database: Path | None = None) -> dict:
                 place_fraction=fraction,
                 places=places,
             )
+            closing_sp = _closing_sp_for_runner(
+                conn,
+                finish_pos=finish_pos,
+                race_id=race_id,
+                card_date=card_date,
+                horse_name=horse_name,
+                runner_id=runner_id,
+                course=course,
+                off_time=off_time,
+                race_natural_key=race_natural_key,
+            )
+            clv_beat = None
+            if closing_sp and offered_win and float(offered_win) > float(closing_sp):
+                clv_beat = 1
+            elif closing_sp and offered_win:
+                clv_beat = 0
             conn.execute(
                 """
                 UPDATE paper_bets
-                SET status = ?, result_pnl = ?, settled_at = ?, finish_pos = ?
+                SET status = ?, result_pnl = ?, settled_at = ?, finish_pos = ?,
+                    closing_sp = ?, clv_beat = ?
                 WHERE bet_id = ?
                 """,
-                (status, pnl, now, finish_pos, bet_id),
+                (status, pnl, now, finish_pos, closing_sp, clv_beat, bet_id),
             )
             settled += 1
             details.append(
@@ -272,42 +359,66 @@ def settle_paper_bets(database: Path | None = None) -> dict:
     }
 
 
-def load_ledger_rows(database: Path | None = None, *, limit: int = 200) -> list[dict]:
+def load_ledger_rows(database: Path | None = None, *, limit: int = 200, days: int | None = None) -> list[dict]:
     db = database or db_path(load_config())
     init_db(db)
+    cutoff = _date_cutoff(days)
     with connect(db) as conn:
-        rows = conn.execute(
-            """
-            SELECT pb.bet_id, pb.race_id, pb.runner_id, pb.bet_type, pb.stake_units, pb.model_ev,
-                   pb.offered_win, pb.offered_place, pb.place_terms, pb.status, pb.result_pnl,
-                   pb.settled_at, pb.created_at, pb.is_value_pick, pb.finish_pos,
-                   u.horse_name, u.course, u.off_time, u.card_date
-            FROM paper_bets pb
-            LEFT JOIN upcoming_runners u ON u.runner_id = pb.runner_id
-            ORDER BY pb.created_at DESC
-            LIMIT ?
-            """,
-            (limit,),
-        ).fetchall()
+        if cutoff:
+            rows = conn.execute(
+                """
+                SELECT pb.bet_id, pb.race_id, pb.runner_id, pb.bet_type, pb.stake_units, pb.model_ev,
+                       pb.offered_win, pb.offered_place, pb.place_terms, pb.status, pb.result_pnl,
+                       pb.settled_at, pb.created_at, pb.is_value_pick, pb.finish_pos,
+                       pb.closing_sp, pb.clv_beat, pb.verification_hash,
+                       u.horse_name, u.course, u.off_time, u.card_date
+                FROM paper_bets pb
+                LEFT JOIN upcoming_runners u ON u.runner_id = pb.runner_id
+                WHERE pb.created_at >= ?
+                ORDER BY pb.created_at DESC
+                LIMIT ?
+                """,
+                (cutoff, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT pb.bet_id, pb.race_id, pb.runner_id, pb.bet_type, pb.stake_units, pb.model_ev,
+                       pb.offered_win, pb.offered_place, pb.place_terms, pb.status, pb.result_pnl,
+                       pb.settled_at, pb.created_at, pb.is_value_pick, pb.finish_pos,
+                       pb.closing_sp, pb.clv_beat, pb.verification_hash,
+                       u.horse_name, u.course, u.off_time, u.card_date
+                FROM paper_bets pb
+                LEFT JOIN upcoming_runners u ON u.runner_id = pb.runner_id
+                ORDER BY pb.created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
     cols = [
         "bet_id", "race_id", "runner_id", "bet_type", "stake_units", "model_ev",
         "offered_win", "offered_place", "place_terms", "status", "result_pnl",
         "settled_at", "created_at", "is_value_pick", "finish_pos",
+        "closing_sp", "clv_beat", "verification_hash",
         "horse_name", "course", "off_time", "card_date",
     ]
     return [dict(zip(cols, row, strict=True)) for row in rows]
 
 
-def ledger_stats(database: Path | None = None) -> LedgerStats:
+def ledger_stats(database: Path | None = None, *, days: int | None = None) -> LedgerStats:
     db = database or db_path(load_config())
     init_db(db)
+    cutoff = _date_cutoff(days)
     with connect(db) as conn:
-        rows = conn.execute(
-            """
-            SELECT status, stake_units, result_pnl, is_value_pick
-            FROM paper_bets
-            """
-        ).fetchall()
+        if cutoff:
+            rows = conn.execute(
+                "SELECT status, stake_units, result_pnl, is_value_pick FROM paper_bets WHERE created_at >= ?",
+                (cutoff,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT status, stake_units, result_pnl, is_value_pick FROM paper_bets",
+            ).fetchall()
 
     open_bets = settled = place_hits = place_misses = win_hits = 0
     value_pick_count = value_pick_settled = value_pick_hits = value_pick_misses = 0
@@ -369,24 +480,9 @@ def ledger_stats(database: Path | None = None) -> LedgerStats:
     )
 
 
-def build_tracker_dict(database: Path | None = None, *, limit: int = 200) -> dict:
-    stats = ledger_stats(database).to_dict()
-    rows = load_ledger_rows(database, limit=limit)
-    return {
-        "enabled": True,
-        "methodology": {
-            "lock_rule": "Paper bets logged at score time with model EV gates.",
-            "settlement_rule": "Auto-settled via race natural key (date+course+time), then horse/course fallbacks.",
-        },
-        "stats": stats,
-        "ledger_rows": rows,
-        "ledger_count": len(rows),
-        "third_party_note": "Paper ledger only — no live money. Settle via hibs-racing settle-paper after ingesting results.",
-    }
 
-
-def export_ledger_csv(database: Path | None = None) -> str:
-    rows = load_ledger_rows(database, limit=10_000)
+def export_ledger_csv(database: Path | None = None, *, days: int | None = 60) -> str:
+    rows = load_ledger_rows(database, limit=10_000, days=days)
     buf = io.StringIO()
     if not rows:
         return ""
@@ -413,15 +509,25 @@ def record_paper_bet(
 
     db = database or db_path(load_config())
     init_db(db)
+    with connect(db) as conn:
+        existing = conn.execute(
+            "SELECT bet_id FROM paper_bets WHERE runner_id = ? AND race_id = ? LIMIT 1",
+            (runner_id, race_id),
+        ).fetchone()
+        if existing:
+            return str(existing[0])
+
     bet_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    vhash = bet_verification_hash(bet_id, now, runner_id, offered_win, stake_units)
     with connect(db) as conn:
         conn.execute(
             """
             INSERT INTO paper_bets (
                 bet_id, race_id, runner_id, bet_type, stake_units,
-                model_ev, offered_win, offered_place, place_terms, is_value_pick, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                model_ev, offered_win, offered_place, place_terms, is_value_pick,
+                verification_hash, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 bet_id,
@@ -434,6 +540,7 @@ def record_paper_bet(
                 offered_place,
                 place_terms,
                 1 if is_value_pick else 0,
+                vhash,
                 now,
             ),
         )

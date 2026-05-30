@@ -6,9 +6,18 @@
 @media(max-width:900px){.fi-grid{grid-template-columns:1fr;}}
 .fi-chart{background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:12px;padding:12px;overflow-x:auto;}
 .fi-hint{font-size:0.82em;color:#cbd5e1;margin:8px 0;line-height:1.5;}
+.check-pass{color:#86efac;font-weight:700;}
+.check-fail{color:#fca5a5;font-weight:700;}
+.attr-scroll{max-height:420px;overflow:auto;margin-top:10px;}
+.attr-scroll table{font-size:0.85em;}
+.attr-scroll tr.cd-row td:first-child{color:#f6d889;}
 .gauge-steam{color:#86efac;font-weight:700;}
 .gauge-drift{color:#fca5a5;font-weight:700;}
 .gauge-abort{background:rgba(239,68,68,0.15);}
+.exec-status-routed,.exec-status-stub_ok{color:#86efac;font-weight:600;}
+.exec-status-rejected,.exec-status-stub_error{color:#fca5a5;font-weight:600;}
+.exec-status-skipped_duplicate{color:#94a3b8;font-weight:600;}
+.exec-preview-row td{font-size:0.85em;}
 {% endblock %}
 
 {% block content %}
@@ -19,6 +28,11 @@
             <span class="pill {% if health.racing_api %}ok{% else %}warn{% endif %}">Racing API</span>
             <span class="pill {% if health.racing_post %}ok{% else %}warn{% endif %}">Racing Post</span>
             <span class="pill {% if health.matchbook %}ok{% else %}warn{% endif %}">Matchbook</span>
+            {% if health.betfair_enabled %}
+            <span class="pill {% if health.betfair_configured %}ok{% else %}warn{% endif %}">Betfair</span>
+            {% else %}
+            <span class="pill muted" title="Phase C — enable in ingest/config.yaml when API access is ready">Betfair off</span>
+            {% endif %}
             <span class="pill {% if health.raceform_path %}ok{% else %}warn{% endif %}">Kaggle raceform.db</span>
             {% if ranker_loaded %}<span class="pill ok">Ranker artifact</span>{% else %}<span class="pill warn">No ranker</span>{% endif %}
         </p>
@@ -27,6 +41,143 @@
             <div class="stat-card"><div class="stat-label">Card runners</div><div class="stat-value">{{ health.runners_loaded }}</div></div>
             <div class="stat-card"><div class="stat-label">Scored</div><div class="stat-value">{{ health.scores_loaded }}</div></div>
         </div>
+    </div>
+</section>
+
+<section class="card">
+    <div class="card-head">
+        <h2>Execution routing</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-secondary" id="btn-exec-preview">Run preview</button>
+            <button type="button" class="btn btn-secondary" id="btn-exec-preview-log">Preview &amp; log</button>
+            <button type="button" class="btn btn-secondary" id="btn-exec-refresh">Refresh audit</button>
+        </div>
+    </div>
+    <div class="card-body" style="padding:16px;">
+        <p style="margin-bottom:12px;" id="exec-config-pills">
+            <span class="pill {% if execution.dry_run %}ok{% else %}warn{% endif %}">
+                {% if execution.dry_run %}Dry-run{% else %}LIVE{% endif %}
+            </span>
+            {% for venue in execution.preferred_venues %}
+            <span class="pill ok">{{ venue }}</span>
+            {% endfor %}
+            {% if not health.betfair_enabled %}
+            <span class="pill muted">betfair disabled</span>
+            {% endif %}
+            <span class="pill ok">EW win + place split</span>
+        </p>
+        <p class="fi-hint">
+            Matchbook each-way routes as separate win and place back offers (half stake each).
+            Refresh cards to map place market IDs. CLI: <code>hibs-racing route-execution</code> · API:
+            <a href="{{ url_for('api_execution_preview') }}">/api/execution/preview</a>
+            · Max stake {{ execution.max_stake }}u
+        </p>
+        <div class="stat-grid" style="margin:14px 0;">
+            <div class="stat-card"><div class="stat-label">Audit rows</div><div class="stat-value" id="exec-total-rows">{{ execution_audit.total_rows }}</div></div>
+            <div class="stat-card"><div class="stat-label">Live routed</div><div class="stat-value" id="exec-live-routed">{{ execution_audit.live_routed }}</div></div>
+            <div class="stat-card"><div class="stat-label">Last batch</div><div class="stat-value" id="exec-last-batch" style="font-size:0.75em;">{% if execution_audit.last_created_at %}{{ execution_audit.last_created_at[:19]|replace('T',' ') }}{% else %}—{% endif %}</div></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;" id="exec-status-pills">
+            {% for status, count in (execution_audit.status_counts or {}).items() %}
+            <span class="pill {% if status in ['routed','stub_ok'] %}ok{% elif status in ['rejected','stub_error'] %}warn{% else %}muted{% endif %}">{{ status }}: {{ count }}</span>
+            {% else %}
+            <span class="pill muted">no audit rows yet</span>
+            {% endfor %}
+        </div>
+        <h3 style="font-size:0.9em;margin:12px 0 8px;color:var(--muted);">Recent batches</h3>
+        <div class="port-scroll" style="overflow-x:auto;margin-bottom:14px;">
+            <table class="port-table exec-preview-row">
+                <thead>
+                    <tr><th>Batch</th><th>Time (UTC)</th><th>Rows</th><th>Accepted</th><th>Rejected</th><th>Skipped dup</th><th>Live</th></tr>
+                </thead>
+                <tbody id="exec-batch-body">
+                {% for b in execution_audit.recent_batches %}
+                <tr>
+                    <td><code>{{ b.batch_id[:8] }}…</code></td>
+                    <td>{{ (b.created_at or '')[:19]|replace('T',' ') }}</td>
+                    <td class="num">{{ b.rows }}</td>
+                    <td class="num">{{ b.accepted }}</td>
+                    <td class="num">{{ b.rejected }}</td>
+                    <td class="num">{{ b.skipped_duplicate }}</td>
+                    <td class="num">{{ b.live_rows }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7">No batches logged — run <code>hibs-racing route-execution</code> or Preview &amp; log.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <h3 style="font-size:0.9em;margin:12px 0 8px;color:var(--muted);">Latest routing instructions</h3>
+        <div class="attr-scroll">
+            <table class="port-table exec-preview-row">
+                <thead>
+                    <tr><th>Time</th><th>Horse</th><th>Leg</th><th>Venue</th><th>Status</th><th>Stake</th><th>Odds</th><th>Gate</th><th>Mode</th><th>Message</th></tr>
+                </thead>
+                <tbody id="exec-log-body">
+                {% for row in execution_audit.recent_logs %}
+                <tr>
+                    <td>{{ (row.created_at or '')[:19]|replace('T',' ') }}</td>
+                    <td>{{ row.horse_name or '—' }}</td>
+                    <td>{{ row.bet_leg }}</td>
+                    <td>{{ row.venue }}</td>
+                    <td class="exec-status-{{ row.status }}">{{ row.status }}</td>
+                    <td class="num">{% if row.stake is not none %}{{ '%.2f'|format(row.stake) }}{% else %}—{% endif %}</td>
+                    <td class="num">{% if row.odds is not none %}{{ '%.2f'|format(row.odds) }}{% else %}—{% endif %}</td>
+                    <td>{{ row.steam_gate or '—' }}</td>
+                    <td>{% if row.dry_run %}dry{% else %}live{% endif %}</td>
+                    <td>{{ (row.message or '')[:60] }}{% if row.message and row.message|length > 60 %}…{% endif %}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="10">No routing instructions logged yet.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <pre id="exec-preview-json" class="fi-hint" style="display:none;margin-top:12px;max-height:220px;overflow:auto;background:rgba(0,0,0,0.25);padding:10px;border-radius:8px;"></pre>
+    </div>
+</section>
+
+<section class="card">
+    <div class="card-head">
+        <h2>Ranker live verification</h2>
+        <button type="button" class="btn btn-secondary" id="btn-refresh-attribution">Refresh attribution</button>
+    </div>
+    <div class="card-body" style="padding:16px;">
+        {% if ranker_attribution %}
+        <p class="fi-hint" id="attr-meta">
+            Method: <strong>{{ ranker_attribution.method }}</strong>
+            · SHAP source: <strong>{{ ranker_attribution.shap_source }}</strong>
+            · {{ ranker_attribution.feature_count }} features from <code>lgbm_ranker_features.json</code>
+            · Card sample: <strong>{{ ranker_attribution.card_sample_rows }}</strong> runners
+            · CD block gain: <strong>{{ ranker_attribution.cd_block_pct_gain }}%</strong>
+            · Updated {{ (ranker_attribution.generated_at or '')[:19]|replace('T',' ') }} UTC
+        </p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;" id="attr-checks">
+            {% for check in ranker_attribution.checks %}
+            <span class="pill {% if check.status == 'pass' %}ok{% else %}warn{% endif %}" title="{{ check.detail }}">
+                {{ check.name }}: {{ check.status }}
+            </span>
+            {% endfor %}
+        </div>
+        <div class="attr-scroll">
+            <table>
+                <thead><tr><th>#</th><th>Feature</th><th>Gain %</th><th>SHAP %</th><th>|SHAP|</th></tr></thead>
+                <tbody id="attr-matrix-body">
+                {% for row in ranker_attribution.matrix %}
+                <tr class="{% if row.in_cd_block %}cd-row{% endif %}">
+                    <td class="num">{{ row.rank }}</td>
+                    <td>{{ row.feature }}</td>
+                    <td class="num">{{ row.gain_pct }}%</td>
+                    <td class="num">{% if row.shap_pct is not none %}{{ row.shap_pct }}%{% else %}—{% endif %}</td>
+                    <td class="num">{% if row.mean_abs_shap is not none %}{{ row.mean_abs_shap }}{% else %}—{% endif %}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="fi-hint">Ranker attribution unavailable — train model and refresh card.</p>
+        {% endif %}
     </div>
 </section>
 
@@ -115,6 +266,52 @@
 
 {% block extra_js %}
 <script>
+(function attributionMonitor(){
+    const meta = document.getElementById('attr-meta');
+    const checksEl = document.getElementById('attr-checks');
+    const body = document.getElementById('attr-matrix-body');
+    if (!body) return;
+
+    const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    function renderChecks(checks){
+        if (!checksEl || !checks) return;
+        checksEl.innerHTML = checks.map(c =>
+            `<span class="pill ${c.status === 'pass' ? 'ok' : 'warn'}" title="${esc(c.detail)}">${esc(c.name)}: ${esc(c.status)}</span>`
+        ).join('');
+    }
+
+    function renderMatrix(rows){
+        if (!rows.length){
+            body.innerHTML = '<tr><td colspan="5">No attribution rows — load ranker artifacts.</td></tr>';
+            return;
+        }
+        body.innerHTML = rows.map(r => `
+            <tr class="${r.in_cd_block ? 'cd-row' : ''}">
+                <td class="num">${r.rank}</td>
+                <td>${esc(r.feature)}</td>
+                <td class="num">${r.gain_pct}%</td>
+                <td class="num">${r.shap_pct != null ? r.shap_pct + '%' : '—'}</td>
+                <td class="num">${r.mean_abs_shap != null ? r.mean_abs_shap : '—'}</td>
+            </tr>`).join('');
+    }
+
+    async function refresh(){
+        try {
+            const r = await fetch('/api/ranker/attribution');
+            const j = await r.json();
+            if (meta){
+                meta.innerHTML = `Method: <strong>${esc(j.method)}</strong> · SHAP source: <strong>${esc(j.shap_source)}</strong> · ${j.feature_count} features from <code>lgbm_ranker_features.json</code> · Card sample: <strong>${j.card_sample_rows}</strong> runners · CD block gain: <strong>${j.cd_block_pct_gain}%</strong> · Updated ${esc((j.generated_at || '').slice(0,19).replace('T',' '))} UTC`;
+            }
+            renderChecks(j.checks);
+            renderMatrix(j.matrix || []);
+        } catch (_) {}
+    }
+
+    document.getElementById('btn-refresh-attribution')?.addEventListener('click', refresh);
+    setInterval(refresh, 180000);
+})();
+
 (function driftMonitor(){
     const body = document.getElementById('drift-gauge-body');
     if (!body) return;
@@ -159,6 +356,117 @@
     });
 
     setInterval(() => refresh(true), 120000);
+})();
+
+(function executionAuditMonitor(){
+    const batchBody = document.getElementById('exec-batch-body');
+    const logBody = document.getElementById('exec-log-body');
+    const statusPills = document.getElementById('exec-status-pills');
+    const previewJson = document.getElementById('exec-preview-json');
+    if (!logBody) return;
+
+    const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const fmtNum = (v) => (v == null ? '—' : Number(v).toFixed(2));
+    const fmtTime = (t) => esc((t || '').slice(0, 19).replace('T', ' '));
+    const statusClass = (s) => `exec-status-${esc(s)}`;
+    const pillClass = (s) => (['routed','stub_ok'].includes(s) ? 'ok' : ['rejected','stub_error'].includes(s) ? 'warn' : 'muted');
+
+    function renderStatusCounts(counts){
+        if (!statusPills) return;
+        const entries = Object.entries(counts || {});
+        if (!entries.length){
+            statusPills.innerHTML = '<span class="pill muted">no audit rows yet</span>';
+            return;
+        }
+        statusPills.innerHTML = entries.map(([status, count]) =>
+            `<span class="pill ${pillClass(status)}">${esc(status)}: ${count}</span>`
+        ).join('');
+    }
+
+    function renderBatches(batches){
+        if (!batchBody) return;
+        if (!batches.length){
+            batchBody.innerHTML = '<tr><td colspan="7">No batches logged — run route-execution or Preview &amp; log.</td></tr>';
+            return;
+        }
+        batchBody.innerHTML = batches.map(b => `
+            <tr>
+                <td><code>${esc((b.batch_id || '').slice(0, 8))}…</code></td>
+                <td>${fmtTime(b.created_at)}</td>
+                <td class="num">${b.rows ?? 0}</td>
+                <td class="num">${b.accepted ?? 0}</td>
+                <td class="num">${b.rejected ?? 0}</td>
+                <td class="num">${b.skipped_duplicate ?? 0}</td>
+                <td class="num">${b.live_rows ?? 0}</td>
+            </tr>`).join('');
+    }
+
+    function renderLogs(logs){
+        if (!logs.length){
+            logBody.innerHTML = '<tr><td colspan="10">No routing instructions logged yet.</td></tr>';
+            return;
+        }
+        logBody.innerHTML = logs.map(r => `
+            <tr>
+                <td>${fmtTime(r.created_at)}</td>
+                <td>${esc(r.horse_name || '—')}</td>
+                <td>${esc(r.bet_leg)}</td>
+                <td>${esc(r.venue)}</td>
+                <td class="${statusClass(r.status)}">${esc(r.status)}</td>
+                <td class="num">${fmtNum(r.stake)}</td>
+                <td class="num">${fmtNum(r.odds)}</td>
+                <td>${esc(r.steam_gate || '—')}</td>
+                <td>${r.dry_run ? 'dry' : 'live'}</td>
+                <td>${esc((r.message || '').slice(0, 60))}${(r.message || '').length > 60 ? '…' : ''}</td>
+            </tr>`).join('');
+    }
+
+    function renderAudit(audit){
+        if (!audit) return;
+        const totalEl = document.getElementById('exec-total-rows');
+        const liveEl = document.getElementById('exec-live-routed');
+        const lastEl = document.getElementById('exec-last-batch');
+        if (totalEl) totalEl.textContent = audit.total_rows ?? 0;
+        if (liveEl) liveEl.textContent = audit.live_routed ?? 0;
+        if (lastEl) lastEl.textContent = audit.last_created_at ? fmtTime(audit.last_created_at) : '—';
+        renderStatusCounts(audit.status_counts);
+        renderBatches(audit.recent_batches || []);
+        renderLogs(audit.recent_logs || []);
+    }
+
+    async function refreshAudit(){
+        try {
+            const r = await fetch('/api/execution/log');
+            renderAudit(await r.json());
+        } catch (_) {}
+    }
+
+    async function runPreview(persist){
+        const btnPreview = document.getElementById('btn-exec-preview');
+        const btnLog = document.getElementById('btn-exec-preview-log');
+        btnPreview && (btnPreview.disabled = true);
+        btnLog && (btnLog.disabled = true);
+        try {
+            const r = await fetch('/api/execution/preview' + (persist ? '?log=1' : ''));
+            const j = await r.json();
+            if (previewJson){
+                previewJson.style.display = 'block';
+                previewJson.textContent = JSON.stringify(j, null, 2);
+            }
+            if (j.audit) renderAudit(j.audit);
+            else if (persist) await refreshAudit();
+        } catch (_) {
+            alert('Execution preview failed');
+        } finally {
+            btnPreview && (btnPreview.disabled = false);
+            btnLog && (btnLog.disabled = false);
+        }
+    }
+
+    document.getElementById('btn-exec-preview')?.addEventListener('click', () => runPreview(false));
+    document.getElementById('btn-exec-preview-log')?.addEventListener('click', () => runPreview(true));
+    document.getElementById('btn-exec-refresh')?.addEventListener('click', refreshAudit);
+    setInterval(refreshAudit, 120000);
 })();
 </script>
 {% endblock %}

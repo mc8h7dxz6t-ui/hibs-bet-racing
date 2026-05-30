@@ -38,6 +38,7 @@ UPCOMING_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("place_fraction", "REAL"),
     ("places", "INTEGER"),
     ("offered_place_decimal", "REAL"),
+    ("rp_verdict", "TEXT"),
 )
 
 CARD_SCORES_MIGRATIONS: tuple[tuple[str, str], ...] = (
@@ -53,9 +54,17 @@ RUNNER_NATURAL_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("race_natural_key", "TEXT"),
 )
 
+EXECUTION_LOG_MIGRATIONS: tuple[tuple[str, str], ...] = (
+    ("matchbook_place_market_id", "INTEGER"),
+    ("betfair_place_market_id", "TEXT"),
+)
+
 PAPER_BETS_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("is_value_pick", "INTEGER NOT NULL DEFAULT 0"),
     ("finish_pos", "INTEGER"),
+    ("closing_sp", "REAL"),
+    ("clv_beat", "INTEGER"),
+    ("verification_hash", "TEXT"),
 )
 
 
@@ -86,6 +95,7 @@ def init_db(db: Path) -> None:
         _migrate_columns(conn, "upcoming_runners", UPCOMING_MIGRATIONS)
         _migrate_columns(conn, "paper_bets", PAPER_BETS_MIGRATIONS)
         _migrate_columns(conn, "card_scores", CARD_SCORES_MIGRATIONS)
+        _migrate_columns(conn, "execution_log", EXECUTION_LOG_MIGRATIONS)
         for stmt in (
             "CREATE INDEX IF NOT EXISTS idx_upcoming_natural ON upcoming_runners (race_natural_key)",
             "CREATE INDEX IF NOT EXISTS idx_runners_natural ON runners (race_natural_key)",

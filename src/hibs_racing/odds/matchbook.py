@@ -146,6 +146,41 @@ class MatchbookClient:
                 break
         return events
 
+    def place_back_offer(
+        self,
+        *,
+        market_id: int,
+        runner_id: int,
+        odds: float,
+        stake: float,
+    ) -> dict:
+        """
+        Submit a back offer to Matchbook REST API.
+        Live calls require HIBS_EXECUTION_LIVE=1; otherwise callers should dry-run via execution router.
+        """
+        if os.environ.get("HIBS_EXECUTION_LIVE", "").strip().lower() not in {"1", "true", "yes"}:
+            raise NotImplementedError(
+                "Matchbook live offers disabled — set HIBS_EXECUTION_LIVE=1 after paper validation."
+            )
+        self.login()
+        url = f"{self._api_base}/offers"
+        payload = {
+            "offers": [
+                {
+                    "market-id": market_id,
+                    "runner-id": runner_id,
+                    "odds": odds,
+                    "stake": stake,
+                    "side": "back",
+                }
+            ]
+        }
+        resp = self._session.post(url, json=payload, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        offers = data.get("offers") or []
+        return offers[0] if offers else data
+
 
 def build_matchbook_natural_key(event: dict) -> str:
     """Event → date_course_time key aligned with card settlement keys."""
@@ -193,6 +228,24 @@ def _select_win_market(markets: list[dict]) -> dict | None:
         if "win" in name or "outright" in mtype or "single" in mtype:
             return market
     return markets[0] if markets else None
+
+
+def _select_place_market(markets: list[dict]) -> dict | None:
+    for market in markets:
+        name = str(market.get("name") or "").lower()
+        mtype = str(market.get("market-type") or market.get("type") or "").lower()
+        if "place" in name or "place" in mtype:
+            return market
+    return None
+
+
+def _runner_by_horse_name(market: dict, horse_name: str | None) -> dict | None:
+    if not horse_name:
+        return None
+    for runner in market.get("runners") or []:
+        if horse_names_match(horse_name, str(runner.get("name") or "")):
+            return runner
+    return None
 
 
 def _best_back_price(runner: dict) -> float | None:
@@ -275,6 +328,8 @@ def fetch_matchbook_odds(
             report.errors.append(f"{race_id}: no win market on event {event.get('id')}")
             continue
 
+        place_market = _select_place_market(event.get("markets") or [])
+
         report.races_matched += 1
         runners = {str(r.get("name") or ""): r for r in market.get("runners") or []}
 
@@ -290,14 +345,22 @@ def fetch_matchbook_odds(
             back = _best_back_price(mb_runner)
             if back is None:
                 continue
+
+            place_runner = _runner_by_horse_name(place_market, horse) if place_market else None
+            place_back = _best_back_price(place_runner) if place_runner else None
+
             priced.append(
                 {
                     "race_id": race_id,
                     "runner_id": card_row.get("runner_id"),
                     "horse_name": horse,
                     "win_decimal": back,
+                    "place_decimal": place_back,
                     "best_book": "matchbook",
                     "matchbook_runner_id": mb_runner.get("id"),
+                    "matchbook_market_id": market.get("id"),
+                    "matchbook_place_runner_id": place_runner.get("id") if place_runner else None,
+                    "matchbook_place_market_id": place_market.get("id") if place_market else None,
                     "matchbook_event_id": event.get("id"),
                     "race_natural_key": build_matchbook_natural_key(event),
                     "place_fraction": place_fraction,

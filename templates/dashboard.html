@@ -61,9 +61,31 @@
     .meetings-toolbar{position:relative;top:0;}
     .toolbar-actions{width:100%;margin-left:0;}
 }
+.runner-highlight td{background:rgba(246,216,137,0.18)!important;box-shadow:inset 0 0 0 1px rgba(246,216,137,0.45);}
+.rp-verdict-block{
+    margin:0 0 14px;padding:12px 14px;border-radius:10px;
+    background:rgba(0,0,0,0.22);border:1px solid rgba(183,247,200,0.18);
+}
+.rp-verdict-block h4{
+    margin:0 0 6px;font-size:0.72em;text-transform:uppercase;letter-spacing:0.08em;
+    color:var(--hibs-neon);font-family:'Orbitron',monospace;
+}
+.rp-verdict-block p{margin:0;font-size:0.88em;line-height:1.55;color:#dbeafe;}
+.race-drawer > summary .rp-verdict-snippet{
+    flex:1 1 100%;font-size:0.78em;color:#cbd5e1;line-height:1.45;margin-top:4px;
+}
+@media(min-width:900px){
+    .race-drawer > summary .rp-verdict-snippet{flex:1 1 auto;margin-top:0;margin-left:8px;}
+}
 {% endblock %}
 
 {% block content %}
+{% if initial_meeting or initial_race or highlight_runner %}
+<div id="racecard-nav-state" hidden
+    {% if initial_meeting %}data-initial-meeting="{{ initial_meeting }}"{% endif %}
+    {% if initial_race %}data-initial-race="{{ initial_race }}"{% endif %}
+    {% if highlight_runner %}data-highlight-runner="{{ highlight_runner }}"{% endif %}></div>
+{% endif %}
 <div class="window-banner">
     <strong>Next {{ window_hours or 24 }}h</strong>
     <span>UK &amp; Ireland racecards · meetings sorted by first race time</span>
@@ -72,6 +94,23 @@
     {% endif %}
     {% if scoring_method %}<span class="pill ok">Engine: {{ scoring_method }}</span>{% endif %}
 </div>
+
+<section class="smart-picks-hero brand-panel-framed" id="smart-picks-hero" aria-live="polite">
+    {% from '_hibs_brand.html' import brand_horse_watermark, brand_logo_watermark %}
+    {{ brand_logo_watermark(modifier='brand-logo-watermark--corner-tl') }}
+    {{ brand_horse_watermark(modifier='brand-horse-watermark--corner-br') }}
+    <h2>Hibs Smart Portfolio Picks</h2>
+    <p class="trk-intro" style="margin:0;font-size:0.82em;color:var(--muted);">
+        Top 3 high-conviction each-way angles — value-flagged, strong data quality, steam gate clear.
+    </p>
+    <div class="smart-picks-grid" id="smart-picks-grid">
+        <div class="smart-pick-card"><span class="sp-meta">Loading smart picks…</span></div>
+    </div>
+</section>
+
+{% if pick_candidates is defined %}
+<script id="pick-candidates-data" type="application/json">{{ pick_candidates|tojson }}</script>
+{% endif %}
 
 <section class="hero-panel is-open" id="hero-monitor">
     <div class="hero-head">
@@ -127,7 +166,10 @@
 </div>
 
 {% if meetings %}
-<section class="card meetings-shell" id="racecard-shell">
+<section class="card meetings-shell" id="racecard-shell"
+    {% if initial_meeting %}data-initial-meeting="{{ initial_meeting }}"{% endif %}
+    {% if initial_race %}data-initial-race="{{ initial_race }}"{% endif %}
+    {% if highlight_runner %}data-highlight-runner="{{ highlight_runner }}"{% endif %}>
     <div class="meetings-toolbar">
         <h2>Racecard · next {{ window_hours or 24 }}h</h2>
         <div class="ctrl-group">
@@ -148,6 +190,10 @@
         <div class="ctrl-group">
             <label for="race-select">Race</label>
             <select id="race-select" class="ctrl-select" aria-label="Select race"></select>
+        </div>
+        <div class="ctrl-group" style="flex:2 1 280px;">
+            <label for="race-verdict-hint">Racing Post verdict</label>
+            <div id="race-verdict-hint" class="pill" style="min-height:38px;align-items:center;line-height:1.45;">Select a race to view the RP verdict</div>
         </div>
         <div class="toolbar-actions">
             {% if scoring_method %}
@@ -183,7 +229,9 @@
             {% for race in meeting.races %}
             <details class="race-drawer"
                 id="race-{{ meeting.slug }}-{{ race.race_slug }}"
-                data-off="{{ race.off_time or '' }}">
+                data-race-id="{{ race.race_id }}"
+                data-off="{{ race.off_time or '' }}"
+                {% if race.rp_verdict_short %}data-rp-verdict="{{ race.rp_verdict_short }}"{% endif %}>
                 <summary>
                     <span class="race-time">{{ race.off_time or '—' }}</span>
                     <span class="race-name">{{ race.race_name or 'Race' }}</span>
@@ -193,8 +241,17 @@
                     <span class="race-leader">{{ race.insights.top_pick.horse_name }} · {{ (race.insights.top_pick.model_place_prob or 0)|fmt_pct }}</span>
                     {% endif %}
                     {% if race.value_count %}<span class="value-flag">VALUE×{{ race.value_count }}</span>{% endif %}
+                    {% if race.rp_verdict_short %}
+                    <span class="rp-verdict-snippet">{{ race.rp_verdict_short }}</span>
+                    {% endif %}
                 </summary>
                 <div class="race-body">
+                    {% if race.rp_verdict %}
+                    <div class="rp-verdict-block">
+                        <h4>Racing Post verdict</h4>
+                        <p>{{ race.rp_verdict }}</p>
+                    </div>
+                    {% endif %}
                     {% if race.insights %}
                     <div class="race-insights">
                         <h3>Race insights</h3>
@@ -218,17 +275,32 @@
                             <thead>
                                 <tr>
                                     <th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>OR</th>
-                                    <th>Form</th><th>Win</th><th>Place</th><th>Δ</th>
+                                    <th>Form</th><th>Win</th><th>Place</th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="Δ = odds change vs 20 minutes ago. Green steam can mean market confidence; red drift means caution.">Δ</span></th>
                                     <th>RP comment</th><th>Engine view</th>
-                                    <th>Place%</th><th>Combo</th><th>EV</th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="Place %: estimated chance of finishing in the places (usually top 3) based on our ranker + Harville formula.">Place%</span></th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="Combo: jockey+trainer Bayesian place rate from historical results — how often this pair places.">Combo</span></th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="EV (Expected Value): long-run profit edge on an each-way bet at these odds if the model is accurate.">EV</span></th>
+                                    <th>Stake</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for r in race.runners %}
                                 {% set g = r.market_gauge %}
-                                <tr class="{% if g and g.gate == 'abort' %}gate-abort{% elif g and g.gate == 'scale_up' %}gate-scale{% elif r.value_flag %}runner-value{% elif loop.index <= 3 %}runner-top{% endif %}">
+                                <tr class="{% if highlight_runner and r.runner_id == highlight_runner %}runner-highlight{% endif %} {% if g and g.gate == 'abort' %}gate-abort{% elif g and g.gate == 'scale_up' %}gate-scale{% elif r.value_flag %}runner-value{% elif loop.index <= 3 %}runner-top{% endif %}"
+                                    {% if r.runner_id %}data-runner-id="{{ r.runner_id }}"{% endif %}
+                                    data-horse="{{ r.horse_name }}"
+                                    data-course="{{ meeting.course }}"
+                                    data-off="{{ race.off_time or '' }}"
+                                    data-win-odds="{{ r.win_decimal if r.win_decimal is not none else '' }}"
+                                    data-model-win-prob="{{ r.model_win_prob if r.model_win_prob is not none else '' }}"
+                                    data-value-flag="{{ 1 if r.value_flag else 0 }}"
+                                    data-steam-gate="{{ g.gate if g else 'proceed' }}"
+                                    data-kelly-mult="{{ g.kelly_multiplier if g and g.kelly_multiplier is not none else 1 }}"
+                                    data-stake-units="1"
+                                    data-bet-type="each_way">
                                     <td class="num">{{ loop.index }}</td>
-                                    <td class="strong">{{ r.horse_name }}{% if r.draw %} <span class="pill" style="font-size:0.7em;">({{ r.draw }})</span>{% endif %}{% if r.value_flag %} <span class="value-flag">VALUE</span>{% endif %}</td>
+                                    <td class="strong horse-cell">{{ r.horse_name }}{% if r.draw %} <span class="pill" style="font-size:0.7em;">({{ r.draw }})</span>{% endif %}{% if r.value_flag %} <span class="value-flag">VALUE</span>{% endif %}<span class="risk-badge-slot"></span></td>
                                     <td>{{ r.jockey or '—' }}</td>
                                     <td>{{ r.trainer or '—' }}</td>
                                     <td class="num">{% if r.official_rating is not none and r.official_rating == r.official_rating %}{{ r.official_rating|int }}{% else %}—{% endif %}</td>
@@ -243,6 +315,7 @@
                                     <td class="num">{{ (r.model_place_prob or 0)|fmt_pct }}</td>
                                     <td class="num">{{ r.combo_bayes_place|fmt_num }}</td>
                                     <td class="num">{{ r.ew_combined_ev|fmt_num }}</td>
+                                    <td class="num stake-cell"><span class="stake-units-label">1.0u</span><span class="stake-cash-hint stake-cash-slot"></span></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>

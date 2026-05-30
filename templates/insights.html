@@ -3,14 +3,13 @@
 
 {% block extra_css %}
 .insights-hero{
-    display:grid;grid-template-columns:minmax(0,1fr) minmax(200px,280px);gap:16px;
-    margin-bottom:16px;padding:18px;border-radius:16px;
+    margin-bottom:16px;padding:18px 20px 18px 18px;border-radius:16px;
     background:linear-gradient(135deg,rgba(0,122,51,0.24),rgba(6,14,24,0.95));
     border:1px solid rgba(183,247,200,0.22);
+    position:relative;overflow:hidden;isolation:isolate;
 }
 .insights-hero h1{font-family:'Orbitron',monospace;color:var(--hibs-neon);font-size:1.2em;letter-spacing:0.06em;margin-bottom:8px;}
 .insights-hero p{color:var(--muted);font-size:0.88em;line-height:1.55;max-width:720px;}
-.insights-hero img{width:100%;max-height:220px;object-fit:contain;opacity:0.92;filter:drop-shadow(0 8px 20px rgba(0,0,0,0.35));}
 .pick-card{
     background:var(--card);border:1px solid var(--border);border-radius:14px;
     margin-bottom:14px;overflow:hidden;
@@ -23,7 +22,7 @@
 .pick-rank{font-family:'Orbitron',monospace;color:var(--gold);font-size:1.4em;font-weight:900;min-width:42px;}
 .pick-title{font-size:1.05em;font-weight:700;flex:1;}
 .pick-body{padding:14px 16px 16px;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-@media(max-width:860px){.insights-hero{grid-template-columns:1fr;}.pick-body{grid-template-columns:1fr;}}
+@media(max-width:860px){.pick-body{grid-template-columns:1fr;}}
 .pick-metrics{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
 .pick-metrics .pill{font-size:0.78em;}
 .pick-reasons{margin:0;padding-left:1.1em;font-size:0.84em;line-height:1.55;color:#cbd5e1;}
@@ -42,7 +41,10 @@
     {% if scoring_method %}<span class="pill ok">{{ scoring_method }} model</span>{% endif %}
 </div>
 
-<section class="insights-hero">
+<section class="insights-hero brand-panel-framed">
+    {% from '_hibs_brand.html' import brand_horse_watermark, brand_logo_watermark %}
+    {{ brand_logo_watermark(modifier='brand-logo-watermark--corner-tl') }}
+    {{ brand_horse_watermark(modifier='brand-horse-watermark--corner-tr') }}
     <div>
         <h1>Best 10 picks — explained</h1>
         <p>
@@ -59,19 +61,29 @@
         </p>
         {% endif %}
     </div>
-    <img src="{{ url_for('static', filename=hibs_hero_horse|default('hero_horse.png')) }}" alt="" aria-hidden="true">
 </section>
 
 {% if not top_picks %}
 <div class="banner error">No qualifying picks in the next {{ window_hours or 24 }}h window. Run <strong>Refresh 24h</strong> once cards and scores are loaded.</div>
 {% else %}
 
+{% if pick_candidates is defined %}
+<script id="pick-candidates-data" type="application/json">{{ pick_candidates|tojson }}</script>
+{% endif %}
+
 {% for r in top_picks %}
-<article class="pick-card" id="pick-{{ r.day_rank }}">
+<article class="pick-card" id="pick-{{ r.day_rank }}"
+    data-horse="{{ r.horse_name }}"
+    data-course="{{ r.course }}"
+    data-off="{{ r.off_time or '' }}"
+    data-win-odds="{{ r.win_decimal if r.win_decimal is not none else '' }}"
+    data-model-win-prob="{{ r.model_win_prob if r.model_win_prob is not none else '' }}"
+    data-bet-type="each_way">
     <div class="pick-card-head">
         <span class="pick-rank">#{{ r.day_rank or loop.index }}</span>
-        <div class="pick-title">{{ r.horse_name }}</div>
+        <div class="pick-title">{{ r.horse_name }}<span class="risk-badge-slot"></span></div>
         {% if r.value_flag %}<span class="value-flag">VALUE</span>{% endif %}
+        <button type="button" class="slip-copy-btn" data-slip-copy aria-label="Copy bet slip text">📋 Copy slip</button>
         <span class="pill">{{ r.off_time or '—' }} · {{ r.course or '' }}</span>
         <span class="pill">{{ r.race_name or '' }}</span>
     </div>
@@ -83,7 +95,8 @@
                 <span class="pill">score {{ r.place_score|fmt_num }}</span>
                 {% if r.win_decimal %}<span class="pill">win {{ r.win_decimal|fmt_num(1) }}</span>{% endif %}
                 {% if r.offered_place_decimal %}<span class="pill">place {{ r.offered_place_decimal|fmt_num(1) }}</span>{% endif %}
-                {% if r.ew_combined_ev is not none %}<span class="pill">EW EV {{ r.ew_combined_ev|fmt_num }}</span>{% endif %}
+                {% if r.ew_combined_ev is not none %}<span class="pill"><span class="tip-term" tabindex="0" data-tip="Expected Value: estimated long-run profit edge on this each-way bet at these odds.">EV</span> {{ r.ew_combined_ev|fmt_num }}</span>{% endif %}
+                <span class="pill stake-cash-slot"></span>
             </div>
             <p style="font-size:0.88em;color:var(--neon-value);margin-bottom:10px;">{{ r.pick_summary or r.engine_opinion or '' }}</p>
             <ul class="pick-reasons">
@@ -103,7 +116,15 @@
                 {% if r.nlp_pace_rank and r.nlp_pace_rank == r.nlp_pace_rank %}<li><strong>Pace NLP</strong> — sectional rank #{{ r.nlp_pace_rank|fmt_num(1) }} in this race from parsed running comments.</li>{% endif %}
                 {% if r.card_comment %}<li><strong>RP card</strong> — "{{ (r.card_comment[:100] + '…') if r.card_comment|length > 100 else r.card_comment }}"</li>{% endif %}
             </ul>
-            <p style="margin-top:10px;"><a href="{{ url_for('index') }}#racecard-shell" style="color:var(--accent);">View full racecard →</a></p>
+            <p style="margin-top:10px;">
+                {% if r.deep_link and r.deep_link.meeting %}
+                <a href="{{ url_for('index', race_id=r.race_id, runner_id=r.runner_id) }}#racecard-shell" class="deep-link-card" style="color:var(--accent);font-weight:600;">
+                    View {{ r.horse_name }} in racecard →
+                </a>
+                {% else %}
+                <a href="{{ url_for('index') }}#racecard-shell" style="color:var(--accent);">View full racecard →</a>
+                {% endif %}
+            </p>
         </div>
     </div>
 </article>

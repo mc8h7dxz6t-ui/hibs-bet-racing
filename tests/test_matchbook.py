@@ -5,9 +5,15 @@ from hibs_racing.odds.matchbook import (
     MatchbookClient,
     _best_back_price,
     _match_event_to_race,
+    _select_place_market,
     _select_win_market,
     fetch_matchbook_odds,
 )
+
+
+def test_select_place_market():
+    markets = [{"name": "Place", "market-type": "place"}, {"name": "Win", "market-type": "outright"}]
+    assert _select_place_market(markets)["name"] == "Place"
 
 
 def test_select_win_market():
@@ -47,6 +53,7 @@ class FakeMatchbookClient:
                 "meta-tags": [{"type": "VENUE", "name": "Newcastle"}],
                 "markets": [
                     {
+                        "id": 100,
                         "name": "Win",
                         "market-type": "outright",
                         "runners": [
@@ -61,7 +68,24 @@ class FakeMatchbookClient:
                                 "prices": [{"side": "back", "decimal-odds": 3.2}],
                             },
                         ],
-                    }
+                    },
+                    {
+                        "id": 101,
+                        "name": "Place",
+                        "market-type": "place",
+                        "runners": [
+                            {
+                                "id": 11,
+                                "name": "Star Runner",
+                                "prices": [{"side": "back", "decimal-odds": 1.9}],
+                            },
+                            {
+                                "id": 12,
+                                "name": "Slow Coach",
+                                "prices": [{"side": "back", "decimal-odds": 1.5}],
+                            },
+                        ],
+                    },
                 ],
             }
         ]
@@ -93,6 +117,10 @@ def test_fetch_matchbook_odds_aligns_runners():
     assert report.runners_priced == 2
     assert set(odds["best_book"]) == {"matchbook"}
     assert float(odds.loc[odds["horse_name"].str.contains("Star"), "win_decimal"].iloc[0]) == 5.0
+    star = odds.loc[odds["horse_name"].str.contains("Star")].iloc[0]
+    assert float(star["place_decimal"]) == 1.9
+    assert int(star["matchbook_place_market_id"]) == 101
+    assert int(star["matchbook_place_runner_id"]) == 11
 
 
 def test_matchbook_login_mock(monkeypatch):

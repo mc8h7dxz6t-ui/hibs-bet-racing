@@ -80,6 +80,9 @@ CREATE TABLE IF NOT EXISTS paper_bets (
     settled_at      TEXT,
     is_value_pick   INTEGER NOT NULL DEFAULT 0,
     finish_pos      INTEGER,
+    closing_sp      REAL,
+    clv_beat        INTEGER,
+    verification_hash TEXT,
     created_at      TEXT NOT NULL
 );
 
@@ -136,6 +139,7 @@ CREATE TABLE IF NOT EXISTS upcoming_runners (
     trainer         TEXT,
     days_since_last_run INTEGER,
     card_comment    TEXT,
+    rp_verdict      TEXT,
     win_decimal     REAL,
     race_natural_key TEXT,
     source          TEXT NOT NULL,
@@ -194,3 +198,46 @@ CREATE TABLE IF NOT EXISTS tipster_tips (
 CREATE INDEX IF NOT EXISTS idx_tips_date ON tipster_tips (card_date);
 CREATE INDEX IF NOT EXISTS idx_tips_stable ON tipster_tips (stable_intel);
 CREATE INDEX IF NOT EXISTS idx_tips_match ON tipster_tips (match_status);
+
+-- Phase C: execution audit log (routing instructions + live dedup)
+CREATE TABLE IF NOT EXISTS execution_log (
+    log_id                      TEXT PRIMARY KEY,
+    batch_id                    TEXT NOT NULL,
+    runner_id                   TEXT NOT NULL,
+    race_id                     TEXT NOT NULL,
+    horse_name                  TEXT,
+    course                      TEXT,
+    off_time                    TEXT,
+    bet_type                    TEXT NOT NULL,   -- win | place | each_way
+    bet_leg                     TEXT NOT NULL,   -- win | place (exchange leg)
+    venue                       TEXT NOT NULL,   -- matchbook | betfair | none
+    status                      TEXT NOT NULL,   -- routed | rejected | stub_ok | stub_error | skipped_duplicate
+    dry_run                     INTEGER NOT NULL DEFAULT 1,
+    stake                       REAL,
+    odds                        REAL,
+    place_odds                  REAL,
+    steam_gate                  TEXT,
+    value_flag                  INTEGER NOT NULL DEFAULT 0,
+    kelly_multiplier            REAL,
+    message                     TEXT,
+    external_id                 TEXT,
+    matchbook_runner_id         INTEGER,
+    matchbook_market_id         INTEGER,
+    matchbook_place_market_id   INTEGER,
+    matchbook_event_id          INTEGER,
+    betfair_market_id           TEXT,
+    betfair_selection_id        INTEGER,
+    betfair_place_market_id     TEXT,
+    payload_json                TEXT,
+    idempotency_key             TEXT NOT NULL,
+    created_at                  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_execution_log_batch ON execution_log (batch_id);
+CREATE INDEX IF NOT EXISTS idx_execution_log_runner ON execution_log (runner_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_execution_log_created ON execution_log (created_at);
+
+-- One live routed offer per runner/leg/venue (re-runs skip instead of double-bet)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_log_live_dedup
+ON execution_log (idempotency_key)
+WHERE dry_run = 0 AND status = 'routed';

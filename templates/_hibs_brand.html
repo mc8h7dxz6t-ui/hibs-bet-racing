@@ -1,7 +1,12 @@
-{% macro site_crests(primary=hibs_badge_primary|default('logo_hibs_racing.svg'), harp=hibs_badge_harp|default('badge_harp_embroidered.png'), size=44) %}
+{% macro site_crests(
+    logo=hibs_racing_logo|default('badge_hibs_racing_oval.png'),
+    svg=hibs_badge_primary|default('logo_hibs_racing.svg'),
+    harp=hibs_badge_harp|default('badge_harp_embroidered.png'),
+    logo_height=52
+) %}
 <div class="site-crest-wrap" role="img" aria-label="hibs-racing">
-    <img src="{{ url_for('static', filename=primary) }}" alt="hibs-racing" class="site-crest site-crest-primary" width="{{ size }}" height="{{ (size * 1.15)|int }}">
-    <img src="{{ url_for('static', filename=harp) }}" alt="" class="site-crest site-crest-harp" width="{{ (size * 0.55)|int }}" height="{{ (size * 0.55)|int }}" aria-hidden="true">
+    <img src="{{ url_for('static', filename=logo) }}" alt="Hibs Racing" class="site-crest site-crest-oval" height="{{ logo_height }}" width="{{ logo_height }}" decoding="async">
+    <img src="{{ url_for('static', filename=harp) }}" alt="" class="site-crest site-crest-harp site-crest-harp-mini" width="28" height="28" aria-hidden="true" decoding="async">
 </div>
 {% endmacro %}
 
@@ -10,8 +15,15 @@
 {% endmacro %}
 
 {% macro heritage_strip(size=22) %}
-{# Golden harp only — no multi-badge strip #}
 <div class="hibs-heritage-strip" aria-hidden="true">
     <img src="{{ url_for('static', filename=hibs_badge_harp|default('badge_harp_embroidered.png')) }}" alt="" width="{{ size }}" height="{{ size }}" title="Golden harp">
 </div>
+{% endmacro %}
+
+{% macro brand_horse_watermark(horse=hibs_hero_horse|default('hero_horse.png'), modifier='') %}
+<div class="brand-horse-watermark {{ modifier }}" aria-hidden="true" style="background-image:url('{{ url_for('static', filename=horse) }}');"></div>
+{% endmacro %}
+
+{% macro brand_logo_watermark(logo=hibs_racing_logo|default('badge_hibs_racing_oval.png'), modifier='') %}
+<div class="brand-logo-watermark {{ modifier }}" aria-hidden="true" style="background-image:url('{{ url_for('static', filename=logo) }}');"></div>
 {% endmacro %}

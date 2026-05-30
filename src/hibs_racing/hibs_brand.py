@@ -8,7 +8,9 @@ from typing import Any
 
 HIBS_BADGE_PRIMARY = "logo_hibs_racing.svg"
 HIBS_BADGE_HARP = "badge_harp_embroidered.png"
+HIBS_RACING_LOGO = "badge_hibs_racing_oval.png"
 HIBS_HERO_HORSE = "hero_horse.png"
+HIBS_HORSE_CLUB_REF = "logo_horse_club_ref.png"
 
 HIBS_HERITAGE_BADGES: list[dict[str, Any]] = [
     {"file": HIBS_BADGE_HARP, "label": "Golden harp shield", "era": "heritage"},
@@ -23,7 +25,9 @@ def hibs_brand_context() -> dict[str, Any]:
     return {
         "hibs_badge_primary": HIBS_BADGE_PRIMARY,
         "hibs_badge_harp": HIBS_BADGE_HARP,
+        "hibs_racing_logo": HIBS_RACING_LOGO,
         "hibs_hero_horse": HIBS_HERO_HORSE,
+        "hibs_horse_club_ref": HIBS_HORSE_CLUB_REF,
         "hibs_heritage_badges": HIBS_HERITAGE_BADGES,
         "hibs_watermark_badges": HIBS_WATERMARK_BADGES,
         "product_name": "hibs-racing",

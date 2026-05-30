@@ -15,6 +15,8 @@ from hibs_racing.config import db_path, load_config
 from hibs_racing.entity.natural_key import generate_natural_key
 from hibs_racing.features.store import connect, init_db
 from hibs_racing.pick_explain import attach_pick_explanations, explain_pick
+from hibs_racing.ingest.rp_verdict import race_verdict_from_runners
+from hibs_racing.live.execution_config import betfair_configured, betfair_enabled, preferred_execution_venues
 from hibs_racing.race_insights import build_race_insights
 
 
@@ -27,6 +29,9 @@ class HealthStatus:
     racing_post: bool
     matchbook: bool
     raceform_path: str | None
+    betfair_enabled: bool
+    betfair_configured: bool
+    execution_venues: list[str]
 
     def to_dict(self) -> dict:
         return {
@@ -37,6 +42,9 @@ class HealthStatus:
             "racing_post": self.racing_post,
             "matchbook": self.matchbook,
             "raceform_path": self.raceform_path,
+            "betfair_enabled": self.betfair_enabled,
+            "betfair_configured": self.betfair_configured,
+            "execution_venues": self.execution_venues,
         }
 
 
@@ -68,6 +76,9 @@ def health_status() -> HealthStatus:
         racing_post=_env_ok("EMAIL", "ACCESS_TOKEN"),
         matchbook=_env_ok("MATCHBOOK_USERNAME", "MATCHBOOK_PASSWORD"),
         raceform_path=raceform,
+        betfair_enabled=betfair_enabled(),
+        betfair_configured=betfair_configured(),
+        execution_venues=preferred_execution_venues(),
     )
 
 
@@ -123,6 +134,10 @@ def group_meetings(frame: pd.DataFrame) -> list[dict]:
             runners = [_enrich_runner(rec, peers) for rec in race_df.to_dict(orient="records")]
             first = race_df.iloc[0]
             insights = build_race_insights(race_df)
+            rp_verdict = race_verdict_from_runners(race_df)
+            rp_verdict_short = (
+                (rp_verdict[:160] + "…") if rp_verdict and len(rp_verdict) > 160 else rp_verdict
+            )
             value_n = int((race_df.get("value_flag", 0) == 1).sum()) if "value_flag" in race_df.columns else 0
             races.append(
                 {
@@ -143,6 +158,8 @@ def group_meetings(frame: pd.DataFrame) -> list[dict]:
                         first.get("off_time"),
                     ),
                     "value_count": value_n,
+                    "rp_verdict": rp_verdict,
+                    "rp_verdict_short": rp_verdict_short,
                     "insights": insights,
                     "runners": runners,
                 }
@@ -178,6 +195,71 @@ def group_meetings(frame: pd.DataFrame) -> list[dict]:
     return meetings
 
 
+def race_dom_id(meeting_slug: str, race_slug: str) -> str:
+    return f"race-{meeting_slug}-{race_slug}"
+
+
+def resolve_race_deep_link(
+    meetings: list[dict],
+    *,
+    race_id: str | None = None,
+    meeting: str | None = None,
+    race: str | None = None,
+) -> dict[str, str]:
+    """
+    Map query params → meeting slug + race drawer DOM id for deep-linking.
+    Prefer explicit meeting+race; otherwise resolve by race_id.
+    """
+    meeting = (meeting or "").strip()
+    race = (race or "").strip()
+    if meeting and race:
+        if not race.startswith("race-"):
+            race = race_dom_id(meeting, race)
+        return {"meeting": meeting, "race": race, "race_id": str(race_id or "")}
+
+    rid = str(race_id or "").strip()
+    if not rid:
+        return {}
+
+    for m in meetings:
+        for r in m.get("races") or []:
+            if str(r.get("race_id")) == rid:
+                slug = str(m.get("slug") or "")
+                dom = race_dom_id(slug, str(r.get("race_slug") or "r1"))
+                return {"meeting": slug, "race": dom, "race_id": rid}
+    return {}
+
+
+def attach_deep_links_to_picks(picks: list[dict], meetings: list[dict]) -> list[dict]:
+    out: list[dict] = []
+    for pick in picks:
+        link = resolve_race_deep_link(meetings, race_id=str(pick.get("race_id") or ""))
+        if pick.get("runner_id"):
+            link = {**link, "runner_id": str(pick["runner_id"])}
+        out.append({**pick, "deep_link": link})
+    return out
+
+
+def cards_deep_link_context(
+    meetings: list[dict],
+    *,
+    race_id: str | None = None,
+    meeting: str | None = None,
+    race: str | None = None,
+    runner_id: str | None = None,
+) -> dict:
+    link = resolve_race_deep_link(meetings, race_id=race_id, meeting=meeting, race=race)
+    runner = (runner_id or "").strip()
+    if runner:
+        link = {**link, "runner_id": runner}
+    return {
+        "deep_link": link,
+        "initial_meeting": link.get("meeting"),
+        "initial_race": link.get("race"),
+        "highlight_runner": runner or link.get("runner_id"),
+    }
+
+
 def _attach_market_gauges(meetings: list[dict]) -> None:
     try:
         from hibs_racing.odds.market_steam import evaluate_market_gauges
@@ -206,14 +288,17 @@ def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
     from hibs_racing.monitor import top_places_of_day
 
     frame = _base_frame(window_hours=window_hours)
-    picks = top_places_of_day(frame, top_n=top_n)
+    meetings = group_meetings(frame) if not frame.empty else []
+    picks = attach_deep_links_to_picks(top_places_of_day(frame, top_n=top_n), meetings)
     feature_impact = load_feature_impact_report()
+    pick_candidates = novice_pick_candidates(meetings)
     scoring_method = None
     if not frame.empty and "scoring_method" in frame.columns:
         modes = frame["scoring_method"].dropna().unique().tolist()
         scoring_method = modes[0] if len(modes) == 1 else "mixed"
     return {
         "top_picks": picks,
+        "pick_candidates": pick_candidates,
         "pick_count": len(picks),
         "runner_count": len(frame),
         "race_count": int(frame["race_id"].nunique()) if not frame.empty else 0,
@@ -224,15 +309,81 @@ def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
     }
 
 
+def _ui_data_completeness(row: dict) -> int:
+    """UI-only completeness proxy (not persisted) — helps novice 'Best Bets' filter."""
+    checks = [
+        row.get("win_decimal"),
+        row.get("model_win_prob"),
+        row.get("model_place_prob"),
+        row.get("jockey"),
+        row.get("trainer"),
+        row.get("card_comment"),
+        row.get("official_rating"),
+    ]
+    ok = 0
+    for val in checks:
+        if val is None or (isinstance(val, float) and pd.isna(val)):
+            continue
+        if str(val).strip():
+            ok += 1
+    return int(round(100 * ok / max(len(checks), 1)))
+
+
+def novice_pick_candidates(meetings: list[dict]) -> list[dict]:
+    """Flatten card rows for client-side Smart Portfolio / slip copy (UI layer only)."""
+    out: list[dict] = []
+    for meeting in meetings:
+        course = meeting.get("course")
+        for race in meeting.get("races") or []:
+            off_time = race.get("off_time")
+            for row in race.get("runners") or []:
+                gauge = row.get("market_gauge") or {}
+                win = row.get("win_decimal")
+                try:
+                    win_f = float(win) if win is not None and not (isinstance(win, float) and pd.isna(win)) else None
+                except (TypeError, ValueError):
+                    win_f = None
+                mwp = row.get("model_win_prob")
+                try:
+                    mwp_f = float(mwp) if mwp is not None and not (isinstance(mwp, float) and pd.isna(mwp)) else None
+                except (TypeError, ValueError):
+                    mwp_f = None
+                implied = mwp_f if mwp_f else ((1.0 / win_f) if win_f and win_f > 1 else None)
+                out.append(
+                    {
+                        "runner_id": row.get("runner_id"),
+                        "horse_name": row.get("horse_name"),
+                        "course": course,
+                        "off_time": off_time,
+                        "race_name": race.get("race_name"),
+                        "win_decimal": win_f,
+                        "implied_prob": implied,
+                        "model_place_prob": row.get("model_place_prob"),
+                        "place_score": row.get("place_score") or row.get("model_place_prob"),
+                        "ew_combined_ev": row.get("ew_combined_ev"),
+                        "value_flag": bool(row.get("value_flag")),
+                        "steam_gate": str(gauge.get("gate") or "proceed"),
+                        "kelly_multiplier": float(gauge.get("kelly_multiplier") or 1.0),
+                        "data_quality_pct": _ui_data_completeness(row),
+                        "stake_units": float(load_config().get("paper", {}).get("default_stake", 1.0)),
+                        "bet_type": "each_way",
+                        "deep_link": {
+                            "meeting": meeting.get("slug"),
+                            "race": race_dom_id(str(meeting.get("slug") or ""), str(race.get("race_slug") or "r1")),
+                            "runner_id": row.get("runner_id"),
+                        },
+                    }
+                )
+    return out
+
+
 def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -> dict:
     frame = _base_frame(card_date=card_date, window_hours=window_hours)
     health = health_status()
     value = frame[frame["value_flag"] == 1] if not frame.empty and "value_flag" in frame.columns else frame.iloc[0:0]
     from hibs_racing.monitor import monitor_snapshot, top_places_of_day
 
-    top_picks = top_places_of_day(frame, top_n=10)
     monitor = monitor_snapshot(refresh=False, settle=True)
-    backtest = None
     try:
         backtest = run_place_backtest().to_dict()
     except Exception:
@@ -244,6 +395,8 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
     from hibs_racing.odds.market_steam import latest_gauges
 
     card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else []
+    meetings = group_meetings(frame) if not frame.empty else []
+    pick_candidates = novice_pick_candidates(meetings)
     return {
         "health": health,
         "card_date": card_date or (card_dates[0] if len(card_dates) == 1 else None),
@@ -252,8 +405,9 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
         "runner_count": len(frame),
         "race_count": int(frame["race_id"].nunique()) if not frame.empty else 0,
         "value_count": len(value),
-        "meetings": group_meetings(frame),
-        "top_picks": top_picks,
+        "meetings": meetings,
+        "top_picks": attach_deep_links_to_picks(top_places_of_day(frame, top_n=10), meetings),
+        "pick_candidates": pick_candidates,
         "monitor": monitor,
         "backtest": backtest,
         "scoring_method": scoring_method,

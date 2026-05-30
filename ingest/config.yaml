@@ -57,10 +57,21 @@ paper:
   default_place_fraction: 0.25
   default_places: 3
   default_stake: 1.0
+  # Value picks auto-logged when refresh-cards runs with --paper (daily_refresh.sh)
 
 cards:
   default_region: gb
   fetch_timeout_sec: 120
+  parallel_workers: 4
+  rp_verdict_workers: 6
+
+execution:
+  dry_run: true
+  betfair_enabled: false
+  preferred_venues: [matchbook]
+  max_stake: 2.0
+  require_value_flag: true
+  allowed_steam_gates: [proceed, scale_up]
 
 monitor:
   top_n: 10

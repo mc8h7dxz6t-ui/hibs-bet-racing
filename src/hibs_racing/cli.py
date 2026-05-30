@@ -223,6 +223,17 @@ def cmd_poll_odds(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_route_execution(args: argparse.Namespace) -> int:
+    from hibs_racing.cards.query import load_scored_cards
+    from hibs_racing.live.execution_router import build_execution_intents, route_execution_batch
+
+    scored = load_scored_cards()
+    intents = build_execution_intents(scored)
+    report = route_execution_batch(intents, log_results=True)
+    print(json.dumps(report, indent=2))
+    return 0
+
+
 def cmd_refresh_cards(args: argparse.Namespace) -> int:
     """Same path as web Refresh 24h: GB+IRE window, score, optional odds + paper."""
     from hibs_racing.cards.refresh import refresh_cards
@@ -241,6 +252,7 @@ def cmd_refresh_cards(args: argparse.Namespace) -> int:
             window_hours=window_hours,
             regions=tuple(r.strip().lower() for r in args.regions.split(",") if r.strip()),
             paper=args.paper,
+            parallel_workers=getattr(args, "workers", None),
         )
     except Exception as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, indent=2), file=sys.stderr)
@@ -652,7 +664,14 @@ def main(argv: list[str] | None = None) -> int:
         default="auto",
     )
     p_refresh.add_argument("--paper", action="store_true", help="Log paper EW bets for value flags")
+    p_refresh.add_argument("--workers", type=int, help="Parallel workers for fetch + RP verdict (default: config)")
     p_refresh.set_defaults(func=cmd_refresh_cards)
+
+    p_exec = sub.add_parser(
+        "route-execution",
+        help="Preview automated Matchbook/Betfair routing for value picks (dry-run by default)",
+    )
+    p_exec.set_defaults(func=cmd_route_execution)
 
     p_ic = sub.add_parser("ingest-cards", help="Load racecards from CSV or rpscrape JSON")
     p_ic.add_argument("path", help="cards.csv or YYYY-MM-DD.json")

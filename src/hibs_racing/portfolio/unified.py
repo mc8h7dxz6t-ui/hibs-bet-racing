@@ -10,7 +10,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 from hibs_racing.config import load_config
-from hibs_racing.place.paper_ledger import build_tracker_dict
+from hibs_racing.place.public_tracker import build_public_tracker_dict
 
 
 def _football_tracker_url() -> str:
@@ -197,7 +197,7 @@ def build_unified_portfolio(*, football_days: int = 90, racing_limit: int = 200)
             football_source = f"sqlite:{db}"
             football_rows = _load_football_from_sqlite(db, days=football_days)
 
-    racing_tracker = build_tracker_dict(limit=racing_limit)
+    racing_tracker = build_public_tracker_dict(limit=racing_limit)
     racing_rows = [_normalize_racing_row(r) for r in racing_tracker.get("ledger_rows") or []]
     racing_stats = racing_tracker.get("stats") or {}
 

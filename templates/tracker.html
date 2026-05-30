@@ -1,11 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Performance Tracker — {{ product_name }}{% endblock %}
+{% block title %}Live Track Record — {{ product_name }}{% endblock %}
 
 {% block extra_css %}
 .trk-page{max-width:1140px;margin:0 auto;}
 .trk-hero{
     margin-bottom:18px;padding:18px 20px;border:1px solid rgba(0,122,51,0.35);border-radius:16px;
     background:linear-gradient(118deg,rgba(0,122,51,0.22) 0%,rgba(10,32,22,0.92) 50%,rgba(6,14,24,0.96) 100%);
+    position:relative;overflow:hidden;isolation:isolate;
 }
 .trk-hero h1{font-family:'Orbitron',monospace;font-size:1.35em;color:var(--hibs-neon);margin-bottom:8px;}
 .trk-badge{
@@ -24,6 +25,7 @@
 .trk-stat span{font-size:0.75em;color:var(--muted);}
 .trk-stat.pos strong{color:#86efac;}
 .trk-stat.neg strong{color:#fca5a5;}
+.trk-chart{width:100%;height:160px;background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:10px;}
 .trk-table{width:100%;font-size:0.8em;border-collapse:collapse;}
 .trk-table th,.trk-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
 .trk-table th{color:var(--muted);font-weight:600;font-size:0.72em;text-transform:uppercase;}
@@ -33,67 +35,101 @@
 .trk-open td{opacity:0.85;}
 .trk-value{color:var(--gold);font-size:0.72em;font-weight:700;margin-left:6px;}
 .trk-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.trk-hash{font-family:ui-monospace,monospace;font-size:0.68em;color:var(--muted);word-break:break-all;max-width:88px;}
+.trk-days a{margin-right:10px;font-size:0.85em;color:var(--hibs-neon);}
 {% endblock %}
 
 {% block content %}
-{% set stats = tracker.stats if tracker else (monitor.ledger if monitor else {}) %}
+{% set stats = tracker.stats if tracker else {} %}
+{% set clv = tracker.clv if tracker else {} %}
+{% set days = tracker.history_days if tracker else 60 %}
 <div class="trk-page">
-    <div class="trk-hero">
-        <span class="trk-badge">Paper only</span>
+    <div class="trk-hero brand-panel-framed">
+        {% from '_hibs_brand.html' import brand_horse_watermark, brand_logo_watermark %}
+        {{ brand_logo_watermark(modifier='brand-logo-watermark--corner-tl') }}
+        {{ brand_horse_watermark(modifier='brand-horse-watermark--corner-br') }}
+        <span class="trk-badge">Public read-only</span>
+        <span class="trk-badge">Pre-race lock</span>
         <span class="trk-badge">Auto-settle</span>
-        <span class="trk-badge">Place / EW</span>
-        <h1>Performance Tracker</h1>
+        <span class="trk-badge">CLV audit</span>
+        <h1>Live Paper Track Record</h1>
         <p class="trk-intro">
-            Independent paper ledger for <strong>{{ product_name }}</strong>. Each row is a logged each-way value pick
-            (or manual paper bet). Results are joined from your ingested raceform / scrape history when you run
-            <code>hibs-racing settle-paper</code> or open the monitor (auto-settles every 5 min).
+            Independent verification ledger for <strong>{{ product_name }}</strong>.
+            Each row is an each-way value pick logged at score time during
+            <code>daily_refresh.sh</code> — before results are known. Settlement joins ingested
+            raceform; closing SP is stored for CLV. This page cannot edit bets or outcomes.
         </p>
         {% if tracker and tracker.methodology %}
         <p class="trk-intro">
+            <strong>Lock:</strong> {{ tracker.methodology.lock_rule }}
             <strong>Settlement:</strong> {{ tracker.methodology.settlement_rule }}
         </p>
+        <p class="trk-intro" style="font-size:0.82em;">{{ tracker.methodology.verification }}</p>
         {% endif %}
-        <div class="trk-actions">
-            <button type="button" class="btn" id="btn-settle-paper">Settle now</button>
-            <a class="btn btn-secondary" href="/api/tracker/export.csv" download="hibs-racing-ledger.csv">Download CSV</a>
-            <a class="btn btn-secondary" href="/api/tracker">JSON API</a>
+        <div class="trk-days">
+            Window:
+            <a href="?days=30">30d</a>
+            <a href="?days=60">60d</a>
+            <a href="?days=90">90d</a>
+            (showing {{ days }} days)
         </div>
+        <div class="trk-actions">
+            {% if not public_read_only %}
+            <button type="button" class="btn" id="btn-settle-paper">Settle now</button>
+            {% endif %}
+            <a class="btn btn-secondary" href="/api/tracker/export.csv?days={{ days }}" download="hibs-racing-tracker.csv">Download CSV</a>
+            <a class="btn btn-secondary" href="/api/tracker?days={{ days }}">JSON API</a>
+        </div>
+        {% if tracker and tracker.daily_refresh %}
+        <p class="trk-intro" style="font-size:0.8em;margin-top:10px;">{{ tracker.daily_refresh.message }}</p>
+        {% endif %}
+        {% if tracker and tracker.third_party_note %}
+        <p class="trk-intro" style="font-size:0.78em;">{{ tracker.third_party_note }}</p>
+        {% endif %}
     </div>
+
+    <section class="trk-card">
+        <h2>Cumulative P&amp;L (settled)</h2>
+        <svg id="pnl-chart" class="trk-chart" viewBox="0 0 800 160" preserveAspectRatio="none" role="img" aria-label="Cumulative paper P and L curve"></svg>
+        <p class="trk-intro" style="font-size:0.78em;margin-top:8px;">
+            {{ tracker.pnl_curve|length if tracker else 0 }} settled points in window · built from immutable paper_bets rows
+        </p>
+    </section>
 
     <section class="trk-card">
         <h2>Summary</h2>
         <div class="trk-stats">
             <div class="trk-stat {% if stats.total_pnl and stats.total_pnl >= 0 %}pos{% elif stats.total_pnl %}neg{% endif %}">
                 <strong>{% if stats.total_pnl is not none %}{{ '%+.2f'|format(stats.total_pnl) }}u{% else %}—{% endif %}</strong>
-                <span>Units P&L (settled)</span>
-            </div>
-            <div class="trk-stat">
-                <strong>{% if stats.place_hit_pct is not none %}{{ stats.place_hit_pct }}%{% elif stats.strike_rate %}{{ '%.0f'|format(stats.strike_rate * 100) }}%{% else %}—{% endif %}</strong>
-                <span>Place hit rate</span>
+                <span>Units P&amp;L (settled)</span>
             </div>
             <div class="trk-stat">
                 <strong>{% if stats.roi_pct is not none %}{{ '%+.1f'|format(stats.roi_pct) }}%{% else %}—{% endif %}</strong>
                 <span>ROI on settled stakes</span>
             </div>
             <div class="trk-stat">
+                <strong>{% if clv.clv_beat_rate_pct is not none %}{{ clv.clv_beat_rate_pct }}%{% else %}—{% endif %}</strong>
+                <span>Beat closing SP (n={{ clv.n_with_closing_sp or 0 }})</span>
+            </div>
+            <div class="trk-stat">
+                <strong>{% if stats.place_hit_pct is not none %}{{ stats.place_hit_pct }}%{% else %}—{% endif %}</strong>
+                <span>Place hit rate</span>
+            </div>
+            <div class="trk-stat">
                 <strong>{% if stats.value_pick_strike_pct is not none %}{{ stats.value_pick_strike_pct }}%{% else %}—{% endif %}</strong>
-                <span>Value-flag success (settled)</span>
+                <span>Value-flag success</span>
             </div>
             <div class="trk-stat">
-                <strong>{{ stats.settled_bets or 0 }}</strong>
-                <span>Settled bets</span>
+                <strong>{{ tracker.settled_count if tracker else stats.settled_bets or 0 }}</strong>
+                <span>Settled</span>
             </div>
             <div class="trk-stat">
-                <strong>{{ stats.open_bets or 0 }}</strong>
+                <strong>{{ tracker.open_count if tracker else stats.open_bets or 0 }}</strong>
                 <span>Awaiting results</span>
             </div>
             <div class="trk-stat">
-                <strong>{{ stats.value_pick_count or 0 }}</strong>
-                <span>Value picks logged</span>
-            </div>
-            <div class="trk-stat">
-                <strong>{{ stats.win_hits or 0 }}</strong>
-                <span>Winners (incl EW win leg)</span>
+                <strong>{{ tracker.ledger_count if tracker else 0 }}</strong>
+                <span>Rows in window</span>
             </div>
         </div>
     </section>
@@ -105,35 +141,37 @@
             <table class="trk-table">
                 <thead>
                     <tr>
-                        <th>Date</th><th>Time</th><th>Course</th><th>Horse</th><th>Type</th>
-                        <th>Stake</th><th>Odds</th><th>Model EV</th><th>Pos</th><th>Status</th><th>P&L</th>
+                        <th>Logged</th><th>Date</th><th>Course</th><th>Horse</th>
+                        <th><span class="tip-term" tabindex="0" data-tip="Stake in units — set bankroll above to see cash equivalent.">Stake</span></th>
+                        <th>Taken</th><th>Close SP</th><th>CLV</th><th>Pos</th><th>Status</th><th>P&amp;L</th><th>Hash</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for r in tracker.ledger_rows %}
                     <tr class="{% if r.status == 'open' %}trk-open{% elif r.status in ('won','placed') %}trk-win{% elif r.status == 'lost' %}trk-loss{% endif %}">
+                        <td>{{ (r.created_at or '')[:19]|replace('T',' ') }}</td>
                         <td>{{ r.card_date or '—' }}</td>
-                        <td class="num">{{ r.off_time or '—' }}</td>
                         <td>{{ r.course or '—' }}</td>
                         <td>
                             <strong>{{ r.horse_name or r.runner_id }}</strong>
                             {% if r.is_value_pick %}<span class="trk-value">VALUE</span>{% endif %}
                         </td>
-                        <td>{{ r.bet_type }}</td>
-                        <td class="num">{{ '%.1f'|format(r.stake_units or 0) }}</td>
+                        <td class="num stake-tracker-cell" data-stake-units="{{ r.stake_units or 0 }}">{{ '%.1f'|format(r.stake_units or 0) }}u<span class="stake-cash-hint stake-cash-slot"></span></td>
                         <td class="num">{% if r.offered_win %}{{ '%.1f'|format(r.offered_win) }}{% else %}—{% endif %}</td>
-                        <td class="num">{% if r.model_ev is not none %}{{ '%+.2f'|format(r.model_ev) }}{% else %}—{% endif %}</td>
+                        <td class="num">{% if r.closing_sp %}{{ '%.1f'|format(r.closing_sp) }}{% else %}—{% endif %}</td>
+                        <td>{% if r.clv_beat == 1 %}✓{% elif r.clv_beat == 0 %}✗{% else %}—{% endif %}</td>
                         <td class="num">{{ r.finish_pos or '—' }}</td>
                         <td>{{ r.status }}</td>
                         <td class="num">{% if r.result_pnl is not none %}<strong>{{ '%+.2f'|format(r.result_pnl) }}</strong>{% else %}—{% endif %}</td>
+                        <td><span class="trk-hash" title="{{ r.verification_hash or '' }}">{{ (r.verification_hash or '')[:12] }}…</span></td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
             {% else %}
             <p class="trk-intro" style="padding:8px 0;">
-                No paper bets yet. Log value picks with:
-                <code>hibs-racing score-card --odds my_odds.csv --paper</code>
+                No paper bets in this window yet. Enable cron:
+                <code>bash scripts/install_cron.sh</code> — daily_refresh logs value picks with <code>--paper</code>.
             </p>
             {% endif %}
         </div>
@@ -142,7 +180,40 @@
 {% endblock %}
 
 {% block extra_js %}
+<script id="pnl-data" type="application/json">{{ (tracker.pnl_curve if tracker else [])|tojson }}</script>
 <script>
+(function pnlChart(){
+    const el = document.getElementById('pnl-chart');
+    const raw = document.getElementById('pnl-data');
+    if (!el || !raw) return;
+    let points = [];
+    try { points = JSON.parse(raw.textContent || '[]'); } catch (_) {}
+    if (!points.length) {
+        el.innerHTML = '<text x="20" y="80" fill="#94a3b8" font-size="14">No settled bets yet — track record builds daily via cron.</text>';
+        return;
+    }
+    const vals = points.map(p => Number(p.cum_pnl));
+    const minY = Math.min(0, ...vals);
+    const maxY = Math.max(0.01, ...vals);
+    const pad = 24;
+    const w = 800, h = 160;
+    const span = maxY - minY || 1;
+    const coords = points.map((p, i) => {
+        const x = pad + (i / Math.max(1, points.length - 1)) * (w - pad * 2);
+        const y = h - pad - ((Number(p.cum_pnl) - minY) / span) * (h - pad * 2);
+        return `${x},${y}`;
+    }).join(' ');
+    const zeroY = h - pad - ((0 - minY) / span) * (h - pad * 2);
+    const last = points[points.length - 1];
+    const color = Number(last.cum_pnl) >= 0 ? '#86efac' : '#fca5a5';
+    el.innerHTML = `
+        <line x1="${pad}" y1="${zeroY}" x2="${w - pad}" y2="${zeroY}" stroke="#334155" stroke-width="1"/>
+        <polyline fill="none" stroke="${color}" stroke-width="2.5" points="${coords}"/>
+        <text x="${pad}" y="16" fill="#94a3b8" font-size="11">${points[0].date} → ${last.date}</text>
+        <text x="${w - pad}" y="16" fill="${color}" font-size="12" text-anchor="end">${Number(last.cum_pnl) >= 0 ? '+' : ''}${Number(last.cum_pnl).toFixed(2)}u</text>`;
+})();
+
+{% if not public_read_only %}
 document.getElementById('btn-settle-paper')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-settle-paper');
     btn.disabled = true; btn.textContent = 'Settling…';
@@ -154,5 +225,6 @@ document.getElementById('btn-settle-paper')?.addEventListener('click', async () 
     } catch (e) { alert('Settle failed'); }
     finally { btn.disabled = false; btn.textContent = 'Settle now'; }
 });
+{% endif %}
 </script>
 {% endblock %}

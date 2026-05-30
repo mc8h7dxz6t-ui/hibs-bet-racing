@@ -52,3 +52,25 @@ class BetfairStreamClient:
         raise NotImplementedError(
             "Phase C: implement Betfair stream after offline backtest passes."
         )
+
+
+class BetfairExecutionClient:
+    """Transactional stub — placeOrders via Sports API (live gated by HIBS_EXECUTION_LIVE)."""
+
+    def __init__(self, app_key: str, username: str, password: str) -> None:
+        self.app_key = app_key
+        self.username = username
+        self.password = password
+        self._session_token: str | None = None
+
+    def login(self) -> str:
+        raise NotImplementedError(
+            "Phase C: implement Betfair SSO login + session token before live routing."
+        )
+
+    def place_orders(self, instructions: list[dict]) -> dict:
+        if not instructions:
+            return {"status": "SUCCESS", "instructionReports": []}
+        raise NotImplementedError(
+            "Phase C: wire SportsAPING/v1.0/placeOrders — use execution router dry_run until mapped."
+        )

@@ -31,3 +31,4 @@ run_logged "daily-settle-paper" \
   hibs-racing settle-paper
 
 echo "Daily refresh completed successfully."
+echo "Public track record: /tracker (paper bets logged: see refresh-cards --paper)"

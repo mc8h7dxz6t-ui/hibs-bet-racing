@@ -8,15 +8,23 @@ from flask import Flask, Response, jsonify, render_template, request
 
 from hibs_racing.hibs_brand import hibs_brand_context
 from hibs_racing.models.feature_impact import impact_artifact_paths, load_feature_impact_report
+from hibs_racing.models.ranker_attribution import live_ranker_attribution
 from hibs_racing.monitor import monitor_snapshot
 from hibs_racing.odds.market_steam import latest_gauges, latest_triggers, poll_matchbook_odds_once
-from hibs_racing.place.paper_ledger import build_tracker_dict, export_ledger_csv, settle_paper_bets
+from hibs_racing.place.paper_ledger import export_ledger_csv, settle_paper_bets
+from hibs_racing.place.public_tracker import (
+    build_public_tracker_dict,
+    default_history_days,
+    public_tracker_enabled,
+)
 from hibs_racing.portfolio.summary_bar import portfolio_summary_dict
 from hibs_racing.portfolio.unified import build_unified_portfolio
 from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.config import db_path, load_config
 from hibs_racing.web_format import fmt_num, fmt_pct
-from hibs_racing.web_service import dashboard_context, health_status
+from hibs_racing.live.execution_config import execution_summary
+from hibs_racing.live.execution_log import execution_audit_panel
+from hibs_racing.web_service import cards_deep_link_context, dashboard_context, health_status, insights_context
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -45,10 +53,23 @@ def create_app() -> Flask:
             resp.headers["Access-Control-Allow-Origin"] = os.environ.get("HIBS_PORTFOLIO_CORS_ORIGIN", "*")
         return resp
 
-    @app.route("/")
-    def index():
+    def _render_cards():
         ctx = dashboard_context()
+        ctx.update(
+            cards_deep_link_context(
+                ctx["meetings"],
+                race_id=request.args.get("race_id"),
+                meeting=request.args.get("meeting"),
+                race=request.args.get("race"),
+                runner_id=request.args.get("runner_id") or request.args.get("runner"),
+            )
+        )
         return render_template("dashboard.html", **ctx)
+
+    @app.route("/")
+    @app.route("/cards")
+    def index():
+        return _render_cards()
 
     @app.route("/insights")
     def insights_page():
@@ -58,8 +79,6 @@ def create_app() -> Flask:
 
     @app.route("/api/picks")
     def api_picks():
-        from hibs_racing.web_service import insights_context
-
         top_n = int(request.args.get("top", "10"))
         return jsonify(insights_context(top_n=top_n))
 
@@ -68,24 +87,54 @@ def create_app() -> Flask:
         ctx = dashboard_context()
         return render_template("backtest.html", **ctx)
 
+    def _tracker_days() -> int:
+        try:
+            return max(7, min(90, int(request.args.get("days", default_history_days()))))
+        except ValueError:
+            return default_history_days()
+
     @app.route("/tracker")
+    @app.route("/track-record")
     def tracker_page():
+        if not public_tracker_enabled():
+            from flask import abort
+            abort(404)
         ctx = dashboard_context()
-        ctx["tracker"] = build_tracker_dict()
-        return render_template("tracker.html", **ctx)
+        ctx["tracker"] = build_public_tracker_dict(history_days=_tracker_days())
+        ctx["public_read_only"] = True
+        from flask import make_response
+        resp = make_response(render_template("tracker.html", **ctx))
+        resp.headers["Cache-Control"] = "public, max-age=120"
+        return resp
 
     @app.route("/api/tracker")
     def api_tracker():
-        return jsonify(build_tracker_dict())
+        from flask import abort
+
+        if not public_tracker_enabled():
+            abort(404)
+        payload = build_public_tracker_dict(history_days=_tracker_days())
+        resp = jsonify(payload)
+        resp.headers["Cache-Control"] = "public, max-age=120"
+        resp.headers["Access-Control-Allow-Origin"] = os.environ.get("HIBS_TRACKER_CORS_ORIGIN", "*")
+        return resp
 
     @app.route("/api/tracker/export.csv")
     def api_tracker_csv():
-        body = export_ledger_csv()
-        return Response(
+        from flask import abort
+
+        if not public_tracker_enabled():
+            abort(404)
+        days = _tracker_days()
+        body = export_ledger_csv(days=days)
+        resp = Response(
             body,
             mimetype="text/csv",
-            headers={"Content-Disposition": "attachment; filename=hibs-racing-ledger.csv"},
+            headers={"Content-Disposition": "attachment; filename=hibs-racing-tracker.csv"},
         )
+        resp.headers["Cache-Control"] = "public, max-age=300"
+        resp.headers["Access-Control-Allow-Origin"] = os.environ.get("HIBS_TRACKER_CORS_ORIGIN", "*")
+        return resp
 
     @app.route("/api/settle-paper", methods=["POST"])
     def api_settle_paper():
@@ -123,6 +172,34 @@ def create_app() -> Flask:
         report = load_feature_impact_report()
         return jsonify(report or {"ok": False, "message": "Run train-ranker first"})
 
+    @app.route("/api/ranker/attribution")
+    def api_ranker_attribution():
+        return jsonify(live_ranker_attribution())
+
+    @app.route("/api/execution/log")
+    def api_execution_log():
+        limit = request.args.get("limit", 30, type=int)
+        batch_limit = request.args.get("batches", 5, type=int)
+        return jsonify(
+            execution_audit_panel(
+                log_limit=max(1, min(limit, 200)),
+                batch_limit=max(1, min(batch_limit, 20)),
+            )
+        )
+
+    @app.route("/api/execution/preview")
+    def api_execution_preview():
+        from hibs_racing.cards.query import load_scored_cards
+        from hibs_racing.live.execution_router import build_execution_intents, route_execution_batch
+
+        scored = load_scored_cards()
+        intents = build_execution_intents(scored)
+        persist = request.args.get("log", "0").strip().lower() in {"1", "true", "yes"}
+        report = route_execution_batch(intents, log_results=persist)
+        if persist:
+            report["audit"] = execution_audit_panel(log_limit=10, batch_limit=3)
+        return jsonify(report)
+
     @app.route("/models/feature_impact.svg")
     def feature_impact_svg():
         _, svg_path = impact_artifact_paths()
@@ -135,7 +212,10 @@ def create_app() -> Flask:
         return render_template(
             "status.html",
             health=health_status(),
+            execution=execution_summary(),
+            execution_audit=execution_audit_panel(),
             feature_impact=load_feature_impact_report(),
+            ranker_attribution=live_ranker_attribution(),
             market_gauges=latest_gauges(limit=40),
         )
 

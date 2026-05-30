@@ -29,10 +29,10 @@ def store_upcoming_runners(frame: pd.DataFrame, *, source: str, database: Path |
                     runner_id, race_id, card_date, off_time, course, region,
                     race_name, race_type, race_class, going, field_size, distance_f,
                     horse_id, horse_name, draw, official_rating, rpr,
-                    jockey, trainer, days_since_last_run, card_comment, win_decimal,
+                    jockey, trainer, days_since_last_run, card_comment, rp_verdict, win_decimal,
                     form_string, trainer_rtf, trainer_14d_wins, trainer_14d_runs, trainer_location,
                     race_natural_key, source, fetched_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     rec["runner_id"],
@@ -56,6 +56,7 @@ def store_upcoming_runners(frame: pd.DataFrame, *, source: str, database: Path |
                     rec.get("trainer"),
                     int(rec["days_since_last_run"]) if pd.notna(rec.get("days_since_last_run")) else None,
                     rec.get("card_comment"),
+                    rec.get("rp_verdict"),
                     float(rec["win_decimal"]) if pd.notna(rec.get("win_decimal")) else None,
                     rec.get("form_string"),
                     float(rec["trainer_rtf"]) if pd.notna(rec.get("trainer_rtf")) else None,

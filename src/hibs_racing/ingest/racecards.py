@@ -171,6 +171,7 @@ def parse_racecard_json(json_path: Path) -> pd.DataFrame:
                             "trainer": runner.get("trainer"),
                             "days_since_last_run": runner.get("last_run"),
                             "card_comment": runner.get("comment") or runner.get("spotlight") or "",
+                            "rp_verdict": race.get("rp_verdict"),
                             "form_string": runner.get("form") or "",
                             "trainer_rtf": _parse_trainer_rtf(runner.get("trainer_rtf")),
                             "trainer_14d_wins": t14_w,
