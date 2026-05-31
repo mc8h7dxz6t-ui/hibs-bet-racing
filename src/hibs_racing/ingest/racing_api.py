@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 
 import pandas as pd
 import requests
@@ -113,7 +114,18 @@ def _request_racecards(
     endpoint = ENDPOINTS.get(plan, ENDPOINTS["free"])
     url = f"{base.rstrip('/')}{endpoint}"
     params: dict[str, object] = {"day": day, "region_codes": [region.lower()]}
-    resp = requests.get(url, params=params, auth=(user, password), timeout=30)
+    retries = max(1, int(os.environ.get("RACING_API_429_RETRIES", "4")))
+    pause = float(os.environ.get("RACING_API_429_PAUSE_SEC", "8"))
+    last_resp: requests.Response | None = None
+    for attempt in range(retries):
+        resp = requests.get(url, params=params, auth=(user, password), timeout=30)
+        last_resp = resp
+        if resp.status_code != 429:
+            break
+        if attempt + 1 < retries:
+            time.sleep(pause * (attempt + 1))
+    resp = last_resp
+    assert resp is not None
     if resp.status_code == 401:
         raise RuntimeError(
             "Racing API 401 — check RACING_API_USERNAME and RACING_API_PASSWORD in .env "
@@ -164,7 +176,10 @@ def fetch_racing_api_racecards(
         api_days = [_api_day(day)]
 
     frames: list[pd.DataFrame] = []
-    for api_day in api_days:
+    api_pause = float(os.environ.get("RACING_API_PAUSE_SEC", "1.5"))
+    for i, api_day in enumerate(api_days):
+        if i > 0 and api_pause > 0:
+            time.sleep(api_pause)
         payload = _request_racecards(
             day=api_day,
             region=region,

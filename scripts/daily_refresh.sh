@@ -24,6 +24,7 @@ run_logged "daily-refresh-cards" \
     --source racing_api \
     --window 24 \
     --regions gb,ire \
+    --workers 1 \
     --odds-source auto \
     --paper
 

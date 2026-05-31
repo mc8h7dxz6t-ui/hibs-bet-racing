@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import time
+
 import pandas as pd
 
 from hibs_racing.cards.refresh_parallel import parallel_map, timed_ms
@@ -37,11 +40,12 @@ def fetch_cards_window(
         def _fetch_region(region: str) -> pd.DataFrame:
             return fetch_racing_api_racecards(day=1, days=2, region=region)
 
-        if len(regions) > 1 and workers > 1:
-            frames = parallel_map(list(regions), _fetch_region, max_workers=min(workers, len(regions)))
-        else:
-            for region in regions:
-                frames.append(_fetch_region(region))
+        # Free Racing API tier rate-limits parallel today/tomorrow × region calls.
+        region_pause = float(os.environ.get("RACING_API_PAUSE_SEC", "1.5"))
+        for i, region in enumerate(regions):
+            if i > 0 and region_pause > 0:
+                time.sleep(region_pause)
+            frames.append(_fetch_region(region))
     else:
 
         def _fetch_rpscrape(region: str) -> pd.DataFrame:
