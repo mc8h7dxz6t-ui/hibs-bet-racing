@@ -53,7 +53,17 @@ def test_tracker_page_public():
     assert resp.status_code == 200
     assert b"Live Paper Track Record" in resp.data
     assert b"Cumulative P" in resp.data
+    assert b"Institutional Data Room" in resp.data
+    assert b"Download May OOS Track Record" in resp.data
     assert resp.headers.get("Cache-Control", "").startswith("public")
+
+    oos = client.get("/tracker?backtest=1")
+    assert oos.status_code == 200
+    assert b"OOS holdout" in oos.data
+
+    faq = client.get("/docs/technical-faq")
+    assert faq.status_code == 200
+    assert b"Technical" in faq.data or b"Due Diligence" in faq.data or b"FAQ" in faq.data
 
     api = client.get("/api/tracker?days=30")
     assert api.status_code == 200
@@ -72,6 +82,8 @@ def test_status_page_analytics_batch_mode():
     assert resp.status_code == 200
     assert b"Batch operations" in resp.data
     assert b"06:00 daily batch" in resp.data
+    assert b"Automation Status" in resp.data
+    assert b"SHA-256 Ledger Chain Verification" in resp.data
     assert b"Execution routing" not in resp.data
 
     assert client.get("/api/execution/log").status_code == 404

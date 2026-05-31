@@ -83,3 +83,12 @@ def test_public_tracker_api_404_when_disabled(monkeypatch):
     client = app.test_client()
     assert client.get("/tracker").status_code == 404
     assert client.get("/api/tracker").status_code == 404
+
+
+def test_automation_ops_status_structure():
+    from hibs_racing.place.public_tracker import automation_ops_status
+
+    ops = automation_ops_status()
+    assert len(ops) == 3
+    assert ops[0]["label"].startswith("06:00")
+    assert ops[2]["id"] == "ledger_chain"

@@ -1,5 +1,70 @@
 /** hibs-racing racecard UI — meeting/race navigation, deep-links, persisted state */
 
+(function brandingModule(global) {
+  const STORAGE_KEY = 'hibs_racing_brand_v1';
+  const DEFAULTS = {
+    productName: '',
+    tagline: '',
+    primaryColor: '',
+    neonColor: '',
+    wordmarkFont: '',
+    logoDataUrl: '',
+  };
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return { ...DEFAULTS };
+      return { ...DEFAULTS, ...JSON.parse(raw) };
+    } catch (_) {
+      return { ...DEFAULTS };
+    }
+  }
+
+  function save(payload) {
+    const next = { ...load(), ...payload };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch (_) {}
+    return next;
+  }
+
+  function reset() {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (_) {}
+  }
+
+  function apply(payload) {
+    const b = payload || load();
+    const root = document.documentElement;
+    if (b.primaryColor) {
+      root.style.setProperty('--primary-brand-color', b.primaryColor);
+      root.style.setProperty('--hibs-green', b.primaryColor);
+    }
+    if (b.neonColor) {
+      root.style.setProperty('--hibs-neon', b.neonColor);
+      root.style.setProperty('--accent', b.neonColor);
+    }
+    if (b.wordmarkFont) {
+      const stack = b.wordmarkFont === 'Inter' ? "'Inter',sans-serif" : `'${b.wordmarkFont}',sans-serif`;
+      root.style.setProperty('--wordmark-font', stack);
+    }
+    const wordmark = document.getElementById('site-wordmark');
+    if (wordmark && b.productName) wordmark.textContent = b.productName;
+    const tagline = document.getElementById('site-tagline');
+    if (tagline && b.tagline) tagline.textContent = b.tagline;
+    const crest = document.getElementById('site-crest-primary');
+    if (crest && b.logoDataUrl) {
+      crest.src = b.logoDataUrl;
+      crest.alt = b.productName || crest.alt;
+    }
+    if (b.productName) document.title = document.title.replace(/^[^—]+/, b.productName + ' ');
+  }
+
+  global.HibsBranding = { load, save, reset, apply, STORAGE_KEY };
+})(window);
+
 (function () {
   const STORAGE_MEETING = 'hibs_racing_meeting';
   const STORAGE_RACE = 'hibs_racing_race';
@@ -453,6 +518,60 @@
       .slice(0, 3);
   }
 
+  function formatPickLine(pick, index) {
+    const horse = pick.horse_name || '?';
+    const course = pick.course || '?';
+    const off = pick.off_time || '?';
+    const dq = pick.data_quality_pct || 0;
+    const gate = pick.steam_gate || 'proceed';
+    const placePct = Math.round((parseFloat(pick.model_place_prob) || 0) * 100);
+    const ev = pick.ew_combined_ev;
+    const evS = ev != null ? Number(ev).toFixed(2) : '—';
+    const winS = pick.win_decimal ? ` · win ${Number(pick.win_decimal).toFixed(2)}` : '';
+    const linkS = pick.monetized_link ? `\n   Partner: ${pick.monetized_link}` : '';
+    return (
+      `#${index} ${horse} (${off} ${course})\n` +
+      `   Place ${placePct}% · EV ${evS} · DQ ${dq}% · gate ${gate}${winS}${linkS}`
+    );
+  }
+
+  function formatChannelDigest(picks, cardDates) {
+    const dates = (cardDates && cardDates.length) ? cardDates.join(', ') : 'today';
+    const lines = [
+      '🏇 Hibs Racing Intelligence — Daily Value Sheet',
+      `Cards: ${dates}`,
+      '',
+    ];
+    if (!picks.length) {
+      lines.push('No value picks passed filters today (value + DQ≥75% + steam gate).');
+      lines.push('Tracker: /tracker');
+    } else {
+      picks.forEach((pick, i) => {
+        lines.push(formatPickLine(pick, i + 1));
+        lines.push('');
+      });
+      lines.push('Each-way paper picks logged to public SHA-256 ledger.');
+    }
+    return lines.join('\n').trim();
+  }
+
+  function loadCardDates() {
+    const el = document.getElementById('card-dates-data');
+    if (!el) return [];
+    try {
+      return JSON.parse(el.textContent || '[]');
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function renderChannelDigest() {
+    const el = document.getElementById('channel-digest-text');
+    if (!el) return;
+    const picks = filterSmartPicks(loadCandidates());
+    el.textContent = formatChannelDigest(picks, loadCardDates());
+  }
+
   function renderSmartPicks() {
     const grid = document.getElementById('smart-picks-grid');
     if (!grid) return;
@@ -480,6 +599,7 @@
     }).join('');
     bindSlipCopy();
     applyRiskBadges(grid);
+    renderChannelDigest();
   }
 
   function bindBankroll() {
@@ -504,6 +624,7 @@
     bindBankroll();
     bindSlipCopy();
     renderSmartPicks();
+    renderChannelDigest();
     applyRiskBadges();
     applyStakeHints();
   }
@@ -517,6 +638,8 @@
     filterSmartPicks,
     applyStakeHints,
     renderSmartPicks,
+    renderChannelDigest,
+    formatChannelDigest,
     TIPS,
   };
 })(window);

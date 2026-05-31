@@ -6,7 +6,12 @@ from pathlib import Path
 from typing import Any
 
 from hibs_racing.config import ROOT, db_path, load_config
-from hibs_racing.place.paper_ledger import export_ledger_csv, ledger_stats, load_ledger_rows
+from hibs_racing.place.paper_ledger import (
+    bet_verification_hash,
+    export_ledger_csv,
+    ledger_stats,
+    load_ledger_rows,
+)
 
 
 def public_tracker_enabled() -> bool:
@@ -19,6 +24,111 @@ def default_history_days() -> int:
         return max(30, min(90, int(raw)))
     except ValueError:
         return 60
+
+
+def _last_log_ok(log_path: Path, ok_marker: str) -> tuple[str | None, bool]:
+    if not log_path.exists():
+        return None, False
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    last_ok = None
+    ok = False
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == ok_marker and i > 0:
+            ok = True
+            prev = lines[i - 1].strip()
+            if prev.startswith("==="):
+                last_ok = prev.strip("= ").split(" ", 1)[0]
+    if last_ok is None:
+        mtime = datetime.fromtimestamp(log_path.stat().st_mtime, tz=timezone.utc).replace(microsecond=0)
+        last_ok = mtime.isoformat()
+    return last_ok, ok
+
+
+def automation_ops_status(*, database: Path | None = None) -> list[dict[str, Any]]:
+    """Cron step health for /status Automation Ops panel."""
+    db = database or db_path(load_config())
+    ledger = verify_ledger_chain(database=db, sample_limit=500)
+    football_log = Path(os.environ.get("HIBS_FOOTBALL_SYNC_LOG", str(ROOT / "logs" / "football-sync.log")))
+    ingest_ts, ingest_ok = _last_log_ok(ROOT / "logs" / "daily-ingest-sync.log", "OK: daily-ingest-sync")
+    football_ts, football_ok = _last_log_ok(football_log, "OK: football-sync")
+    if football_log.exists():
+        football_detail = "SUCCESS (Logged)" if football_ok else "Check football-sync.log"
+    else:
+        football_detail = "Optional hibs-bet cron — configure HIBS_FOOTBALL_SYNC_LOG when linked"
+
+    return [
+        {
+            "id": "ingestion",
+            "label": "06:00 Ingestion Pipeline",
+            "status": "success" if ingest_ok else "amber",
+            "detail": "SUCCESS (Logged)" if ingest_ok else "Awaiting first daily_refresh run",
+            "last_run_utc": ingest_ts,
+        },
+        {
+            "id": "football_sync",
+            "label": "06:30 Football Sync Engine",
+            "status": "success" if football_ok else "amber",
+            "detail": football_detail,
+            "last_run_utc": football_ts,
+        },
+        {
+            "id": "ledger_chain",
+            "label": "SHA-256 Ledger Chain Verification",
+            "status": "success" if ledger.get("ok") else "amber",
+            "detail": ledger.get("message") or "Verification pending",
+            "last_run_utc": ledger.get("checked_at"),
+            "sample_checked": ledger.get("sample_checked", 0),
+        },
+    ]
+
+
+def verify_ledger_chain(*, database: Path | None = None, sample_limit: int = 500) -> dict[str, Any]:
+    """Recompute verification_hash on recent ledger rows."""
+    db = database or db_path(load_config())
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    rows = load_ledger_rows(db, limit=max(10, min(5000, int(sample_limit))))
+    mismatches = 0
+    missing = 0
+    for row in rows:
+        stored = row.get("verification_hash")
+        if not stored:
+            missing += 1
+            continue
+        expected = bet_verification_hash(
+            str(row.get("bet_id") or ""),
+            str(row.get("created_at") or ""),
+            str(row.get("runner_id") or ""),
+            float(row.get("offered_win") or 0),
+            float(row.get("stake_units") or 0),
+        )
+        if stored != expected:
+            mismatches += 1
+    checked = len(rows)
+    if checked == 0:
+        return {
+            "ok": False,
+            "sample_checked": 0,
+            "mismatches": 0,
+            "missing_hash": 0,
+            "checked_at": now,
+            "message": "No ledger rows to verify yet",
+        }
+    ok = mismatches == 0 and missing == 0
+    if ok:
+        msg = f"SECURE & TAMPER-EVIDENT ({checked} rows checked)"
+    elif mismatches:
+        msg = f"HASH MISMATCH on {mismatches} of {checked} rows — investigate ledger"
+    else:
+        msg = f"{missing} rows missing verification_hash"
+    return {
+        "ok": ok,
+        "sample_checked": checked,
+        "mismatches": mismatches,
+        "missing_hash": missing,
+        "checked_at": now,
+        "message": msg,
+    }
 
 
 def daily_refresh_status() -> dict[str, Any]:
@@ -124,8 +234,18 @@ def build_public_tracker_dict(
         "daily_refresh": daily_refresh_status(),
         "ledger_rows": rows,
         "export_urls": {
-            "csv": f"/api/tracker/export.csv?days={days}",
-            "json": f"/api/tracker?days={days}",
+            "csv": f"/api/tracker/export.csv?days={days}{'&backtest=1' if backtest else ''}",
+            "json": f"/api/tracker?days={days}{'&backtest=1' if backtest else ''}",
+            "oos_csv": "/api/tracker/export.csv?backtest=1",
+            "technical_faq": "/docs/technical-faq",
+        },
+        "oos_rules": {
+            "train_end": "2026-04-30",
+            "test_start": "2026-05-01",
+            "summary": (
+                "Nov 2025–Apr 2026 is in-sample calibration; May 2026 is a pure untouched holdout "
+                "(test_start 2026-05-01). Each row carries SHA-256 verification_hash for third-party audit."
+            ),
         },
         "third_party_note": (
             "Paper ledger only — no live money. Submit CSV exports to independent verifiers "

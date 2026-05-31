@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ faq_title }} — {{ product_name }}{% endblock %}
+
+{% block extra_css %}
+.faq-page{max-width:920px;margin:0 auto;}
+.faq-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;}
+.faq-article{
+    background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px 28px;
+    line-height:1.65;font-size:0.92em;
+}
+.faq-article h1{font-family:'Orbitron',monospace;color:var(--hibs-neon);font-size:1.35em;margin:0 0 12px;}
+.faq-article h2{font-size:1.05em;color:var(--gold);margin:22px 0 10px;border-top:1px solid var(--border);padding-top:16px;}
+.faq-article h2:first-of-type{border-top:none;padding-top:0;}
+.faq-article h3{font-size:0.95em;color:#dbeafe;margin:16px 0 8px;}
+.faq-article p,.faq-article li{color:#cbd5e1;margin:0 0 10px;}
+.faq-article ul{margin:0 0 12px 18px;padding:0;}
+.faq-article code{background:rgba(0,0,0,0.35);padding:2px 6px;border-radius:4px;font-size:0.88em;}
+.faq-code{
+    background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:12px 14px;
+    overflow-x:auto;font-size:0.82em;margin:10px 0 14px;
+}
+@media print{
+    .site-top,.site-links,.sys-strip,.bankroll-bar,.faq-toolbar,.site-top-actions{display:none!important;}
+    .faq-article{border:none;padding:0;}
+}
+{% endblock %}
+
+{% block content %}
+<div class="faq-page">
+    <div class="faq-toolbar">
+        <a class="btn btn-secondary" href="{{ url_for('tracker_page', backtest=1) }}">← Track Record (OOS)</a>
+        <button type="button" class="btn" onclick="window.print()">Print / Save as PDF</button>
+    </div>
+    <article class="faq-article brand-panel-framed">
+        {{ faq_html|safe }}
+    </article>
+</div>
+{% endblock %}

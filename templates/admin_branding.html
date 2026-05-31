@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Whitelabel Branding — {{ product_name }}{% endblock %}
+
+{% block extra_css %}
+.admin-page{max-width:720px;margin:0 auto;}
+.admin-card{
+    background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:16px;
+}
+.admin-card h2{font-family:var(--wordmark-font,'Orbitron',monospace);font-size:1.05em;color:var(--gold);margin-bottom:12px;}
+.admin-field{margin-bottom:14px;}
+.admin-field label{display:block;font-size:0.72em;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px;font-weight:700;}
+.admin-field input[type="text"],.admin-field input[type="color"],.admin-field select{
+    width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+    background:rgba(0,0,0,0.35);color:var(--text);font-size:0.92em;
+}
+.admin-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:640px){.admin-row{grid-template-columns:1fr;}}
+.admin-hint{font-size:0.78em;color:var(--muted);line-height:1.5;margin:8px 0 14px;}
+.logo-preview-wrap{display:flex;align-items:center;gap:12px;margin-top:8px;}
+.logo-preview{width:52px;height:52px;border-radius:50%;object-fit:contain;background:rgba(0,0,0,0.35);border:1px solid var(--border);}
+.admin-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;}
+{% endblock %}
+
+{% block content %}
+<div class="admin-page">
+    <div class="admin-card">
+        <h2>B2B Whitelabel Theme Customizer</h2>
+        <p class="admin-hint">
+            Re-skin the dashboard in under 60 seconds — stored in this browser via localStorage.
+            No HTML edits required. Perfect for rental / white-label partners.
+        </p>
+        <form id="branding-form">
+            <div class="admin-field">
+                <label for="brand-name">Dashboard wordmark</label>
+                <input type="text" id="brand-name" placeholder="Your Racing Intelligence">
+            </div>
+            <div class="admin-field">
+                <label for="brand-tagline">Tagline</label>
+                <input type="text" id="brand-tagline" placeholder="AI place-ranking · verified ledger">
+            </div>
+            <div class="admin-row">
+                <div class="admin-field">
+                    <label for="brand-primary">Primary brand color</label>
+                    <input type="color" id="brand-primary" value="#10B981">
+                </div>
+                <div class="admin-field">
+                    <label for="brand-neon">Accent / neon color</label>
+                    <input type="color" id="brand-neon" value="#b7f7c8">
+                </div>
+            </div>
+            <div class="admin-field">
+                <label for="brand-font">Wordmark font</label>
+                <select id="brand-font">
+                    <option value="Orbitron">Orbitron (terminal)</option>
+                    <option value="Inter">Inter (clean SaaS)</option>
+                    <option value="Georgia">Georgia (editorial)</option>
+                </select>
+            </div>
+            <div class="admin-field">
+                <label for="brand-logo">Corporate logo upload</label>
+                <input type="file" id="brand-logo" accept="image/png,image/jpeg,image/svg+xml,image/webp">
+                <div class="logo-preview-wrap">
+                    <img id="brand-logo-preview" class="logo-preview" alt="" hidden>
+                    <span class="admin-hint" style="margin:0;">Replaces the oval crest in the header when set.</span>
+                </div>
+            </div>
+            <div class="admin-actions">
+                <button type="submit" class="btn">Apply branding</button>
+                <button type="button" class="btn btn-secondary" id="brand-reset">Reset to Hibs default</button>
+                <a class="btn btn-secondary" href="{{ url_for('index') }}">Preview on Cards →</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function brandingAdmin(){
+    const form = document.getElementById('branding-form');
+    if (!form || !window.HibsBranding) return;
+    const b = window.HibsBranding.load();
+    document.getElementById('brand-name').value = b.productName || '';
+    document.getElementById('brand-tagline').value = b.tagline || '';
+    document.getElementById('brand-primary').value = b.primaryColor || '#10B981';
+    document.getElementById('brand-neon').value = b.neonColor || '#b7f7c8';
+    document.getElementById('brand-font').value = b.wordmarkFont || 'Orbitron';
+    const prev = document.getElementById('brand-logo-preview');
+    if (b.logoDataUrl && prev) {
+        prev.src = b.logoDataUrl;
+        prev.hidden = false;
+    }
+    document.getElementById('brand-logo')?.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            if (prev) { prev.src = reader.result; prev.hidden = false; }
+        };
+        reader.readAsDataURL(file);
+    });
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const logoFile = document.getElementById('brand-logo');
+        const payload = {
+            productName: document.getElementById('brand-name').value.trim(),
+            tagline: document.getElementById('brand-tagline').value.trim(),
+            primaryColor: document.getElementById('brand-primary').value,
+            neonColor: document.getElementById('brand-neon').value,
+            wordmarkFont: document.getElementById('brand-font').value,
+            logoDataUrl: prev && !prev.hidden ? prev.src : '',
+        };
+        window.HibsBranding.save(payload);
+        window.HibsBranding.apply(payload);
+        alert('Branding applied — open Cards to preview.');
+    });
+    document.getElementById('brand-reset')?.addEventListener('click', () => {
+        window.HibsBranding.reset();
+        location.reload();
+    });
+})();
+</script>
+{% endblock %}

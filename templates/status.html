@@ -18,6 +18,19 @@
 .exec-status-rejected,.exec-status-stub_error{color:#fca5a5;font-weight:600;}
 .exec-status-skipped_duplicate{color:#94a3b8;font-weight:600;}
 .exec-preview-row td{font-size:0.85em;}
+.automation-ops-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:12px;}
+.automation-op{
+    padding:14px 16px;border-radius:12px;border:1px solid var(--border);background:rgba(0,0,0,0.22);
+}
+.automation-op h3{font-size:0.82em;color:#e2e8f0;margin:0 0 8px;font-weight:600;}
+.automation-op .op-badge{
+    display:inline-block;font-size:0.72em;font-weight:700;padding:4px 10px;border-radius:999px;
+    letter-spacing:0.04em;text-transform:uppercase;margin-bottom:8px;
+}
+.automation-op .op-badge.success{background:rgba(16,185,129,0.18);color:#6ee7b7;border:1px solid rgba(16,185,129,0.4);}
+.automation-op .op-badge.amber{background:rgba(245,158,11,0.15);color:#fcd34d;border:1px solid rgba(245,158,11,0.35);}
+.automation-op .op-detail{font-size:0.78em;color:#94a3b8;line-height:1.45;}
+.automation-op .op-ts{font-size:0.68em;color:#64748b;margin-top:6px;}
 {% endblock %}
 
 {% block content %}
@@ -56,6 +69,35 @@
             CLI: <code>./scripts/daily_refresh.sh</code> · Public ledger: <a href="{{ url_for('tracker_page') }}">/tracker</a>
             · CSV: <a href="/api/tracker/export.csv">export</a>
         </p>
+    </div>
+</section>
+
+<section class="card">
+    <div class="card-head"><h2>Automation Status</h2></div>
+    <div class="card-body" style="padding:16px;">
+        <p class="fi-hint">
+            Zero-maintenance ops at a glance — cron success from automation logs plus live SHA-256 ledger verification.
+        </p>
+        <div class="automation-ops-grid">
+            {% for op in automation_ops or [] %}
+            <div class="automation-op">
+                <h3>{{ op.label }}</h3>
+                <span class="op-badge {{ op.status }}">{{ op.detail }}</span>
+                {% if op.last_run_utc %}
+                <div class="op-ts">Last signal: {{ op.last_run_utc[:19]|replace('T',' ') }} UTC</div>
+                {% endif %}
+                {% if op.sample_checked %}
+                <div class="op-ts">{{ op.sample_checked }} ledger rows verified</div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="automation-op">
+                <h3>Automation ops</h3>
+                <span class="op-badge amber">Run install_cron.sh</span>
+                <div class="op-detail">No automation logs detected yet.</div>
+            </div>
+            {% endfor %}
+        </div>
     </div>
 </section>
 

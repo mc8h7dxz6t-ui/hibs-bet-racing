@@ -9,7 +9,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --hibs-green:#007A33;
+            --primary-brand-color:#007A33;
+            --wordmark-font:'Orbitron',monospace;
+            --hibs-green:var(--primary-brand-color);
             --hibs-green-dark:#052e16;
             --hibs-navy:#0a1628;
             --hibs-navy-deep:#060e18;
@@ -70,7 +72,7 @@
             box-shadow:0 0 0 2px rgba(183,247,200,0.15),0 4px 16px rgba(0,0,0,0.35);
         }
         .site-crest-harp-mini{opacity:0.88;filter:drop-shadow(0 1px 6px rgba(0,0,0,0.4));}
-        .site-wordmark{font-family:'Orbitron',monospace;font-weight:900;font-size:1.15em;color:var(--hibs-neon);letter-spacing:0.08em;}
+        .site-wordmark{font-family:var(--wordmark-font);font-weight:900;font-size:1.15em;color:var(--hibs-neon);letter-spacing:0.08em;}
         .site-tagline{font-size:0.78em;color:var(--muted);margin-top:2px;}
         .site-links{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
         .site-links a{
@@ -98,7 +100,7 @@
             .nav-more{display:none;}
         }
         .btn{
-            background:linear-gradient(135deg,#007A33,#055a28);
+            background:linear-gradient(135deg,var(--primary-brand-color),#055a28);
             color:#fff;border:1px solid rgba(183,247,200,0.25);
             padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.88em;
         }
@@ -335,8 +337,8 @@
         <div class="site-top-left">
             {{ site_crests() }}
             <div>
-                <div class="site-wordmark">{{ product_name }}</div>
-                <div class="site-tagline">{{ product_tagline }}</div>
+                <div class="site-wordmark" id="site-wordmark">{{ product_name }}</div>
+                <div class="site-tagline" id="site-tagline">{{ product_tagline }}</div>
             </div>
             {{ heritage_strip() }}
         </div>
@@ -355,6 +357,8 @@
                     <a href="{{ url_for('tips_page') }}">Tips</a>
                     <a href="{{ url_for('backtest_page') }}">Backtest</a>
                     <a href="{{ url_for('status_page') }}">Status</a>
+                    <a href="{{ url_for('admin_branding_page') }}">Branding</a>
+                    <a href="{{ url_for('settings_monetization_page') }}">Monetization</a>
                 </div>
             </details>
             <a href="{{ url_for('backtest_page') }}" class="nav-primary-only {% if request.endpoint == 'backtest_page' %}active{% endif %}">Backtest</a>
@@ -453,6 +457,10 @@ document.getElementById('btn-refresh')?.addEventListener('click', async () => {
 })();
 </script>
 <script src="{{ url_for('static', filename='racing_ui.js') }}" defer></script>
+<script>
+/* Sync whitelabel apply — runs after racing_ui.js defines HibsBranding */
+document.addEventListener('DOMContentLoaded', () => window.HibsBranding?.apply?.());
+</script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>

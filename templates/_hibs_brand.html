@@ -5,7 +5,7 @@
     logo_height=52
 ) %}
 <div class="site-crest-wrap" role="img" aria-label="hibs-racing">
-    <img src="{{ url_for('static', filename=logo) }}" alt="Hibs Racing" class="site-crest site-crest-oval" height="{{ logo_height }}" width="{{ logo_height }}" decoding="async">
+    <img id="site-crest-primary" src="{{ url_for('static', filename=logo) }}" alt="Hibs Racing" class="site-crest site-crest-oval" height="{{ logo_height }}" width="{{ logo_height }}" decoding="async">
     <img src="{{ url_for('static', filename=harp) }}" alt="" class="site-crest site-crest-harp site-crest-harp-mini" width="28" height="28" aria-hidden="true" decoding="async">
 </div>
 {% endmacro %}

@@ -3,8 +3,21 @@ from hibs_racing.utils.monetization import (
     generate_monetized_link,
 )
 
+UI_ENV_KEYS = (
+    "HIBS_AFFILIATE_VENUE",
+    "HIBS_AFFILIATE_UTM_SOURCE",
+    "HIBS_AFFILIATE_TRACKING_ID",
+    "AFFILIATE_MATCHBOOK_BASE_URL",
+    "AFFILIATE_BETFAIR_BASE_URL",
+)
 
-def test_generate_monetized_link_uses_query_string():
+
+def test_generate_monetized_link_uses_query_string(monkeypatch, tmp_path):
+    from hibs_racing.utils import ui_settings as mod
+
+    monkeypatch.setattr(mod, "SETTINGS_PATH", tmp_path / "empty.json")
+    for key in UI_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
     url = generate_monetized_link("Golden Fleece", "Epsom", "14:30", venue="matchbook")
     assert url.startswith("https://www.matchbook.com?")
     assert "utm_source=hibs_racing_app" in url
@@ -18,9 +31,13 @@ def test_attach_monetized_links():
     assert out[0]["monetized_link"].startswith("https://")
 
 
-def test_novice_candidates_include_monetized_link():
+def test_novice_candidates_include_monetized_link(monkeypatch, tmp_path):
+    from hibs_racing.utils import ui_settings as mod
     from hibs_racing.web_service import novice_pick_candidates
 
+    monkeypatch.setattr(mod, "SETTINGS_PATH", tmp_path / "empty.json")
+    for key in UI_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
     meetings = [
         {
             "course": "York",

@@ -25,7 +25,6 @@
 .trk-stat span{font-size:0.75em;color:var(--muted);}
 .trk-stat.pos strong{color:#86efac;}
 .trk-stat.neg strong{color:#fca5a5;}
-.trk-chart{width:100%;height:160px;background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:10px;}
 .trk-table{width:100%;font-size:0.8em;border-collapse:collapse;}
 .trk-table th,.trk-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
 .trk-table th{color:var(--muted);font-weight:600;font-size:0.72em;text-transform:uppercase;}
@@ -37,6 +36,39 @@
 .trk-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
 .trk-hash{font-family:ui-monospace,monospace;font-size:0.68em;color:var(--muted);word-break:break-all;max-width:88px;}
 .trk-days a{margin-right:10px;font-size:0.85em;color:var(--hibs-neon);}
+.trk-data-room{
+    border:1px solid rgba(183,247,200,0.35);border-radius:14px;padding:20px 22px;
+    background:linear-gradient(145deg,rgba(0,122,51,0.12),rgba(6,14,24,0.92));
+}
+.trk-data-room h2{font-family:'Orbitron',monospace;color:var(--gold);font-size:1.05em;margin-bottom:10px;}
+.trk-data-room p{font-size:0.86em;color:#cbd5e1;line-height:1.55;margin:0 0 12px;}
+.trk-data-room .oos-rules{
+    font-size:0.82em;color:var(--muted);padding:10px 12px;border-radius:8px;
+    border:1px dashed rgba(183,247,200,0.25);margin-bottom:14px;
+}
+.trk-data-room-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;}
+.trk-data-room-btn{
+    flex:1 1 260px;display:inline-flex;align-items:center;justify-content:center;
+    padding:14px 18px;border-radius:12px;font-weight:700;font-size:0.92em;text-decoration:none;
+    border:1px solid rgba(16,185,129,0.45);background:rgba(16,185,129,0.14);color:#a7f3d0;
+    transition:background .15s,border-color .15s,transform .12s;
+}
+.trk-data-room-btn:hover{background:rgba(16,185,129,0.24);border-color:#10B981;transform:translateY(-1px);}
+.trk-data-room-btn.secondary{
+    border-color:rgba(246,216,137,0.4);background:rgba(246,216,137,0.1);color:var(--gold);
+}
+.trk-data-room-btn.secondary:hover{border-color:var(--gold);background:rgba(246,216,137,0.16);}
+.trk-chart{width:100%;height:180px;background:linear-gradient(180deg,rgba(0,0,0,0.35),rgba(0,0,0,0.18));border:1px solid var(--border);border-radius:10px;}
+.trk-filters{
+    display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:14px;padding:12px 14px;
+    border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.2);
+}
+.trk-filter label{display:block;font-size:0.68em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;font-weight:700;}
+.trk-filter select{
+    min-width:160px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);
+    background:rgba(0,0,0,0.35);color:var(--text);font-size:0.85em;
+}
+.trk-filter-count{font-size:0.78em;color:var(--muted);margin-left:auto;}
 {% endblock %}
 
 {% block content %}
@@ -52,6 +84,7 @@
         <span class="trk-badge">Pre-race lock</span>
         <span class="trk-badge">Auto-settle</span>
         <span class="trk-badge">CLV audit</span>
+        {% if tracker_backtest %}<span class="trk-badge">OOS holdout</span>{% endif %}
         <h1>Live Paper Track Record</h1>
         <p class="trk-intro">
             Independent verification ledger for <strong>{{ product_name }}</strong>.
@@ -99,29 +132,29 @@
     <section class="trk-card">
         <h2>Summary</h2>
         <div class="trk-stats">
-            <div class="trk-stat {% if stats.total_pnl and stats.total_pnl >= 0 %}pos{% elif stats.total_pnl %}neg{% endif %}">
-                <strong>{% if stats.total_pnl is not none %}{{ '%+.2f'|format(stats.total_pnl) }}u{% else %}—{% endif %}</strong>
-                <span>Units P&amp;L (settled)</span>
+            <div class="trk-stat {% if stats.total_pnl and stats.total_pnl >= 0 %}pos{% elif stats.total_pnl %}neg{% endif %}" id="trk-stat-pnl">
+                <strong id="trk-val-pnl">{% if stats.total_pnl is not none %}{{ '%+.2f'|format(stats.total_pnl) }}u{% else %}—{% endif %}</strong>
+                <span>Units P&amp;L (filtered settled)</span>
             </div>
-            <div class="trk-stat">
-                <strong>{% if stats.roi_pct is not none %}{{ '%+.1f'|format(stats.roi_pct) }}%{% else %}—{% endif %}</strong>
-                <span>ROI on settled stakes</span>
+            <div class="trk-stat" id="trk-stat-roi">
+                <strong id="trk-val-roi">{% if stats.roi_pct is not none %}{{ '%+.1f'|format(stats.roi_pct) }}%{% else %}—{% endif %}</strong>
+                <span>ROI on filtered stakes</span>
             </div>
             <div class="trk-stat">
                 <strong>{% if clv.clv_beat_rate_pct is not none %}{{ clv.clv_beat_rate_pct }}%{% else %}—{% endif %}</strong>
                 <span>Beat closing SP (n={{ clv.n_with_closing_sp or 0 }})</span>
             </div>
-            <div class="trk-stat">
-                <strong>{% if stats.place_hit_pct is not none %}{{ stats.place_hit_pct }}%{% else %}—{% endif %}</strong>
-                <span>Place hit rate</span>
+            <div class="trk-stat" id="trk-stat-hit">
+                <strong id="trk-val-hit">{% if stats.place_hit_pct is not none %}{{ stats.place_hit_pct }}%{% else %}—{% endif %}</strong>
+                <span>Place hit rate (filtered)</span>
+            </div>
+            <div class="trk-stat" id="trk-stat-value">
+                <strong id="trk-val-value">{% if stats.value_pick_strike_pct is not none %}{{ stats.value_pick_strike_pct }}%{% else %}—{% endif %}</strong>
+                <span>Value-flag success (filtered)</span>
             </div>
             <div class="trk-stat">
-                <strong>{% if stats.value_pick_strike_pct is not none %}{{ stats.value_pick_strike_pct }}%{% else %}—{% endif %}</strong>
-                <span>Value-flag success</span>
-            </div>
-            <div class="trk-stat">
-                <strong>{{ tracker.settled_count if tracker else stats.settled_bets or 0 }}</strong>
-                <span>Settled</span>
+                <strong id="trk-val-settled">{{ tracker.settled_count if tracker else stats.settled_bets or 0 }}</strong>
+                <span>Settled (filtered)</span>
             </div>
             <div class="trk-stat">
                 <strong>{{ tracker.open_count if tracker else stats.open_bets or 0 }}</strong>
@@ -136,9 +169,37 @@
 
     <section class="trk-card">
         <h2>Paper ledger</h2>
+        {% if tracker and tracker.ledger_rows %}
+        <div class="trk-filters" id="tracker-filters">
+            <div class="trk-filter">
+                <label for="filter-course">Course</label>
+                <select id="filter-course"><option value="">All courses</option></select>
+            </div>
+            <div class="trk-filter">
+                <label for="filter-min-odds">Minimum odds (win)</label>
+                <select id="filter-min-odds">
+                    <option value="">Any odds</option>
+                    <option value="2">2.0+</option>
+                    <option value="3">3.0+</option>
+                    <option value="5">5.0+</option>
+                    <option value="8">8.0+</option>
+                    <option value="12">12.0+</option>
+                </select>
+            </div>
+            <div class="trk-filter">
+                <label for="filter-value">Value pick status</label>
+                <select id="filter-value">
+                    <option value="">All rows</option>
+                    <option value="1">VALUE flagged only</option>
+                    <option value="0">Non-value only</option>
+                </select>
+            </div>
+            <span class="trk-filter-count" id="filter-count"></span>
+        </div>
+        {% endif %}
         <div class="trk-scroll">
             {% if tracker and tracker.ledger_rows %}
-            <table class="trk-table">
+            <table class="trk-table" id="tracker-ledger-table">
                 <thead>
                     <tr>
                         <th>Logged</th><th>Date</th><th>Course</th><th>Horse</th>
@@ -146,9 +207,18 @@
                         <th>Taken</th><th>Close SP</th><th>CLV</th><th>Pos</th><th>Status</th><th>P&amp;L</th><th>Hash</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="tracker-ledger-body">
                     {% for r in tracker.ledger_rows %}
-                    <tr class="{% if r.status == 'open' %}trk-open{% elif r.status in ('won','placed') %}trk-win{% elif r.status == 'lost' %}trk-loss{% endif %}">
+                    <tr class="tracker-row {% if r.status == 'open' %}trk-open{% elif r.status in ('won','placed') %}trk-win{% elif r.status == 'lost' %}trk-loss{% endif %}"
+                        data-course="{{ r.course or '' }}"
+                        data-offered-win="{{ r.offered_win if r.offered_win is not none else '' }}"
+                        data-value-pick="{{ 1 if r.is_value_pick else 0 }}"
+                        data-status="{{ r.status or '' }}"
+                        data-pnl="{{ r.result_pnl if r.result_pnl is not none else '' }}"
+                        data-stake="{{ r.stake_units or 0 }}"
+                        data-settled="{{ 1 if r.status != 'open' and r.result_pnl is not none else 0 }}"
+                        data-place-hit="{{ 1 if r.status in ('won','placed') else 0 }}"
+                        data-settled-at="{{ (r.settled_at or r.card_date or '')[:10] }}">
                         <td>{{ (r.created_at or '')[:19]|replace('T',' ') }}</td>
                         <td>{{ r.card_date or '—' }}</td>
                         <td>{{ r.course or '—' }}</td>
@@ -176,41 +246,177 @@
             {% endif %}
         </div>
     </section>
+
+    <section class="trk-card trk-data-room" id="institutional-data-room">
+        <h2>Institutional Data Room</h2>
+        <p>
+            Due-diligence exports for buyers and third-party verifiers. All rows are tamper-evident
+            via per-bet SHA-256 hashes — no screenshot trust required.
+        </p>
+        {% if tracker and tracker.oos_rules %}
+        <div class="oos-rules">
+            <strong>Out-of-sample rules:</strong>
+            train_end {{ tracker.oos_rules.train_end }} · test_start {{ tracker.oos_rules.test_start }}.
+            {{ tracker.oos_rules.summary }}
+        </div>
+        {% endif %}
+        <div class="trk-data-room-actions">
+            <a class="trk-data-room-btn" href="/api/tracker/export.csv?backtest=1" download="hibs-racing-may-oos-track-record.csv">
+                Download May OOS Track Record (CSV)
+            </a>
+            <a class="trk-data-room-btn secondary" href="{{ url_for('technical_faq_page') }}">
+                Architecture Technical FAQ (PDF-ready)
+            </a>
+        </div>
+    </section>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script id="pnl-data" type="application/json">{{ (tracker.pnl_curve if tracker else [])|tojson }}</script>
 <script>
-(function pnlChart(){
+function renderPnlChart(points) {
     const el = document.getElementById('pnl-chart');
-    const raw = document.getElementById('pnl-data');
-    if (!el || !raw) return;
-    let points = [];
-    try { points = JSON.parse(raw.textContent || '[]'); } catch (_) {}
+    if (!el) return;
     if (!points.length) {
-        el.innerHTML = '<text x="20" y="80" fill="#94a3b8" font-size="14">No settled bets yet — track record builds daily via cron.</text>';
+        el.innerHTML = '<text x="20" y="80" fill="#94a3b8" font-size="14">No settled bets in filter — adjust filters above.</text>';
         return;
     }
     const vals = points.map(p => Number(p.cum_pnl));
     const minY = Math.min(0, ...vals);
     const maxY = Math.max(0.01, ...vals);
-    const pad = 24;
-    const w = 800, h = 160;
+    const pad = 28;
+    const w = 800, h = 180;
     const span = maxY - minY || 1;
+    const chartW = w - pad * 2;
+    const chartH = h - pad * 2;
     const coords = points.map((p, i) => {
-        const x = pad + (i / Math.max(1, points.length - 1)) * (w - pad * 2);
-        const y = h - pad - ((Number(p.cum_pnl) - minY) / span) * (h - pad * 2);
-        return `${x},${y}`;
-    }).join(' ');
-    const zeroY = h - pad - ((0 - minY) / span) * (h - pad * 2);
+        const x = pad + (i / Math.max(1, points.length - 1)) * chartW;
+        const y = h - pad - ((Number(p.cum_pnl) - minY) / span) * chartH;
+        return [x, y];
+    });
+    const polyline = coords.map(c => c.join(',')).join(' ');
+    const baselineY = h - pad;
+    const areaPath = [
+        `M ${coords[0][0]},${baselineY}`,
+        ...coords.map(c => `L ${c[0]},${c[1]}`),
+        `L ${coords[coords.length - 1][0]},${baselineY}`,
+        'Z',
+    ].join(' ');
+    const zeroY = h - pad - ((0 - minY) / span) * chartH;
     const last = points[points.length - 1];
-    const color = Number(last.cum_pnl) >= 0 ? '#86efac' : '#fca5a5';
+    const lineColor = '#10B981';
+    const gridLines = [];
+    for (let i = 0; i <= 4; i++) {
+        const gy = pad + (i / 4) * chartH;
+        gridLines.push(`<line x1="${pad}" y1="${gy}" x2="${w - pad}" y2="${gy}" stroke="#1e293b" stroke-width="1" opacity="0.85"/>`);
+    }
+    for (let i = 0; i <= 5; i++) {
+        const gx = pad + (i / 5) * chartW;
+        gridLines.push(`<line x1="${gx}" y1="${pad}" x2="${gx}" y2="${h - pad}" stroke="#1e293b" stroke-width="1" opacity="0.55"/>`);
+    }
     el.innerHTML = `
-        <line x1="${pad}" y1="${zeroY}" x2="${w - pad}" y2="${zeroY}" stroke="#334155" stroke-width="1"/>
-        <polyline fill="none" stroke="${color}" stroke-width="2.5" points="${coords}"/>
-        <text x="${pad}" y="16" fill="#94a3b8" font-size="11">${points[0].date} → ${last.date}</text>
-        <text x="${w - pad}" y="16" fill="${color}" font-size="12" text-anchor="end">${Number(last.cum_pnl) >= 0 ? '+' : ''}${Number(last.cum_pnl).toFixed(2)}u</text>`;
+        <defs>
+            <linearGradient id="pnlFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#10B981" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#10B981" stop-opacity="0"/>
+            </linearGradient>
+        </defs>
+        ${gridLines.join('')}
+        <line x1="${pad}" y1="${zeroY}" x2="${w - pad}" y2="${zeroY}" stroke="#475569" stroke-width="1" stroke-dasharray="4 4"/>
+        <path d="${areaPath}" fill="url(#pnlFill)" stroke="none"/>
+        <polyline fill="none" stroke="${lineColor}" stroke-width="2.75" stroke-linejoin="round" stroke-linecap="round" points="${polyline}"/>
+        <text x="${pad}" y="18" fill="#94a3b8" font-size="11">${points[0].date} → ${last.date}</text>
+        <text x="${w - pad}" y="18" fill="${lineColor}" font-size="12" font-weight="600" text-anchor="end">${Number(last.cum_pnl) >= 0 ? '+' : ''}${Number(last.cum_pnl).toFixed(2)}u</text>`;
+}
+
+(function pnlChartInit(){
+    const raw = document.getElementById('pnl-data');
+    let points = [];
+    try { points = JSON.parse(raw?.textContent || '[]'); } catch (_) {}
+    if (!points.length) {
+        const el = document.getElementById('pnl-chart');
+        if (el) el.innerHTML = '<text x="20" y="80" fill="#94a3b8" font-size="14">No settled bets yet — track record builds daily via cron.</text>';
+        return;
+    }
+    renderPnlChart(points);
+    window.__trackerPnlAll = points;
+})();
+
+(function trackerAuditFilters(){
+    const body = document.getElementById('tracker-ledger-body');
+    const courseSel = document.getElementById('filter-course');
+    const minOddsSel = document.getElementById('filter-min-odds');
+    const valueSel = document.getElementById('filter-value');
+    const countEl = document.getElementById('filter-count');
+    if (!body || !courseSel) return;
+
+    const rows = Array.from(body.querySelectorAll('.tracker-row'));
+    const courses = [...new Set(rows.map(r => r.dataset.course).filter(Boolean))].sort();
+    courses.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        courseSel.appendChild(opt);
+    });
+
+    function rowMatches(row) {
+        const course = courseSel.value;
+        const minOdds = minOddsSel.value ? Number(minOddsSel.value) : null;
+        const valueFlag = valueSel.value;
+        if (course && row.dataset.course !== course) return false;
+        if (minOdds != null) {
+            const odds = Number(row.dataset.offeredWin);
+            if (!odds || odds < minOdds) return false;
+        }
+        if (valueFlag !== '' && row.dataset.valuePick !== valueFlag) return false;
+        return true;
+    }
+
+    function recomputeStats() {
+        const visible = rows.filter(r => r.style.display !== 'none');
+        const settled = visible.filter(r => r.dataset.settled === '1');
+        let totalPnl = 0;
+        let totalStake = 0;
+        let placeHits = 0;
+        let valueSettled = 0;
+        let valueHits = 0;
+        const curve = [];
+        let cum = 0;
+        const sorted = [...settled].sort((a, b) => (a.dataset.settledAt || '').localeCompare(b.dataset.settledAt || ''));
+        sorted.forEach(r => {
+            const pnl = Number(r.dataset.pnl);
+            const stake = Number(r.dataset.stake) || 0;
+            totalPnl += pnl;
+            totalStake += stake;
+            if (r.dataset.placeHit === '1') placeHits += 1;
+            if (r.dataset.valuePick === '1') {
+                valueSettled += 1;
+                if (r.dataset.placeHit === '1') valueHits += 1;
+            }
+            cum += pnl;
+            curve.push({ date: r.dataset.settledAt || '—', cum_pnl: cum });
+        });
+        const roi = totalStake > 0 ? (100 * totalPnl / totalStake) : null;
+        const hitPct = settled.length ? (100 * placeHits / settled.length) : null;
+        const valuePct = valueSettled ? (100 * valueHits / valueSettled) : null;
+        const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+        setText('trk-val-pnl', settled.length ? ((totalPnl >= 0 ? '+' : '') + totalPnl.toFixed(2) + 'u') : '—');
+        setText('trk-val-roi', roi != null ? ((roi >= 0 ? '+' : '') + roi.toFixed(1) + '%') : '—');
+        setText('trk-val-hit', hitPct != null ? hitPct.toFixed(1) + '%' : '—');
+        setText('trk-val-value', valuePct != null ? valuePct.toFixed(1) + '%' : '—');
+        setText('trk-val-settled', String(settled.length));
+        if (countEl) countEl.textContent = visible.length + ' of ' + rows.length + ' rows shown';
+        renderPnlChart(curve);
+    }
+
+    function applyFilters() {
+        rows.forEach(r => { r.style.display = rowMatches(r) ? '' : 'none'; });
+        recomputeStats();
+    }
+
+    [courseSel, minOddsSel, valueSel].forEach(el => el.addEventListener('change', applyFilters));
+    applyFilters();
 })();
 
 {% if not public_read_only %}

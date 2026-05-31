@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import html
 import os
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -13,6 +15,7 @@ from hibs_racing.monitor import monitor_snapshot
 from hibs_racing.odds.market_steam import latest_gauges, latest_triggers
 from hibs_racing.place.paper_ledger import export_ledger_csv, settle_paper_bets
 from hibs_racing.place.public_tracker import (
+    automation_ops_status,
     build_public_tracker_dict,
     default_history_days,
     public_tracker_enabled,
@@ -23,12 +26,99 @@ from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.config import db_path, load_config
 from hibs_racing.web_format import fmt_num, fmt_pct
 from hibs_racing.web_service import cards_deep_link_context, dashboard_context, health_status, insights_context
+from hibs_racing.utils.ui_settings import (
+    apply_saved_ui_env,
+    monetization_form_payload,
+    save_ui_monetization,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
+FAQ_PATH = ROOT / "docs" / "TECHNICAL_DUE_DILIGENCE_FAQ.md"
+
+
+def _channel_digest_preview(ctx: dict | None = None) -> str:
+    """Render-only digest copy — reuses dashboard ctx so DQ filters match Smart Portfolio."""
+    try:
+        from hibs_racing.daily.smart_picks import filter_smart_picks, format_digest_message
+        from hibs_racing.web_service import novice_pick_candidates
+
+        if ctx is None:
+            ctx = dashboard_context()
+        candidates = novice_pick_candidates(ctx.get("meetings") or [])
+        picks = filter_smart_picks(candidates, limit=3)
+        return format_digest_message(
+            {"picks": picks, "card_dates": ctx.get("card_dates") or []},
+        )
+    except Exception:
+        return (
+            "🏇 Hibs Racing Intelligence — Daily Value Sheet\n"
+            "Cards: today\n\n"
+            "No value picks passed filters today (value + DQ≥75% + steam gate).\n"
+            "Tracker: /tracker"
+        )
+
+
+def _render_markdown_simple(text: str) -> str:
+    out: list[str] = []
+    in_code = False
+    in_ul = False
+    for line in text.splitlines():
+        if line.startswith("```"):
+            if in_code:
+                out.append("</code></pre>")
+                in_code = False
+            else:
+                out.append('<pre class="faq-code"><code>')
+                in_code = True
+            continue
+        if in_code:
+            out.append(html.escape(line))
+            continue
+        if line.startswith("### "):
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+            out.append(f"<h3>{html.escape(line[4:])}</h3>")
+        elif line.startswith("## "):
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+            out.append(f"<h2>{html.escape(line[3:])}</h2>")
+        elif line.startswith("# "):
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+            out.append(f"<h1>{html.escape(line[2:])}</h1>")
+        elif line.strip().startswith("- "):
+            if not in_ul:
+                out.append("<ul>")
+                in_ul = True
+            item = html.escape(line.strip()[2:])
+            item = re.sub(r"`([^`]+)`", r"<code>\1</code>", item)
+            item = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", item)
+            out.append(f"<li>{item}</li>")
+        elif not line.strip():
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+        else:
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+            esc = html.escape(line)
+            esc = re.sub(r"`([^`]+)`", r"<code>\1</code>", esc)
+            esc = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", esc)
+            out.append(f"<p>{esc}</p>")
+    if in_ul:
+        out.append("</ul>")
+    if in_code:
+        out.append("</code></pre>")
+    return "\n".join(out)
 
 
 def create_app() -> Flask:
     load_dotenv(ROOT / ".env")
+    apply_saved_ui_env()
     app = Flask(
         __name__,
         template_folder=str(ROOT / "templates"),
@@ -53,6 +143,7 @@ def create_app() -> Flask:
 
     def _render_cards():
         ctx = dashboard_context()
+        ctx["channel_digest"] = _channel_digest_preview(ctx)
         ctx.update(
             cards_deep_link_context(
                 ctx["meetings"],
@@ -108,6 +199,7 @@ def create_app() -> Flask:
             history_days=_tracker_days(),
             backtest=_tracker_backtest(),
         )
+        ctx["tracker_backtest"] = _tracker_backtest()
         ctx["public_read_only"] = True
         from flask import make_response
         resp = make_response(render_template("tracker.html", **ctx))
@@ -136,11 +228,13 @@ def create_app() -> Flask:
         if not public_tracker_enabled():
             abort(404)
         days = _tracker_days()
-        body = export_ledger_csv(days=days)
+        backtest = _tracker_backtest()
+        body = export_ledger_csv(days=days, backtest=backtest)
+        fname = "hibs-racing-oos-track-record.csv" if backtest else "hibs-racing-tracker.csv"
         resp = Response(
             body,
             mimetype="text/csv",
-            headers={"Content-Disposition": "attachment; filename=hibs-racing-tracker.csv"},
+            headers={"Content-Disposition": f"attachment; filename={fname}"},
         )
         resp.headers["Cache-Control"] = "public, max-age=300"
         resp.headers["Access-Control-Allow-Origin"] = os.environ.get("HIBS_TRACKER_CORS_ORIGIN", "*")
@@ -202,6 +296,49 @@ def create_app() -> Flask:
             return Response("Not found", status=404)
         return Response(svg_path.read_text(encoding="utf-8"), mimetype="image/svg+xml")
 
+    @app.route("/docs/technical-faq")
+    def technical_faq_page():
+        if not FAQ_PATH.exists():
+            from flask import abort
+
+            abort(404)
+        md = FAQ_PATH.read_text(encoding="utf-8")
+        return render_template(
+            "docs_faq.html",
+            faq_html=_render_markdown_simple(md),
+            faq_title="Architecture Technical FAQ",
+        )
+
+    @app.route("/api/daily-digest-preview")
+    def api_daily_digest_preview():
+        return jsonify({"ok": True, "message": _channel_digest_preview()})
+
+    @app.route("/admin/branding")
+    def admin_branding_page():
+        return render_template("admin_branding.html")
+
+    @app.route("/settings/monetization")
+    def settings_monetization_page():
+        payload = monetization_form_payload()
+        return render_template(
+            "settings_monetization.html",
+            monetization_fields=payload["fields"],
+            monetization_bootstrap=payload,
+        )
+
+    @app.route("/api/settings/monetization", methods=["GET", "POST"])
+    def api_settings_monetization():
+        if request.method == "GET":
+            return jsonify(monetization_form_payload())
+        body = request.get_json(silent=True) or {}
+        if not isinstance(body, dict):
+            return jsonify({"ok": False, "error": "Expected JSON object"}), 400
+        try:
+            saved = save_ui_monetization(body)
+            return jsonify({"ok": True, "saved_keys": sorted(saved.keys())})
+        except OSError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 500
+
     @app.route("/status")
     def status_page():
         return render_template(
@@ -210,6 +347,7 @@ def create_app() -> Flask:
             feature_impact=load_feature_impact_report(),
             ranker_attribution=live_ranker_attribution(),
             market_gauges=latest_gauges(limit=40),
+            automation_ops=automation_ops_status(),
         )
 
     @app.route("/tips")

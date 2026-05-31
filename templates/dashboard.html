@@ -77,6 +77,52 @@
 @media(min-width:900px){
     .race-drawer > summary .rp-verdict-snippet{flex:1 1 auto;margin-top:0;margin-left:8px;}
 }
+.smart-portfolio-row{
+    display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;align-items:stretch;
+}
+@media(max-width:960px){.smart-portfolio-row{grid-template-columns:1fr;}}
+.webhook-preview-card{
+    padding:16px 18px;border-radius:16px;
+    border:1px solid rgba(88,166,255,0.35);
+    background:linear-gradient(145deg,rgba(30,58,95,0.35),rgba(6,14,24,0.92));
+    position:relative;overflow:hidden;isolation:isolate;
+}
+.webhook-preview-card h2{
+    font-family:'Orbitron',monospace;color:#93c5fd;font-size:1.05em;margin-bottom:4px;
+}
+.webhook-preview-card .wp-sub{font-size:0.78em;color:var(--muted);margin-bottom:12px;}
+.phone-frame{
+    max-width:320px;margin:0 auto;border-radius:28px;padding:12px 10px 16px;
+    background:linear-gradient(160deg,#1f2937,#0f172a);
+    border:2px solid rgba(148,163,184,0.35);box-shadow:0 16px 40px rgba(0,0,0,0.45);
+}
+.phone-notch{
+    width:88px;height:5px;border-radius:999px;background:rgba(148,163,184,0.35);
+    margin:0 auto 10px;
+}
+.phone-screen{
+    background:#0b1220;border-radius:18px;padding:12px 12px 14px;min-height:220px;
+    border:1px solid rgba(51,65,85,0.8);
+}
+.phone-header{
+    display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;
+    border-bottom:1px solid rgba(51,65,85,0.6);
+}
+.phone-app-icon{
+    width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#10B981,#047857);
+    display:flex;align-items:center;justify-content:center;font-size:14px;
+}
+.phone-app-name{font-size:0.72em;font-weight:700;color:#e2e8f0;}
+.phone-time{font-size:0.65em;color:#64748b;margin-left:auto;}
+.phone-bubble{
+    background:rgba(30,41,59,0.95);border:1px solid rgba(71,85,105,0.6);
+    border-radius:12px 12px 12px 4px;padding:10px 11px;
+}
+.phone-bubble pre{
+    margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:0.68em;line-height:1.45;color:#e2e8f0;white-space:pre-wrap;word-break:break-word;
+}
+.phone-caption{font-size:0.68em;color:#64748b;text-align:center;margin-top:10px;}
 {% endblock %}
 
 {% block content %}
@@ -95,6 +141,7 @@
     {% if scoring_method %}<span class="pill ok">Engine: {{ scoring_method }}</span>{% endif %}
 </div>
 
+<div class="smart-portfolio-row">
 <section class="smart-picks-hero brand-panel-framed" id="smart-picks-hero" aria-live="polite">
     {% from '_hibs_brand.html' import brand_horse_watermark, brand_logo_watermark %}
     {{ brand_logo_watermark(modifier='brand-logo-watermark--corner-tl') }}
@@ -108,8 +155,31 @@
     </div>
 </section>
 
+<section class="webhook-preview-card brand-panel-framed" id="webhook-preview-card" aria-label="Automated premium channel stream preview">
+    <h2>Automated Premium Channel Stream</h2>
+    <p class="wp-sub">Exact 06:01 AM Telegram / Discord digest — partner tracking links included.</p>
+    <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+            <div class="phone-header">
+                <div class="phone-app-icon">🏇</div>
+                <div class="phone-app-name">Hibs Racing Premium</div>
+                <div class="phone-time">06:01</div>
+            </div>
+            <div class="phone-bubble">
+                <pre id="channel-digest-text">{{ channel_digest or '' }}</pre>
+            </div>
+        </div>
+        <p class="phone-caption">Pushed by notify-daily after morning batch</p>
+    </div>
+</section>
+</div>
+
 {% if pick_candidates is defined %}
 <script id="pick-candidates-data" type="application/json">{{ pick_candidates|tojson }}</script>
+{% endif %}
+{% if card_dates is defined %}
+<script id="card-dates-data" type="application/json">{{ card_dates|tojson }}</script>
 {% endif %}
 
 <section class="hero-panel is-open" id="hero-monitor">

@@ -39,11 +39,14 @@ def generate_monetized_link(
     book = venue or default_affiliate_venue()
     base_url = affiliate_base_url(book).rstrip("/")
     params = {
-        "utm_source": "hibs_racing_app",
+        "utm_source": os.environ.get("HIBS_AFFILIATE_UTM_SOURCE", "hibs_racing_app").strip() or "hibs_racing_app",
         "utm_medium": utm_medium,
         "event_ref": f"{course}_{off_time}".lower().replace(" ", "_"),
         "selection": runner_name,
     }
+    tracking_id = os.environ.get("HIBS_AFFILIATE_TRACKING_ID", "").strip()
+    if tracking_id:
+        params["affiliate_id"] = tracking_id
     sep = "&" if "?" in base_url else "?"
     return f"{base_url}{sep}{urllib.parse.urlencode(params)}"
 

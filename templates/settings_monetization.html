@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Monetization &amp; API Credentials — {{ product_name }}{% endblock %}
+
+{% block extra_css %}
+.admin-page{max-width:820px;margin:0 auto;}
+.admin-card{
+    background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:16px;
+}
+.admin-card h2{font-family:var(--wordmark-font,'Orbitron',monospace);font-size:1.05em;color:var(--gold);margin-bottom:12px;}
+.admin-field{margin-bottom:14px;}
+.admin-field label{display:block;font-size:0.72em;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px;font-weight:700;}
+.admin-field input,.admin-field select{
+    width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+    background:rgba(0,0,0,0.35);color:var(--text);font-size:0.92em;
+}
+.admin-hint{font-size:0.78em;color:var(--muted);line-height:1.55;margin:8px 0 14px;}
+.field-meta{font-size:0.68em;color:#64748b;margin-top:4px;}
+.field-meta.ok{color:#86efac;}
+.status-banner{padding:10px 14px;border-radius:10px;margin-bottom:14px;font-size:0.82em;display:none;}
+.status-banner.ok{display:block;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.35);color:#a7f3d0;}
+.status-banner.err{display:block;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;}
+{% endblock %}
+
+{% block content %}
+<div class="admin-page">
+    <div class="admin-card">
+        <h2>Monetization &amp; API Credentials</h2>
+        <p class="admin-hint">
+            Control affiliate routing and webhook destinations from the browser — no terminal required.
+            Values save to <code>data/ui_monetization.json</code> and overlay runtime config instantly
+            (no database or model changes). Cron inherits these on the next process restart.
+        </p>
+        <div id="monetize-status" class="status-banner" role="status"></div>
+        <form id="monetization-form">
+            {% for field in monetization_fields %}
+            <div class="admin-field">
+                <label for="field-{{ field.key }}">{{ field.label }}</label>
+                {% if field.key == 'HIBS_AFFILIATE_VENUE' %}
+                <select id="field-{{ field.key }}" name="{{ field.key }}">
+                    <option value="">— use .env default —</option>
+                    <option value="matchbook">Matchbook</option>
+                    <option value="betfair">Betfair</option>
+                    <option value="oddschecker">Oddschecker</option>
+                </select>
+                {% else %}
+                <input type="{% if field.secret %}password{% else %}text{% endif %}"
+                    id="field-{{ field.key }}" name="{{ field.key }}"
+                    placeholder="{% if field.secret %}Leave blank to keep current{% else %}Optional override{% endif %}"
+                    autocomplete="off">
+                {% endif %}
+                <div class="field-meta {% if field.effective_set %}ok{% endif %}" data-meta="{{ field.key }}">
+                    Source: {{ field.source }}{% if field.effective_set %} · active{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;">
+                <button type="submit" class="btn">Save configuration</button>
+                <a class="btn btn-secondary" href="{{ url_for('admin_branding_page') }}">Whitelabel branding →</a>
+            </div>
+        </form>
+    </div>
+</div>
+<script id="monetization-bootstrap" type="application/json">{{ monetization_bootstrap|tojson }}</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function monetizationAdmin(){
+    const form = document.getElementById('monetization-form');
+    const statusEl = document.getElementById('monetize-status');
+    if (!form) return;
+    let bootstrap = {};
+    try {
+        bootstrap = JSON.parse(document.getElementById('monetization-bootstrap')?.textContent || '{}');
+    } catch (_) {}
+    (bootstrap.fields || []).forEach((f) => {
+        const el = document.getElementById('field-' + f.key);
+        if (!el || !f.value) return;
+        el.value = f.value;
+        if (f.key === 'HIBS_AFFILIATE_VENUE' && el.tagName === 'SELECT') {
+            el.value = f.value;
+        }
+    });
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {};
+        form.querySelectorAll('[name]').forEach((el) => {
+            if (el.value && el.value.trim()) payload[el.name] = el.value.trim();
+        });
+        try {
+            const r = await fetch('/api/settings/monetization', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const j = await r.json();
+            if (!j.ok) throw new Error(j.error || 'Save failed');
+            statusEl.className = 'status-banner ok';
+            statusEl.textContent = 'Saved — affiliate links and webhooks will use these values (runtime overlay active).';
+            setTimeout(() => location.reload(), 900);
+        } catch (err) {
+            statusEl.className = 'status-banner err';
+            statusEl.textContent = err.message || 'Save failed';
+        }
+    });
+})();
+</script>
+{% endblock %}

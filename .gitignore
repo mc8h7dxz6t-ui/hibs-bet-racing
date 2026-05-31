@@ -15,6 +15,7 @@ __pycache__/
 # Feature store & heavy data (never commit live DB)
 data/*.sqlite
 data/*.sqlite-journal
+data/ui_monetization.json
 data/parquet/
 data/raw/
 *.parquet
