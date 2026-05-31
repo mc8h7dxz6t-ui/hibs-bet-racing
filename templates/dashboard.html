@@ -143,7 +143,13 @@
                 <div class="hero-horse">{{ r.horse_name }}</div>
                 <div class="hero-meta">{{ r.off_time or '—' }} {{ r.course or '' }}<br>{{ r.jockey or '—' }} · {{ r.trainer or '—' }}</div>
                 <div class="hero-prob">{{ (r.model_place_prob or 0)|fmt_pct }}</div>
-                <div class="hero-meta">combo {{ r.combo_bayes_place|fmt_num }} · score {{ r.place_score|fmt_num }}</div>
+                <div class="hero-meta">combo {{ r.combo_bayes_place|fmt_num }} · score {{ r.place_score|fmt_num }}
+                {% if r.win_decimal and r.monetized_link %}
+                · <a class="odds-affiliate-link" href="{{ r.monetized_link }}" target="_blank" rel="noopener sponsored">win {{ r.win_decimal|fmt_num }}</a>
+                {% elif r.win_decimal %}
+                · win {{ r.win_decimal|fmt_num }}
+                {% endif %}
+                </div>
                 {% if r.pick_reasons %}
                 <div class="hero-explain"><strong>Why</strong><ul>{% for reason in r.pick_reasons %}<li>{{ reason }}</li>{% endfor %}</ul></div>
                 {% endif %}

@@ -76,6 +76,9 @@ def monitor_snapshot(*, refresh: bool = False, settle: bool = True) -> dict:
     frame = load_scored_cards()
     card_date = frame["card_date"].iloc[0] if not frame.empty else None
     picks = top_places_of_day(frame)
+    from hibs_racing.utils.monetization import attach_monetized_links
+
+    picks = attach_monetized_links(picks)
 
     return {
         "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),

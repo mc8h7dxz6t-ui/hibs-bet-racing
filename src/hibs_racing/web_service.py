@@ -231,13 +231,15 @@ def resolve_race_deep_link(
 
 
 def attach_deep_links_to_picks(picks: list[dict], meetings: list[dict]) -> list[dict]:
+    from hibs_racing.utils.monetization import attach_monetized_links
+
     out: list[dict] = []
     for pick in picks:
         link = resolve_race_deep_link(meetings, race_id=str(pick.get("race_id") or ""))
         if pick.get("runner_id"):
             link = {**link, "runner_id": str(pick["runner_id"])}
         out.append({**pick, "deep_link": link})
-    return out
+    return attach_monetized_links(out)
 
 
 def cards_deep_link_context(
@@ -331,6 +333,8 @@ def _ui_data_completeness(row: dict) -> int:
 
 def novice_pick_candidates(meetings: list[dict]) -> list[dict]:
     """Flatten card rows for client-side Smart Portfolio / slip copy (UI layer only)."""
+    from hibs_racing.utils.monetization import generate_monetized_link
+
     out: list[dict] = []
     for meeting in meetings:
         course = meeting.get("course")
@@ -372,6 +376,11 @@ def novice_pick_candidates(meetings: list[dict]) -> list[dict]:
                             "race": race_dom_id(str(meeting.get("slug") or ""), str(race.get("race_slug") or "r1")),
                             "runner_id": row.get("runner_id"),
                         },
+                        "monetized_link": generate_monetized_link(
+                            str(row.get("horse_name") or ""),
+                            str(course or ""),
+                            str(off_time or ""),
+                        ),
                     }
                 )
     return out

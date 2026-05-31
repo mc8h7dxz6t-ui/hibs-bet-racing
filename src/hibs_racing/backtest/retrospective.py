@@ -360,6 +360,40 @@ def export_oos_ledger(
     return out
 
 
+def write_master_ledger(
+    *,
+    start: str,
+    end: str,
+    output_path: Path | None = None,
+    database: Path | None = None,
+) -> tuple[Path, dict]:
+    from hibs_racing.config import ROOT
+    from hibs_racing.place.paper_ledger import export_master_ledger_csv
+
+    db = database or db_path(load_config())
+    csv_text = export_master_ledger_csv(db, start=start, end=end)
+    if not csv_text.strip():
+        raise ValueError("No backtest rows for master export in the requested range.")
+    out = output_path or (ROOT / "exports" / "Hibs_Racing_Master_6Month_TrackRecord.csv")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(csv_text, encoding="utf-8")
+    rows = max(0, csv_text.count("\n") - 1)
+    cal = oos = 0
+    for line in csv_text.strip().splitlines()[1:]:
+        if line.endswith(",oos_holdout"):
+            oos += 1
+        elif line.endswith(",calibration"):
+            cal += 1
+    return out, {
+        "export_path": str(out),
+        "total_rows": rows,
+        "calibration_rows": cal,
+        "oos_holdout_rows": oos,
+        "start": start,
+        "end": end,
+    }
+
+
 def _backtest_ledger_stats(db: Path) -> dict:
     init_db(db)
     with connect(db) as conn:

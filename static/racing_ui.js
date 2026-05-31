@@ -369,14 +369,33 @@
     });
   }
 
+  function pickFromCard(card) {
+    const horse = card.dataset.horse || '';
+    const candidates = loadCandidates();
+    const full = candidates.find((c) => c.horse_name === horse) || {};
+    return {
+      horse_name: horse,
+      course: card.dataset.course || full.course || '',
+      off_time: card.dataset.off || full.off_time || '',
+      win_decimal: card.dataset.winOdds || full.win_decimal || '',
+      bet_type: card.dataset.betType || full.bet_type || 'each_way',
+      monetized_link: card.dataset.monetizedLink || full.monetized_link || '',
+    };
+  }
+
   function slipText(pick) {
-    const course = pick.course || pick.dataset?.course || '';
-    const off = pick.off_time || pick.dataset?.off || '';
-    const horse = pick.horse_name || pick.dataset?.horse || '';
-    const odds = pick.win_decimal || pick.dataset?.winOdds || '';
-    const betType = pick.bet_type || pick.dataset?.betType || 'each_way';
-    const oddsBit = odds ? ' (Target Odds: ' + odds + ')' : '';
-    return course + ' ' + off + ' - Horse: ' + horse + ' - ' + (betType === 'each_way' ? 'Each-Way' : betType) + oddsBit;
+    const course = pick.course || '';
+    const off = pick.off_time || '';
+    const horse = pick.horse_name || '';
+    const odds = pick.win_decimal || '';
+    const betType = pick.bet_type || 'each_way';
+    const betLabel = betType === 'each_way' ? 'Each-Way' : betType;
+    const oddsBit = odds ? ' (' + odds + ' EW)' : '';
+    const head = 'Hibs Smart Pick: ' + off + ' ' + course + ' - ' + horse + oddsBit + ' - ' + betLabel;
+    if (pick.monetized_link) {
+      return head + '\nSecure these odds via our verified partner: ' + pick.monetized_link;
+    }
+    return head;
   }
 
   async function copySlip(text, btn) {
@@ -397,7 +416,17 @@
       btn.addEventListener('click', () => {
         const card = btn.closest('.pick-card, .smart-pick-card, tr');
         if (!card) return;
-        copySlip(card, btn);
+        const pick = card.classList.contains('smart-pick-card') || card.dataset.horse
+          ? pickFromCard(card)
+          : {
+              horse_name: card.querySelector('.horse-cell')?.textContent?.trim(),
+              course: card.dataset.course,
+              off_time: card.dataset.off,
+              win_decimal: card.dataset.winOdds,
+              bet_type: 'each_way',
+              monetized_link: '',
+            };
+        copySlip(slipText(pick), btn);
       });
     });
   }
@@ -437,11 +466,14 @@
       const risk = riskProfile(impliedProb(p));
       const riskHtml = risk ? `<span class="risk-badge ${risk.cls}">● ${esc(risk.label)}</span>` : '';
       const cashHtml = cash != null ? `<div class="stake-cash-hint">Suggested stake: ${formatCash(cash)}</div>` : '';
+      const oddsHtml = p.win_decimal && p.monetized_link
+        ? `<a class="odds-affiliate-link" href="${encodeURI(p.monetized_link)}" target="_blank" rel="noopener sponsored" title="Open partner odds">win ${p.win_decimal}</a>`
+        : (p.win_decimal ? ' · win ' + p.win_decimal : '');
       return `
-        <div class="smart-pick-card" data-horse="${esc(p.horse_name)}" data-course="${esc(p.course)}" data-off="${esc(p.off_time)}" data-win-odds="${p.win_decimal || ''}" data-bet-type="each_way">
+        <div class="smart-pick-card" data-horse="${esc(p.horse_name)}" data-course="${esc(p.course)}" data-off="${esc(p.off_time)}" data-win-odds="${p.win_decimal || ''}" data-bet-type="each_way" data-monetized-link="${esc(p.monetized_link || '')}">
           <div class="sp-horse">#${i + 1} ${esc(p.horse_name)} ${riskHtml}</div>
           <div class="sp-meta">${esc(p.off_time)} · ${esc(p.course)} · DQ ${p.data_quality_pct}% · gate ${esc(p.steam_gate)}</div>
-          <div class="sp-meta">Place ${Math.round((parseFloat(p.model_place_prob) || 0) * 100)}% · EV ${p.ew_combined_ev != null ? Number(p.ew_combined_ev).toFixed(2) : '—'}${p.win_decimal ? ' · win ' + p.win_decimal : ''}</div>
+          <div class="sp-meta">Place ${Math.round((parseFloat(p.model_place_prob) || 0) * 100)}% · EV ${p.ew_combined_ev != null ? Number(p.ew_combined_ev).toFixed(2) : '—'}${oddsHtml ? ' · ' + oddsHtml : ''}</div>
           ${cashHtml}
           <button type="button" class="slip-copy-btn" data-slip-copy style="margin-top:8px;">📋 Copy slip</button>
         </div>`;

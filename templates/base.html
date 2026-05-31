@@ -282,6 +282,10 @@
             border-radius:8px;padding:4px 10px;font-size:0.72em;cursor:pointer;margin-left:6px;
         }
         .slip-copy-btn:hover{border-color:rgba(183,247,200,0.45);color:var(--hibs-neon);}
+        .odds-affiliate-link{
+            color:var(--gold);font-weight:700;text-decoration:none;border-bottom:1px dotted rgba(212,175,55,0.55);
+        }
+        .odds-affiliate-link:hover{color:var(--hibs-neon);border-bottom-color:var(--hibs-neon);}
         .smart-picks-hero{
             margin-bottom:16px;padding:16px 18px;border-radius:16px;
             border:1px solid rgba(246,216,137,0.35);
@@ -425,6 +429,10 @@ document.getElementById('btn-refresh')?.addEventListener('click', async () => {
                 const bankroll = window.HibsNoviceUX?.readBankroll?.();
                 const cash = bankroll != null && window.HibsNoviceUX?.stakeCash ? window.HibsNoviceUX.stakeCash(1, 1) : null;
                 const stakeLine = cash != null ? `<div class="stake-cash-hint">Suggested stake: £${cash.toFixed(2)}</div>` : '';
+                const winOdds = p.win_decimal != null ? Number(p.win_decimal).toFixed(2) : null;
+                const oddsLine = p.monetized_link && winOdds
+                    ? `<div class="hero-meta"><a class="odds-affiliate-link" href="${encodeURI(p.monetized_link)}" target="_blank" rel="noopener sponsored">Partner odds: ${winOdds} EW</a></div>`
+                    : (winOdds ? `<div class="hero-meta">win ${winOdds}</div>` : '');
                 return `
                 <div class="hero-pick">
                     <div class="hero-rank">#${p.day_rank}</div>
@@ -432,6 +440,7 @@ document.getElementById('btn-refresh')?.addEventListener('click', async () => {
                     <div class="hero-meta">${esc(p.off_time)} ${esc(p.course)}<br>${esc(p.jockey)} · ${esc(p.trainer)}</div>
                     <div class="hero-prob">${Math.round((p.model_place_prob||0)*100)}% place</div>
                     <div class="hero-meta">combo ${(p.combo_bayes_place||0).toFixed(2)} · score ${(p.place_score||0).toFixed(2)}</div>
+                    ${oddsLine}
                     ${stakeLine}
                     <div class="hero-explain"><strong>Why</strong><ul>${reasons}</ul></div>
                 </div>`;

@@ -84,6 +84,20 @@ def cmd_backtest_replay(args: argparse.Namespace) -> int:
     return 0 if report.value_picks_logged or report.runners_scored else 1
 
 
+def cmd_export_backtest_master(args: argparse.Namespace) -> int:
+    from hibs_racing.backtest.retrospective import write_master_ledger
+
+    start = getattr(args, "start", None) or "2025-12-01"
+    end = getattr(args, "end", None) or "2026-05-31"
+    out, summary = write_master_ledger(
+        start=start,
+        end=end,
+        output_path=getattr(args, "export_path", None),
+    )
+    print(json.dumps({**summary, "ok": True}, indent=2))
+    return 0
+
+
 def cmd_scrape(args: argparse.Namespace) -> int:
     from datetime import date as date_cls, timedelta
 
@@ -663,6 +677,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Custom CSV output path (default: exports/Hibs_Racing_OOS_PhaseA_May2026_TrackRecord.csv)",
     )
     p_btr.set_defaults(func=cmd_backtest_replay)
+
+    p_btm = sub.add_parser(
+        "export-backtest-master",
+        help="Export aggregated backtest CSV with calibration vs OOS labels",
+    )
+    p_btm.add_argument("--start", default="2025-12-01", help="Start date YYYY-MM-DD")
+    p_btm.add_argument("--end", default="2026-05-31", help="End date YYYY-MM-DD")
+    p_btm.add_argument("--export-path", type=Path, help="Output CSV path")
+    p_btm.set_defaults(func=cmd_export_backtest_master)
 
     p_matrix = sub.add_parser("build-matrix", help="Build LTR feature matrix (combo + NLP + relative)")
     p_matrix.set_defaults(func=cmd_build_matrix)

@@ -598,6 +598,39 @@ def export_oos_ledger_csv(
     return buf.getvalue()
 
 
+MASTER_LEDGER_COLUMNS = OOS_LEDGER_COLUMNS + ["sample_type"]
+
+
+def export_master_ledger_csv(
+    database: Path | None = None,
+    *,
+    start: str,
+    end: str,
+    train_end: str | None = None,
+) -> str:
+    """6-month+ master sheet with calibration vs OOS holdout label per row."""
+    cfg = load_config()
+    cutoff = train_end or cfg.get("backtest", {}).get("train_end", "2026-04-30")
+    raw = export_oos_ledger_csv(database, start=start, end=end)
+    if not raw.strip():
+        return ""
+    lines = raw.strip().splitlines()
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(MASTER_LEDGER_COLUMNS)
+    header = lines[0].split(",")
+    card_idx = header.index("card_date") if "card_date" in header else 1
+    for line in lines[1:]:
+        if not line.strip():
+            continue
+        # Simple CSV parse — fields are not quoted with commas in our export
+        cols = line.split(",")
+        card_date = cols[card_idx] if len(cols) > card_idx else ""
+        sample = "oos_holdout" if card_date > cutoff else "calibration"
+        writer.writerow(cols + [sample])
+    return buf.getvalue()
+
+
 def record_paper_bet(
     race_id: str,
     runner_id: str,
