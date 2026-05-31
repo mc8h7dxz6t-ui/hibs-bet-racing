@@ -39,7 +39,7 @@ AFFILIATE_MATCHBOOK_BASE_URL=https://www.matchbook.com/
 | OOS holdout | **2,178** May 2026 picks · **+124.14% SP ROI** (post `train_end`) |
 | Winter/spring calibration | **16,541** Nov–Apr 2026 picks · **+116.37% SP ROI** (in-sample) |
 | Operations | 06:00 cron batch · Docker `docker compose up -d` |
-| Data room | `DATA_ROOM.md` · `exports/Hibs_Racing_Master_6Month_TrackRecord.csv` |
+| Data room | `DATA_ROOM.md` · `exports/Hibs_Racing_Master_18k_TrackRecord.csv` · `exports/DATA_ROOM_EXPORT.log` |
 
 ---
 
@@ -73,7 +73,7 @@ Side-by-side calibration vs pure holdout — verified via local `backtest-replay
 
 > *The November to April block represents the model's core calibration footprint. We explicitly document it as in-sample to remain completely transparent. Its purpose is to demonstrate that the LightGBM architecture maintains rigid statistical edge and volume consistency across thousands of winter all-weather and spring turf fields. The undeniable proof of the software, however, is the May holdout block: when given entirely blind future data, the model's performance **advanced** to a peak **+124.14% ROI** at SP on 2,178 value picks — proving it captures structural market inefficiencies on autopilot.*
 
-**Data room deliverables:** `exports/Hibs_Racing_Master_6Month_TrackRecord.csv` · `exports/Hibs_Racing_OOS_PhaseA_May2026_TrackRecord.csv` (generated locally; secure transfer to buyers — not in public git).
+**Data room deliverables:** `exports/Hibs_Racing_Master_18k_TrackRecord.csv` · `exports/DATA_ROOM_EXPORT.log` (generated locally; secure transfer to buyers — not in public git).
 
 ---
 

@@ -1,8 +1,10 @@
 # Hibs Racing Intelligence — Data Room Summary
 
 **Asset:** Proprietary LightGBM UK/IRE horse racing analytics engine  
-**Master ledger:** `exports/Hibs_Racing_Master_6Month_TrackRecord.csv`  
-*(Winter calibration Dec–Feb 2026 + May OOS holdout — single buyer-facing file)*  
+**Master ledger:** `exports/Hibs_Racing_Master_18k_TrackRecord.csv`  
+*(Nov 2025–Apr 2026 calibration + May OOS holdout — **18,719** settled value picks)*  
+**Legacy master:** `exports/Hibs_Racing_Master_6Month_TrackRecord.csv` (Dec–Feb + May, 10,176 rows)  
+**Export log:** `exports/DATA_ROOM_EXPORT.log`  
 **Public verifier:** `http://127.0.0.1:5003/tracker?backtest=1` · SHA-256 `verification_hash` per row
 
 ---
@@ -11,11 +13,24 @@
 
 | File | Period | Rows | Label for buyers |
 |------|--------|------|------------------|
-| **`Hibs_Racing_Master_6Month_TrackRecord.csv`** | Dec–Feb + May 2026 | **10,176** | **Primary data room deliverable** |
+| **`Hibs_Racing_Master_18k_TrackRecord.csv`** | Nov 2025 – May 2026 | **18,719** | **Primary data room deliverable (peak Harville config)** |
+| `Hibs_Racing_Backtest_NovApr2026_TrackRecord.csv` | Nov → Apr 2026 | 16,541 | In-sample calibration window |
+| `Hibs_Racing_OOS_PhaseA_May2026_TrackRecord.csv` | May only | 2,178 | Pure OOS holdout (optimized config) |
+| `Hibs_Racing_Master_6Month_TrackRecord.csv` | Dec–Feb + May 2026 | 10,176 | Legacy master (prior export) |
 | `Hibs_Racing_Backtest_DecFeb2026_TrackRecord.csv` | Dec → Feb (winter) | 7,926 | Model calibration (in-sample) |
-| `Hibs_Racing_OOS_PhaseA_May2026_TrackRecord.csv` | May only | 2,250 | Pure OOS holdout (merged into master) |
 
-**Build master (one file for listing):**
+**Build 18k master (buyer-facing bundle):**
+```bash
+cd ~/hibs-racing && source .venv/bin/activate
+export HIBS_HARVILLE_CORRECTION=1
+hibs-racing backtest-replay --start 2025-11-01 --end 2026-04-30
+hibs-racing backtest-replay --start 2026-05-01 --end 2026-05-19 --keep --export-ledger \
+  --export-path exports/Hibs_Racing_OOS_PhaseA_May2026_TrackRecord.csv
+hibs-racing export-backtest-master --start 2025-11-01 --end 2026-05-19 \
+  --export-path exports/Hibs_Racing_Master_18k_TrackRecord.csv
+```
+
+**Legacy master (Dec–Feb + May):**
 ```bash
 cat exports/Hibs_Racing_Backtest_DecFeb2026_TrackRecord.csv \
   <(tail -n +2 exports/Hibs_Racing_OOS_PhaseA_May2026_TrackRecord.csv) \
