@@ -11,6 +11,14 @@ def test_harville_place_probs_sum():
     assert all(0 <= p <= 1 for p in pp)
 
 
+def test_harville_longshot_discount_reduces_tail_place_prob():
+    wp = [0.02, 0.02, 0.46, 0.50]
+    plain = harville_place_probs(wp, places=3, longshot_discount=1.0)
+    discounted = harville_place_probs(wp, places=3, longshot_discount=0.85, longshot_win_prob_threshold=0.03)
+    assert discounted[0] < plain[0]
+    assert discounted[1] < plain[1]
+
+
 def test_score_card_smoke(monkeypatch, tmp_path):
     from hibs_racing.config import load_config
     from hibs_racing.features.store import connect, init_db

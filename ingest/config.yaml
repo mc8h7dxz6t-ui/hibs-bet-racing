@@ -54,6 +54,8 @@ ranker:
 paper:
   min_place_ev: 0.05
   min_combo_bayes_place: 0.22
+  harville_longshot_win_prob_threshold: 0.03
+  harville_longshot_discount: 0.85
   default_place_fraction: 0.25
   default_places: 3
   default_stake: 1.0

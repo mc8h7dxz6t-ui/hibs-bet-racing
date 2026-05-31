@@ -1,7 +1,32 @@
 from __future__ import annotations
 
 
-def harville_place_probs(win_probs: list[float], places: int = 3) -> list[float]:
+def _apply_longshot_discount(
+    win_probs: list[float],
+    *,
+    threshold: float = 0.03,
+    discount: float = 0.85,
+) -> list[float]:
+    """Scale down severe longshots before Harville (canonical formula over-places tails)."""
+    if discount >= 1.0 or threshold <= 0:
+        return list(win_probs)
+    total = sum(win_probs)
+    if total <= 0:
+        return list(win_probs)
+    out: list[float] = []
+    for p in win_probs:
+        implied = p / total
+        out.append(p * discount if implied < threshold else p)
+    return out
+
+
+def harville_place_probs(
+    win_probs: list[float],
+    places: int = 3,
+    *,
+    longshot_win_prob_threshold: float = 0.03,
+    longshot_discount: float = 1.0,
+) -> list[float]:
     """
     Harville place probabilities (top-k) from win probabilities.
     Phase B starter — swap for Henery calibration once backtest justifies it.
@@ -13,11 +38,16 @@ def harville_place_probs(win_probs: list[float], places: int = 3) -> list[float]
     if n == 0:
         return []
 
-    total = sum(win_probs)
+    wp = _apply_longshot_discount(
+        win_probs,
+        threshold=longshot_win_prob_threshold,
+        discount=longshot_discount,
+    )
+    total = sum(wp)
     if total <= 0:
         raise ValueError("win_probs must sum to a positive value")
 
-    p = [x / total for x in win_probs]
+    p = [x / total for x in wp]
     place_p = [0.0] * n
 
     # 1st

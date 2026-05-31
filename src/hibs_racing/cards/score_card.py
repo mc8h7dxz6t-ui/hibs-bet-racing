@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,6 +14,16 @@ from hibs_racing.place.ew_ev import EachWayQuote, each_way_ev
 from hibs_racing.place.harville import harville_place_probs
 from hibs_racing.place.paper_ledger import record_paper_bet
 from hibs_racing.racing_engine.score_card import apply_scoring
+
+
+def _harville_longshot_discount(configured: float) -> float:
+    """HIBS_HARVILLE_CORRECTION=0 disables trim; =1 forces config discount (default 0.85)."""
+    raw = os.environ.get("HIBS_HARVILLE_CORRECTION", "").strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return 1.0
+    if raw in ("1", "true", "yes", "on"):
+        return configured if configured < 1.0 else 0.85
+    return configured
 
 
 def score_upcoming_cards(
@@ -30,6 +41,10 @@ def score_upcoming_cards(
     paper_cfg = cfg.get("paper", {})
     min_place_ev = paper_cfg.get("min_place_ev", 0.05)
     min_combo_place = paper_cfg.get("min_combo_bayes_place", 0.22)
+    longshot_threshold = float(paper_cfg.get("harville_longshot_win_prob_threshold", 0.03))
+    longshot_discount = _harville_longshot_discount(
+        float(paper_cfg.get("harville_longshot_discount", 1.0))
+    )
 
     frame = build_card_feature_frame(
         cards,
@@ -47,7 +62,12 @@ def score_upcoming_cards(
     for _, group in frame.groupby("race_id", sort=False):
         wp = group["model_win_prob"].tolist()
         places = min(3, len(wp))
-        hp = harville_place_probs(wp, places=places)
+        hp = harville_place_probs(
+            wp,
+            places=places,
+            longshot_win_prob_threshold=longshot_threshold,
+            longshot_discount=longshot_discount,
+        )
         place_probs.extend(hp)
 
     frame["model_place_prob"] = place_probs
