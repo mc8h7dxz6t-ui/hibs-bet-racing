@@ -16,7 +16,7 @@ from hibs_racing.entity.natural_key import generate_natural_key
 from hibs_racing.features.store import connect, init_db
 from hibs_racing.pick_explain import attach_pick_explanations, explain_pick
 from hibs_racing.ingest.rp_verdict import race_verdict_from_runners
-from hibs_racing.live.execution_config import betfair_configured, betfair_enabled, preferred_execution_venues
+from hibs_racing.live.execution_config import betfair_configured, betfair_enabled
 from hibs_racing.race_insights import build_race_insights
 
 
@@ -31,7 +31,7 @@ class HealthStatus:
     raceform_path: str | None
     betfair_enabled: bool
     betfair_configured: bool
-    execution_venues: list[str]
+    analytics_mode: bool
 
     def to_dict(self) -> dict:
         return {
@@ -44,7 +44,7 @@ class HealthStatus:
             "raceform_path": self.raceform_path,
             "betfair_enabled": self.betfair_enabled,
             "betfair_configured": self.betfair_configured,
-            "execution_venues": self.execution_venues,
+            "analytics_mode": self.analytics_mode,
         }
 
 
@@ -78,7 +78,7 @@ def health_status() -> HealthStatus:
         raceform_path=raceform,
         betfair_enabled=betfair_enabled(),
         betfair_configured=betfair_configured(),
-        execution_venues=preferred_execution_venues(),
+        analytics_mode=True,
     )
 
 

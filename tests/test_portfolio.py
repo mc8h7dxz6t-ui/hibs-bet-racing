@@ -1,14 +1,4 @@
-from hibs_racing.portfolio.unified import _football_pnl_units, _normalize_racing_row, build_unified_portfolio
-
-
-def test_football_pnl_units_value_win():
-    row = {"has_value": True, "value_result": "W", "value_odds": 3.5}
-    assert _football_pnl_units(row) == 2.5
-
-
-def test_football_pnl_units_value_loss():
-    row = {"has_value": True, "value_result": "L", "value_odds": 3.5}
-    assert _football_pnl_units(row) == -1.0
+from hibs_racing.portfolio.racing import _normalize_racing_row, build_racing_portfolio
 
 
 def test_normalize_racing_row():
@@ -34,10 +24,9 @@ def test_normalize_racing_row():
     assert out["result"] == "W"
 
 
-def test_build_unified_portfolio_racing_only(monkeypatch):
-    monkeypatch.setenv("HIBS_BET_TRACKER_URL", "http://127.0.0.1:9/invalid")
-    monkeypatch.delenv("HIBS_BET_DB_PATH", raising=False)
-    payload = build_unified_portfolio()
+def test_build_racing_portfolio():
+    payload = build_racing_portfolio()
     assert payload["ok"] is True
+    assert payload["mode"] == "analytics"
     assert "summary" in payload
-    assert payload["football_source"] in ("none", "sqlite:") or payload["football_source"].startswith("sqlite:")
+    assert "racing_pnl_units" in payload["summary"]

@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from hibs_racing.backtest.place_signal import run_place_backtest
+from hibs_racing.backtest.retrospective import run_retrospective_backtest
 from hibs_racing.config import db_path, load_config
 from hibs_racing.features.build_features import build_next_run_outcomes, build_tags
 from hibs_racing.features.store import init_db
@@ -57,6 +58,30 @@ def cmd_backtest(_: argparse.Namespace) -> int:
     report = run_place_backtest()
     print(json.dumps(report.to_dict(), indent=2))
     return 0
+
+
+def cmd_backtest_replay(args: argparse.Namespace) -> int:
+    from hibs_racing.backtest.retrospective import export_oos_ledger
+
+    start = getattr(args, "start", None)
+    end = getattr(args, "end", None)
+    report = run_retrospective_backtest(
+        months=int(getattr(args, "months", 3)),
+        start=start,
+        end=end,
+        replace=not getattr(args, "keep", False),
+    )
+    payload = report.to_dict()
+    if getattr(args, "export_ledger", False) and start and end:
+        out = export_oos_ledger(
+            start=start,
+            end=end,
+            output_path=getattr(args, "export_path", None),
+        )
+        payload["export_path"] = str(out)
+        payload["export_rows"] = max(0, out.read_text(encoding="utf-8").count("\n") - 1)
+    print(json.dumps(payload, indent=2))
+    return 0 if report.value_picks_logged or report.runners_scored else 1
 
 
 def cmd_scrape(args: argparse.Namespace) -> int:
@@ -224,14 +249,22 @@ def cmd_poll_odds(args: argparse.Namespace) -> int:
 
 
 def cmd_route_execution(args: argparse.Namespace) -> int:
-    from hibs_racing.cards.query import load_scored_cards
-    from hibs_racing.live.execution_router import build_execution_intents, route_execution_batch
+    from hibs_racing.live.execution_config import EXECUTION_DISABLED_MSG
+    from hibs_racing.live.execution_router import route_execution_batch
 
-    scored = load_scored_cards()
-    intents = build_execution_intents(scored)
-    report = route_execution_batch(intents, log_results=True)
+    report = route_execution_batch([], log_results=False)
+    print(json.dumps({**report, "cli_note": EXECUTION_DISABLED_MSG}, indent=2))
+    return 0 if report.get("status") == "disabled" else 1
+
+
+def cmd_notify_daily(args: argparse.Namespace) -> int:
+    from hibs_racing.daily.webhook_notify import notify_daily_digest
+
+    report = notify_daily_digest(limit=int(getattr(args, "top", 3)))
     print(json.dumps(report, indent=2))
-    return 0
+    if report.get("skipped"):
+        return 0
+    return 0 if report.get("ok") else 1
 
 
 def cmd_refresh_cards(args: argparse.Namespace) -> int:
@@ -611,6 +644,26 @@ def main(argv: list[str] | None = None) -> int:
     p_bt = sub.add_parser("backtest", help="Place/top-N signal backtest")
     p_bt.set_defaults(func=cmd_backtest)
 
+    p_btr = sub.add_parser(
+        "backtest-replay",
+        help="Replay last N months of GB/IRE cards — log value picks vs outcomes (SP odds)",
+    )
+    p_btr.add_argument("--months", type=int, default=3, help="Lookback months (default 3)")
+    p_btr.add_argument("--start", help="Start date YYYY-MM-DD (overrides --months)")
+    p_btr.add_argument("--end", help="End date YYYY-MM-DD (default today)")
+    p_btr.add_argument("--keep", action="store_true", help="Keep existing backtest ledger rows")
+    p_btr.add_argument(
+        "--export-ledger",
+        action="store_true",
+        help="Write sanitized OOS CSV to exports/ (requires --start and --end)",
+    )
+    p_btr.add_argument(
+        "--export-path",
+        type=Path,
+        help="Custom CSV output path (default: exports/Hibs_Racing_OOS_PhaseA_May2026_TrackRecord.csv)",
+    )
+    p_btr.set_defaults(func=cmd_backtest_replay)
+
     p_matrix = sub.add_parser("build-matrix", help="Build LTR feature matrix (combo + NLP + relative)")
     p_matrix.set_defaults(func=cmd_build_matrix)
 
@@ -669,7 +722,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_exec = sub.add_parser(
         "route-execution",
-        help="Preview automated Matchbook/Betfair routing for value picks (dry-run by default)",
+        help="(Disabled) Legacy execution preview — analytics-only product",
     )
     p_exec.set_defaults(func=cmd_route_execution)
 
@@ -716,6 +769,13 @@ def main(argv: list[str] | None = None) -> int:
 
     p_settle = sub.add_parser("settle-paper", help="Settle open paper bets from ingested results")
     p_settle.set_defaults(func=cmd_settle_paper)
+
+    p_notify = sub.add_parser(
+        "notify-daily",
+        help="Post top Smart Portfolio picks to Telegram/Discord (after daily refresh)",
+    )
+    p_notify.add_argument("--top", type=int, default=3, help="Max picks to include (default 3)")
+    p_notify.set_defaults(func=cmd_notify_daily)
 
     p_tips = sub.add_parser("ingest-tips", help="Ingest tips: paste, .eml folder, or IMAP inbox")
     p_tips.add_argument(

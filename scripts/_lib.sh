@@ -8,6 +8,9 @@ mkdir -p "${LOG_DIR}"
 
 activate_venv() {
   cd "${ROOT}"
+  if [[ -n "${HIBS_RACING_SKIP_VENV:-}" ]]; then
+    return 0
+  fi
   if [[ ! -d .venv ]]; then
     echo "Creating .venv..."
     python3 -m venv .venv

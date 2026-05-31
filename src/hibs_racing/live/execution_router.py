@@ -10,7 +10,13 @@ import pandas as pd
 
 from hibs_racing.config import load_config
 from hibs_racing.live.betfair_wom import BetfairExecutionClient
-from hibs_racing.live.execution_config import betfair_enabled, preferred_execution_venues
+from hibs_racing.live.execution_config import (
+    EXECUTION_DISABLED,
+    EXECUTION_DISABLED_MSG,
+    betfair_enabled,
+    execution_disabled,
+    preferred_execution_venues,
+)
 from hibs_racing.odds.market_steam import evaluate_market_gauges
 from hibs_racing.odds.matchbook import MatchbookClient
 
@@ -548,6 +554,16 @@ class ExecutionRouter:
         return None
 
     def route_legs(self, intent: ExecutionIntent, *, database: Path | None = None) -> list[ExecutionResult]:
+        if execution_disabled():
+            return [
+                ExecutionResult(
+                    intent=intent,
+                    venue="none",
+                    status="disabled",
+                    dry_run=True,
+                    message=EXECUTION_DISABLED_MSG,
+                )
+            ]
         stake = min(float(intent.stake), self.max_stake) * float(intent.kelly_multiplier or 1.0)
         intent = replace(intent, stake=round(stake, 2))
 
@@ -616,7 +632,9 @@ def build_execution_intents(
     default_stake: float | None = None,
     gauges: list | None = None,
 ) -> list[ExecutionIntent]:
-    """Build routable intents from scored card rows (value flags by default)."""
+    """Build routable intents from scored card rows (disabled in analytics mode)."""
+    if execution_disabled():
+        return []
     if scored.empty:
         return []
     cfg = load_config()
@@ -680,6 +698,20 @@ def route_execution_batch(
     database: Path | None = None,
     log_results: bool = False,
 ) -> dict[str, Any]:
+    if execution_disabled():
+        return {
+            "ok": False,
+            "status": "disabled",
+            "message": EXECUTION_DISABLED_MSG,
+            "mode": "analytics",
+            "intents": 0,
+            "results": [],
+            "batch_id": None,
+            "accepted": 0,
+            "rejected": 0,
+            "skipped_duplicate": 0,
+            "dry_run": True,
+        }
     import uuid
 
     from hibs_racing.config import db_path as resolve_db_path

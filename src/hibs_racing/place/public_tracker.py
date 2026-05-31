@@ -78,6 +78,7 @@ def build_public_tracker_dict(
     history_days: int | None = None,
     limit: int = 500,
     database: Path | None = None,
+    backtest: bool | None = False,
 ) -> dict[str, Any]:
     """Read-only trust-layer payload for /tracker and /api/tracker."""
     days = history_days if history_days is not None else default_history_days()
@@ -85,8 +86,8 @@ def build_public_tracker_dict(
     limit = max(10, min(2000, int(limit)))
     db = database or db_path(load_config())
 
-    rows = load_ledger_rows(db, limit=limit, days=days)
-    stats = ledger_stats(db, days=days).to_dict()
+    rows = load_ledger_rows(db, limit=limit, days=days, backtest=backtest)
+    stats = ledger_stats(db, days=days, backtest=backtest).to_dict()
     value_settled = [r for r in rows if r.get("is_value_pick") and r.get("status") != "open"]
     clv = _clv_metrics(rows)
     curve = _pnl_curve(rows)
@@ -97,6 +98,7 @@ def build_public_tracker_dict(
         "read_only": True,
         "enabled": public_tracker_enabled(),
         "product": "hibs-racing",
+        "ledger_kind": "backtest" if backtest else "forward",
         "history_days": days,
         "ledger_count": len(rows),
         "settled_count": stats.get("settled_bets", 0),

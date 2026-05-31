@@ -63,26 +63,22 @@ def test_tracker_page_public():
     assert "clv" in payload
 
 
-def test_status_page_execution_audit():
+def test_status_page_analytics_batch_mode():
     from hibs_racing.web import create_app
 
     app = create_app()
     client = app.test_client()
     resp = client.get("/status")
     assert resp.status_code == 200
-    assert b"Latest routing instructions" in resp.data
-    assert b"Recent batches" in resp.data
+    assert b"Batch operations" in resp.data
+    assert b"06:00 daily batch" in resp.data
+    assert b"Execution routing" not in resp.data
 
-    api = client.get("/api/execution/log")
-    assert api.status_code == 200
-    payload = api.get_json()
-    assert "recent_logs" in payload
-    assert "recent_batches" in payload
-    assert "status_counts" in payload
+    assert client.get("/api/execution/log").status_code == 404
+    assert client.get("/api/execution/preview").status_code == 404
 
-    preview = client.get("/api/execution/preview")
-    assert preview.status_code == 200
-    assert "results" in preview.get_json()
+    poll = client.get("/api/market-steam?poll=1")
+    assert poll.status_code == 403
 
 
 def test_status_page_ranker_attribution():

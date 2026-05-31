@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Unified Portfolio — {{ product_name }}{% endblock %}
+{% block title %}Paper Ledger — {{ product_name }}{% endblock %}
 
 {% block extra_css %}
 .port-page{max-width:1200px;margin:0 auto;}
@@ -27,10 +27,6 @@
 .port-table th,.port-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
 .port-table th{color:var(--muted);font-size:0.72em;text-transform:uppercase;}
 .port-scroll{overflow-x:auto;max-height:60vh;}
-.src-football{color:#93c5fd;}
-.src-racing{color:var(--hibs-neon);}
-.trig-steam{color:#86efac;font-weight:700;}
-.trig-drift{color:#fca5a5;font-weight:700;}
 {% endblock %}
 
 {% block content %}
@@ -38,78 +34,50 @@
 {% set s = p.summary if p else {} %}
 <div class="port-page">
     <div class="port-hero">
-        <span class="port-badge">Cross-product</span>
+        <span class="port-badge">Analytics mode</span>
         <span class="port-badge">Paper only</span>
-        <span class="port-badge">Units P&L</span>
-        <h1>Unified Portfolio Tracker</h1>
+        <span class="port-badge">SHA-256 verified</span>
+        <h1>Racing Paper Ledger</h1>
         <p class="port-intro">
-            Combined view of <strong>hibs-bet</strong> football value picks and <strong>hibs-racing</strong> paper ledger.
-            Football rows use flat 1u on value legs; racing uses logged stake units from each-way paper bets.
+            Each-way value picks logged at <strong>06:00 batch</strong> score time — before results are known.
+            Settlement joins ingested raceform; export CSV for third-party verification.
         </p>
-        <p class="port-intro">
-            Football source: <code>{{ p.football_source if p else '—' }}</code>
-            {% if p and p.updated_at %} · Updated {{ (p.updated_at or '')[:19]|replace('T',' ') }} UTC{% endif %}
-        </p>
+        {% if p and p.updated_at %}
+        <p class="port-intro">Updated {{ (p.updated_at or '')[:19]|replace('T',' ') }} UTC</p>
+        {% endif %}
         <div class="port-grid">
-            <div class="port-stat {% if s.combined_pnl_units and s.combined_pnl_units >= 0 %}pos{% elif s.combined_pnl_units %}neg{% endif %}">
-                <strong>{% if s.combined_pnl_units is defined %}{{ '%+.2f'|format(s.combined_pnl_units) }}u{% else %}—{% endif %}</strong>
-                <span>Combined P&L</span>
-            </div>
-            <div class="port-stat">
-                <strong>{% if s.football_pnl_units is defined %}{{ '%+.2f'|format(s.football_pnl_units) }}u{% else %}—{% endif %}</strong>
-                <span>Football (value, 1u)</span>
-            </div>
-            <div class="port-stat">
+            <div class="port-stat {% if s.racing_pnl_units and s.racing_pnl_units >= 0 %}pos{% elif s.racing_pnl_units %}neg{% endif %}">
                 <strong>{% if s.racing_pnl_units is defined %}{{ '%+.2f'|format(s.racing_pnl_units) }}u{% else %}—{% endif %}</strong>
-                <span>Racing paper</span>
+                <span>Total P&amp;L</span>
+            </div>
+            <div class="port-stat">
+                <strong>{{ s.racing_settled or 0 }}</strong>
+                <span>Settled bets</span>
+            </div>
+            <div class="port-stat">
+                <strong>{{ s.open_bets or 0 }}</strong>
+                <span>Open bets</span>
             </div>
             <div class="port-stat">
                 <strong>{{ s.total_rows or 0 }}</strong>
-                <span>Total rows</span>
+                <span>Ledger rows</span>
             </div>
         </div>
     </div>
 
-    {% if market_steam and market_steam.triggers %}
     <section class="port-card">
-        <h2>Market steam / drift (latest poll)</h2>
-        <div class="port-scroll">
-            <table class="port-table">
-                <thead><tr><th>Trigger</th><th>Horse</th><th>Course</th><th>Time</th><th>Was</th><th>Now</th><th>Δ%</th></tr></thead>
-                <tbody>
-                {% for t in market_steam.triggers %}
-                <tr>
-                    <td class="{% if t.trigger == 'steam' %}trig-steam{% else %}trig-drift{% endif %}">{{ t.trigger|upper }}</td>
-                    <td>{{ t.horse_name }}</td>
-                    <td>{{ t.course or '—' }}</td>
-                    <td>{{ t.off_time or '—' }}</td>
-                    <td>{{ t.previous_odds }}</td>
-                    <td>{{ t.current_odds }}</td>
-                    <td>{{ '%+.1f'|format(t.change_pct) }}%</td>
-                </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </section>
-    {% endif %}
-
-    <section class="port-card">
-        <h2>Unified ledger</h2>
+        <h2>Ledger</h2>
         <div class="port-scroll">
             <table class="port-table">
                 <thead>
                     <tr>
-                        <th>Source</th><th>Event</th><th>Selection</th><th>Odds</th>
-                        <th>Stake</th><th>Result</th><th>P&L</th><th>Edge</th>
+                        <th>Event</th><th>Selection</th><th>Odds</th>
+                        <th>Stake</th><th>Result</th><th>P&amp;L</th><th>Edge</th>
                     </tr>
                 </thead>
                 <tbody>
                 {% for row in (p.ledger if p else []) %}
                 <tr>
-                    <td class="{% if row.sport == 'football' %}src-football{% else %}src-racing{% endif %}">
-                        {{ row.source }}
-                    </td>
                     <td>{{ row.description or '—' }}<br><span style="color:var(--muted);font-size:0.9em">{{ row.league_or_meeting or '' }}</span></td>
                     <td>{{ row.selection or '—' }}</td>
                     <td>{% if row.odds %}{{ '%.2f'|format(row.odds) }}{% else %}—{% endif %}</td>
@@ -119,28 +87,16 @@
                     <td>{% if row.edge_pct is not none %}{{ '%.1f'|format(row.edge_pct) }}%{% else %}—{% endif %}</td>
                 </tr>
                 {% else %}
-                <tr><td colspan="8">No portfolio rows yet — score cards with paper logging and ensure hibs-bet tracker is reachable.</td></tr>
+                <tr><td colspan="7">No paper bets yet — add Matchbook creds and run <code>./scripts/daily_refresh.sh</code>.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
         <p class="port-intro" style="margin-top:12px">
-            <a href="{{ p.links.football_tracker if p and p.links else 'http://127.0.0.1:5001/tracker' }}" target="_blank" rel="noopener">hibs-bet tracker ↗</a>
-            · <a href="/tracker">hibs-racing tracker</a>
+            <a href="/tracker">Public track record</a>
+            · <a href="/api/tracker/export.csv">CSV export</a>
             · <a href="/api/portfolio">JSON API</a>
         </p>
     </section>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-setInterval(async () => {
-    try {
-        const r = await fetch('/api/market-steam');
-        const j = await r.json();
-        if (j.triggers?.length) location.reload();
-    } catch (_) {}
-}, 120000);
-</script>
 {% endblock %}

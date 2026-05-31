@@ -1,13 +1,12 @@
-{# Cross-sport portfolio summary — fetches /api/portfolio/summary #}
+{# Racing paper-ledger summary bar #}
 <div id="hibs-portfolio-bar" class="hibs-portfolio-bar" data-api-url="{{ portfolio_api_url | default('/api/portfolio/summary') }}">
     <div class="hibs-portfolio-inner">
-        <span class="hibs-portfolio-label">Portfolio</span>
+        <span class="hibs-portfolio-label">Paper P&amp;L</span>
         <span class="hibs-portfolio-stat" id="pf-combined">—</span>
-        <span class="hibs-portfolio-meta">combined P&amp;L</span>
-        <span class="hibs-portfolio-divider">|</span>
-        <span class="hibs-portfolio-pill" id="pf-football">⚽ —</span>
-        <span class="hibs-portfolio-pill" id="pf-racing">🏇 —</span>
-        <a class="hibs-portfolio-link" href="{{ portfolio_full_url | default('/portfolio') }}">Details →</a>
+        <span class="hibs-portfolio-meta">verified ledger</span>
+        <span class="hibs-portfolio-pill" id="pf-settled">— settled</span>
+        <a class="hibs-portfolio-link" href="{{ url_for('tracker_page') }}">Track record →</a>
+        <a class="hibs-portfolio-link" href="{{ portfolio_full_url | default('/portfolio') }}">Ledger</a>
     </div>
 </div>
 <style>
@@ -22,12 +21,11 @@
 .hibs-portfolio-stat{font-family:'Orbitron',monospace;font-size:1.15em;font-weight:700;color:#86efac;}
 .hibs-portfolio-stat.neg{color:#fca5a5;}
 .hibs-portfolio-meta{color:#94a3b8;font-size:0.85em;}
-.hibs-portfolio-divider{color:rgba(148,163,184,0.35);}
 .hibs-portfolio-pill{
     padding:3px 10px;border-radius:999px;border:1px solid rgba(148,163,184,0.2);
     color:#cbd5e1;font-size:0.88em;
 }
-.hibs-portfolio-link{margin-left:auto;color:#b7f7c8;text-decoration:none;font-weight:600;}
+.hibs-portfolio-link{color:#b7f7c8;text-decoration:none;font-weight:600;font-size:0.88em;}
 .hibs-portfolio-link:hover{text-decoration:underline;}
 </style>
 <script>
@@ -41,17 +39,15 @@
             const r = await fetch(url, {credentials:'same-origin'});
             const j = await r.json();
             const comb = document.getElementById('pf-combined');
-            const fb = document.getElementById('pf-football');
-            const rc = document.getElementById('pf-racing');
+            const settled = document.getElementById('pf-settled');
             if (comb) {
-                comb.textContent = fmt(j.combined_pnl_units);
-                comb.classList.toggle('neg', j.combined_pnl_units != null && j.combined_pnl_units < 0);
+                comb.textContent = fmt(j.racing_pnl_units);
+                comb.classList.toggle('neg', j.racing_pnl_units != null && j.racing_pnl_units < 0);
             }
-            if (fb) fb.textContent = '⚽ ' + fmt(j.football_pnl_units);
-            if (rc) rc.textContent = '🏇 ' + fmt(j.racing_pnl_units);
+            if (settled) settled.textContent = (j.racing_settled ?? 0) + ' settled';
         } catch (_) {}
     }
     refresh();
-    setInterval(refresh, 120000);
+    setInterval(refresh, 300000);
 })();
 </script>

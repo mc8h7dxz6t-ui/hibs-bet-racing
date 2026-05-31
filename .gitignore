@@ -34,3 +34,18 @@ vendor/rpscrape/.cache/
 
 # Optional: large local raceform copy
 raceform.db
+
+# Local caches & scratch DBs
+*.sqlite-journal
+*.db-journal
+.cache/
+tmp/
+*.tmp
+
+# Data room exports (generate locally; do not commit transaction logs)
+exports/*.csv
+
+# Secrets & tokens (never commit)
+*.pem
+credentials.json
+secrets/

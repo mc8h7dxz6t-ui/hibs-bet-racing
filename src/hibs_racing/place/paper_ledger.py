@@ -359,22 +359,33 @@ def settle_paper_bets(database: Path | None = None) -> dict:
     }
 
 
-def load_ledger_rows(database: Path | None = None, *, limit: int = 200, days: int | None = None) -> list[dict]:
+def load_ledger_rows(
+    database: Path | None = None,
+    *,
+    limit: int = 200,
+    days: int | None = None,
+    backtest: bool | None = False,
+) -> list[dict]:
     db = database or db_path(load_config())
     init_db(db)
     cutoff = _date_cutoff(days)
+    bt_clause = ""
+    if backtest is True:
+        bt_clause = " AND pb.backtest = 1"
+    elif backtest is False:
+        bt_clause = " AND pb.backtest = 0"
     with connect(db) as conn:
         if cutoff:
             rows = conn.execute(
-                """
+                f"""
                 SELECT pb.bet_id, pb.race_id, pb.runner_id, pb.bet_type, pb.stake_units, pb.model_ev,
                        pb.offered_win, pb.offered_place, pb.place_terms, pb.status, pb.result_pnl,
                        pb.settled_at, pb.created_at, pb.is_value_pick, pb.finish_pos,
-                       pb.closing_sp, pb.clv_beat, pb.verification_hash,
+                       pb.closing_sp, pb.clv_beat, pb.verification_hash, pb.backtest,
                        u.horse_name, u.course, u.off_time, u.card_date
                 FROM paper_bets pb
                 LEFT JOIN upcoming_runners u ON u.runner_id = pb.runner_id
-                WHERE pb.created_at >= ?
+                WHERE pb.created_at >= ?{bt_clause}
                 ORDER BY pb.created_at DESC
                 LIMIT ?
                 """,
@@ -382,14 +393,15 @@ def load_ledger_rows(database: Path | None = None, *, limit: int = 200, days: in
             ).fetchall()
         else:
             rows = conn.execute(
-                """
+                f"""
                 SELECT pb.bet_id, pb.race_id, pb.runner_id, pb.bet_type, pb.stake_units, pb.model_ev,
                        pb.offered_win, pb.offered_place, pb.place_terms, pb.status, pb.result_pnl,
                        pb.settled_at, pb.created_at, pb.is_value_pick, pb.finish_pos,
-                       pb.closing_sp, pb.clv_beat, pb.verification_hash,
+                       pb.closing_sp, pb.clv_beat, pb.verification_hash, pb.backtest,
                        u.horse_name, u.course, u.off_time, u.card_date
                 FROM paper_bets pb
                 LEFT JOIN upcoming_runners u ON u.runner_id = pb.runner_id
+                WHERE 1=1{bt_clause}
                 ORDER BY pb.created_at DESC
                 LIMIT ?
                 """,
@@ -399,25 +411,30 @@ def load_ledger_rows(database: Path | None = None, *, limit: int = 200, days: in
         "bet_id", "race_id", "runner_id", "bet_type", "stake_units", "model_ev",
         "offered_win", "offered_place", "place_terms", "status", "result_pnl",
         "settled_at", "created_at", "is_value_pick", "finish_pos",
-        "closing_sp", "clv_beat", "verification_hash",
+        "closing_sp", "clv_beat", "verification_hash", "backtest",
         "horse_name", "course", "off_time", "card_date",
     ]
     return [dict(zip(cols, row, strict=True)) for row in rows]
 
 
-def ledger_stats(database: Path | None = None, *, days: int | None = None) -> LedgerStats:
+def ledger_stats(database: Path | None = None, *, days: int | None = None, backtest: bool | None = False) -> LedgerStats:
     db = database or db_path(load_config())
     init_db(db)
     cutoff = _date_cutoff(days)
+    bt_clause = ""
+    if backtest is True:
+        bt_clause = " AND backtest = 1"
+    elif backtest is False:
+        bt_clause = " AND backtest = 0"
     with connect(db) as conn:
         if cutoff:
             rows = conn.execute(
-                "SELECT status, stake_units, result_pnl, is_value_pick FROM paper_bets WHERE created_at >= ?",
+                f"SELECT status, stake_units, result_pnl, is_value_pick FROM paper_bets WHERE created_at >= ?{bt_clause}",
                 (cutoff,),
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT status, stake_units, result_pnl, is_value_pick FROM paper_bets",
+                f"SELECT status, stake_units, result_pnl, is_value_pick FROM paper_bets WHERE 1=1{bt_clause}",
             ).fetchall()
 
     open_bets = settled = place_hits = place_misses = win_hits = 0
@@ -481,14 +498,103 @@ def ledger_stats(database: Path | None = None, *, days: int | None = None) -> Le
 
 
 
-def export_ledger_csv(database: Path | None = None, *, days: int | None = 60) -> str:
-    rows = load_ledger_rows(database, limit=10_000, days=days)
+def export_ledger_csv(
+    database: Path | None = None,
+    *,
+    days: int | None = 60,
+    backtest: bool | None = False,
+) -> str:
+    rows = load_ledger_rows(database, limit=10_000, days=days, backtest=backtest)
     buf = io.StringIO()
     if not rows:
         return ""
     writer = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
     writer.writeheader()
     writer.writerows(rows)
+    return buf.getvalue()
+
+
+OOS_LEDGER_COLUMNS = [
+    "bet_id",
+    "card_date",
+    "off_time",
+    "course",
+    "horse_name",
+    "runner_id",
+    "race_id",
+    "bet_type",
+    "stake_units",
+    "offered_win",
+    "closing_sp",
+    "each_way_pnl",
+    "status",
+    "finish_pos",
+    "model_ev",
+    "verification_hash",
+    "created_at",
+    "settled_at",
+]
+
+
+def export_oos_ledger_csv(
+    database: Path | None = None,
+    *,
+    start: str | None = None,
+    end: str | None = None,
+) -> str:
+    """Sanitized backtest ledger for Acquire data room (SHA-256 verifiable)."""
+    db = database or db_path(load_config())
+    init_db(db)
+    clauses = ["pb.backtest = 1"]
+    params: list[object] = []
+    if start:
+        clauses.append("u.card_date >= ?")
+        params.append(start)
+    if end:
+        clauses.append("u.card_date <= ?")
+        params.append(end)
+    where = " AND ".join(clauses)
+    with connect(db) as conn:
+        rows = conn.execute(
+            f"""
+            SELECT pb.bet_id, u.card_date, u.off_time, u.course, u.horse_name,
+                   pb.runner_id, pb.race_id, pb.bet_type, pb.stake_units,
+                   pb.offered_win, pb.closing_sp, pb.result_pnl, pb.status,
+                   pb.finish_pos, pb.model_ev, pb.verification_hash,
+                   pb.created_at, pb.settled_at
+            FROM paper_bets pb
+            LEFT JOIN upcoming_runners u ON u.runner_id = pb.runner_id
+            WHERE {where}
+            ORDER BY u.card_date, u.off_time, pb.created_at
+            """,
+            params,
+        ).fetchall()
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(OOS_LEDGER_COLUMNS)
+    for row in rows:
+        writer.writerow(
+            [
+                row[0],
+                row[1],
+                row[2],
+                row[3],
+                row[4],
+                row[5],
+                row[6],
+                row[7],
+                row[8],
+                row[9],
+                row[10],
+                round(float(row[11]), 2) if row[11] is not None else "",
+                row[12],
+                row[13],
+                round(float(row[14]), 4) if row[14] is not None else "",
+                row[15],
+                row[16],
+                row[17],
+            ]
+        )
     return buf.getvalue()
 
 
@@ -503,6 +609,8 @@ def record_paper_bet(
     offered_place: float | None = None,
     place_terms: str | None = None,
     is_value_pick: bool = False,
+    backtest: bool = False,
+    created_at: str | None = None,
     database: Path | None = None,
 ) -> str:
     import uuid
@@ -511,14 +619,14 @@ def record_paper_bet(
     init_db(db)
     with connect(db) as conn:
         existing = conn.execute(
-            "SELECT bet_id FROM paper_bets WHERE runner_id = ? AND race_id = ? LIMIT 1",
-            (runner_id, race_id),
+            "SELECT bet_id FROM paper_bets WHERE runner_id = ? AND race_id = ? AND backtest = ? LIMIT 1",
+            (runner_id, race_id, 1 if backtest else 0),
         ).fetchone()
         if existing:
             return str(existing[0])
 
     bet_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    now = created_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     vhash = bet_verification_hash(bet_id, now, runner_id, offered_win, stake_units)
     with connect(db) as conn:
         conn.execute(
@@ -526,8 +634,8 @@ def record_paper_bet(
             INSERT INTO paper_bets (
                 bet_id, race_id, runner_id, bet_type, stake_units,
                 model_ev, offered_win, offered_place, place_terms, is_value_pick,
-                verification_hash, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                verification_hash, backtest, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 bet_id,
@@ -541,6 +649,7 @@ def record_paper_bet(
                 place_terms,
                 1 if is_value_pick else 0,
                 vhash,
+                1 if backtest else 0,
                 now,
             ),
         )

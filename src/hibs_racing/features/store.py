@@ -65,6 +65,7 @@ PAPER_BETS_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("closing_sp", "REAL"),
     ("clv_beat", "INTEGER"),
     ("verification_hash", "TEXT"),
+    ("backtest", "INTEGER NOT NULL DEFAULT 0"),
 )
 
 

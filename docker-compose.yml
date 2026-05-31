@@ -1,0 +1,42 @@
+services:
+  racing:
+    build: .
+    image: hibs-racing-intelligence:latest
+    container_name: hibs-racing
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 5003
+      TZ: Europe/London
+      HIBS_RACING_DATA_DIR: /data
+      HIBS_RACING_DB_PATH: /data/feature_store.sqlite
+      HIBS_PUBLIC_TRACKER: "1"
+    ports:
+      - "5003:5003"
+    volumes:
+      - hibs_data:/data
+      # Mount Kaggle raceform.db read-only (required for ingest sync)
+      - ${RACEFORM_DB_PATH:-./raceform.db}:/raceform/raceform.db:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5003/api/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: hibs-racing-nginx
+    restart: unless-stopped
+    depends_on:
+      racing:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    volumes:
+      - ./deploy/nginx/docker.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  hibs_data:

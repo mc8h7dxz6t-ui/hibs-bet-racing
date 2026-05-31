@@ -1,0 +1,5 @@
+# 06:00 Europe/London — daily batch (ingest, score, paper ledger, webhook)
+0 6 * * * /app/scripts/daily_refresh.sh >> /app/logs/cron_daily.log 2>&1
+
+# Sunday 05:30 — optional weekly ranker retrain (disable by commenting out)
+30 5 * * 0 /app/scripts/weekly_retrain.sh >> /app/logs/cron_weekly.log 2>&1

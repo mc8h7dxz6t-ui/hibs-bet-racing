@@ -120,34 +120,7 @@ def test_execution_audit_panel(racing_db):
     assert panel["recent_batches"][0]["batch_id"] == batch_id
 
 
-def test_route_execution_batch_logs_batch_id(racing_db, monkeypatch):
-    monkeypatch.setenv("HIBS_EXECUTION_LIVE", "0")
-    intents = [_intent()]
-    report = route_execution_batch(intents, database=racing_db, log_results=True)
-    assert report["intents"] == 1
-    assert report["legs"] == 2
-    assert report["routed"] == 2
-    rows = recent_execution_logs(batch_id=report["batch_id"], database=racing_db)
-    assert len(rows) == 2
-    assert {r["bet_leg"] for r in rows} == {"win", "place"}
-
-
-def test_route_execution_batch_skips_log_by_default(racing_db, monkeypatch):
-    monkeypatch.setenv("HIBS_EXECUTION_LIVE", "0")
-    report = route_execution_batch([_intent()], database=racing_db)
-    assert report["batch_id"]
+def test_route_execution_batch_disabled_in_analytics_mode(racing_db):
+    report = route_execution_batch([_intent()], database=racing_db, log_results=True)
+    assert report["status"] == "disabled"
     assert execution_log_summary(database=racing_db)["total_rows"] == 0
-
-
-def test_live_duplicate_skipped_on_rerun(racing_db, monkeypatch):
-    monkeypatch.setenv("HIBS_EXECUTION_LIVE", "1")
-    intent = _intent()
-    batch_id = str(uuid.uuid4())
-    append_execution_log(_routed_result(intent, dry_run=False, bet_leg="win"), batch_id=batch_id, database=racing_db)
-
-    report = route_execution_batch([intent], database=racing_db, log_results=True)
-    assert report["skipped_duplicate"] == 1
-    assert report["routed"] == 0
-    statuses = [r["status"] for r in report["results"]]
-    assert statuses[0] == "skipped_duplicate"
-    assert statuses[1] in {"stub_error", "rejected", "skipped_duplicate"}

@@ -27,11 +27,12 @@
         <p style="margin-bottom:12px;">
             <span class="pill {% if health.racing_api %}ok{% else %}warn{% endif %}">Racing API</span>
             <span class="pill {% if health.racing_post %}ok{% else %}warn{% endif %}">Racing Post</span>
-            <span class="pill {% if health.matchbook %}ok{% else %}warn{% endif %}">Matchbook</span>
+            <span class="pill ok">Analytics mode</span>
+            <span class="pill {% if health.matchbook %}ok{% else %}warn{% endif %}">Matchbook (batch odds)</span>
             {% if health.betfair_enabled %}
             <span class="pill {% if health.betfair_configured %}ok{% else %}warn{% endif %}">Betfair</span>
             {% else %}
-            <span class="pill muted" title="Phase C — enable in ingest/config.yaml when API access is ready">Betfair off</span>
+            <span class="pill muted">No live execution</span>
             {% endif %}
             <span class="pill {% if health.raceform_path %}ok{% else %}warn{% endif %}">Kaggle raceform.db</span>
             {% if ranker_loaded %}<span class="pill ok">Ranker artifact</span>{% else %}<span class="pill warn">No ranker</span>{% endif %}
@@ -45,95 +46,16 @@
 </section>
 
 <section class="card">
-    <div class="card-head">
-        <h2>Execution routing</h2>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button type="button" class="btn btn-secondary" id="btn-exec-preview">Run preview</button>
-            <button type="button" class="btn btn-secondary" id="btn-exec-preview-log">Preview &amp; log</button>
-            <button type="button" class="btn btn-secondary" id="btn-exec-refresh">Refresh audit</button>
-        </div>
-    </div>
+    <div class="card-head"><h2>Batch operations</h2></div>
     <div class="card-body" style="padding:16px;">
-        <p style="margin-bottom:12px;" id="exec-config-pills">
-            <span class="pill {% if execution.dry_run %}ok{% else %}warn{% endif %}">
-                {% if execution.dry_run %}Dry-run{% else %}LIVE{% endif %}
-            </span>
-            {% for venue in execution.preferred_venues %}
-            <span class="pill ok">{{ venue }}</span>
-            {% endfor %}
-            {% if not health.betfair_enabled %}
-            <span class="pill muted">betfair disabled</span>
-            {% endif %}
-            <span class="pill ok">EW win + place split</span>
-        </p>
         <p class="fi-hint">
-            Matchbook each-way routes as separate win and place back offers (half stake each).
-            Refresh cards to map place market IDs. CLI: <code>hibs-racing route-execution</code> · API:
-            <a href="{{ url_for('api_execution_preview') }}">/api/execution/preview</a>
-            · Max stake {{ execution.max_stake }}u
+            This product runs as a <strong>06:00 daily batch</strong>: ingest results → fetch cards → score with LightGBM →
+            log value picks to the SHA-256 paper ledger → auto-settle. No live exchange routing or real-time odds polling.
         </p>
-        <div class="stat-grid" style="margin:14px 0;">
-            <div class="stat-card"><div class="stat-label">Audit rows</div><div class="stat-value" id="exec-total-rows">{{ execution_audit.total_rows }}</div></div>
-            <div class="stat-card"><div class="stat-label">Live routed</div><div class="stat-value" id="exec-live-routed">{{ execution_audit.live_routed }}</div></div>
-            <div class="stat-card"><div class="stat-label">Last batch</div><div class="stat-value" id="exec-last-batch" style="font-size:0.75em;">{% if execution_audit.last_created_at %}{{ execution_audit.last_created_at[:19]|replace('T',' ') }}{% else %}—{% endif %}</div></div>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;" id="exec-status-pills">
-            {% for status, count in (execution_audit.status_counts or {}).items() %}
-            <span class="pill {% if status in ['routed','stub_ok'] %}ok{% elif status in ['rejected','stub_error'] %}warn{% else %}muted{% endif %}">{{ status }}: {{ count }}</span>
-            {% else %}
-            <span class="pill muted">no audit rows yet</span>
-            {% endfor %}
-        </div>
-        <h3 style="font-size:0.9em;margin:12px 0 8px;color:var(--muted);">Recent batches</h3>
-        <div class="port-scroll" style="overflow-x:auto;margin-bottom:14px;">
-            <table class="port-table exec-preview-row">
-                <thead>
-                    <tr><th>Batch</th><th>Time (UTC)</th><th>Rows</th><th>Accepted</th><th>Rejected</th><th>Skipped dup</th><th>Live</th></tr>
-                </thead>
-                <tbody id="exec-batch-body">
-                {% for b in execution_audit.recent_batches %}
-                <tr>
-                    <td><code>{{ b.batch_id[:8] }}…</code></td>
-                    <td>{{ (b.created_at or '')[:19]|replace('T',' ') }}</td>
-                    <td class="num">{{ b.rows }}</td>
-                    <td class="num">{{ b.accepted }}</td>
-                    <td class="num">{{ b.rejected }}</td>
-                    <td class="num">{{ b.skipped_duplicate }}</td>
-                    <td class="num">{{ b.live_rows }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="7">No batches logged — run <code>hibs-racing route-execution</code> or Preview &amp; log.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        <h3 style="font-size:0.9em;margin:12px 0 8px;color:var(--muted);">Latest routing instructions</h3>
-        <div class="attr-scroll">
-            <table class="port-table exec-preview-row">
-                <thead>
-                    <tr><th>Time</th><th>Horse</th><th>Leg</th><th>Venue</th><th>Status</th><th>Stake</th><th>Odds</th><th>Gate</th><th>Mode</th><th>Message</th></tr>
-                </thead>
-                <tbody id="exec-log-body">
-                {% for row in execution_audit.recent_logs %}
-                <tr>
-                    <td>{{ (row.created_at or '')[:19]|replace('T',' ') }}</td>
-                    <td>{{ row.horse_name or '—' }}</td>
-                    <td>{{ row.bet_leg }}</td>
-                    <td>{{ row.venue }}</td>
-                    <td class="exec-status-{{ row.status }}">{{ row.status }}</td>
-                    <td class="num">{% if row.stake is not none %}{{ '%.2f'|format(row.stake) }}{% else %}—{% endif %}</td>
-                    <td class="num">{% if row.odds is not none %}{{ '%.2f'|format(row.odds) }}{% else %}—{% endif %}</td>
-                    <td>{{ row.steam_gate or '—' }}</td>
-                    <td>{% if row.dry_run %}dry{% else %}live{% endif %}</td>
-                    <td>{{ (row.message or '')[:60] }}{% if row.message and row.message|length > 60 %}…{% endif %}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="10">No routing instructions logged yet.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        <pre id="exec-preview-json" class="fi-hint" style="display:none;margin-top:12px;max-height:220px;overflow:auto;background:rgba(0,0,0,0.25);padding:10px;border-radius:8px;"></pre>
+        <p class="fi-hint" style="margin-top:8px;">
+            CLI: <code>./scripts/daily_refresh.sh</code> · Public ledger: <a href="{{ url_for('tracker_page') }}">/tracker</a>
+            · CSV: <a href="/api/tracker/export.csv">export</a>
+        </p>
     </div>
 </section>
 
@@ -231,11 +153,10 @@
 
 <section class="card">
     <div class="card-head">
-        <h2>Market drift gauges</h2>
-        <button type="button" class="btn btn-secondary" id="btn-poll-drift">Poll Matchbook</button>
+        <h2>Morning odds snapshot</h2>
     </div>
     <div class="card-body" style="padding:16px;">
-        <p class="fi-hint">Δ = Odds<sub>now</sub> − Odds<sub>20m ago</sub>. Polls every 2 min within 20 min of off. Steam → scale Kelly; drift ≥ abort threshold → safety gate.</p>
+        <p class="fi-hint">Reference gauges from the last <code>daily_refresh.sh</code> run (06:00 batch). Not updated in real time.</p>
         <div class="port-scroll" style="overflow-x:auto;">
             <table class="port-table">
                 <thead>
@@ -255,7 +176,7 @@
                     <td>{% if g.value_flag %}★{% else %}—{% endif %}</td>
                 </tr>
                 {% else %}
-                <tr><td colspan="9">No pre-race gauges — fetch cards and run <code>hibs-racing poll-odds</code> within 20 min of off.</td></tr>
+                <tr><td colspan="9">No snapshot yet — run <code>./scripts/daily_refresh.sh</code> with Matchbook creds.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
@@ -322,7 +243,7 @@
 
     function render(gauges){
         if (!gauges.length){
-            body.innerHTML = '<tr><td colspan="9">No pre-race gauges — fetch cards and run poll within 20 min of off.</td></tr>';
+            body.innerHTML = '<tr><td colspan="9">No snapshot yet — run daily_refresh.sh.</td></tr>';
             return;
         }
         body.innerHTML = gauges.map(g => `
@@ -339,134 +260,15 @@
             </tr>`).join('');
     }
 
-    async function refresh(poll){
+    async function refresh(){
         try {
-            const r = await fetch('/api/market-steam' + (poll ? '?poll=1' : ''));
+            const r = await fetch('/api/market-steam');
             const j = await r.json();
             render(j.gauges || []);
         } catch (_) {}
     }
 
-    document.getElementById('btn-poll-drift')?.addEventListener('click', async () => {
-        const btn = document.getElementById('btn-poll-drift');
-        btn.disabled = true;
-        try { await refresh(true); }
-        catch (_) { alert('Poll failed'); }
-        finally { btn.disabled = false; }
-    });
-
-    setInterval(() => refresh(true), 120000);
-})();
-
-(function executionAuditMonitor(){
-    const batchBody = document.getElementById('exec-batch-body');
-    const logBody = document.getElementById('exec-log-body');
-    const statusPills = document.getElementById('exec-status-pills');
-    const previewJson = document.getElementById('exec-preview-json');
-    if (!logBody) return;
-
-    const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const fmtNum = (v) => (v == null ? '—' : Number(v).toFixed(2));
-    const fmtTime = (t) => esc((t || '').slice(0, 19).replace('T', ' '));
-    const statusClass = (s) => `exec-status-${esc(s)}`;
-    const pillClass = (s) => (['routed','stub_ok'].includes(s) ? 'ok' : ['rejected','stub_error'].includes(s) ? 'warn' : 'muted');
-
-    function renderStatusCounts(counts){
-        if (!statusPills) return;
-        const entries = Object.entries(counts || {});
-        if (!entries.length){
-            statusPills.innerHTML = '<span class="pill muted">no audit rows yet</span>';
-            return;
-        }
-        statusPills.innerHTML = entries.map(([status, count]) =>
-            `<span class="pill ${pillClass(status)}">${esc(status)}: ${count}</span>`
-        ).join('');
-    }
-
-    function renderBatches(batches){
-        if (!batchBody) return;
-        if (!batches.length){
-            batchBody.innerHTML = '<tr><td colspan="7">No batches logged — run route-execution or Preview &amp; log.</td></tr>';
-            return;
-        }
-        batchBody.innerHTML = batches.map(b => `
-            <tr>
-                <td><code>${esc((b.batch_id || '').slice(0, 8))}…</code></td>
-                <td>${fmtTime(b.created_at)}</td>
-                <td class="num">${b.rows ?? 0}</td>
-                <td class="num">${b.accepted ?? 0}</td>
-                <td class="num">${b.rejected ?? 0}</td>
-                <td class="num">${b.skipped_duplicate ?? 0}</td>
-                <td class="num">${b.live_rows ?? 0}</td>
-            </tr>`).join('');
-    }
-
-    function renderLogs(logs){
-        if (!logs.length){
-            logBody.innerHTML = '<tr><td colspan="10">No routing instructions logged yet.</td></tr>';
-            return;
-        }
-        logBody.innerHTML = logs.map(r => `
-            <tr>
-                <td>${fmtTime(r.created_at)}</td>
-                <td>${esc(r.horse_name || '—')}</td>
-                <td>${esc(r.bet_leg)}</td>
-                <td>${esc(r.venue)}</td>
-                <td class="${statusClass(r.status)}">${esc(r.status)}</td>
-                <td class="num">${fmtNum(r.stake)}</td>
-                <td class="num">${fmtNum(r.odds)}</td>
-                <td>${esc(r.steam_gate || '—')}</td>
-                <td>${r.dry_run ? 'dry' : 'live'}</td>
-                <td>${esc((r.message || '').slice(0, 60))}${(r.message || '').length > 60 ? '…' : ''}</td>
-            </tr>`).join('');
-    }
-
-    function renderAudit(audit){
-        if (!audit) return;
-        const totalEl = document.getElementById('exec-total-rows');
-        const liveEl = document.getElementById('exec-live-routed');
-        const lastEl = document.getElementById('exec-last-batch');
-        if (totalEl) totalEl.textContent = audit.total_rows ?? 0;
-        if (liveEl) liveEl.textContent = audit.live_routed ?? 0;
-        if (lastEl) lastEl.textContent = audit.last_created_at ? fmtTime(audit.last_created_at) : '—';
-        renderStatusCounts(audit.status_counts);
-        renderBatches(audit.recent_batches || []);
-        renderLogs(audit.recent_logs || []);
-    }
-
-    async function refreshAudit(){
-        try {
-            const r = await fetch('/api/execution/log');
-            renderAudit(await r.json());
-        } catch (_) {}
-    }
-
-    async function runPreview(persist){
-        const btnPreview = document.getElementById('btn-exec-preview');
-        const btnLog = document.getElementById('btn-exec-preview-log');
-        btnPreview && (btnPreview.disabled = true);
-        btnLog && (btnLog.disabled = true);
-        try {
-            const r = await fetch('/api/execution/preview' + (persist ? '?log=1' : ''));
-            const j = await r.json();
-            if (previewJson){
-                previewJson.style.display = 'block';
-                previewJson.textContent = JSON.stringify(j, null, 2);
-            }
-            if (j.audit) renderAudit(j.audit);
-            else if (persist) await refreshAudit();
-        } catch (_) {
-            alert('Execution preview failed');
-        } finally {
-            btnPreview && (btnPreview.disabled = false);
-            btnLog && (btnLog.disabled = false);
-        }
-    }
-
-    document.getElementById('btn-exec-preview')?.addEventListener('click', () => runPreview(false));
-    document.getElementById('btn-exec-preview-log')?.addEventListener('click', () => runPreview(true));
-    document.getElementById('btn-exec-refresh')?.addEventListener('click', refreshAudit);
-    setInterval(refreshAudit, 120000);
+    refresh();
 })();
 </script>
 {% endblock %}

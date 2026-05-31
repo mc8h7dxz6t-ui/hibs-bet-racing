@@ -1,5 +1,3 @@
-import os
-
 from hibs_racing.live.execution_config import (
     betfair_configured,
     betfair_enabled,
@@ -8,46 +6,14 @@ from hibs_racing.live.execution_config import (
 )
 
 
-def test_betfair_disabled_by_default_config():
-    cfg = {"execution": {"betfair_enabled": False, "preferred_venues": ["matchbook", "betfair"]}}
-    assert betfair_enabled(cfg) is False
-    assert preferred_execution_venues(cfg) == ["matchbook"]
-
-
-def test_betfair_env_override_enable():
-    cfg = {"execution": {"betfair_enabled": False}}
-    os.environ["HIBS_BETFAIR_ENABLED"] = "1"
-    try:
-        assert betfair_enabled(cfg) is True
-        assert "betfair" in preferred_execution_venues(cfg)
-    finally:
-        os.environ.pop("HIBS_BETFAIR_ENABLED", None)
-
-
-def test_betfair_env_override_disable():
-    cfg = {"execution": {"betfair_enabled": True}}
-    os.environ["HIBS_BETFAIR_ENABLED"] = "0"
-    try:
-        assert betfair_enabled(cfg) is False
-        assert preferred_execution_venues(cfg) == ["matchbook"]
-    finally:
-        os.environ.pop("HIBS_BETFAIR_ENABLED", None)
-
-
-def test_execution_summary_includes_routing_fields():
-    cfg = {
-        "execution": {
-            "dry_run": True,
-            "betfair_enabled": False,
-            "preferred_venues": ["matchbook"],
-            "max_stake": 3.5,
-        }
-    }
-    summary = execution_summary(cfg)
+def test_analytics_mode_execution_disabled():
+    assert betfair_enabled() is False
+    assert preferred_execution_venues() == []
+    summary = execution_summary()
+    assert summary["disabled"] is True
+    assert summary["mode"] == "analytics"
     assert summary["dry_run"] is True
-    assert summary["betfair_enabled"] is False
-    assert summary["preferred_venues"] == ["matchbook"]
-    assert summary["max_stake"] == 3.5
+    assert summary["preferred_venues"] == []
 
 
 def test_betfair_configured_requires_all_creds(monkeypatch):

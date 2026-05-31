@@ -339,24 +339,22 @@
         <nav class="site-links">
             <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Cards</a>
             <a href="{{ url_for('insights_page') }}" class="nav-primary-only {% if request.endpoint == 'insights_page' %}active{% endif %}">Insights</a>
-            <a href="{{ url_for('portfolio_page') }}" class="nav-primary-only {% if request.endpoint == 'portfolio_page' %}active{% endif %}">Portfolio</a>
-            <a href="{{ url_for('tracker_page') }}" class="nav-primary-only {% if request.endpoint == 'tracker_page' %}active{% endif %}">Tracker</a>
+            <a href="{{ url_for('portfolio_page') }}" class="nav-primary-only {% if request.endpoint == 'portfolio_page' %}active{% endif %}">Ledger</a>
+            <a href="{{ url_for('tracker_page') }}" class="nav-primary-only {% if request.endpoint == 'tracker_page' %}active{% endif %}">Track Record</a>
             <a href="{{ url_for('tips_page') }}" class="nav-primary-only {% if request.endpoint == 'tips_page' %}active{% endif %}">Tips</a>
             <details class="nav-more">
                 <summary>Menu ▾</summary>
                 <div class="nav-more-menu">
                     <a href="{{ url_for('insights_page') }}">Insights</a>
-                    <a href="{{ url_for('portfolio_page') }}">Portfolio</a>
-                    <a href="{{ url_for('tracker_page') }}">Tracker</a>
+                    <a href="{{ url_for('portfolio_page') }}">Ledger</a>
+                    <a href="{{ url_for('tracker_page') }}">Track Record</a>
                     <a href="{{ url_for('tips_page') }}">Tips</a>
                     <a href="{{ url_for('backtest_page') }}">Backtest</a>
                     <a href="{{ url_for('status_page') }}">Status</a>
-                    <a href="{{ hibs_bet_url }}/" target="_blank" rel="noopener">hibs-bet ↗</a>
                 </div>
             </details>
             <a href="{{ url_for('backtest_page') }}" class="nav-primary-only {% if request.endpoint == 'backtest_page' %}active{% endif %}">Backtest</a>
             <a href="{{ url_for('status_page') }}" class="nav-primary-only {% if request.endpoint == 'status_page' %}active{% endif %}">Status</a>
-            <a href="{{ hibs_bet_url }}/" class="nav-primary-only" target="_blank" rel="noopener">hibs-bet ↗</a>
         </nav>
         <div class="site-top-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             {% if ranker_loaded %}<span class="pill ok">Ranker live</span>{% else %}<span class="pill warn">No ranker</span>{% endif %}
@@ -365,10 +363,8 @@
     </header>
     <div class="sys-strip" id="sys-strip">
         {% if health is defined %}
-        <span class="pill {% if health.matchbook %}ok{% else %}warn{% endif %}">Matchbook {% if health.matchbook %}ready{% else %}no creds{% endif %}</span>
-        {% if health.betfair_enabled %}
-        <span class="pill {% if health.betfair_configured %}ok{% else %}warn{% endif %}">Betfair {% if health.betfair_configured %}ready{% else %}no creds{% endif %}</span>
-        {% endif %}
+        <span class="pill ok">Analytics</span>
+        <span class="pill {% if health.matchbook %}ok{% else %}warn{% endif %}">Matchbook {% if health.matchbook %}batch odds{% else %}no creds{% endif %}</span>
         <span class="pill {% if health.racing_api %}ok{% else %}warn{% endif %}">Racing API</span>
         {% endif %}
         {% if scoring_method is defined and scoring_method %}

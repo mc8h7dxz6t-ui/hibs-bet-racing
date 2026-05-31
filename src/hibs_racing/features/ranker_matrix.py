@@ -261,6 +261,8 @@ def build_card_feature_frame(
     database: Path | None = None,
     *,
     config_path: Path | None = None,
+    hist_frame: pd.DataFrame | None = None,
+    hist_before_date: str | None = None,
 ) -> pd.DataFrame:
     """
     Ranker-aligned features for upcoming card rows — same pipeline as build_ranker_matrix
@@ -271,7 +273,9 @@ def build_card_feature_frame(
     alpha = cfg.get("ranker", {}).get("combo_alpha", 8.0)
     place_cutoff = cfg["backtest"].get("place_cutoff_default", 3)
 
-    hist = load_runner_frame(db)
+    hist = hist_frame.copy() if hist_frame is not None else load_runner_frame(db)
+    if hist_before_date:
+        hist = hist[hist["race_date"] < hist_before_date]
     upcoming = cards.copy()
     upcoming["race_date"] = upcoming.get("card_date", upcoming.get("race_date"))
     for col in ("draw", "days_since_last_run", "field_size", "course", "distance_f"):

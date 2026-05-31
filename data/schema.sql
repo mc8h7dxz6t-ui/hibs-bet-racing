@@ -83,7 +83,8 @@ CREATE TABLE IF NOT EXISTS paper_bets (
     closing_sp      REAL,
     clv_beat        INTEGER,
     verification_hash TEXT,
-    created_at      TEXT NOT NULL
+    backtest         INTEGER NOT NULL DEFAULT 0,
+    created_at       TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS ingest_log (

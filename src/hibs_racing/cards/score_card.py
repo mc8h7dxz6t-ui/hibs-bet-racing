@@ -20,6 +20,9 @@ def score_upcoming_cards(
     *,
     database: Path | None = None,
     odds: pd.DataFrame | None = None,
+    persist: bool = True,
+    hist_frame: pd.DataFrame | None = None,
+    hist_before_date: str | None = None,
 ) -> pd.DataFrame:
     """Score card runners → win/place probs → optional EW value vs offered odds."""
     cfg = load_config()
@@ -28,7 +31,12 @@ def score_upcoming_cards(
     min_place_ev = paper_cfg.get("min_place_ev", 0.05)
     min_combo_place = paper_cfg.get("min_combo_bayes_place", 0.22)
 
-    frame = build_card_feature_frame(cards, database=db)
+    frame = build_card_feature_frame(
+        cards,
+        database=db,
+        hist_frame=hist_frame,
+        hist_before_date=hist_before_date,
+    )
     card_cols = [c for c in cards.columns if c not in frame.columns]
     if card_cols:
         frame = frame.merge(cards[["runner_id"] + card_cols], on="runner_id", how="left")
@@ -67,8 +75,9 @@ def score_upcoming_cards(
                 frame.at[idx, "value_flag"] = 1
 
     scored_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-    _persist_scores(db, frame, scored_at)
-    _persist_runner_odds(db, frame)
+    if persist:
+        _persist_scores(db, frame, scored_at)
+        _persist_runner_odds(db, frame)
     return frame.sort_values(["race_id", "model_score"], ascending=[True, False])
 
 
@@ -170,7 +179,13 @@ def _persist_scores(db: Path, frame: pd.DataFrame, scored_at: str) -> None:
         conn.commit()
 
 
-def paper_log_value_picks(frame: pd.DataFrame, *, stake: float = 1.0) -> list[str]:
+def paper_log_value_picks(
+    frame: pd.DataFrame,
+    *,
+    stake: float = 1.0,
+    backtest: bool = False,
+    created_at: str | None = None,
+) -> list[str]:
     """Record paper EW bets for rows flagged as value."""
     bet_ids: list[str] = []
     for rec in frame[frame["value_flag"] == 1].to_dict(orient="records"):
@@ -183,6 +198,8 @@ def paper_log_value_picks(frame: pd.DataFrame, *, stake: float = 1.0) -> list[st
             offered_win=rec.get("win_decimal"),
             place_terms=f"1/{int((rec.get('place_fraction') or 0.25)*4)} top {int(rec.get('places') or 3)}",
             is_value_pick=True,
+            backtest=backtest,
+            created_at=created_at,
         )
         bet_ids.append(bet_id)
     return bet_ids
