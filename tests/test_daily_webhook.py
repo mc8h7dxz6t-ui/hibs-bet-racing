@@ -31,6 +31,25 @@ def test_format_digest_message_no_picks():
     assert "2026-05-29" in text
 
 
+def test_format_pick_line_includes_partner_link():
+    from hibs_racing.daily.smart_picks import format_pick_line
+
+    text = format_pick_line(
+        {
+            "horse_name": "Golden Fleece",
+            "course": "Epsom",
+            "off_time": "14:30",
+            "data_quality_pct": 80,
+            "steam_gate": "proceed",
+            "model_place_prob": 0.55,
+            "monetized_link": "https://www.matchbook.com?utm_source=hibs_racing_app",
+        },
+        1,
+    )
+    assert "Partner:" in text
+    assert "utm_source=hibs_racing_app" in text
+
+
 def test_webhook_skipped_when_unconfigured(monkeypatch):
     from hibs_racing.daily import webhook_notify
 

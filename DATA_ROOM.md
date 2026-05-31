@@ -135,3 +135,9 @@ hibs-racing backtest-replay --start 2026-05-01 --end 2026-05-31 --export-ledger
 2. **Matchbook** — enable API → forward `/tracker` (non-backtest) proof  
 3. **Extend May** — re-ingest raceform when May 20–31 available  
 4. **VPS/Docker** — 24/7 cron for buyer demo (Mac sleep breaks local cron)
+
+---
+
+## Affiliate monetization (Acquire listing)
+
+See **`ACQUIRE_LISTING.md`** for revenue-deck copy: programmatic UTM deep-links, novice UX touchpoints, env-driven venue switching (`HIBS_AFFILIATE_VENUE`).

@@ -48,9 +48,11 @@ def format_pick_line(pick: dict[str, Any], index: int) -> str:
     ev_s = f"{float(ev):.2f}" if ev is not None else "—"
     win = pick.get("win_decimal")
     win_s = f" · win {float(win):.2f}" if win else ""
+    link = pick.get("monetized_link")
+    link_s = f"\n   Partner: {link}" if link else ""
     return (
         f"#{index} {horse} ({off} {course})\n"
-        f"   Place {place_pct}% · EV {ev_s} · DQ {dq}% · gate {gate}{win_s}"
+        f"   Place {place_pct}% · EV {ev_s} · DQ {dq}% · gate {gate}{win_s}{link_s}"
     )
 
 
