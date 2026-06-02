@@ -34,5 +34,8 @@ run_logged "daily-settle-paper" \
 run_logged "daily-notify" \
   hibs-racing notify-daily --top "${HIBS_DAILY_PICKS_TOP:-3}" || true
 
+run_logged "daily-log-retention" \
+  hibs-racing retain-logs || true
+
 echo "Daily refresh completed successfully."
 echo "Public track record: /tracker (paper bets logged: see refresh-cards --paper)"

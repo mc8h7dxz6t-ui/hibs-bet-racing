@@ -108,3 +108,9 @@ matchbook:
   steam_threshold_pct: 8.0          # shorten by ≥8% → steam trigger
   drift_threshold_pct: 10.0         # lengthen by ≥10% → drift trigger
   steam_min_odds: 1.5
+
+# Audit log retention — never touches card_scores, snapshots, or paper_bets.
+logging:
+  retention:
+    detailed_days: 30               # full ledger payloads + cron log sections
+    brief_days: 120                   # compact summaries only; then purge

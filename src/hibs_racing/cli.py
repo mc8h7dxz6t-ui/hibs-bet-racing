@@ -60,6 +60,20 @@ def cmd_backtest(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_retain_logs(args: argparse.Namespace) -> int:
+    from hibs_racing.institutional.log_retention import run_log_retention
+
+    report = run_log_retention(
+        detailed_days=getattr(args, "detailed_days", None),
+        brief_days=getattr(args, "brief_days", None),
+        dry_run=bool(getattr(args, "dry_run", False)),
+        files=not getattr(args, "skip_files", False),
+        database_audit=not getattr(args, "skip_db", False),
+    )
+    print(json.dumps(report.to_dict(), indent=2))
+    return 0
+
+
 def cmd_backtest_replay(args: argparse.Namespace) -> int:
     from hibs_racing.backtest.retrospective import export_oos_ledger
 
@@ -657,6 +671,17 @@ def main(argv: list[str] | None = None) -> int:
 
     p_bt = sub.add_parser("backtest", help="Place/top-N signal backtest")
     p_bt.set_defaults(func=cmd_backtest)
+
+    p_lr = sub.add_parser(
+        "retain-logs",
+        help="Tiered log retention: 30d detailed, 120d brief (audit logs only)",
+    )
+    p_lr.add_argument("--detailed-days", type=int, help="Full-detail window (default: config)")
+    p_lr.add_argument("--brief-days", type=int, help="Brief archive window (default: config)")
+    p_lr.add_argument("--dry-run", action="store_true", help="Report only; do not prune")
+    p_lr.add_argument("--skip-files", action="store_true", help="Skip cron log files")
+    p_lr.add_argument("--skip-db", action="store_true", help="Skip ledger_events + run_manifests")
+    p_lr.set_defaults(func=cmd_retain_logs)
 
     p_btr = sub.add_parser(
         "backtest-replay",
