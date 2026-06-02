@@ -134,6 +134,12 @@ def create_app() -> Flask:
         ctx["portfolio_api_url"] = "/api/portfolio/summary"
         ctx["portfolio_full_url"] = "/portfolio"
         ctx["health"] = health_status()
+        football_base = os.environ.get("HIBS_FOOTBALL_BASE_URL", "http://127.0.0.1:5000").rstrip("/")
+        ctx["hibs_football_base_url"] = football_base
+        ctx["hibs_racing_base_url"] = os.environ.get("HIBS_RACING_PUBLIC_URL", "").rstrip("/") or ""
+        ctx["hibs_football_home_url"] = football_base + "/"
+        ctx["hibs_racing_home_url"] = "/cards"
+        ctx["hibs_product_active"] = "racing"
         return ctx
 
     def _cors_summary(resp):
@@ -430,16 +436,18 @@ def create_app() -> Flask:
         source = request.args.get("source", "racing_api")
         region = request.args.get("region", "gb")
         day = int(request.args.get("day", "1"))
-        odds_source = request.args.get("odds_source", "auto")
+        odds_source = os.environ.get("HIBS_ODDS_SOURCE") or request.args.get("odds_source", "auto")
         window = request.args.get("window", "24")
         window_hours = int(window) if window.isdigit() else 24
         try:
+            paper_on_refresh = bool(load_config().get("paper", {}).get("log_on_refresh", True))
             stats = refresh_cards(
                 source=source,
                 region=region,
                 day=day,
                 odds_source=odds_source,
                 window_hours=window_hours if window_hours > 0 else None,
+                paper=paper_on_refresh,
             )
             monitor = monitor_snapshot(refresh=False, settle=True)
             return jsonify({"ok": True, **stats, "monitor": monitor})

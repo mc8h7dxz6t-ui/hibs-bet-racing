@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from hibs_racing.cards.enrich_display import build_enrich_display
 from hibs_racing.cards.query import load_scored_cards
 from hibs_racing.cards.window import filter_next_hours, off_minutes
 from hibs_racing.backtest.place_signal import run_place_backtest
@@ -107,8 +108,10 @@ def _enrich_runner(row: dict, peers: pd.DataFrame) -> dict:
     place = _offered_place_decimal(row)
     if place is not None:
         row["offered_place_decimal"] = place
-    comment = (row.get("card_comment") or "").strip()
+    raw_comment = row.get("card_comment")
+    comment = raw_comment.strip() if isinstance(raw_comment, str) else ""
     row["rp_comment_short"] = (comment[:120] + "…") if len(comment) > 120 else comment
+    row.update(build_enrich_display(row))
     return row
 
 
@@ -312,16 +315,21 @@ def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
 
 
 def _ui_data_completeness(row: dict) -> int:
-    """UI-only completeness proxy (not persisted) — helps novice 'Best Bets' filter."""
+    """UI-only completeness — maidens skip OR/comment penalties; enrich counts separately."""
+    from hibs_racing.cards.actionability import is_exempt_unrated_race
+
+    exempt = is_exempt_unrated_race(row)
     checks = [
         row.get("win_decimal"),
         row.get("model_win_prob"),
         row.get("model_place_prob"),
         row.get("jockey"),
         row.get("trainer"),
-        row.get("card_comment"),
-        row.get("official_rating"),
     ]
+    if not exempt:
+        checks.extend([row.get("card_comment"), row.get("official_rating")])
+    if row.get("enrich_source"):
+        checks.append(row.get("form_string") or row.get("horse_course_win_rate"))
     ok = 0
     for val in checks:
         if val is None or (isinstance(val, float) and pd.isna(val)):
@@ -366,6 +374,8 @@ def novice_pick_candidates(meetings: list[dict]) -> list[dict]:
                         "place_score": row.get("place_score") or row.get("model_place_prob"),
                         "ew_combined_ev": row.get("ew_combined_ev"),
                         "value_flag": bool(row.get("value_flag")),
+                        "value_gate_reason": row.get("value_gate_reason"),
+                        "enrich_source": row.get("enrich_source"),
                         "steam_gate": str(gauge.get("gate") or "proceed"),
                         "kelly_multiplier": float(gauge.get("kelly_multiplier") or 1.0),
                         "data_quality_pct": _ui_data_completeness(row),
@@ -402,10 +412,16 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
         modes = frame["scoring_method"].dropna().unique().tolist()
         scoring_method = modes[0] if len(modes) == 1 else "mixed"
     from hibs_racing.odds.market_steam import latest_gauges
+    from hibs_racing.ranker_features import ranker_feature_profile
+    from hibs_racing.backtest.gate_compare import compare_value_gates
 
     card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else []
     meetings = group_meetings(frame) if not frame.empty else []
     pick_candidates = novice_pick_candidates(meetings)
+    try:
+        gate_summary = compare_value_gates(days=14).to_dict()
+    except Exception:
+        gate_summary = None
     return {
         "health": health,
         "card_date": card_date or (card_dates[0] if len(card_dates) == 1 else None),
@@ -420,6 +436,8 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
         "monitor": monitor,
         "backtest": backtest,
         "scoring_method": scoring_method,
+        "ranker_profile": ranker_feature_profile(),
+        "gate_summary": gate_summary,
         "market_gauges": latest_gauges(limit=100),
         "parquet_path": str(Path(load_config()["paths"]["parquet_dir"]) / "card_scores.parquet"),
     }

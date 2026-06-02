@@ -5,6 +5,7 @@ from hibs_racing.cards.window import filter_next_hours, off_minutes, runner_off_
 
 def test_off_minutes():
     assert off_minutes("14:30") == 14 * 60 + 30
+    assert off_minutes("6:15") == 18 * 60 + 15
     assert off_minutes("bad") == 9999
 
 

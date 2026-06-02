@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from datetime import date, timedelta
@@ -8,6 +9,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from hibs_racing.cards.enrich import parse_runner_row_enrich
+from hibs_racing.cards.form_parser import parse_form_string
 from hibs_racing.config import ROOT
 from hibs_racing.ingest.scrape import _load_env, ensure_rpscrape, ensure_rpscrape_deps
 
@@ -149,8 +152,7 @@ def parse_racecard_json(json_path: Path) -> pd.DataFrame:
                     horse = runner.get("name") or ""
                     horse_id = str(runner.get("horse_id") or horse)
                     t14_w, t14_r = _parse_trainer_14_days(runner.get("trainer_14_days"))
-                    rows.append(
-                        {
+                    row = {
                             "race_id": race_id,
                             "card_date": race.get("date") or card_date,
                             "off_time": race.get("off_time") or off_time,
@@ -178,7 +180,14 @@ def parse_racecard_json(json_path: Path) -> pd.DataFrame:
                             "trainer_14d_runs": t14_r,
                             "trainer_location": runner.get("trainer_location"),
                         }
+                    row.update(parse_runner_row_enrich(runner))
+                    row.update(
+                        parse_form_string(
+                            row.get("form_string"),
+                            today_distance_f=row.get("distance_f"),
+                        )
                     )
+                    rows.append(row)
 
     if not rows:
         raise ValueError(f"No runners parsed from {json_path}")

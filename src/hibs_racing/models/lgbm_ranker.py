@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from hibs_racing.config import load_config, ranker_feature_path, ranker_model_path
+from hibs_racing.ranker_features import ranker_enrich_feature_path, resolve_ranker_feature_path
 from hibs_racing.features.ranker_matrix import build_ranker_matrix, ranker_feature_columns
 
 
@@ -72,7 +73,7 @@ def save_ranker_artifacts(
 
 
 def load_ranker_features(path: Path | None = None) -> list[str]:
-    fp = path or ranker_feature_path()
+    fp = path or resolve_ranker_feature_path()
     if not fp.exists():
         return ranker_feature_columns()
     payload = json.loads(fp.read_text(encoding="utf-8"))
@@ -129,6 +130,7 @@ def train_lgbm_ranker(
     min_rows: int | None = None,
     min_races: int | None = None,
     save: bool = True,
+    with_enrich: bool = False,
 ) -> RankerTrainReport:
     """
     Learning-to-rank with LightGBM (optional dependency).
@@ -150,7 +152,10 @@ def train_lgbm_ranker(
     if frame.empty:
         return RankerTrainReport(0, 0, None, None, None, None, None, "No rows — ingest + tag first.")
 
-    features = [c for c in ranker_feature_columns() if c in frame.columns]
+    from hibs_racing.features.ranker_matrix import ranker_enrich_feature_columns, ranker_feature_columns
+
+    feature_cols = ranker_enrich_feature_columns() if with_enrich else ranker_feature_columns()
+    features = [c for c in feature_cols if c in frame.columns]
     df = frame.dropna(subset=["finish_pos"]).copy()
     df = df.sort_values(["race_date", "race_id"])
 
@@ -220,11 +225,12 @@ def train_lgbm_ranker(
     model_path_str: str | None = None
     if save:
         final = _fit(df)
+        fp = ranker_enrich_feature_path(cfg) if with_enrich else ranker_feature_path(cfg)
         mp, _ = save_ranker_artifacts(
             final,
             features,
             model_path=ranker_model_path(cfg),
-            feature_path=ranker_feature_path(cfg),
+            feature_path=fp,
         )
         model_path_str = str(mp)
         try:

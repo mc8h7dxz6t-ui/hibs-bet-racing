@@ -19,13 +19,17 @@ echo "hibs-racing daily refresh — results since ${START_DATE}"
 run_logged "daily-ingest-sync" \
   hibs-racing ingest-raceform "${RFDB}" --since "${START_DATE}" --sync
 
+run_logged "daily-scrape-results" \
+  hibs-racing scrape --days "${LOOKBACK_DAYS}" --region gb --ingest --from-cache || true
+# Prefer --from-cache on daily cron; live scrape uses rp_scrape_day_pause_sec pacing in config.
+
 run_logged "daily-refresh-cards" \
   hibs-racing refresh-cards \
     --source racing_api \
     --window 24 \
     --regions gb,ire \
     --workers 1 \
-    --odds-source auto \
+    --odds-source "${HIBS_ODDS_SOURCE:-matchbook}" \
     --paper
 
 run_logged "daily-settle-paper" \

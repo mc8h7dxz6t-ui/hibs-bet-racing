@@ -77,9 +77,8 @@
 {% set days = tracker.history_days if tracker else 60 %}
 <div class="trk-page">
     <div class="trk-hero brand-panel-framed">
-        {% from '_hibs_brand.html' import brand_horse_watermark, brand_logo_watermark %}
+        {% from '_hibs_brand.html' import brand_logo_watermark %}
         {{ brand_logo_watermark(modifier='brand-logo-watermark--corner-tl') }}
-        {{ brand_horse_watermark(modifier='brand-horse-watermark--corner-br') }}
         <span class="trk-badge">Public read-only</span>
         <span class="trk-badge">Pre-race lock</span>
         <span class="trk-badge">Auto-settle</span>

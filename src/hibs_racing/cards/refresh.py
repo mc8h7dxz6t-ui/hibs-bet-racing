@@ -6,10 +6,17 @@ import time
 import pandas as pd
 
 from hibs_racing.cards.refresh_parallel import parallel_map, timed_ms
-from hibs_racing.cards.score_card import paper_log_value_picks, score_upcoming_cards
+from hibs_racing.cards.enrich import dual_source_enrich
+from hibs_racing.cards.score_card import score_upcoming_cards
 from hibs_racing.cards.store import store_upcoming_runners
 from hibs_racing.cards.window import filter_next_hours
 from hibs_racing.config import load_config
+from hibs_racing.ingest.rate_limit import (
+    racing_api_pause,
+    rp_verdict_max_races,
+    rp_verdict_race_pause,
+    rp_verdict_workers,
+)
 from hibs_racing.ingest.racecards import load_racecard_frames
 from hibs_racing.ingest.racing_api import fetch_racing_api_racecards
 from hibs_racing.ingest.rp_verdict import enrich_cards_with_rp_verdicts
@@ -31,21 +38,30 @@ def fetch_cards_window(
     hours: int = 24,
     parallel_workers: int | None = None,
 ) -> pd.DataFrame:
-    """Next N hours of UK + Ireland racecards (today + tomorrow when needed)."""
+    """Next N hours of UK + Ireland racecards (today by default; optional tomorrow)."""
     workers = parallel_workers if parallel_workers is not None else _parallel_workers()
+    cfg = _cards_cfg()
+    include_tomorrow = bool(cfg.get("include_tomorrow", False))
     frames: list[pd.DataFrame] = []
 
     if source == "racing_api":
 
         def _fetch_region(region: str) -> pd.DataFrame:
-            return fetch_racing_api_racecards(day=1, days=2, region=region)
+            if include_tomorrow:
+                return fetch_racing_api_racecards(day=1, days=2, region=region)
+            return fetch_racing_api_racecards(day=1, region=region)
 
         # Free Racing API tier rate-limits parallel today/tomorrow × region calls.
-        region_pause = float(os.environ.get("RACING_API_PAUSE_SEC", "1.5"))
+        region_pause = racing_api_pause()
         for i, region in enumerate(regions):
             if i > 0 and region_pause > 0:
                 time.sleep(region_pause)
-            frames.append(_fetch_region(region))
+            try:
+                frames.append(_fetch_region(region))
+            except ValueError as exc:
+                if "no runners" in str(exc).lower() and len(regions) > 1:
+                    continue
+                raise
     else:
 
         def _fetch_rpscrape(region: str) -> pd.DataFrame:
@@ -65,7 +81,13 @@ def fetch_cards_window(
         raise RuntimeError("No racecards returned for GB/IRE window.")
     combined = pd.concat(frames, ignore_index=True)
     combined = combined.drop_duplicates(subset=["runner_id"], keep="last")
-    return filter_next_hours(combined, hours=hours)
+    combined = filter_next_hours(combined, hours=hours)
+    if cfg.get("primary_date_only", True) and not combined.empty:
+        dates = pd.to_datetime(combined["card_date"].astype(str), errors="coerce").dropna()
+        if not dates.empty:
+            primary = dates.min().date().isoformat()
+            combined = combined[combined["card_date"].astype(str).str[:10] == primary].copy()
+    return combined
 
 
 def refresh_cards(
@@ -102,9 +124,24 @@ def refresh_cards(
     if cards.empty:
         raise RuntimeError("No runners in card window — check Racing API credentials or off times.")
 
-    rp_workers = int(_cards_cfg().get("rp_verdict_workers", workers))
+    enrich_meta: dict = {}
+    if source == "racing_api" and _cards_cfg().get("dual_source_enrich", True):
+        cards, enrich_meta = dual_source_enrich(
+            cards,
+            regions=regions or ("gb", "ire"),
+            day=day if window_hours is None else 1,
+        )
+
+    rp_workers = rp_verdict_workers()
+    verdict_pause = rp_verdict_race_pause()
     cards, timings["verdict_ms"] = timed_ms(
-        lambda: enrich_cards_with_rp_verdicts(cards, max_workers=rp_workers)
+        lambda: enrich_cards_with_rp_verdicts(
+            cards,
+            max_workers=rp_workers,
+            sleep_sec=verdict_pause,
+            max_races=rp_verdict_max_races(),
+            skip_existing=True,
+        )
     )
 
     _, timings["store_ms"] = timed_ms(lambda: store_upcoming_runners(cards, source=src))
@@ -112,15 +149,59 @@ def refresh_cards(
     (odds, odds_meta), timings["odds_ms"] = timed_ms(lambda: resolve_scoring_odds(cards, odds_source=odds_source))
 
     scored, timings["score_ms"] = timed_ms(
-        lambda: score_upcoming_cards(cards, odds=odds if odds is not None and not odds.empty else None)
+        lambda: score_upcoming_cards(
+            cards,
+            odds=odds if odds is not None and not odds.empty else None,
+            write_snapshot=True,
+            snapshot_odds_source=str(odds_meta.get("source") or "live"),
+        )
     )
 
+    from hibs_racing.institutional.ledger_events import append_ledger_event
+    from hibs_racing.institutional.run_manifest import build_run_manifest, persist_run_manifest
+    from hibs_racing.institutional.shadow_execution import log_shadow_intents
+
+    card_dates = sorted(cards["card_date"].astype(str).unique().tolist())
+    primary_date = card_dates[0] if card_dates else None
+    value_n = int((scored["value_flag"] == 1).sum()) if "value_flag" in scored.columns else 0
+    manifest = build_run_manifest(
+        run_kind="refresh",
+        card_date=primary_date,
+        scoring_method=str(scored["scoring_method"].iloc[0]) if "scoring_method" in scored.columns and len(scored) else None,
+        odds_source=str(odds_meta.get("source")),
+        runner_count=len(scored),
+        value_flag_count=value_n,
+        extras={
+            "enrich_matched": enrich_meta.get("matched"),
+            "source": src,
+            "timings_ms": timings,
+        },
+    )
+    manifest_id = persist_run_manifest(manifest)
+    append_ledger_event(
+        event_type="manifest_written",
+        manifest_id=manifest_id,
+        payload=manifest.to_dict(),
+    )
+    shadow_count = 0
+    if value_n:
+        shadow_count = len(log_shadow_intents(scored, manifest_id=manifest_id, venue="shadow"))
+
     paper_bets = 0
-    if paper and "value_flag" in scored.columns:
-        value = scored[scored["value_flag"] == 1]
-        if not value.empty:
-            stake = float(load_config().get("paper", {}).get("default_stake", 1.0))
-            paper_bets = len(paper_log_value_picks(value, stake=stake))
+    recon_clean = True
+    paper_enabled = paper or bool(load_config().get("paper", {}).get("log_on_refresh", True))
+    if paper_enabled and "value_flag" in scored.columns and primary_date:
+        from hibs_racing.institutional.paper_reconciliation import sync_paper_ledger_to_scored
+
+        stake = float(load_config().get("paper", {}).get("default_stake", 1.0))
+        recon = sync_paper_ledger_to_scored(
+            scored,
+            card_date=str(primary_date),
+            stake=stake,
+            manifest_id=manifest_id,
+        )
+        paper_bets = recon.expected_value_picks
+        recon_clean = recon.is_clean
 
     timings["total_ms"] = round(sum(timings.values()), 1)
 
@@ -134,9 +215,18 @@ def refresh_cards(
         "odds_source": odds_meta.get("source"),
         "odds_runners": odds_meta.get("runners_priced", 0),
         "value_flags": int((scored["value_flag"] == 1).sum()) if "value_flag" in scored.columns else 0,
+        "value_gates_blocked": int(scored["value_gate_reason"].notna().sum())
+        if "value_gate_reason" in scored.columns
+        else 0,
+        "enrich_matched": enrich_meta.get("matched", 0),
+        "enrich_rp_runners": enrich_meta.get("rp_runners", 0),
+        "enrich_error": enrich_meta.get("error"),
         "scoring_method": str(scored["scoring_method"].iloc[0]) if "scoring_method" in scored.columns and len(scored) else None,
         "window_hours": window_hours,
         "paper_bets_logged": paper_bets,
+        "paper_recon_clean": recon_clean,
+        "manifest_id": manifest_id,
+        "shadow_intents": shadow_count,
         "parallel_workers": workers,
         "timings_ms": timings,
     }

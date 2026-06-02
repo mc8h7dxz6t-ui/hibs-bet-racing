@@ -71,6 +71,29 @@
     color:var(--hibs-neon);font-family:'Orbitron',monospace;
 }
 .rp-verdict-block p{margin:0;font-size:0.88em;line-height:1.55;color:#dbeafe;}
+.enrich-panel{
+    font-size:0.8em;line-height:1.5;min-width:120px;max-width:168px;
+    padding:6px 8px;border-radius:8px;background:rgba(0,0,0,0.2);
+    border:1px solid rgba(183,247,200,0.12);
+}
+.enrich-panel.is-empty{color:var(--muted);font-size:0.85em;border-style:dashed;}
+.enrich-row{display:block;margin-bottom:4px;color:#e2e8f0;}
+.enrich-row:last-child{margin-bottom:0;}
+.enrich-row-label{display:block;font-size:0.72em;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;}
+.enrich-row-value{display:block;font-weight:600;color:#f1f5f9;}
+.enrich-flag{
+    display:inline-block;margin:3px 4px 0 0;padding:2px 6px;border-radius:4px;
+    font-size:0.72em;font-weight:700;background:rgba(0,122,51,0.25);color:var(--hibs-neon);
+    border:1px solid rgba(183,247,200,0.28);cursor:help;
+}
+.enrich-note{display:block;margin-top:4px;font-size:0.72em;color:var(--gold);font-weight:600;}
+.enrich-meta-line{display:block;margin-top:4px;font-size:0.78em;color:var(--muted);}
+.gate-reason{
+    display:inline-block;margin-left:4px;padding:1px 6px;border-radius:4px;
+    font-size:0.65em;color:#fecaca;font-weight:700;background:rgba(127,29,29,0.35);
+    text-transform:none;letter-spacing:0.02em;vertical-align:middle;
+}
+.scoring-pill{font-size:0.72em;color:var(--muted);}
 .race-drawer > summary .rp-verdict-snippet{
     flex:1 1 100%;font-size:0.78em;color:#cbd5e1;line-height:1.45;margin-top:4px;
 }
@@ -139,13 +162,17 @@
     <span class="pill">{{ card_dates|join(' · ') }}</span>
     {% endif %}
     {% if scoring_method %}<span class="pill ok">Engine: {{ scoring_method }}</span>{% endif %}
+    {% if ranker_profile %}
+    <span class="pill scoring-pill" title="Feature manifest matched to saved ranker">
+        {{ ranker_profile.feature_count or '?' }} features{% if ranker_profile.uses_enrich %} · enrich{% endif %}
+    </span>
+    {% endif %}
 </div>
 
 <div class="smart-portfolio-row">
 <section class="smart-picks-hero brand-panel-framed" id="smart-picks-hero" aria-live="polite">
-    {% from '_hibs_brand.html' import brand_horse_watermark, brand_logo_watermark %}
+    {% from '_hibs_brand.html' import brand_logo_watermark %}
     {{ brand_logo_watermark(modifier='brand-logo-watermark--corner-tl') }}
-    {{ brand_horse_watermark(modifier='brand-horse-watermark--corner-br') }}
     <h2>Hibs Smart Portfolio Picks</h2>
     <p class="trk-intro" style="margin:0;font-size:0.82em;color:var(--muted);">
         Top 3 high-conviction each-way angles — value-flagged, strong data quality, steam gate clear.
@@ -239,7 +266,30 @@
     <div class="stat-card"><div class="stat-label">Meetings</div><div class="stat-value">{{ meetings|length }}</div></div>
     <div class="stat-card"><div class="stat-label">Races</div><div class="stat-value">{{ race_count }}</div></div>
     <div class="stat-card"><div class="stat-label">Value flags</div><div class="stat-value">{{ value_count }}</div></div>
+    {% if gate_summary and gate_summary.raw_value_flags is not none %}
+    <div class="stat-card">
+        <div class="stat-label">Raw value</div>
+        <div class="stat-value">{{ gate_summary.raw_value_flags }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Blocked by gates</div>
+        <div class="stat-value">
+            {{ gate_summary.blocked_by_gates }}
+            {% if gate_summary.gate_block_rate is not none %}
+            <span class="pill" style="margin-left:6px;">{{ (gate_summary.gate_block_rate * 100)|round(1) }}%</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
+{% if gate_summary and gate_summary.reason_counts %}
+<p class="data-note" style="margin-top:6px;">
+    Gate reasons:
+    {% for reason, n in gate_summary.reason_counts.items() %}
+    <span class="pill" style="margin-right:4px;">{{ reason|replace('_',' ') }}: {{ n }}</span>
+    {% endfor %}
+</p>
+{% endif %}
 
 {% if meetings %}
 <section class="card meetings-shell" id="racecard-shell"
@@ -351,7 +401,9 @@
                             <thead>
                                 <tr>
                                     <th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>OR</th>
-                                    <th>Form</th><th>Win</th><th>Place</th>
+                                    <th>Form</th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="Racing Post course, trip and going record for this horse (when RP credentials are set).">Course fit</span></th>
+                                    <th>Win</th><th>Place</th>
                                     <th><span class="tip-term" tabindex="0" data-tip="Δ = odds change vs 20 minutes ago. Green steam can mean market confidence; red drift means caution.">Δ</span></th>
                                     <th>RP comment</th><th>Engine view</th>
                                     <th><span class="tip-term" tabindex="0" data-tip="Place %: estimated chance of finishing in the places (usually top 3) based on our ranker + Harville formula.">Place%</span></th>
@@ -376,11 +428,31 @@
                                     data-stake-units="1"
                                     data-bet-type="each_way">
                                     <td class="num">{{ loop.index }}</td>
-                                    <td class="strong horse-cell">{{ r.horse_name }}{% if r.draw %} <span class="pill" style="font-size:0.7em;">({{ r.draw }})</span>{% endif %}{% if r.value_flag %} <span class="value-flag">VALUE</span>{% endif %}<span class="risk-badge-slot"></span></td>
+                                    <td class="strong horse-cell">{{ r.horse_name }}{% if r.draw %} <span class="pill" style="font-size:0.7em;">({{ r.draw }})</span>{% endif %}{% if r.value_flag %} <span class="value-flag">VALUE</span>{% endif %}{% if r.value_gate_label %}<span class="gate-reason" title="Value not flagged">{{ r.value_gate_label }}</span>{% endif %}<span class="risk-badge-slot"></span></td>
                                     <td>{{ r.jockey or '—' }}</td>
                                     <td>{{ r.trainer or '—' }}</td>
                                     <td class="num">{% if r.official_rating is not none and r.official_rating == r.official_rating %}{{ r.official_rating|int }}{% else %}—{% endif %}</td>
                                     <td class="num" title="RP form figures">{{ r.form_string or '—' }}</td>
+                                    <td class="enrich-cell">
+                                        <div class="enrich-panel {% if not r.enrich_has_data %}is-empty{% endif %}" title="{{ r.enrich_tooltip or 'No RP enrich on this runner' }}">
+                                        {% if r.enrich_has_data %}
+                                        {% for row in r.enrich_fit_rows or [] %}
+                                        <span class="enrich-row">
+                                            <span class="enrich-row-label">{{ row.label }}</span>
+                                            <span class="enrich-row-value">{{ row.value }}</span>
+                                        </span>
+                                        {% endfor %}
+                                        {% for flag in r.enrich_flags or [] %}
+                                        <span class="enrich-flag" title="{{ flag.label }}">{{ flag.code }}</span>
+                                        {% endfor %}
+                                        {% if r.enrich_trip_label %}<span class="enrich-note">{{ r.enrich_trip_label }}</span>{% endif %}
+                                        {% if r.enrich_lto_label %}<span class="enrich-meta-line">{{ r.enrich_lto_label }}</span>{% endif %}
+                                        {% if r.enrich_rtf_label or r.enrich_jockey_14d_label %}
+                                        <span class="enrich-meta-line">{{ r.enrich_rtf_label }}{% if r.enrich_rtf_label and r.enrich_jockey_14d_label %} · {% endif %}{{ r.enrich_jockey_14d_label }}</span>
+                                        {% endif %}
+                                        {% else %}—{% endif %}
+                                        </div>
+                                    </td>
                                     <td class="num strong">{% if g and g.odds_now %}{{ g.odds_now|fmt_num(1) }}{% elif r.win_decimal %}{{ r.win_decimal|fmt_num(1) }}{% else %}—{% endif %}</td>
                                     <td class="num">{% if r.offered_place_decimal %}{{ r.offered_place_decimal|fmt_num(1) }}{% else %}—{% endif %}</td>
                                     <td class="num {% if g and g.direction == 'steam' %}drift-steam{% elif g and g.direction == 'drift' %}drift-out{% endif %}">
@@ -407,5 +479,5 @@
 {% endif %}
 {% endif %}
 
-<p class="data-note">All scores, odds, comments and explanations come from your ingested raceform history, live card feed and Matchbook/Oddschecker prices — nothing is fabricated. Refresh 24h pulls GB + IRE today and tomorrow, then re-scores with the full ranker feature set.</p>
+<p class="data-note">Scores use ingested history + live card feed + Matchbook odds. RP enrich (course/dist/going W-R, form flags) fills when EMAIL/ACCESS_TOKEN are set — merge-only, never overwrites API fields.</p>
 {% endblock %}

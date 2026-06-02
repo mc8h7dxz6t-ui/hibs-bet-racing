@@ -7,7 +7,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from hibs_racing.config import load_config, ranker_feature_path, ranker_model_path
+from hibs_racing.config import load_config, ranker_model_path
+from hibs_racing.ranker_features import resolve_ranker_feature_path
 from hibs_racing.features.ranker_matrix import ranker_feature_columns
 
 
@@ -18,7 +19,7 @@ def _resolve_paths(
 ) -> tuple[Path, Path]:
     cfg = load_config(config_path)
     mp = Path(model_path) if model_path else ranker_model_path(cfg)
-    fp = Path(feature_json_path) if feature_json_path else ranker_feature_path(cfg)
+    fp = Path(feature_json_path) if feature_json_path else resolve_ranker_feature_path(cfg)
     return mp, fp
 
 

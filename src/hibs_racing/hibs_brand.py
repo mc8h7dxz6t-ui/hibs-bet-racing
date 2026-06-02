@@ -1,22 +1,22 @@
-"""Hibs Racing Intelligence — brand assets and template context."""
+"""Hibs Racing Intelligence — brand assets (unified HIBS logo)."""
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
-HIBS_BADGE_PRIMARY = "logo_hibs_racing.svg"
-HIBS_BADGE_HARP = "badge_harp_embroidered.png"
-HIBS_RACING_LOGO = "badge_hibs_racing_oval.png"
+HIBS_HARVESTED_LOGO = "hibs_harvested_logo.png"
+HIBS_BADGE_PRIMARY = HIBS_HARVESTED_LOGO
+HIBS_BADGE_HARP = HIBS_HARVESTED_LOGO
+HIBS_RACING_LOGO = HIBS_HARVESTED_LOGO
 HIBS_HERO_HORSE = "hero_horse.png"
 HIBS_HORSE_CLUB_REF = "logo_horse_club_ref.png"
 
 HIBS_HERITAGE_BADGES: list[dict[str, Any]] = [
-    {"file": HIBS_BADGE_HARP, "label": "Golden harp shield", "era": "heritage"},
+    {"file": HIBS_HARVESTED_LOGO, "label": "HIBS — Harvested Intelligent Betting System", "era": "present"},
 ]
 
-HIBS_WATERMARK_BADGES: list[str] = [HIBS_BADGE_HARP]
+HIBS_WATERMARK_BADGES: list[str] = [HIBS_HARVESTED_LOGO]
 
 
 def hibs_brand_context() -> dict[str, Any]:
@@ -24,6 +24,7 @@ def hibs_brand_context() -> dict[str, Any]:
     return {
         "hibs_badge_primary": HIBS_BADGE_PRIMARY,
         "hibs_badge_harp": HIBS_BADGE_HARP,
+        "hibs_harvested_logo": HIBS_HARVESTED_LOGO,
         "hibs_racing_logo": HIBS_RACING_LOGO,
         "hibs_hero_horse": HIBS_HERO_HORSE,
         "hibs_horse_club_ref": HIBS_HORSE_CLUB_REF,

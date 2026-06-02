@@ -44,7 +44,8 @@ def explain_pick(row: dict | pd.Series, *, race_peers: pd.DataFrame | None = Non
     or_val = _i(row.get("official_rating"))
     value_flag = int(_f(row.get("value_flag")))
     ew_ev = row.get("ew_combined_ev")
-    card_comment = (row.get("card_comment") or "").strip()
+    raw_comment = row.get("card_comment")
+    card_comment = raw_comment.strip() if isinstance(raw_comment, str) else ""
 
     reasons: list[str] = []
 
@@ -120,6 +121,19 @@ def explain_pick(row: dict | pd.Series, *, race_peers: pd.DataFrame | None = Non
     if card_comment and len(card_comment) > 20 and math.isnan(nlp_rank):
         snippet = card_comment[:80] + ("…" if len(card_comment) > 80 else "")
         reasons.append(f"Card spotlight: \"{snippet}\"")
+
+    fit_rows = row.get("enrich_fit_rows") or []
+    for item in fit_rows[:2]:
+        label = item.get("label") or "Record"
+        val = item.get("value") or ""
+        if val:
+            reasons.append(f"RP {label.lower()}: {val}.")
+    trip = row.get("enrich_trip_label")
+    if trip:
+        reasons.append(trip + ".")
+    for flag in row.get("enrich_flags") or []:
+        if flag.get("label"):
+            reasons.append(str(flag["label"]) + ".")
 
     if not reasons:
         reasons.append(

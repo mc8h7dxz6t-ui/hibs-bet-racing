@@ -7,6 +7,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from hibs_racing.backtest.snapshot_store import scoring_config_hash, upsert_snapshots
+from hibs_racing.cards.actionability import apply_value_gates, cap_place_prob
 from hibs_racing.config import db_path, load_config
 from hibs_racing.features.ranker_matrix import build_card_feature_frame
 from hibs_racing.features.store import connect, init_db
@@ -34,6 +36,9 @@ def score_upcoming_cards(
     persist: bool = True,
     hist_frame: pd.DataFrame | None = None,
     hist_before_date: str | None = None,
+    write_snapshot: bool | None = None,
+    snapshot_odds_source: str = "sp",
+    sync_paper_ledger: bool | None = None,
 ) -> pd.DataFrame:
     """Score card runners → win/place probs → optional EW value vs offered odds."""
     cfg = load_config()
@@ -68,7 +73,8 @@ def score_upcoming_cards(
             longshot_win_prob_threshold=longshot_threshold,
             longshot_discount=longshot_discount,
         )
-        place_probs.extend(hp)
+        fs = group["field_size"].iloc[0] if "field_size" in group.columns else len(group)
+        place_probs.extend(cap_place_prob(p, field_size=fs) for p in hp)
 
     frame["model_place_prob"] = place_probs
     frame["place_ev"] = np.nan
@@ -94,10 +100,50 @@ def score_upcoming_cards(
             ):
                 frame.at[idx, "value_flag"] = 1
 
+    frame["flag_raw"] = frame["value_flag"].astype(int)
+
+    snap_cfg = paper_cfg.get("snapshots", {}) if isinstance(paper_cfg.get("snapshots"), dict) else {}
+    do_snapshot = write_snapshot if write_snapshot is not None else bool(snap_cfg.get("persist_on_score", False))
+    if do_snapshot and "card_date" in frame.columns:
+        card_dates = frame["card_date"].dropna().unique()
+        if len(card_dates) == 1:
+            upsert_snapshots(
+                db,
+                str(card_dates[0]),
+                frame,
+                odds_source=snapshot_odds_source,
+                config_hash=scoring_config_hash(paper_cfg),
+                paper_cfg=paper_cfg,
+            )
+
+    frame = apply_value_gates(frame, paper_cfg)
+
     scored_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     if persist:
         _persist_scores(db, frame, scored_at)
         _persist_runner_odds(db, frame)
+
+    do_sync = sync_paper_ledger
+    if do_sync is None:
+        do_sync = bool(paper_cfg.get("sync_ledger_on_score", True))
+    if (
+        do_sync
+        and persist
+        and hist_before_date is None
+        and "card_date" in frame.columns
+    ):
+        card_dates = frame["card_date"].dropna().unique()
+        if len(card_dates) == 1:
+            from hibs_racing.institutional.paper_reconciliation import sync_paper_ledger_to_scored
+
+            stake = float(paper_cfg.get("default_stake", 1.0))
+            sync_paper_ledger_to_scored(
+                frame,
+                card_date=str(card_dates[0]),
+                database=db,
+                stake=stake,
+            )
+
     return frame.sort_values(["race_id", "model_score"], ascending=[True, False])
 
 
@@ -173,8 +219,8 @@ def _persist_scores(db: Path, frame: pd.DataFrame, scored_at: str) -> None:
                     runner_id, race_id, model_score, model_win_prob, model_place_prob,
                     combo_bayes_place, hidden_potential, nlp_pace_rank,
                     jockey_bayes_place, trainer_bayes_place, jockey_place_90d, trainer_place_90d,
-                    place_ev, ew_combined_ev, value_flag, scoring_method, scored_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    place_ev, ew_combined_ev, value_flag, value_gate_reason, scoring_method, scored_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     rec["runner_id"],
@@ -192,6 +238,7 @@ def _persist_scores(db: Path, frame: pd.DataFrame, scored_at: str) -> None:
                     rec.get("place_ev") if pd.notna(rec.get("place_ev")) else None,
                     rec.get("ew_combined_ev") if pd.notna(rec.get("ew_combined_ev")) else None,
                     int(rec.get("value_flag") or 0),
+                    rec.get("value_gate_reason"),
                     rec.get("scoring_method"),
                     scored_at,
                 ),
@@ -240,6 +287,7 @@ def top_place_picks(frame: pd.DataFrame, *, per_race: int = 2) -> pd.DataFrame:
         "hidden_potential",
         "nlp_pace_rank",
         "value_flag",
+        "value_gate_reason",
         "ew_combined_ev",
         "scoring_method",
     ]

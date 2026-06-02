@@ -15,6 +15,7 @@ def test_fraction_to_decimal():
 
 def test_horse_name_match():
     assert horse_names_match("Star Runner (GB)", "Star Runner")
+    assert horse_names_match("Seaview Rock", "1 Seaview Rock")
     assert normalize_horse_name("Hope Rising (IRE)") == "hoperising"
 
 

@@ -50,7 +50,10 @@ class FakeMatchbookClient:
                 "id": 999,
                 "start": "2026-06-15T14:30:00.000Z",
                 "name": "15:30 Newcastle",
-                "meta-tags": [{"type": "VENUE", "name": "Newcastle"}],
+                "meta-tags": [
+                    {"type": "COUNTRY", "name": "UK", "url-name": "uk"},
+                    {"type": "VENUE", "name": "Newcastle"},
+                ],
                 "markets": [
                     {
                         "id": 100,
@@ -138,6 +141,8 @@ def test_matchbook_login_mock(monkeypatch):
             assert json["username"] == "user"
             return Resp()
 
-    client = MatchbookClient(username="user", password="pass", api_base="https://api.test/rest")
+    client = MatchbookClient(username="user", password="pass", api_base="https://api.test/edge/rest")
+    client._login_base = "https://api.test/bpapi/rest"
     client._session = Sess()
     assert client.login() == "tok123"
+    assert client._session.headers["session-token"] == "tok123"

@@ -1,4 +1,4 @@
-"""Optional Telegram / Discord webhook for 06:00 daily digest."""
+"""Optional Telegram / Discord / email for 06:00 daily digest."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+from hibs_racing.daily.email_digest import email_digest_configured, send_daily_email_digest
 from hibs_racing.daily.smart_picks import build_morning_smart_picks, format_digest_message
 
 
@@ -16,6 +17,10 @@ def webhook_configured() -> bool:
         (os.environ.get("TELEGRAM_BOT_TOKEN", "").strip() and os.environ.get("TELEGRAM_CHAT_ID", "").strip())
         or os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
     )
+
+
+def digest_channels_configured() -> bool:
+    return webhook_configured() or email_digest_configured()
 
 
 def _post_json(url: str, payload: dict[str, Any], *, timeout: int = 20) -> dict[str, Any]:
@@ -62,20 +67,27 @@ def send_discord(text: str) -> dict[str, Any]:
 
 
 def notify_daily_digest(*, limit: int = 3) -> dict[str, Any]:
-    """Build Smart Portfolio digest and post to configured webhooks."""
-    if not webhook_configured():
-        return {"ok": False, "skipped": True, "reason": "Set TELEGRAM_BOT_TOKEN+TELEGRAM_CHAT_ID and/or DISCORD_WEBHOOK_URL"}
+    """Build Smart Portfolio digest and post to configured channels (webhook + optional email)."""
+    if not digest_channels_configured():
+        return {
+            "ok": False,
+            "skipped": True,
+            "reason": (
+                "Set TELEGRAM_BOT_TOKEN+TELEGRAM_CHAT_ID, DISCORD_WEBHOOK_URL, "
+                "and/or HIBS_DAILY_EMAIL_TO+SMTP_HOST"
+            ),
+        }
 
     payload = build_morning_smart_picks(limit=limit)
     text = format_digest_message(payload)
     results: list[dict[str, Any]] = []
 
-    tg = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
-    if tg:
+    if os.environ.get("TELEGRAM_BOT_TOKEN", "").strip():
         results.append(send_telegram(text))
-    dc = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
-    if dc:
+    if os.environ.get("DISCORD_WEBHOOK_URL", "").strip():
         results.append(send_discord(text))
+    if email_digest_configured():
+        results.append(send_daily_email_digest(limit=limit))
 
     ok = any(r.get("ok") for r in results)
     return {

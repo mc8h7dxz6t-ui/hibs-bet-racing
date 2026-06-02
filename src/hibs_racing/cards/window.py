@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
+from hibs_racing.entity.natural_key import normalize_off_time
 from hibs_racing.entity.timezone import LONDON
 
 _TIME_RE = re.compile(r"(\d{1,2}):(\d{2})")
@@ -14,10 +15,11 @@ def off_minutes(off_time: object) -> int:
     if off_time is None or (isinstance(off_time, float) and pd.isna(off_time)):
         return 9999
     text = str(off_time).strip()
-    m = _TIME_RE.search(text)
-    if not m:
+    norm = normalize_off_time(text)
+    if norm == "00:00" and not _TIME_RE.search(text):
         return 9999
-    return int(m.group(1)) * 60 + int(m.group(2))
+    hour, minute = (int(x) for x in norm.split(":", 1))
+    return hour * 60 + minute
 
 
 def runner_off_dt(card_date: object, off_time: object) -> datetime | None:

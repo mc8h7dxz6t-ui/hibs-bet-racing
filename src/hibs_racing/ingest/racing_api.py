@@ -6,6 +6,7 @@ import time
 import pandas as pd
 import requests
 
+from hibs_racing.ingest.rate_limit import pause_sec, polite_sleep, racing_api_pause
 from hibs_racing.ingest.scrape import _load_env
 
 ENDPOINTS = {
@@ -114,8 +115,8 @@ def _request_racecards(
     endpoint = ENDPOINTS.get(plan, ENDPOINTS["free"])
     url = f"{base.rstrip('/')}{endpoint}"
     params: dict[str, object] = {"day": day, "region_codes": [region.lower()]}
-    retries = max(1, int(os.environ.get("RACING_API_429_RETRIES", "4")))
-    pause = float(os.environ.get("RACING_API_429_PAUSE_SEC", "8"))
+    retries = max(1, int(pause_sec("racing_api_429_retries")))
+    pause = pause_sec("racing_api_429_pause_sec")
     last_resp: requests.Response | None = None
     for attempt in range(retries):
         resp = requests.get(url, params=params, auth=(user, password), timeout=30)
@@ -176,10 +177,10 @@ def fetch_racing_api_racecards(
         api_days = [_api_day(day)]
 
     frames: list[pd.DataFrame] = []
-    api_pause = float(os.environ.get("RACING_API_PAUSE_SEC", "1.5"))
+    api_pause = racing_api_pause()
     for i, api_day in enumerate(api_days):
-        if i > 0 and api_pause > 0:
-            time.sleep(api_pause)
+        if i > 0:
+            polite_sleep("racing_api_pause_sec")
         payload = _request_racecards(
             day=api_day,
             region=region,
@@ -188,8 +189,16 @@ def fetch_racing_api_racecards(
             password=password,
             base=base,
         )
-        frames.append(parse_racing_api_payload(payload, region=region))
+        try:
+            frames.append(parse_racing_api_payload(payload, region=region))
+        except ValueError as exc:
+            # Tomorrow often has no IRE card; skip empty day when fetching today+tomorrow.
+            if str(exc) != "Racing API returned no runners for this query." or len(api_days) == 1:
+                raise
+            continue
 
+    if not frames:
+        raise ValueError("Racing API returned no runners for this query.")
     if len(frames) == 1:
         return frames[0]
     return pd.concat(frames, ignore_index=True)

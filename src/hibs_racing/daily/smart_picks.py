@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
+import pandas as pd
+
+from hibs_racing.cards.query import load_scored_cards
+from hibs_racing.pick_explain import attach_pick_explanations
 from hibs_racing.web_service import dashboard_context, novice_pick_candidates
 
 
@@ -13,6 +18,7 @@ def filter_smart_picks(candidates: list[dict[str, Any]], *, limit: int = 3) -> l
         c
         for c in candidates
         if c.get("value_flag")
+        and not c.get("value_gate_reason")
         and int(c.get("data_quality_pct") or 0) >= 75
         and str(c.get("steam_gate") or "proceed").lower() in allowed_gates
     ]
@@ -21,6 +27,30 @@ def filter_smart_picks(candidates: list[dict[str, Any]], *, limit: int = 3) -> l
         reverse=True,
     )
     return filtered[: max(1, int(limit))]
+
+
+def _merge_pick_with_frame(pick: dict[str, Any], frame: pd.DataFrame) -> dict[str, Any]:
+    """Join UI shortlist row to scored card row for explanations (read-only)."""
+    rid = str(pick.get("runner_id") or "")
+    if rid and not frame.empty and "runner_id" in frame.columns:
+        match = frame[frame["runner_id"].astype(str) == rid]
+        if not match.empty:
+            row = match.iloc[0].to_dict()
+            mpp = row.get("model_place_prob")
+            cbp = row.get("combo_bayes_place")
+            try:
+                ps = float(mpp or 0) * 0.65 + float(cbp or 0) * 0.35
+            except (TypeError, ValueError):
+                ps = float(pick.get("place_score") or pick.get("model_place_prob") or 0)
+            merged = {**row, **pick, "place_score": pick.get("place_score") or ps}
+            race_id = row.get("race_id")
+            if race_id and "model_score" in frame.columns:
+                peers = frame[frame["race_id"] == race_id]
+                if not peers.empty and peers["model_score"].notna().any():
+                    top = peers.sort_values("model_score", ascending=False).iloc[0]
+                    merged["race_top1_horse"] = top.get("horse_name")
+            return merged
+    return dict(pick)
 
 
 def build_morning_smart_picks(*, limit: int = 3, window_hours: int = 24) -> dict[str, Any]:
@@ -34,6 +64,21 @@ def build_morning_smart_picks(*, limit: int = 3, window_hours: int = 24) -> dict
         "card_dates": ctx.get("card_dates") or [],
         "scoring_method": ctx.get("scoring_method"),
         "candidate_count": len(candidates),
+    }
+
+
+def build_morning_smart_picks_explained(*, limit: int = 3, window_hours: int = 24) -> dict[str, Any]:
+    """Same shortlist as build_morning_smart_picks plus pick_reasons from scored card."""
+    base = build_morning_smart_picks(limit=limit, window_hours=window_hours)
+    frame = load_scored_cards()
+    merged = [_merge_pick_with_frame(p, frame) for p in base.get("picks") or []]
+    for i, p in enumerate(merged, start=1):
+        p["day_rank"] = i
+    explained = attach_pick_explanations(merged, frame) if not frame.empty else merged
+    return {
+        **base,
+        "picks": explained,
+        "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
     }
 
 

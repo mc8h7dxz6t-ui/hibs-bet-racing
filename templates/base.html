@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{{ product_name }}{% endblock %}</title>
-    <link rel="icon" href="{{ url_for('static', filename=hibs_badge_harp) }}" type="image/png">
+    <link rel="icon" href="{{ url_for('static', filename=hibs_harvested_logo|default(hibs_badge_harp)) }}" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -38,16 +38,11 @@
                 radial-gradient(ellipse at 88% 12%,rgba(0,122,51,0.16) 0%,transparent 42%);
         }
         body::before{
-            content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.045;
-            background:url('{{ url_for('static', filename=hibs_badge_harp) }}') repeat;
-            background-size:88px 88px;
+            content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.03;
+            background:url('{{ url_for('static', filename=hibs_harvested_logo|default('hibs_harvested_logo.png')) }}') repeat;
+            background-size:min(320px, 50vw) auto;
         }
-        body::after{
-            content:'';position:fixed;right:-24px;bottom:0;width:min(380px,40vw);height:min(300px,36vh);
-            z-index:0;pointer-events:none;opacity:0.16;
-            background:url('{{ url_for('static', filename=hibs_hero_horse|default('hero_horse.png')) }}') no-repeat right bottom/contain;
-            filter:drop-shadow(0 8px 24px rgba(0,0,0,0.35));
-        }
+        body::after{display:none;}
         .ref-page{max-width:1680px;margin:0 auto;position:relative;z-index:1;}
         .site-top{
             display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
@@ -59,9 +54,9 @@
         }
         .site-top::before{
             content:'';position:absolute;right:2%;top:50%;transform:translateY(-50%);
-            width:min(120px,22vw);height:min(120px,22vw);pointer-events:none;z-index:0;
-            background:url('{{ url_for('static', filename=hibs_racing_logo|default('badge_hibs_racing_oval.png')) }}') center/contain no-repeat;
-            opacity:0.11;filter:grayscale(15%);
+            width:min(200px,32vw);height:min(80px,14vw);pointer-events:none;z-index:0;
+            background:url('{{ url_for('static', filename=hibs_harvested_logo|default('hibs_harvested_logo.png')) }}') center/contain no-repeat;
+            opacity:0.08;
         }
         .site-top-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:relative;z-index:1;}
         .site-top-actions,.site-links{position:relative;z-index:1;}
@@ -306,7 +301,7 @@
             position:absolute;pointer-events:none;z-index:0;background:center/contain no-repeat;
         }
         .brand-horse-watermark{opacity:0.14;filter:drop-shadow(0 6px 18px rgba(0,0,0,0.35));}
-        .brand-logo-watermark{opacity:0.1;filter:grayscale(20%);}
+        .brand-logo-watermark{opacity:0.07;background-size:contain;background-repeat:no-repeat;background-position:center;}
         .brand-horse-watermark--corner-br{
             right:-12px;bottom:-16px;width:min(160px,38%);height:min(140px,70%);max-height:160px;
         }
@@ -332,15 +327,15 @@
 </head>
 <body>
 <div class="ref-page">
+    {% include '_product_switcher.html' %}
     {% from '_hibs_brand.html' import site_crests, heritage_strip %}
     <header class="site-top">
         <div class="site-top-left">
-            {{ site_crests() }}
+            {{ site_crests(height=56) }}
             <div>
                 <div class="site-wordmark" id="site-wordmark">{{ product_name }}</div>
                 <div class="site-tagline" id="site-tagline">{{ product_tagline }}</div>
             </div>
-            {{ heritage_strip() }}
         </div>
         <nav class="site-links">
             <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Cards</a>
@@ -389,8 +384,8 @@
     {% block content %}{% endblock %}
     <footer class="site-footer">
         {% from '_hibs_brand.html' import footer_crest %}
-        {{ footer_crest() }}
-        {{ product_name }} — {{ product_tagline }} | Gamble Responsibly | 18+
+        {{ footer_crest(height=24) }}
+        HIBS — {{ product_tagline }} | Gamble Responsibly | 18+
     </footer>
 </div>
 <script>

@@ -6,6 +6,8 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
+from hibs_racing.ingest.rate_limit import rp_scrape_day_pause
+
 ROOT = Path(__file__).resolve().parents[3]
 RPSCRAPE_DIR = ROOT / "vendor" / "rpscrape"
 RPSCRAPE_SCRIPTS = RPSCRAPE_DIR / "scripts"
@@ -171,7 +173,7 @@ def run_rpscrape(
     race_type: str = "flat",
     clean: bool = False,
     chunk_days: int = 1,
-    pause_seconds: float = 2.0,
+    pause_seconds: float | None = None,
     max_retries: int = 0,
     skip_existing: bool = True,
 ) -> list[Path]:
@@ -181,6 +183,8 @@ def run_rpscrape(
     Large ranges are split into single-day jobs so one timeout does not lose 30 days.
     Already-scraped days are skipped unless clean=True.
     """
+    if pause_seconds is None:
+        pause_seconds = rp_scrape_day_pause()
     if chunk_days < 1:
         raise ValueError("chunk_days must be >= 1")
 

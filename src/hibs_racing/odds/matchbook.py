@@ -16,6 +16,8 @@ from hibs_racing.entity.timezone import LONDON, matchbook_event_local_date, norm
 from hibs_racing.odds.matching import horse_names_match
 
 HORSE_RACING_SPORT_ID = 24735152712200
+BPAPI_REST_BASE = "https://api.matchbook.com/bpapi/rest"
+EDGE_REST_BASE = "https://api.matchbook.com/edge/rest"
 
 
 @dataclass
@@ -46,7 +48,13 @@ def _credentials() -> tuple[str, str]:
 
 def _api_base(cfg: dict) -> str:
     return os.environ.get("MATCHBOOK_API_BASE") or cfg.get("matchbook", {}).get(
-        "api_base", "https://api.matchbook.com/edge/rest"
+        "api_base", EDGE_REST_BASE
+    ).rstrip("/")
+
+
+def _login_base(cfg: dict) -> str:
+    return os.environ.get("MATCHBOOK_LOGIN_BASE") or cfg.get("matchbook", {}).get(
+        "login_base", BPAPI_REST_BASE
     ).rstrip("/")
 
 
@@ -73,6 +81,7 @@ class MatchbookClient:
         else:
             self._username, self._password = _credentials()
         self._api_base = (api_base or _api_base(cfg)).rstrip("/")
+        self._login_base = _login_base(cfg)
         self._session = requests.Session()
         self._session.headers.update(
             {
@@ -88,7 +97,7 @@ class MatchbookClient:
     def login(self, *, force: bool = False) -> str:
         if self._token and not force and (time.time() - self._token_at) < 5 * 3600:
             return self._token
-        url = f"{self._api_base}/security/session"
+        url = f"{self._login_base}/security/session"
         resp = self._session.post(
             url,
             json={"username": self._username, "password": self._password},
@@ -117,6 +126,7 @@ class MatchbookClient:
         after_ts: int | None = None,
         before_ts: int | None = None,
         include_prices: bool = True,
+        tag_url_names: str | None = None,
     ) -> list[dict]:
         params: dict[str, Any] = {
             "sport-ids": str(self._sport_id),
@@ -128,6 +138,8 @@ class MatchbookClient:
             "price-depth": "1",
             "side": "back",
         }
+        if tag_url_names:
+            params["tag-url-names"] = tag_url_names
         if after_ts is not None:
             params["after"] = str(after_ts)
         if before_ts is not None:
@@ -266,6 +278,67 @@ def _best_back_price(runner: dict) -> float | None:
     return max(decimals) if decimals else None
 
 
+def _is_gb_ire_event(event: dict) -> bool:
+    """True when Matchbook tags an event as UK or Ireland racing."""
+    for tag in event.get("meta-tags") or []:
+        url = str(tag.get("url-name") or "").lower()
+        name = str(tag.get("name") or "").lower()
+        ttype = str(tag.get("type") or "").upper()
+        if url in {"uk-ireland", "uk", "ireland"}:
+            return True
+        if ttype == "COUNTRY" and name in {"uk", "ireland"}:
+            return True
+    return False
+
+
+def _filter_gb_ire_events(events: list[dict]) -> list[dict]:
+    return [event for event in events if _is_gb_ire_event(event)]
+
+
+def _events_on_card_dates(events: list[dict], card_dates: set[str]) -> list[dict]:
+    matched: list[dict] = []
+    for event in events:
+        ev_date = matchbook_event_local_date(event.get("start"))
+        if ev_date and ev_date in card_dates:
+            matched.append(event)
+    return matched
+
+
+def _load_gb_ire_events_for_cards(
+    client: MatchbookClient,
+    cards: pd.DataFrame,
+    *,
+    mb_cfg: dict,
+) -> tuple[list[dict], list[str]]:
+    """Fetch Matchbook horse events limited to GB/IRE and the card calendar date(s)."""
+    card_dates = {str(d) for d in cards["card_date"].dropna().astype(str).unique()}
+    tag_names = (mb_cfg.get("tag_url_names") or "").strip()
+    tag_kw = {"tag_url_names": tag_names} if tag_names else {}
+
+    after_ts, before_ts = _card_day_window(cards)
+    window_events = client.fetch_horse_events(after_ts=after_ts, before_ts=before_ts, **tag_kw)
+    window_events = _filter_gb_ire_events(window_events)
+    events = _events_on_card_dates(window_events, card_dates)
+
+    all_uk: list[dict] = []
+    if not events:
+        all_uk = _filter_gb_ire_events(client.fetch_horse_events(**tag_kw))
+        events = _events_on_card_dates(all_uk, card_dates)
+
+    if not events:
+        if not all_uk:
+            all_uk = _filter_gb_ire_events(client.fetch_horse_events(**tag_kw))
+        available = sorted({d for d in (matchbook_event_local_date(e.get("start")) for e in all_uk) if d})
+        courses = sorted(cards["course"].dropna().astype(str).unique().tolist())
+        raise ValueError(
+            "Matchbook has no GB/IRE markets for "
+            f"{sorted(card_dates)} ({', '.join(courses)}). "
+            f"API UK/IRE events available on: {available or 'none'}"
+        )
+
+    return events, sorted(card_dates)
+
+
 def _card_day_window(cards: pd.DataFrame) -> tuple[int | None, int | None]:
     """Card calendar dates are UK-local; Matchbook API timestamps are UTC."""
     if cards.empty or "card_date" not in cards.columns:
@@ -298,9 +371,11 @@ def fetch_matchbook_odds(
 
     try:
         client = client or MatchbookClient(config_path=config_path)
-        after_ts, before_ts = _card_day_window(cards)
-        events = client.fetch_horse_events(after_ts=after_ts, before_ts=before_ts)
+        events, _card_dates = _load_gb_ire_events_for_cards(client, cards, mb_cfg=mb_cfg)
         report.events_loaded = len(events)
+    except ValueError as exc:
+        report.errors.append(str(exc))
+        return pd.DataFrame(), report
     except Exception as exc:
         report.errors.append(str(exc))
         return pd.DataFrame(), report
@@ -320,7 +395,8 @@ def fetch_matchbook_odds(
             None,
         )
         if event is None:
-            report.errors.append(f"{race_id}: no Matchbook event for {course} {off_time}")
+            if len(report.errors) < 5:
+                report.errors.append(f"{race_id}: no Matchbook event for {course} {off_time}")
             continue
 
         market = _select_win_market(event.get("markets") or [])

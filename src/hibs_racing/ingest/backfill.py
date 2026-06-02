@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from hibs_racing.config import db_path, load_config
+from hibs_racing.entity.natural_key import generate_natural_key, normalize_off_time
 from hibs_racing.features.store import connect, init_db
 from hibs_racing.ingest.csv_loader import file_hash, normalize_csv_frame, utc_now
 from hibs_racing.nlp.normalize import normalize_comment
@@ -42,6 +43,16 @@ def ingest_csv(
     frame = normalize_csv_frame(pd.read_csv(csv_path))
     if "days_since_last_run" not in frame.columns:
         frame["days_since_last_run"] = _days_since_last_run(frame).astype("Int64")
+    if "off_time" in frame.columns and "race_natural_key" not in frame.columns:
+        frame["race_natural_key"] = [
+            generate_natural_key(str(d)[:10], c, normalize_off_time(t))
+            for d, c, t in zip(
+                frame["race_date"],
+                frame.get("course", pd.Series([None] * len(frame))),
+                frame["off_time"],
+                strict=False,
+            )
+        ]
 
     ingested_at = utc_now()
     rows = 0
@@ -55,10 +66,10 @@ def ingest_csv(
                     runner_id, race_id, horse_id, race_date, course, region,
                     race_type, distance_f, going, field_size, finish_pos,
                     sp_decimal, jockey, trainer, draw, official_rating, rpr,
-                    race_class, days_since_last_run,
+                    race_class, days_since_last_run, off_time, race_natural_key,
                     comment_raw, comment_norm, source_file,
                     source_hash, ingested_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(runner_id) DO UPDATE SET
                     finish_pos = excluded.finish_pos,
                     jockey = excluded.jockey,
@@ -68,8 +79,10 @@ def ingest_csv(
                     rpr = excluded.rpr,
                     race_class = excluded.race_class,
                     days_since_last_run = excluded.days_since_last_run,
-                    comment_raw = excluded.comment_raw,
-                    comment_norm = excluded.comment_norm,
+                    off_time = COALESCE(excluded.off_time, off_time),
+                    race_natural_key = COALESCE(excluded.race_natural_key, race_natural_key),
+                    comment_raw = CASE WHEN length(excluded.comment_raw) > 0 THEN excluded.comment_raw ELSE comment_raw END,
+                    comment_norm = CASE WHEN length(excluded.comment_norm) > 0 THEN excluded.comment_norm ELSE comment_norm END,
                     ingested_at = excluded.ingested_at
                 """,
                 (
@@ -92,6 +105,8 @@ def ingest_csv(
                     int(rec["rpr"]) if pd.notna(rec.get("rpr")) else None,
                     rec.get("race_class"),
                     int(rec["days_since_last_run"]) if pd.notna(rec.get("days_since_last_run")) else None,
+                    rec.get("off_time"),
+                    rec.get("race_natural_key"),
                     norm.raw,
                     norm.normalized,
                     str(csv_path.name),

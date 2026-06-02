@@ -26,8 +26,11 @@ def normalize_off_time(off_time: str | None) -> str:
     minute = m.group(2)
     if "pm" in text and hour < 12:
         hour += 12
-    if "am" in text and hour == 12:
+    elif "am" in text and hour == 12:
         hour = 0
+    elif "am" not in text and "pm" not in text and 1 <= hour <= 9:
+        # Racing API free tier often omits am/pm (e.g. 6:15 → 18:15 UK).
+        hour += 12
     return f"{hour:02d}:{minute}"
 
 

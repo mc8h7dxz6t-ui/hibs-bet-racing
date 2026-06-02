@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from hibs_racing.cards.enrich import ENRICH_RANKER_FEATURES, compute_enrich_ranker_fields
 from hibs_racing.config import db_path, load_config
 from hibs_racing.features.cd_stats import add_all_cd_stats
 from hibs_racing.features.combo_stats import add_point_in_time_combo_stats
@@ -13,6 +14,7 @@ from hibs_racing.features.discrepancy import add_discrepancy_features
 from hibs_racing.features.entity_stats import add_all_entity_stats
 from hibs_racing.features.store import connect, init_db
 from hibs_racing.nlp.pipeline import parse_comment
+from hibs_racing.odds.matching import normalize_horse_name
 
 RANKER_QUERY = """
 SELECT
@@ -225,21 +227,44 @@ def ranker_feature_columns() -> list[str]:
     ]
 
 
+def ranker_enrich_feature_columns() -> list[str]:
+    return ranker_feature_columns() + list(ENRICH_RANKER_FEATURES)
+
+
+def _nlp_history_index(hist: pd.DataFrame) -> pd.DataFrame:
+    """Point-in-time NLP keyed by normalized horse name (bridges API horse_id vs name history)."""
+    if hist.empty:
+        return pd.DataFrame(columns=["_hn", "sectional_composite", "finishing_burst_level", "late_pace_level"])
+    slug = hist.copy()
+    slug["_hn"] = slug["horse_id"].astype(str).map(normalize_horse_name)
+    slug = slug[slug["_hn"].astype(str).str.len() > 0]
+    return (
+        slug.sort_values("race_date", ascending=False)
+        .drop_duplicates(subset=["_hn"], keep="first")
+        .set_index("_hn")[["sectional_composite", "finishing_burst_level", "late_pace_level"]]
+    )
+
+
 def _attach_card_nlp(cards: pd.DataFrame, hist: pd.DataFrame) -> pd.DataFrame:
     """Latest historical NLP per horse; parse card_comment when no history."""
     out = cards.copy()
+    nlp_cols = ["sectional_composite", "finishing_burst_level", "late_pace_level"]
     if hist.empty:
-        out["sectional_composite"] = 0.0
-        out["finishing_burst_level"] = 0
-        out["late_pace_level"] = 0
+        for col in nlp_cols:
+            out[col] = 0.0 if col == "sectional_composite" else 0
     else:
-        nlp = (
-            hist.sort_values("race_date", ascending=False)
-            .drop_duplicates(subset=["horse_id"], keep="first")
-            .set_index("horse_id")[["sectional_composite", "finishing_burst_level", "late_pace_level"]]
-        )
-        for col in nlp.columns:
-            out[col] = out["horse_id"].map(nlp[col])
+        nlp = _nlp_history_index(hist)
+        name_col = "horse_name" if "horse_name" in out.columns else "horse_id"
+        out["_hn"] = out[name_col].astype(str).map(normalize_horse_name)
+        for col in nlp_cols:
+            by_name = out["_hn"].map(nlp[col]) if not nlp.empty else pd.Series(index=out.index, dtype=float)
+            by_id = out["horse_id"].map(
+                hist.sort_values("race_date", ascending=False)
+                .drop_duplicates(subset=["horse_id"], keep="first")
+                .set_index("horse_id")[col]
+            )
+            out[col] = by_name.combine_first(by_id)
+        out = out.drop(columns=["_hn"], errors="ignore")
     out["sectional_composite"] = pd.to_numeric(out.get("sectional_composite"), errors="coerce").fillna(0.0)
     out["finishing_burst_level"] = pd.to_numeric(out.get("finishing_burst_level"), errors="coerce").fillna(0).astype(int)
     out["late_pace_level"] = pd.to_numeric(out.get("late_pace_level"), errors="coerce").fillna(0).astype(int)
@@ -281,6 +306,7 @@ def build_card_feature_frame(
     for col in ("draw", "days_since_last_run", "field_size", "course", "distance_f"):
         if col not in upcoming.columns:
             upcoming[col] = np.nan
+    upcoming = compute_enrich_ranker_fields(upcoming)
     upcoming = _attach_card_nlp(upcoming, hist)
     upcoming["finish_pos"] = np.nan
     upcoming["_is_card"] = 1
@@ -301,6 +327,7 @@ def build_card_feature_frame(
     combined = add_all_cd_stats(combined, alpha=alpha, place_cutoff=place_cutoff)
     combined = add_discrepancy_features(combined)
     combined = add_within_race_features(combined)
+    combined = compute_enrich_ranker_fields(combined)
     combined["hidden_potential"] = combined["hidden_potential"].fillna(0.0)
 
     card_ids = set(upcoming["runner_id"])

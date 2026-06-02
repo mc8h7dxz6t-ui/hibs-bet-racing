@@ -687,4 +687,25 @@ def record_paper_bet(
             ),
         )
         conn.commit()
+    if not backtest and is_value_pick:
+        try:
+            from hibs_racing.institutional.ledger_events import append_ledger_event
+
+            append_ledger_event(
+                event_type="bet_placed",
+                runner_id=runner_id,
+                race_id=race_id,
+                verification_hash=vhash,
+                payload={
+                    "bet_id": bet_id,
+                    "bet_type": bet_type,
+                    "stake_units": stake_units,
+                    "offered_win": offered_win,
+                    "model_ev": model_ev,
+                    "is_value_pick": True,
+                },
+                database=db,
+            )
+        except Exception:
+            pass
     return bet_id

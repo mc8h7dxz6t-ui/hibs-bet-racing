@@ -204,6 +204,8 @@ def enrich_cards_with_rp_verdicts(
     *,
     sleep_sec: float = 0.0,
     max_workers: int = 1,
+    max_races: int | None = None,
+    skip_existing: bool = True,
 ) -> pd.DataFrame:
     """Attach race-level RP verdict to each runner row (when credentials are set)."""
     if cards.empty:
@@ -221,6 +223,23 @@ def enrich_cards_with_rp_verdicts(
         .reset_index()[["card_date", "course", "off_time"]]
     )
     records = keys.to_dict(orient="records")
+    if skip_existing and "rp_verdict" in out.columns:
+        have_verdict = {
+            (str(r["card_date"])[:10], str(r["course"] or ""), str(r["off_time"] or ""))
+            for _, r in out.iterrows()
+            if isinstance(r.get("rp_verdict"), str) and str(r.get("rp_verdict")).strip()
+        }
+        records = [
+            rec
+            for rec in records
+            if (str(rec["card_date"])[:10], str(rec["course"] or ""), str(rec["off_time"] or ""))
+            not in have_verdict
+        ]
+    if max_races is not None and max_races > 0 and len(records) > max_races:
+        records = records[:max_races]
+    if not records:
+        return out
+
     verdict_map: dict[tuple[str, str, str], str | None] = {}
 
     def _fetch_one(rec: dict) -> tuple[tuple[str, str, str], str | None]:

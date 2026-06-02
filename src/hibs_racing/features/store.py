@@ -39,6 +39,31 @@ UPCOMING_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("places", "INTEGER"),
     ("offered_place_decimal", "REAL"),
     ("rp_verdict", "TEXT"),
+    ("horse_course_wins", "INTEGER"),
+    ("horse_course_runs", "INTEGER"),
+    ("horse_course_win_rate", "REAL"),
+    ("horse_distance_wins", "INTEGER"),
+    ("horse_distance_runs", "INTEGER"),
+    ("horse_distance_win_rate", "REAL"),
+    ("horse_going_wins", "INTEGER"),
+    ("horse_going_runs", "INTEGER"),
+    ("horse_going_win_rate", "REAL"),
+    ("jockey_rp_14d_wins", "INTEGER"),
+    ("jockey_rp_14d_runs", "INTEGER"),
+    ("jockey_rp_14d_win_rate", "REAL"),
+    ("jockey_rp_14d_wins_pct", "REAL"),
+    ("trainer_rp_14d_wins", "INTEGER"),
+    ("trainer_rp_14d_runs", "INTEGER"),
+    ("trainer_rp_14d_win_rate", "REAL"),
+    ("trainer_rp_14d_wins_pct", "REAL"),
+    ("form_lto_position", "INTEGER"),
+    ("form_trip_change_f", "REAL"),
+    ("form_cd_flag", "INTEGER"),
+    ("form_bf_flag", "INTEGER"),
+    ("form_poor_runs_3", "INTEGER"),
+    ("trainer_14d_strike", "REAL"),
+    ("enrich_source", "TEXT"),
+    ("enriched_at", "TEXT"),
 )
 
 CARD_SCORES_MIGRATIONS: tuple[tuple[str, str], ...] = (
@@ -47,11 +72,13 @@ CARD_SCORES_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("trainer_bayes_place", "REAL"),
     ("jockey_place_90d", "REAL"),
     ("trainer_place_90d", "REAL"),
+    ("value_gate_reason", "TEXT"),
 )
 
 RUNNER_NATURAL_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("off_time", "TEXT"),
     ("race_natural_key", "TEXT"),
+    ("distance_f", "REAL"),
 )
 
 EXECUTION_LOG_MIGRATIONS: tuple[tuple[str, str], ...] = (
@@ -66,6 +93,10 @@ PAPER_BETS_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("clv_beat", "INTEGER"),
     ("verification_hash", "TEXT"),
     ("backtest", "INTEGER NOT NULL DEFAULT 0"),
+)
+
+SNAPSHOT_MIGRATIONS: tuple[tuple[str, str], ...] = (
+    ("gates_json", "TEXT"),
 )
 
 
@@ -97,6 +128,7 @@ def init_db(db: Path) -> None:
         _migrate_columns(conn, "paper_bets", PAPER_BETS_MIGRATIONS)
         _migrate_columns(conn, "card_scores", CARD_SCORES_MIGRATIONS)
         _migrate_columns(conn, "execution_log", EXECUTION_LOG_MIGRATIONS)
+        _migrate_columns(conn, "scored_runner_snapshots", SNAPSHOT_MIGRATIONS)
         for stmt in (
             "CREATE INDEX IF NOT EXISTS idx_upcoming_natural ON upcoming_runners (race_natural_key)",
             "CREATE INDEX IF NOT EXISTS idx_runners_natural ON runners (race_natural_key)",

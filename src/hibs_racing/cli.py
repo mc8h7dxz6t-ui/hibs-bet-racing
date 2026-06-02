@@ -14,6 +14,19 @@ from hibs_racing.features.store import init_db
 from hibs_racing.ingest.backfill import export_parquet_year, ingest_csv
 
 
+def _load_dotenv_if_present() -> None:
+    """Load repo .env for CLI (matches web + daily_refresh.sh)."""
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    if not env_path.exists():
+        return
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(env_path)
+    except ImportError:
+        pass
+
+
 def cmd_init(_: argparse.Namespace) -> int:
     cfg = load_config()
     init_db(db_path(cfg))
@@ -60,6 +73,106 @@ def cmd_backtest(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_compare_gates(args: argparse.Namespace) -> int:
+    from hibs_racing.backtest.gate_compare import compare_value_gates
+
+    report = compare_value_gates(days=int(getattr(args, "days", 14)))
+    print(json.dumps(report.to_dict(), indent=2))
+    return 0 if report.rows > 0 else 1
+
+
+def cmd_benchmark_gates(args: argparse.Namespace) -> int:
+    from hibs_racing.config import ROOT
+    from hibs_racing.backtest.gate_benchmark import run_gate_benchmark, run_gate_benchmark_walkforward
+
+    start = getattr(args, "start", None)
+    end = getattr(args, "end", None)
+    use_snapshots = not getattr(args, "no_snapshots", False)
+    write_snapshots = getattr(args, "write_snapshots", False)
+    if getattr(args, "walkforward", False):
+        out = getattr(args, "output", None) or (ROOT / "exports" / "gate_walkforward.json")
+        progress = out.with_name("gate_walkforward_progress.json")
+        report = run_gate_benchmark_walkforward(
+            start=start,
+            end=end,
+            progress_path=progress,
+            use_snapshots=use_snapshots,
+            write_snapshots=write_snapshots,
+        )
+        payload = report.to_dict()
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        Path(out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        payload["output_path"] = str(out)
+        payload["progress_path"] = str(progress)
+        print(json.dumps(payload, indent=2))
+        return 0 if report.months_with_data > 0 else 1
+
+    report = run_gate_benchmark(
+        start=start,
+        end=end,
+        use_snapshots=use_snapshots,
+        write_snapshots=write_snapshots,
+        include_slippage=not getattr(args, "no_slippage", False),
+    )
+    print(json.dumps(report.to_dict(), indent=2))
+    return 0 if report.runners > 0 else 1
+
+
+def cmd_snapshot_backfill(args: argparse.Namespace) -> int:
+    from hibs_racing.backtest.gate_benchmark import backfill_scored_snapshots
+
+    result = backfill_scored_snapshots(
+        start=args.start,
+        end=args.end,
+        force=getattr(args, "force", False),
+    )
+    print(json.dumps(result, indent=2))
+    if result.get("rows_written", 0) > 0:
+        return 0
+    if result.get("complete"):
+        return 0
+    return 1
+
+
+def cmd_gate2_sensitivity(args: argparse.Namespace) -> int:
+    from hibs_racing.backtest.gate2_sensitivity import run_gate2_cap_sensitivity
+
+    report = run_gate2_cap_sensitivity(
+        start=getattr(args, "start", None),
+        end=getattr(args, "end", None),
+        days=int(getattr(args, "days", 90)),
+        use_snapshots=not getattr(args, "no_snapshots", False),
+    )
+    print(json.dumps(report.to_dict(), indent=2))
+    return 0 if report.with_caps.get("gate2", {}).get("picks", 0) else 1
+
+
+def cmd_gate_regression(args: argparse.Namespace) -> int:
+    from hibs_racing.backtest.gate_regression import run_gate_regression_check
+
+    check = run_gate_regression_check(
+        days=int(getattr(args, "days", 90)),
+        start=getattr(args, "start", None),
+        end=getattr(args, "end", None),
+        require_snapshots=getattr(args, "require_snapshots", False),
+    )
+    print(json.dumps(check.to_dict(), indent=2))
+    return 0 if check.passed else 1
+
+
+def cmd_institutional_check(args: argparse.Namespace) -> int:
+    from hibs_racing.institutional.check import run_institutional_check
+
+    report = run_institutional_check(
+        days=int(getattr(args, "days", 90)),
+        card_date=getattr(args, "card_date", None),
+        require_snapshots=getattr(args, "require_snapshots", True),
+        require_recon_clean=getattr(args, "require_recon_clean", False),
+    )
+    print(json.dumps(report.to_dict(), indent=2))
+    return 0 if report.passed else 1
+
+
 def cmd_retain_logs(args: argparse.Namespace) -> int:
     from hibs_racing.institutional.log_retention import run_log_retention
 
@@ -72,6 +185,38 @@ def cmd_retain_logs(args: argparse.Namespace) -> int:
     )
     print(json.dumps(report.to_dict(), indent=2))
     return 0
+
+
+def cmd_reconcile_paper(args: argparse.Namespace) -> int:
+    import pandas as pd
+    from hibs_racing.config import db_path, load_config
+    from hibs_racing.features.store import connect, init_db
+    from hibs_racing.institutional.paper_reconciliation import (
+        reconcile_paper_ledger,
+        sync_paper_ledger_to_scored,
+    )
+    from hibs_racing.cards.score_card import score_upcoming_cards
+
+    card_date = args.card_date
+    if getattr(args, "sync", False):
+        db = db_path(load_config())
+        init_db(db)
+        with connect(db) as conn:
+            cards = pd.read_sql_query(
+                "SELECT * FROM upcoming_runners WHERE card_date = ?",
+                conn,
+                params=(card_date,),
+            )
+        if cards.empty:
+            print(json.dumps({"ok": False, "error": f"No upcoming_runners for {card_date}"}))
+            return 1
+        odds = cards[["runner_id", "win_decimal", "place_fraction", "places"]]
+        scored = score_upcoming_cards(cards, database=db, odds=odds, persist=True, write_snapshot=False)
+        result = sync_paper_ledger_to_scored(scored, card_date=card_date, database=db)
+    else:
+        result = reconcile_paper_ledger(card_date)
+    print(json.dumps(result.to_dict(), indent=2))
+    return 0 if result.is_clean else 1
 
 
 def cmd_backtest_replay(args: argparse.Namespace) -> int:
@@ -157,7 +302,6 @@ def cmd_scrape(args: argparse.Namespace) -> int:
                 race_type=args.type,
                 clean=args.clean,
                 chunk_days=1,
-                pause_seconds=3.0,
                 max_retries=0,
             )
         except RuntimeError as exc:
@@ -206,6 +350,7 @@ def cmd_ingest_raceform(args: argparse.Namespace) -> int:
         until=args.until,
         year=args.year,
         limit=args.limit,
+        comments_only=True if args.pipeline else None,
     )
     print(json.dumps(stats, indent=2))
 
@@ -242,11 +387,11 @@ def cmd_build_matrix(_: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_train_ranker(_: argparse.Namespace) -> int:
+def cmd_train_ranker(args: argparse.Namespace) -> int:
     from hibs_racing.models.lgbm_ranker import train_lgbm_ranker
 
     try:
-        report = train_lgbm_ranker()
+        report = train_lgbm_ranker(with_enrich=bool(getattr(args, "with_enrich", False)))
     except ImportError as exc:
         print(json.dumps({"message": str(exc)}, indent=2))
         return 1
@@ -445,7 +590,18 @@ def cmd_score_card(args: argparse.Namespace) -> int:
         print(show.to_string(index=False))
 
     if args.paper and not value.empty:
-        ids = paper_log_value_picks(value, stake=float(load_config().get("paper", {}).get("default_stake", 1.0)))
+        card_date = str(cards["card_date"].iloc[0]) if "card_date" in cards.columns else None
+        if card_date:
+            from hibs_racing.institutional.paper_reconciliation import sync_paper_ledger_to_scored
+
+            recon = sync_paper_ledger_to_scored(
+                scored,
+                card_date=card_date,
+                stake=float(load_config().get("paper", {}).get("default_stake", 1.0)),
+            )
+            ids = list(range(recon.expected_value_picks))
+        else:
+            ids = paper_log_value_picks(value, stake=float(load_config().get("paper", {}).get("default_stake", 1.0)))
         print(f"\nPaper bets logged: {len(ids)}")
 
     out = Path(load_config()["paths"]["parquet_dir"]) / "card_scores.parquet"
@@ -633,6 +789,7 @@ def cmd_phase_a(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _load_dotenv_if_present()
     parser = argparse.ArgumentParser(prog="hibs-racing", description="Offline racing research CLI")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -671,6 +828,99 @@ def main(argv: list[str] | None = None) -> int:
 
     p_bt = sub.add_parser("backtest", help="Place/top-N signal backtest")
     p_bt.set_defaults(func=cmd_backtest)
+
+    p_cg = sub.add_parser(
+        "compare-gates",
+        help="Compare raw value flags vs gated value flags on recent stored cards",
+    )
+    p_cg.add_argument("--days", type=int, default=14, help="How many latest card dates to include")
+    p_cg.set_defaults(func=cmd_compare_gates)
+
+    p_bg = sub.add_parser(
+        "benchmark-gates",
+        help="Historical benchmark: none vs gate1 vs gate1+gate2 on settled SP data",
+    )
+    p_bg.add_argument("--start", help="Start date YYYY-MM-DD (default: earliest available)")
+    p_bg.add_argument("--end", help="End date YYYY-MM-DD (default: latest available)")
+    p_bg.add_argument(
+        "--walkforward",
+        action="store_true",
+        help="Month-by-month benchmark with aggregate + per-period rows",
+    )
+    p_bg.add_argument(
+        "--output",
+        type=Path,
+        help="Write walk-forward JSON report (default: exports/gate_walkforward.json)",
+    )
+    p_bg.add_argument(
+        "--no-snapshots",
+        action="store_true",
+        help="Force full re-score (ignore scored_runner_snapshots)",
+    )
+    p_bg.add_argument(
+        "--write-snapshots",
+        action="store_true",
+        help="Persist snapshots while benchmarking (slow; use snapshot-backfill instead)",
+    )
+    p_bg.add_argument(
+        "--no-slippage",
+        action="store_true",
+        help="Skip slippage stress lanes in single-window benchmark",
+    )
+    p_bg.set_defaults(func=cmd_benchmark_gates)
+
+    p_snap = sub.add_parser(
+        "snapshot-backfill",
+        help="Build scored_runner_snapshots for historical SP replay",
+    )
+    p_snap.add_argument("--start", required=True, help="Start date YYYY-MM-DD")
+    p_snap.add_argument("--end", required=True, help="End date YYYY-MM-DD")
+    p_snap.add_argument("--force", action="store_true", help="Rebuild even if coverage complete")
+    p_snap.set_defaults(func=cmd_snapshot_backfill)
+
+    p_g2s = sub.add_parser(
+        "gate2-sensitivity",
+        help="Compare Gate2 with portfolio caps ON vs OFF",
+    )
+    p_g2s.add_argument("--start", help="Start date YYYY-MM-DD")
+    p_g2s.add_argument("--end", help="End date YYYY-MM-DD")
+    p_g2s.add_argument("--days", type=int, default=90, help="Lookback when start/end omitted")
+    p_g2s.add_argument("--no-snapshots", action="store_true")
+    p_g2s.set_defaults(func=cmd_gate2_sensitivity)
+
+    p_gr = sub.add_parser(
+        "gate-regression",
+        help="CI gate check: Gate1 must not regress vs raw value flags",
+    )
+    p_gr.add_argument("--days", type=int, default=90)
+    p_gr.add_argument("--start", help="Start date YYYY-MM-DD")
+    p_gr.add_argument("--end", help="End date YYYY-MM-DD")
+    p_gr.add_argument(
+        "--require-snapshots",
+        action="store_true",
+        help="Fail if snapshot coverage incomplete for window",
+    )
+    p_gr.set_defaults(func=cmd_gate_regression)
+
+    p_ic = sub.add_parser(
+        "institutional-check",
+        help="Phase 3: snapshots + gate regression + optional paper recon",
+    )
+    p_ic.add_argument("--days", type=int, default=90)
+    p_ic.add_argument("--card-date", help="Optional card date for paper recon")
+    p_ic.add_argument("--require-snapshots", action="store_true", default=True)
+    p_ic.add_argument("--no-require-snapshots", action="store_false", dest="require_snapshots")
+    p_ic.add_argument("--require-recon-clean", action="store_true")
+    p_ic.set_defaults(func=cmd_institutional_check)
+
+    p_rp = sub.add_parser("reconcile-paper", help="Reconcile paper_bets vs Gate1 picks")
+    p_rp.add_argument("--card-date", required=True, help="Card date YYYY-MM-DD")
+    p_rp.add_argument(
+        "--sync",
+        action="store_true",
+        help="Prune stale ledger rows and align to current scored value flags",
+    )
+    p_rp.set_defaults(func=cmd_reconcile_paper)
 
     p_lr = sub.add_parser(
         "retain-logs",
@@ -716,6 +966,11 @@ def main(argv: list[str] | None = None) -> int:
     p_matrix.set_defaults(func=cmd_build_matrix)
 
     p_ranker = sub.add_parser("train-ranker", help="Train LightGBM LambdaRank (needs .[ranker] extra)")
+    p_ranker.add_argument(
+        "--with-enrich",
+        action="store_true",
+        help="Train with RP enrich features (48 cols); saves lgbm_ranker_features_enrich.json",
+    )
     p_ranker.set_defaults(func=cmd_train_ranker)
 
     p_fi = sub.add_parser("feature-importance", help="Feature importance matrix + holdout AUC diagnostic")

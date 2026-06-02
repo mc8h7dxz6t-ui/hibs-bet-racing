@@ -25,6 +25,7 @@ COLUMN_ALIASES: dict[str, list[str]] = {
     "official_rating": ["official_rating", "or"],
     "rpr": ["rpr"],
     "race_class": ["race_class", "class"],
+    "off_time": ["off_time", "off"],
 }
 
 

@@ -32,6 +32,7 @@ ingest:
     - going
     - field_size
     - sp_decimal
+  results_require_comment: false      # false → ingest all finishes for settlement
 
 nlp:
   min_comment_length: 8
@@ -48,6 +49,8 @@ ranker:
   min_races: 50
   model_file: lgbm_ranker.txt
   feature_file: lgbm_ranker_features.json
+  enrich_feature_file: lgbm_ranker_features_enrich.json
+  use_enrich_features: auto          # auto | true | false — auto matches booster to manifest
   scoring_mode: auto  # auto | ranker | heuristic
   production_scoring_mode: ranker  # enforced when HIBS_RACING_PRODUCTION=1
 
@@ -59,6 +62,41 @@ paper:
   default_place_fraction: 0.25
   default_places: 3
   default_stake: 1.0
+  sync_ledger_on_score: true         # prune stale paper rows whenever card_scores refresh
+  log_on_refresh: true                # refresh-cards / API refresh logs value picks
+  # Actionability gates (ranker still scores all runners; value/paper only when allowed)
+  value_gates_enabled: true
+  exempt_unrated_races: true          # maidens/novices → rank-only, not missing data
+  require_official_rating_for_value: true
+  min_official_rating: 45              # handicaps below this OR → no value flag
+  suitability_gates_enabled: true
+  min_horse_dist_runs: 3
+  block_zero_dist_wins: true
+  max_trip_change_f: 2.0
+  max_form_poor_runs_3: 3              # block when ≥3 poor codes in form (PU/F/UR…) last 3
+  min_trainer_rtf: null                # optional e.g. 8 — cold yard gate
+  snapshots:
+    persist_on_score: false            # true: write scored_runner_snapshots on each card score
+  slippage_stress_bps: [0, 25, 50]     # benchmark-gates slippage stress lanes
+  regression:
+    min_card_days: 7
+    min_gate1_roi_delta_pp: 0.0        # CI: gate1 ROI must be >= none by this margin
+    min_gate1_hit_rate_delta_pp: 0.0
+  gate2:
+    enabled: false                     # optional stricter post-filter (set true to activate)
+    min_confidence: 0.55               # data completeness confidence (0..1)
+    small_field_max: 7
+    large_field_min: 12
+    min_place_ev_small: 0.04
+    min_place_ev_medium: 0.05
+    min_place_ev_large: 0.07
+    min_combo_small: 0.20
+    min_combo_medium: 0.22
+    min_combo_large: 0.25
+    price_shock_per_decimal: 0.01      # stress EV by odds size
+    min_stressed_place_ev: 0.0
+    max_value_per_race: 2              # optional concentration control
+    max_value_per_meeting: 6
   # Value picks auto-logged when refresh-cards runs with --paper (daily_refresh.sh)
 
 analytics:
@@ -69,7 +107,22 @@ cards:
   default_region: gb
   fetch_timeout_sec: 120
   parallel_workers: 4
-  rp_verdict_workers: 6
+  include_tomorrow: false             # window refresh: today only (set true for tomorrow card)
+  primary_date_only: true             # drop older/tomorrow dates after hour filter
+  dual_source_enrich: true            # Racing API spine + RP null-only merge
+  enrich_fetch_stats: true            # RP stats accordion (course/dist/going, jockey 14d)
+
+# Outbound pacing — protects Racing API + Racing Post credentials (env overrides below).
+rate_limits:
+  racing_api_pause_sec: 1.5           # between region/day API calls (2 req/s plan cap)
+  racing_api_429_pause_sec: 8.0
+  racing_api_429_retries: 4
+  rp_scrape_day_pause_sec: 4.0        # between rpscrape result days (live scrape)
+  rp_racecard_region_pause_sec: 5.0   # between gb/ire racecard enrich fetches
+  rp_verdict_race_pause_sec: 1.2      # per race page when fetching verdict text
+  rp_verdict_workers: 2               # keep low — enrich already hits RP racecards
+  rp_verdict_max_races: 20            # cap verdict HTTP fetches per refresh
+  oddschecker_pause_sec: 1.5
 
 monitor:
   top_n: 10
@@ -94,6 +147,7 @@ oddschecker:
 
 matchbook:
   enabled: true
+  login_base: https://api.matchbook.com/bpapi/rest
   api_base: https://api.matchbook.com/edge/rest
   sport_id: 24735152712200        # Horse Racing
   default_source: auto

@@ -6,6 +6,9 @@ from pathlib import Path
 
 import pandas as pd
 
+from hibs_racing.entity.natural_key import generate_natural_key, normalize_off_time
+from hibs_racing.config import load_config
+
 _DIST_F_RE = re.compile(r"([\d.]+)\s*f")
 
 
@@ -51,6 +54,7 @@ def normalize_rpscrape_csv(
     source: Path,
     *,
     output: Path | None = None,
+    require_comment: bool | None = None,
 ) -> Path:
     """
     Convert rpscrape CSV → hibs-racing ingest schema.
@@ -95,9 +99,27 @@ def normalize_rpscrape_csv(
         out["rpr"] = pd.to_numeric(frame["rpr"], errors="coerce").astype("Int64")
     if "class" in frame.columns:
         out["race_class"] = frame["class"].fillna("").astype(str).str.strip()
+    if "off" in frame.columns:
+        out["off_time"] = frame["off"].astype(str).str.strip()
 
+    cfg = load_config()
+    need_comment = (
+        require_comment
+        if require_comment is not None
+        else cfg.get("ingest", {}).get("results_require_comment", True)
+    )
     out["comment"] = out["comment"].fillna("").astype(str).str.strip()
-    out = out[out["comment"].str.len() > 0].copy()
+    if need_comment:
+        out = out[out["comment"].str.len() > 0].copy()
+    out["race_natural_key"] = [
+        generate_natural_key(str(d)[:10], c, normalize_off_time(t))
+        for d, c, t in zip(
+            out["race_date"],
+            out.get("course", pd.Series([None] * len(out))),
+            out.get("off_time", pd.Series([None] * len(out))),
+            strict=False,
+        )
+    ]
     out["runner_id"] = (
         out["race_id"].astype(str) + ":" + out["horse_id"].str.lower().str.replace(r"\s+", "_", regex=True)
     )
@@ -124,12 +146,13 @@ def normalize_rpscrape_files(
     sources: list[Path],
     *,
     output_dir: Path,
+    require_comment: bool | None = None,
 ) -> Path:
     """Merge multiple rpscrape CSVs into one hibs-racing ingest file."""
     if not sources:
         raise ValueError("no source CSV files")
     output_dir.mkdir(parents=True, exist_ok=True)
-    parts = [normalize_rpscrape_csv(path) for path in sources]
+    parts = [normalize_rpscrape_csv(path, require_comment=require_comment) for path in sources]
     merged = pd.concat([pd.read_csv(p) for p in parts], ignore_index=True)
     merged = merged.drop_duplicates(subset=["runner_id"], keep="last")
     target = output_dir / "results_merged.csv"

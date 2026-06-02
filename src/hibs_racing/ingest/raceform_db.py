@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from hibs_racing.config import db_path, load_config
+from hibs_racing.entity.natural_key import generate_natural_key, normalize_off_time
 from hibs_racing.features.store import connect, init_db
 from hibs_racing.ingest.csv_loader import utc_now
 from hibs_racing.nlp.normalize import normalize_comment
@@ -88,7 +89,7 @@ def load_raceform_frame(
         return pd.read_sql_query(sql, src, params=params)
 
 
-def normalize_raceform_frame(frame: pd.DataFrame) -> pd.DataFrame:
+def normalize_raceform_frame(frame: pd.DataFrame, *, require_comment: bool = True) -> pd.DataFrame:
     out = pd.DataFrame()
     out["race_id"] = frame["race_id"].astype(str)
     out["race_date"] = pd.to_datetime(frame["date"]).dt.strftime("%Y-%m-%d")
@@ -106,8 +107,15 @@ def normalize_raceform_frame(frame: pd.DataFrame) -> pd.DataFrame:
     out["official_rating"] = pd.to_numeric(frame["or"], errors="coerce").astype("Int64")
     out["rpr"] = pd.to_numeric(frame["rpr"], errors="coerce").astype("Int64")
     out["race_class"] = frame["class"].fillna("").astype(str).str.strip()
+    if "off" in frame.columns:
+        out["off_time"] = frame["off"].astype(str).str.strip()
+        out["race_natural_key"] = [
+            generate_natural_key(str(d)[:10], c, normalize_off_time(t))
+            for d, c, t in zip(out["race_date"], out["course"], out["off_time"], strict=False)
+        ]
 
-    out = out[out["comment"].str.len() > 0].copy()
+    if require_comment:
+        out = out[out["comment"].str.len() > 0].copy()
     out["runner_id"] = (
         out["race_id"].astype(str) + ":" + out["horse_id"].str.lower().str.replace(r"\s+", "_", regex=True)
     )
@@ -130,19 +138,30 @@ def ingest_raceform_db(
     limit: int | None = None,
     database: Path | None = None,
     batch_size: int = 2000,
+    comments_only: bool | None = None,
 ) -> dict[str, int]:
     """Bulk ingest raceform.db into hibs-racing SQLite."""
     cfg = load_config()
     db = database or db_path(cfg)
     init_db(db)
+    require_comment = (
+        comments_only
+        if comments_only is not None
+        else cfg.get("ingest", {}).get("results_require_comment", True)
+    )
 
     frame = load_raceform_frame(
-        db_file, since=since, until=until, year=year, limit=limit, comments_only=True
+        db_file,
+        since=since,
+        until=until,
+        year=year,
+        limit=limit,
+        comments_only=bool(require_comment),
     )
     if frame.empty:
         return {"loaded": 0, "inserted": 0}
 
-    norm = normalize_raceform_frame(frame)
+    norm = normalize_raceform_frame(frame, require_comment=bool(require_comment))
     ingested_at = utc_now()
     source_tag = f"raceform:{db_file.name}"
     inserted = 0
@@ -152,10 +171,10 @@ def ingest_raceform_db(
             runner_id, race_id, horse_id, race_date, course, region,
             race_type, going, field_size, finish_pos,
             sp_decimal, jockey, trainer, draw, official_rating, rpr,
-            race_class, days_since_last_run,
+            race_class, days_since_last_run, off_time, race_natural_key,
             comment_raw, comment_norm, source_file,
             source_hash, ingested_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(runner_id) DO UPDATE SET
             finish_pos = excluded.finish_pos,
             jockey = excluded.jockey,
@@ -165,8 +184,10 @@ def ingest_raceform_db(
             rpr = excluded.rpr,
             race_class = excluded.race_class,
             days_since_last_run = excluded.days_since_last_run,
-            comment_raw = excluded.comment_raw,
-            comment_norm = excluded.comment_norm,
+            off_time = COALESCE(excluded.off_time, off_time),
+            race_natural_key = COALESCE(excluded.race_natural_key, race_natural_key),
+            comment_raw = CASE WHEN length(excluded.comment_raw) > 0 THEN excluded.comment_raw ELSE comment_raw END,
+            comment_norm = CASE WHEN length(excluded.comment_norm) > 0 THEN excluded.comment_norm ELSE comment_norm END,
             ingested_at = excluded.ingested_at
     """
 
@@ -194,6 +215,8 @@ def ingest_raceform_db(
                     int(rec["rpr"]) if pd.notna(rec.get("rpr")) else None,
                     rec.get("race_class"),
                     int(rec["days_since_last_run"]) if pd.notna(rec.get("days_since_last_run")) else None,
+                    rec.get("off_time"),
+                    rec.get("race_natural_key"),
                     comment.raw,
                     comment.normalized,
                     source_tag,

@@ -242,3 +242,67 @@ CREATE INDEX IF NOT EXISTS idx_execution_log_created ON execution_log (created_a
 CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_log_live_dedup
 ON execution_log (idempotency_key)
 WHERE dry_run = 0 AND status = 'routed';
+
+-- Phase D: immutable scored-card snapshots for fast gate replay / audit
+CREATE TABLE IF NOT EXISTS scored_runner_snapshots (
+    card_date               TEXT NOT NULL,
+    runner_id               TEXT NOT NULL,
+    race_id                 TEXT NOT NULL,
+    odds_source             TEXT NOT NULL DEFAULT 'sp',
+    config_hash             TEXT NOT NULL,
+    course                  TEXT,
+    race_name               TEXT,
+    field_size              INTEGER,
+    official_rating         INTEGER,
+    win_decimal             REAL,
+    place_fraction          REAL,
+    places                  INTEGER,
+    model_score             REAL,
+    model_win_prob          REAL,
+    model_place_prob        REAL,
+    combo_bayes_place       REAL,
+    place_ev                REAL,
+    ew_combined_ev          REAL,
+    flag_raw                INTEGER NOT NULL DEFAULT 0,
+    finish_pos              INTEGER,
+    scored_at               TEXT NOT NULL,
+    manifest_json           TEXT,
+    gates_json              TEXT,
+    PRIMARY KEY (card_date, runner_id, odds_source, config_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_snapshots_date ON scored_runner_snapshots (card_date);
+CREATE INDEX IF NOT EXISTS idx_snapshots_config ON scored_runner_snapshots (config_hash);
+
+-- Phase E: institutional run manifests + append-only ledger events
+CREATE TABLE IF NOT EXISTS run_manifests (
+    manifest_id         TEXT PRIMARY KEY,
+    manifest_hash         TEXT NOT NULL,
+    run_kind              TEXT NOT NULL,
+    card_date             TEXT,
+    config_hash           TEXT NOT NULL,
+    model_version         TEXT NOT NULL,
+    scoring_method        TEXT,
+    git_sha               TEXT,
+    odds_source           TEXT,
+    runner_count          INTEGER NOT NULL DEFAULT 0,
+    value_flag_count      INTEGER NOT NULL DEFAULT 0,
+    extras_json           TEXT,
+    created_at            TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_run_manifests_date ON run_manifests (card_date, created_at);
+
+CREATE TABLE IF NOT EXISTS ledger_events (
+    event_id              TEXT PRIMARY KEY,
+    event_type            TEXT NOT NULL,
+    runner_id             TEXT,
+    race_id               TEXT,
+    payload_json          TEXT NOT NULL,
+    manifest_id           TEXT,
+    verification_hash     TEXT,
+    created_at            TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ledger_events_type ON ledger_events (event_type, created_at);
+CREATE INDEX IF NOT EXISTS idx_ledger_events_manifest ON ledger_events (manifest_id);

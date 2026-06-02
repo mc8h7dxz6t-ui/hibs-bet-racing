@@ -42,9 +42,8 @@
 </div>
 
 <section class="insights-hero brand-panel-framed">
-    {% from '_hibs_brand.html' import brand_horse_watermark, brand_logo_watermark %}
+    {% from '_hibs_brand.html' import brand_logo_watermark %}
     {{ brand_logo_watermark(modifier='brand-logo-watermark--corner-tl') }}
-    {{ brand_horse_watermark(modifier='brand-horse-watermark--corner-tr') }}
     <div>
         <h1>Best 10 picks — explained</h1>
         <p>
@@ -114,7 +113,7 @@
                 {% if r.jockey_bayes_place %}<li><strong>Jockey</strong> — {{ r.jockey or '—' }} place prior {{ (r.jockey_bayes_place or 0)|fmt_pct }}{% if r.jockey_place_90d %} ({{ (r.jockey_place_90d or 0)|fmt_pct }} last 90d){% endif %}.</li>{% endif %}
                 {% if r.trainer_bayes_place %}<li><strong>Trainer/yard</strong> — {{ r.trainer or '—' }} {{ (r.trainer_bayes_place or 0)|fmt_pct }}{% if r.trainer_place_90d %} ({{ (r.trainer_place_90d or 0)|fmt_pct }} 90d){% endif %}.</li>{% endif %}
                 {% if r.nlp_pace_rank and r.nlp_pace_rank == r.nlp_pace_rank %}<li><strong>Pace NLP</strong> — sectional rank #{{ r.nlp_pace_rank|fmt_num(1) }} in this race from parsed running comments.</li>{% endif %}
-                {% if r.card_comment %}<li><strong>RP card</strong> — "{{ (r.card_comment[:100] + '…') if r.card_comment|length > 100 else r.card_comment }}"</li>{% endif %}
+                {% if r.card_comment is string and r.card_comment %}<li><strong>RP card</strong> — "{{ (r.card_comment[:100] + '…') if r.card_comment|length > 100 else r.card_comment }}"</li>{% endif %}
             </ul>
             <p style="margin-top:10px;">
                 {% if r.deep_link and r.deep_link.meeting %}

@@ -1,29 +1,32 @@
-{% macro site_crests(
-    logo=hibs_racing_logo|default('badge_hibs_racing_oval.png'),
-    svg=hibs_badge_primary|default('logo_hibs_racing.svg'),
-    harp=hibs_badge_harp|default('badge_harp_embroidered.png'),
-    logo_height=52
-) %}
-<div class="site-crest-wrap" role="img" aria-label="hibs-racing">
-    <img id="site-crest-primary" src="{{ url_for('static', filename=logo) }}" alt="Hibs Racing" class="site-crest site-crest-oval" height="{{ logo_height }}" width="{{ logo_height }}" decoding="async">
-    <img src="{{ url_for('static', filename=harp) }}" alt="" class="site-crest site-crest-harp site-crest-harp-mini" width="28" height="28" aria-hidden="true" decoding="async">
+{# HIBS — Harvested Intelligent Betting System (unified logo, football + racing). #}
+{% macro harvested_logo_link(home_url='/', height=56, file=hibs_harvested_logo|default('hibs_harvested_logo.png'), css_class='') %}
+<a href="{{ home_url }}" class="hibs-harvested-logo-link {{ css_class }}" title="HIBS — Harvested Intelligent Betting System">
+    <img src="{{ url_for('static', filename=file) }}" alt="HIBS — Harvested Intelligent Betting System" class="hibs-harvested-logo" height="{{ height }}" decoding="async">
+</a>
+{% endmacro %}
+
+{% macro site_crests(height=56, file=hibs_harvested_logo|default('hibs_harvested_logo.png')) %}
+<div class="site-crest-wrap" role="img" aria-label="HIBS">
+    <img src="{{ url_for('static', filename=file) }}" alt="HIBS" class="hibs-harvested-logo hibs-header-logo" height="{{ height }}" decoding="async">
 </div>
 {% endmacro %}
 
-{% macro footer_crest(file=hibs_badge_harp|default('badge_harp_embroidered.png')) %}
-<img src="{{ url_for('static', filename=file) }}" alt="" class="footer-crest" width="18" height="18" aria-hidden="true">
+{% macro footer_crest(file=hibs_harvested_logo|default('hibs_harvested_logo.png'), height=22) %}
+<img src="{{ url_for('static', filename=file) }}" alt="" class="footer-crest" height="{{ height }}" aria-hidden="true" decoding="async">
 {% endmacro %}
 
-{% macro heritage_strip(size=22) %}
-<div class="hibs-heritage-strip" aria-hidden="true">
-    <img src="{{ url_for('static', filename=hibs_badge_harp|default('badge_harp_embroidered.png')) }}" alt="" width="{{ size }}" height="{{ size }}" title="Golden harp">
-</div>
+{% macro launch_crest(file=hibs_harvested_logo|default('hibs_harvested_logo.png'), height=120) %}
+<img class="hibs-launch-crest hibs-harvested-logo" src="{{ url_for('static', filename=file) }}" alt="HIBS" height="{{ height }}" decoding="async">
+{% endmacro %}
+
+{% macro brand_logo_watermark(logo=hibs_harvested_logo|default('hibs_harvested_logo.png'), modifier='') %}
+<div class="brand-logo-watermark {{ modifier }}" aria-hidden="true" style="background-image:url('{{ url_for('static', filename=logo) }}');"></div>
 {% endmacro %}
 
 {% macro brand_horse_watermark(horse=hibs_hero_horse|default('hero_horse.png'), modifier='') %}
 <div class="brand-horse-watermark {{ modifier }}" aria-hidden="true" style="background-image:url('{{ url_for('static', filename=horse) }}');"></div>
 {% endmacro %}
 
-{% macro brand_logo_watermark(logo=hibs_racing_logo|default('badge_hibs_racing_oval.png'), modifier='') %}
-<div class="brand-logo-watermark {{ modifier }}" aria-hidden="true" style="background-image:url('{{ url_for('static', filename=logo) }}');"></div>
+{% macro heritage_strip(size=22) %}
+{# Legacy macro — no-op; unified HIBS logo replaces heritage crest strip. #}
 {% endmacro %}
