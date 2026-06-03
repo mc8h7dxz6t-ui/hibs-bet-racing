@@ -33,9 +33,14 @@ class HealthStatus:
     betfair_enabled: bool
     betfair_configured: bool
     analytics_mode: bool
+    config_hash: str | None = None
+    engine_profile: dict | None = None
+    paper_recon_clean: bool | None = None
+    manifest_id: str | None = None
+    snapshot_coverage_pct: float | None = None
 
     def to_dict(self) -> dict:
-        return {
+        out = {
             "db_ok": self.db_ok,
             "runners_loaded": self.runners_loaded,
             "scores_loaded": self.scores_loaded,
@@ -47,6 +52,17 @@ class HealthStatus:
             "betfair_configured": self.betfair_configured,
             "analytics_mode": self.analytics_mode,
         }
+        if self.config_hash is not None:
+            out["config_hash"] = self.config_hash
+        if self.engine_profile is not None:
+            out["engine_profile"] = self.engine_profile
+        if self.paper_recon_clean is not None:
+            out["paper_recon_clean"] = self.paper_recon_clean
+        if self.manifest_id is not None:
+            out["manifest_id"] = self.manifest_id
+        if self.snapshot_coverage_pct is not None:
+            out["snapshot_coverage_pct"] = self.snapshot_coverage_pct
+        return out
 
 
 def _env_ok(*keys: str) -> bool:
@@ -57,7 +73,15 @@ def _env_ok(*keys: str) -> bool:
 
 
 def health_status() -> HealthStatus:
-    db = db_path(load_config())
+    from datetime import datetime, timedelta, timezone
+
+    from hibs_racing.backtest.snapshot_store import scoring_config_hash, snapshot_coverage
+    from hibs_racing.cards.engine_profile import build_engine_profile
+    from hibs_racing.institutional.paper_reconciliation import reconcile_paper_ledger
+    from hibs_racing.institutional.run_manifest import latest_manifest_for_date
+
+    cfg = load_config()
+    db = db_path(cfg)
     init_db(db)
     runners = load_upcoming_runners(db)
     scores = 0
@@ -69,6 +93,18 @@ def health_status() -> HealthStatus:
         raceform = str(Path(raceform).expanduser())
         if not Path(raceform).exists():
             raceform = None
+    today = datetime.now(timezone.utc).date().isoformat()
+    end_dt = datetime.now(timezone.utc).date()
+    start_dt = (end_dt - timedelta(days=7)).isoformat()
+    cov = snapshot_coverage(db, start_dt, end_dt.isoformat())
+    manifest = latest_manifest_for_date(today, database=db)
+    recon_clean = None
+    if runners is not None and len(runners) > 0:
+        try:
+            recon = reconcile_paper_ledger(today, database=db)
+            recon_clean = recon.is_clean
+        except Exception:
+            recon_clean = None
     return HealthStatus(
         db_ok=db.exists(),
         runners_loaded=len(runners),
@@ -80,6 +116,11 @@ def health_status() -> HealthStatus:
         betfair_enabled=betfair_enabled(),
         betfair_configured=betfair_configured(),
         analytics_mode=True,
+        config_hash=scoring_config_hash(),
+        engine_profile=build_engine_profile(cfg),
+        paper_recon_clean=recon_clean,
+        manifest_id=manifest.manifest_id if manifest else None,
+        snapshot_coverage_pct=cov.get("coverage_pct"),
     )
 
 

@@ -199,21 +199,34 @@ def refresh_cards(
 
     paper_bets = 0
     recon_clean = True
+    recon_by_date: list[dict] = []
     paper_enabled = paper or bool(load_config().get("paper", {}).get("log_on_refresh", True))
-    if paper_enabled and "value_flag" in scored.columns and primary_date:
+    if paper_enabled and "value_flag" in scored.columns and "card_date" in scored.columns:
         from hibs_racing.institutional.paper_reconciliation import sync_paper_ledger_to_scored
 
         stake = float(load_config().get("paper", {}).get("default_stake", 1.0))
-        recon = sync_paper_ledger_to_scored(
-            scored,
-            card_date=str(primary_date),
-            stake=stake,
-            manifest_id=manifest_id,
-            odds_source=str(odds_meta.get("source")),
-            engine_profile=engine_profile,
-        )
-        paper_bets = recon.expected_value_picks
-        recon_clean = recon.is_clean
+        for card_date in sorted(scored["card_date"].dropna().astype(str).unique()):
+            day_scored = scored[scored["card_date"].astype(str) == card_date]
+            if day_scored.empty:
+                continue
+            recon = sync_paper_ledger_to_scored(
+                day_scored,
+                card_date=str(card_date),
+                stake=stake,
+                manifest_id=manifest_id,
+                odds_source=str(odds_meta.get("source")),
+                engine_profile=engine_profile,
+            )
+            paper_bets += recon.expected_value_picks
+            recon_clean = recon_clean and recon.is_clean
+            recon_by_date.append(
+                {
+                    "card_date": str(card_date),
+                    "expected": recon.expected_value_picks,
+                    "ledger": recon.ledger_value_picks,
+                    "clean": recon.is_clean,
+                }
+            )
 
     timings["total_ms"] = round(sum(timings.values()), 1)
 
@@ -237,6 +250,7 @@ def refresh_cards(
         "window_hours": window_hours,
         "paper_bets_logged": paper_bets,
         "paper_recon_clean": recon_clean,
+        "paper_recon_by_date": recon_by_date,
         "manifest_id": manifest_id,
         "shadow_intents": shadow_count,
         "engine_profile": engine_profile,

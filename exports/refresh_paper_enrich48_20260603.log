@@ -1,0 +1,64 @@
+
+[notice] A new release of pip is available: 26.1.1 -> 26.1.2
+[notice] To update, run: pip install --upgrade pip
+Note: no EMAIL/ACCESS_TOKEN in .env — RP may rate-limit. See README → rpscrape auth.
+
+[notice] A new release of pip is available: 26.1.1 -> 26.1.2
+[notice] To update, run: pip install --upgrade pip
+Note: no EMAIL/ACCESS_TOKEN in .env — RP may rate-limit. See README → rpscrape auth.
+{
+  "ok": true,
+  "runners": 303,
+  "races": 31,
+  "meetings": 5,
+  "card_dates": [
+    "2026-06-03"
+  ],
+  "regions": [
+    "GB",
+    "IRE"
+  ],
+  "source": "racing_api",
+  "odds_source": "matchbook",
+  "odds_runners": 0,
+  "value_flags": 25,
+  "value_gates_blocked": 61,
+  "enrich_matched": 283,
+  "enrich_rp_runners": 304,
+  "enrich_error": null,
+  "scoring_method": "ranker",
+  "window_hours": 24,
+  "paper_bets_logged": 25,
+  "paper_recon_clean": true,
+  "manifest_id": "4bf9b199387a4ab0",
+  "shadow_intents": 25,
+  "engine_profile": {
+    "ranker_tier": "enrich_48",
+    "ranker_feature_manifest": "lgbm_ranker_features_enrich.json",
+    "ranker_feature_count": 36,
+    "uses_enrich_booster": true,
+    "enrich_manifest_available": true,
+    "enrich_feature_count": 36,
+    "harville": {
+      "correction_env": "1",
+      "win_prob_threshold": 0.03,
+      "configured_discount": 0.85,
+      "effective_discount": 0.85,
+      "min_place_ev": 0.05,
+      "min_combo_bayes_place": 0.22,
+      "default_place_fraction": 0.25,
+      "default_places": 3
+    },
+    "warning": null
+  },
+  "config_hash": "6763fedf92f4b4ff",
+  "parallel_workers": 1,
+  "timings_ms": {
+    "fetch_ms": 1967.2,
+    "verdict_ms": 7.5,
+    "store_ms": 33.5,
+    "odds_ms": 417.7,
+    "score_ms": 18899.4,
+    "total_ms": 21325.3
+  }
+}

@@ -450,7 +450,10 @@ def create_app() -> Flask:
                 paper=paper_on_refresh,
             )
             monitor = monitor_snapshot(refresh=False, settle=True)
-            return jsonify({"ok": True, **stats, "monitor": monitor})
+            payload = {"ok": True, **stats, "monitor": monitor}
+            if paper_on_refresh and not stats.get("paper_recon_clean", True):
+                return jsonify(payload), 503
+            return jsonify(payload)
         except Exception as exc:
             return jsonify({"ok": False, "error": str(exc)}), 500
 

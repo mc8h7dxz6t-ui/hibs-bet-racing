@@ -1,0 +1,181 @@
+{
+  "start": "2026-03-04",
+  "end": "2026-06-02",
+  "card_days": 78,
+  "races": 3226,
+  "runners": 27881,
+  "none": {
+    "picks": 7686,
+    "settled": 7686,
+    "hit_rate": 0.2598230549050221,
+    "roi_pct": -5.389514328697585,
+    "pnl_units": -414.23807130369636
+  },
+  "gate1": {
+    "picks": 5440,
+    "settled": 5440,
+    "hit_rate": 0.2801470588235294,
+    "roi_pct": -5.038743196142093,
+    "pnl_units": -274.10762987012987
+  },
+  "gate2": {
+    "picks": 2442,
+    "settled": 2442,
+    "hit_rate": 0.34111384111384113,
+    "roi_pct": 48.48911411411411,
+    "pnl_units": 1184.1041666666665
+  },
+  "production": {
+    "picks": 2442,
+    "settled": 2442,
+    "hit_rate": 0.34111384111384113,
+    "roi_pct": 48.48911411411411,
+    "pnl_units": 1184.1041666666665
+  },
+  "delta_gate1_vs_none": {
+    "pick_change": -2246,
+    "hit_rate_change_pp": 2.0324003918507305,
+    "roi_change_pp": 0.35077113255549186,
+    "pnl_change_units": 140.1304414335665
+  },
+  "delta_gate2_vs_gate1": {
+    "pick_change": -2998,
+    "hit_rate_change_pp": 6.096678229031172,
+    "roi_change_pp": 53.5278573102562,
+    "pnl_change_units": 1458.2117965367963
+  },
+  "delta_gate2_vs_none": {
+    "pick_change": -5244,
+    "hit_rate_change_pp": 8.129078620881902,
+    "roi_change_pp": 53.878628442811696,
+    "pnl_change_units": 1598.342237970363
+  },
+  "delta_production_vs_none": {
+    "pick_change": -5244,
+    "hit_rate_change_pp": 8.129078620881902,
+    "roi_change_pp": 53.878628442811696,
+    "pnl_change_units": 1598.342237970363
+  },
+  "delta_production_vs_gate2": {
+    "pick_change": 0,
+    "hit_rate_change_pp": 0.0,
+    "roi_change_pp": 0.0,
+    "pnl_change_units": 0.0
+  },
+  "blocked_reasons_gate1": {
+    "missing_or": 2024,
+    "below_or_floor": 222
+  },
+  "blocked_reasons_gate2": {
+    "missing_or": 2024,
+    "gate2_race_cap": 1483,
+    "gate2_meeting_cap": 1050,
+    "gate2_price_fragile": 263,
+    "below_or_floor": 222,
+    "gate2_regime_combo": 169,
+    "gate2_regime_ev": 33
+  },
+  "blocked_reasons_production": {
+    "missing_or": 2024,
+    "gate2_race_cap": 1483,
+    "gate2_meeting_cap": 1050,
+    "gate2_price_fragile": 263,
+    "below_or_floor": 222,
+    "gate2_regime_combo": 169,
+    "gate2_regime_ev": 33
+  },
+  "snapshot_source": "snapshots",
+  "message": "Benchmark 2026-03-04 \u2192 2026-06-02 [snapshots]: none=7686 picks, gate1=5440, gate2=2442, production=2442.",
+  "slippage": {
+    "0bps": {
+      "none": {
+        "picks": 7686,
+        "settled": 7686,
+        "hit_rate": 0.2598230549050221,
+        "roi_pct": -5.389514328697585,
+        "pnl_units": -414.23807130369636
+      },
+      "gate1": {
+        "picks": 5440,
+        "settled": 5440,
+        "hit_rate": 0.2801470588235294,
+        "roi_pct": -5.038743196142093,
+        "pnl_units": -274.10762987012987
+      },
+      "gate2": {
+        "picks": 2442,
+        "settled": 2442,
+        "hit_rate": 0.34111384111384113,
+        "roi_pct": 48.48911411411411,
+        "pnl_units": 1184.1041666666665
+      },
+      "production": {
+        "picks": 2442,
+        "settled": 2442,
+        "hit_rate": 0.34111384111384113,
+        "roi_pct": 48.48911411411411,
+        "pnl_units": 1184.1041666666665
+      }
+    },
+    "25bps": {
+      "none": {
+        "picks": 7681,
+        "settled": 7681,
+        "hit_rate": 0.2599921885171202,
+        "roi_pct": -5.54023289448556,
+        "pnl_units": -425.54528862543583
+      },
+      "gate1": {
+        "picks": 5436,
+        "settled": 5436,
+        "hit_rate": 0.2803532008830022,
+        "roi_pct": -5.180162082329928,
+        "pnl_units": -281.5936107954549
+      },
+      "gate2": {
+        "picks": 2441,
+        "settled": 2441,
+        "hit_rate": 0.34125358459647687,
+        "roi_pct": 48.210563037689575,
+        "pnl_units": 1176.8198437500025
+      },
+      "production": {
+        "picks": 2441,
+        "settled": 2441,
+        "hit_rate": 0.34125358459647687,
+        "roi_pct": 48.210563037689575,
+        "pnl_units": 1176.8198437500025
+      }
+    },
+    "50bps": {
+      "none": {
+        "picks": 7677,
+        "settled": 7677,
+        "hit_rate": 0.25999739481568324,
+        "roi_pct": -5.732618613353907,
+        "pnl_units": -440.0931309471794
+      },
+      "gate1": {
+        "picks": 5433,
+        "settled": 5433,
+        "hit_rate": 0.28032394625437146,
+        "roi_pct": -5.3804567774853576,
+        "pnl_units": -292.32021672077946
+      },
+      "gate2": {
+        "picks": 2441,
+        "settled": 2441,
+        "hit_rate": 0.34125358459647687,
+        "roi_pct": 47.87118069780143,
+        "pnl_units": 1168.5355208333328
+      },
+      "production": {
+        "picks": 2441,
+        "settled": 2441,
+        "hit_rate": 0.34125358459647687,
+        "roi_pct": 47.87118069780143,
+        "pnl_units": 1168.5355208333328
+      }
+    }
+  }
+}

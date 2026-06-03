@@ -41,5 +41,9 @@ run_logged "daily-notify" \
 run_logged "daily-log-retention" \
   hibs-racing retain-logs || true
 
+PRIMARY_DATE="$(date -u +%F)"
+run_logged "daily-institutional-check" \
+  hibs-racing institutional-check --days 14 --card-date "${PRIMARY_DATE}" --require-recon-clean
+
 echo "Daily refresh completed successfully."
 echo "Public track record: /tracker (paper bets logged: see refresh-cards --paper)"

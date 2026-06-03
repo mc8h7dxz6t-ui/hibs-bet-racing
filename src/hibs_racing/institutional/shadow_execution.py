@@ -19,7 +19,7 @@ def log_shadow_intents(
     *,
     manifest_id: str | None = None,
     venue: str = "shadow",
-    strategy_id: str = "HIBS_RACING_GATE1",
+    strategy_id: str = "HIBS_RACING_PRODUCTION",
     database: Path | None = None,
 ) -> list[BetIntent]:
     """Record BetIntent-shaped shadow rows for value picks — no broker routing."""

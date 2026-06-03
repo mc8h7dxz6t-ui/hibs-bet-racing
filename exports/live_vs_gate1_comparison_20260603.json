@@ -1,0 +1,26 @@
+{
+  "date": "2026-06-03",
+  "refresh": {
+    "runners": 303,
+    "races": 31,
+    "engine": "enrich_48",
+    "config_hash": "6763fedf92f4b4ff",
+    "value_flags_after_gates": 25,
+    "value_gates_blocked": 61,
+    "paper_bets_logged": 25,
+    "paper_recon_clean": true,
+    "odds_source": "matchbook"
+  },
+  "prior_session_reference": {
+    "note": "Manual refresh after gate1-only NA fix (pre-gate2, base_36 ranker)",
+    "value_flags": 65,
+    "paper_bets_logged": 65,
+    "card_scope": "fuller 24h GB+IRE window"
+  },
+  "paper_ledger_recent_days": {
+    "2026-06-03": 25,
+    "2026-06-02": 16,
+    "2026-06-01": 48
+  },
+  "interpretation": "Fewer picks vs ~65: production gate2+caps + enrich rescoring; smaller card (303 runners) also reduces pool."
+}

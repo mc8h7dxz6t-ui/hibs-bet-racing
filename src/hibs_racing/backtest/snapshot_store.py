@@ -89,8 +89,19 @@ _CONFIG_HASH_KEYS: tuple[str, ...] = (
 )
 
 
+def _model_version_stamp(cfg: dict) -> str:
+    """Ranker artifact identity — snapshots must not mix scores across retrains."""
+    model_dir = Path(cfg.get("paths", {}).get("model_dir", "data/models"))
+    ranker = cfg.get("ranker", {})
+    model_file = str(ranker.get("model_file", "lgbm_ranker.txt"))
+    path = model_dir / model_file if not Path(model_file).is_absolute() else Path(model_file)
+    if path.exists():
+        return f"{model_file}:{int(path.stat().st_mtime)}"
+    return model_file
+
+
 def scoring_config_hash(paper_cfg: dict | None = None) -> str:
-    """Stable hash of paper config fields that affect scoring and gates."""
+    """Stable hash of paper gates, Harville, and ranker manifest that affect scoring replay."""
     full = load_config()
     cfg = paper_cfg if paper_cfg is not None else full.get("paper", {})
     subset: dict[str, Any] = {}
@@ -100,6 +111,15 @@ def scoring_config_hash(paper_cfg: dict | None = None) -> str:
     hv = harville_runtime_config(full)
     subset["harville_effective_discount"] = hv["effective_discount"]
     subset["harville_correction_env"] = hv["correction_env"]
+    subset["model_version"] = _model_version_stamp(full)
+    try:
+        from hibs_racing.ranker_features import ranker_feature_profile
+
+        profile = ranker_feature_profile(full)
+        subset["ranker_manifest"] = profile.get("feature_manifest")
+        subset["uses_enrich_booster"] = profile.get("uses_enrich")
+    except Exception:
+        pass
     payload = json.dumps(subset, sort_keys=True, default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
@@ -155,7 +175,7 @@ def merge_upcoming_enrich(db: Path, day: pd.DataFrame, card_date: str) -> pd.Dat
                 conn,
                 params=(str(card_date),),
             )
-        except Exception:
+        except (OSError, ValueError):
             return day
     if up.empty:
         return day

@@ -14,6 +14,29 @@ from hibs_racing.institutional.contracts import PaperReconciliationResult, Recon
 from hibs_racing.institutional.run_manifest import latest_manifest_for_date
 
 
+def _emit_recon_ledger_event(
+    recon: PaperReconciliationResult,
+    *,
+    manifest_id: str | None,
+    database: Path,
+) -> None:
+    from hibs_racing.institutional.ledger_events import append_ledger_event
+
+    event_type = "recon_pass" if recon.is_clean else "recon_fail"
+    append_ledger_event(
+        event_type=event_type,
+        manifest_id=manifest_id or recon.manifest_id,
+        payload={
+            "card_date": recon.card_date,
+            "expected_value_picks": recon.expected_value_picks,
+            "ledger_value_picks": recon.ledger_value_picks,
+            "missing_in_ledger": recon.missing_in_ledger[:20],
+            "extra_in_ledger": recon.extra_in_ledger[:20],
+        },
+        database=database,
+    )
+
+
 def _expected_value_runners_from_snapshots(
     db: Path,
     card_date: str,
@@ -23,8 +46,8 @@ def _expected_value_runners_from_snapshots(
     snap = load_snapshots_for_card(db, card_date, config_hash=cfg_hash)
     if snap.empty:
         return set()
-    g1 = _apply_gate_flags(snap, paper_cfg)
-    return set(g1.loc[g1["flag_gate1"] == 1, "runner_id"].astype(str).tolist())
+    gated = _apply_gate_flags(snap, paper_cfg)
+    return set(gated.loc[gated["flag_production"] == 1, "runner_id"].astype(str).tolist())
 
 
 def _ledger_value_runners(db: Path, card_date: str) -> set[str]:
@@ -114,7 +137,9 @@ def sync_paper_ledger_to_scored(
             odds_source=odds_source,
             engine_profile=engine_profile,
         )
-    return reconcile_paper_ledger_from_scores(scored, card_date=card_date, database=db)
+    final = reconcile_paper_ledger_from_scores(scored, card_date=card_date, database=db)
+    _emit_recon_ledger_event(final, manifest_id=manifest_id, database=db)
+    return final
 
 
 def _load_live_scored_card(db: Path, card_date: str) -> pd.DataFrame:
@@ -139,7 +164,7 @@ def reconcile_paper_ledger(
 ) -> PaperReconciliationResult:
     """
     Independent truth check: live card_scores vs paper_bets when card is in DB,
-    else snapshot-derived Gate1 picks for historical dates.
+    else snapshot-derived production picks for historical dates.
     """
     cfg = load_config()
     db = database or db_path(cfg)
@@ -181,7 +206,7 @@ def reconcile_paper_ledger(
             )
 
     is_clean = not missing and not extra
-    return PaperReconciliationResult(
+    result = PaperReconciliationResult(
         is_clean=is_clean,
         manifest_id=manifest.manifest_id if manifest else None,
         card_date=card_date,
@@ -192,6 +217,8 @@ def reconcile_paper_ledger(
         field_mismatches=mismatches,
         discrepancies=mismatches,
     )
+    _emit_recon_ledger_event(result, manifest_id=manifest.manifest_id if manifest else None, database=db)
+    return result
 
 
 def reconcile_paper_ledger_from_scores(

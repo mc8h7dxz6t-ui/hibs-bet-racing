@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -44,6 +45,8 @@ def run_institutional_check(
 ) -> InstitutionalCheckReport:
     cfg = load_config()
     db = database or db_path(cfg)
+    if card_date is None:
+        card_date = datetime.now(timezone.utc).date().isoformat()
     end_dt = datetime.now(timezone.utc).date()
     start_dt = end_dt - timedelta(days=days)
     start_s = start_dt.isoformat()
@@ -74,10 +77,15 @@ def run_institutional_check(
     )
     if profile.get("warning"):
         detail = f"{detail} — {profile['warning']}"
+    production_mode = os.environ.get("HIBS_RACING_PRODUCTION", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
     checks.append(
         {
             "name": "ranker_profile",
-            "passed": True,
+            "passed": not profile.get("warning") if production_mode else True,
             "detail": detail,
         }
     )

@@ -464,6 +464,8 @@ def cmd_refresh_cards(args: argparse.Namespace) -> int:
         print(json.dumps({"ok": False, "error": str(exc)}, indent=2), file=sys.stderr)
         return 1
     print(json.dumps({"ok": True, **stats}, indent=2))
+    if args.paper and not stats.get("paper_recon_clean", True):
+        return 1
     return 0
 
 
@@ -913,7 +915,7 @@ def main(argv: list[str] | None = None) -> int:
     p_ic.add_argument("--require-recon-clean", action="store_true")
     p_ic.set_defaults(func=cmd_institutional_check)
 
-    p_rp = sub.add_parser("reconcile-paper", help="Reconcile paper_bets vs Gate1 picks")
+    p_rp = sub.add_parser("reconcile-paper", help="Reconcile paper_bets vs production value picks")
     p_rp.add_argument("--card-date", required=True, help="Card date YYYY-MM-DD")
     p_rp.add_argument(
         "--sync",

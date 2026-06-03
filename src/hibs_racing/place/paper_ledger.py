@@ -653,11 +653,40 @@ def record_paper_bet(
     init_db(db)
     with connect(db) as conn:
         existing = conn.execute(
-            "SELECT bet_id FROM paper_bets WHERE runner_id = ? AND race_id = ? AND backtest = ? LIMIT 1",
+            """
+            SELECT bet_id, is_value_pick FROM paper_bets
+            WHERE runner_id = ? AND race_id = ? AND backtest = ?
+            LIMIT 1
+            """,
             (runner_id, race_id, 1 if backtest else 0),
         ).fetchone()
         if existing:
-            return str(existing[0])
+            bet_id = str(existing[0])
+            if is_value_pick and not int(existing[1] or 0):
+                now = created_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+                vhash = bet_verification_hash(bet_id, now, runner_id, offered_win, stake_units)
+                conn.execute(
+                    """
+                    UPDATE paper_bets SET
+                        is_value_pick = 1,
+                        model_ev = COALESCE(?, model_ev),
+                        offered_win = COALESCE(?, offered_win),
+                        offered_place = COALESCE(?, offered_place),
+                        place_terms = COALESCE(?, place_terms),
+                        verification_hash = ?
+                    WHERE bet_id = ?
+                    """,
+                    (
+                        model_ev,
+                        offered_win,
+                        offered_place,
+                        place_terms,
+                        vhash,
+                        bet_id,
+                    ),
+                )
+                conn.commit()
+            return bet_id
 
     bet_id = str(uuid.uuid4())
     now = created_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -710,6 +739,10 @@ def record_paper_bet(
                 payload=payload,
                 database=db,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "bet_placed ledger event failed for %s: %s", bet_id, exc
+            )
     return bet_id

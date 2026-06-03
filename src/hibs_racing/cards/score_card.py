@@ -200,8 +200,16 @@ def _persist_runner_odds(db: Path, frame: pd.DataFrame) -> None:
 
 def _persist_scores(db: Path, frame: pd.DataFrame, scored_at: str) -> None:
     init_db(db)
+    runner_ids = frame["runner_id"].astype(str).tolist() if "runner_id" in frame.columns else []
     with connect(db) as conn:
-        conn.execute("DELETE FROM card_scores")
+        if runner_ids:
+            placeholders = ",".join("?" * len(runner_ids))
+            conn.execute(
+                f"DELETE FROM card_scores WHERE runner_id IN ({placeholders})",
+                runner_ids,
+            )
+        else:
+            conn.execute("DELETE FROM card_scores")
         for rec in frame.to_dict(orient="records"):
             conn.execute(
                 """
