@@ -79,14 +79,14 @@ paper:
   max_form_poor_runs_3: 3              # block when ≥3 poor codes in form (PU/F/UR…) last 3
   min_trainer_rtf: null                # optional e.g. 8 — cold yard gate
   snapshots:
-    persist_on_score: false            # true: write scored_runner_snapshots on each card score
+    persist_on_score: true             # replay snapshots on web score-card + refresh
   slippage_stress_bps: [0, 25, 50]     # benchmark-gates slippage stress lanes
   regression:
     min_card_days: 7
     min_gate1_roi_delta_pp: 0.0        # CI: gate1 ROI must be >= none by this margin
     min_gate1_hit_rate_delta_pp: 0.0
   gate2:
-    enabled: false                     # optional stricter post-filter (set true to activate)
+    enabled: true                      # production: gate1 (DQ/steam/OR) + gate2 regime/caps
     min_confidence: 0.55               # data completeness confidence (0..1)
     small_field_max: 7
     large_field_min: 12

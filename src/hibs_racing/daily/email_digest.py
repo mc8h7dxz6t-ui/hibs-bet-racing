@@ -219,7 +219,7 @@ def format_email_digest_html(payload: dict[str, Any]) -> str:
   <header style="margin-bottom:1em;">
     <h1 style="margin:0;color:#7cfc00;">Hibs Racing — Smart Portfolio</h1>
     <p style="margin:0.35em 0;color:#94a3b8;">Card: {dates} · Generated UTC {generated}</p>
-    <p style="margin:0.35em 0;font-size:0.9em;">{payload.get('pick_count', 0)} picks from {payload.get('candidate_count', 0)} candidates · DQ≥75% · value + steam gates</p>
+    <p style="margin:0.35em 0;font-size:0.9em;">{payload.get('pick_count', 0)} picks from {payload.get('candidate_count', 0)} candidates · gate1 (DQ/steam) + gate2 (regime/caps)</p>
   </header>
   {body}
   <footer style="margin-top:1.5em;font-size:0.85em;color:#64748b;">

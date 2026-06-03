@@ -118,7 +118,7 @@ def format_digest_message(payload: dict[str, Any], *, product_name: str = "Hibs 
         "",
     ]
     if not picks:
-        lines.append("No value picks passed filters today (value + DQ≥75% + steam gate).")
+        lines.append("No value picks passed filters today (value + DQ + steam + gate2).")
         lines.append("Tracker: /tracker")
     else:
         for i, pick in enumerate(picks, start=1):
