@@ -43,6 +43,7 @@ def resolve_scoring_odds(
         odds, report = fetch_matchbook_odds(cards, config_path=config_path)
         meta["source"] = "matchbook"
         meta["report"] = report.to_dict()
+        meta["runners_priced"] = report.runners_priced
         return odds if not odds.empty else None, meta
 
     if source in ("oddschecker", "oc"):

@@ -413,12 +413,47 @@ def cmd_feature_importance(args: argparse.Namespace) -> int:
 def cmd_poll_odds(args: argparse.Namespace) -> int:
     from hibs_racing.odds.market_steam import poll_matchbook_odds_once, run_matchbook_poll_loop
 
+    milestone = getattr(args, "milestone", None) or "pre_race_30m"
     if args.once:
-        report = poll_matchbook_odds_once()
-        print(json.dumps(report.to_dict(), indent=2))
+        report = poll_matchbook_odds_once(poll_milestone=milestone)
+        print(json.dumps({**report.to_dict(), "poll_milestone": milestone}, indent=2))
         return 0 if not report.errors or report.runners_priced > 0 else 1
     run_matchbook_poll_loop(interval_seconds=args.interval, max_cycles=args.max_cycles)
     return 0
+
+
+def cmd_dry_run_quotes(_: argparse.Namespace) -> int:
+    from hibs_racing.odds.exchange_quotes import dry_run_exchange_quotes
+
+    result = dry_run_exchange_quotes()
+    print(json.dumps(result, indent=2))
+    return 0 if result.get("ok") else 1
+
+
+def cmd_join_execution_slippage(args: argparse.Namespace) -> int:
+    from hibs_racing.odds.exchange_quotes import join_sp_to_value_picks
+
+    dates = None
+    if getattr(args, "card_dates", None):
+        dates = [d.strip() for d in args.card_dates.split(",") if d.strip()]
+    result = join_sp_to_value_picks(card_dates=dates, days=getattr(args, "days", None))
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def cmd_weekly_gate_efficacy(args: argparse.Namespace) -> int:
+    from datetime import date as date_cls
+
+    from hibs_racing.institutional.weekly_gate_efficacy import append_weekly_report, build_weekly_report
+
+    ended = getattr(args, "week_ended", None)
+    week_ended = date_cls.fromisoformat(ended) if ended else date_cls.today()
+    if not getattr(args, "no_append", False):
+        payload = append_weekly_report(week_ended=week_ended)
+    else:
+        payload = build_weekly_report(week_ended=week_ended)
+    print(json.dumps(payload, indent=2, default=str))
+    return 0 if payload.get("ok") else 1
 
 
 def cmd_route_execution(args: argparse.Namespace) -> int:
@@ -459,6 +494,7 @@ def cmd_refresh_cards(args: argparse.Namespace) -> int:
             regions=tuple(r.strip().lower() for r in args.regions.split(",") if r.strip()),
             paper=args.paper,
             parallel_workers=getattr(args, "workers", None),
+            poll_milestone=getattr(args, "poll_milestone", None),
         )
     except Exception as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, indent=2), file=sys.stderr)
@@ -641,9 +677,12 @@ def cmd_fetch_odds(args: argparse.Namespace) -> int:
 
 
 def cmd_settle_paper(_: argparse.Namespace) -> int:
+    from hibs_racing.odds.exchange_quotes import join_sp_to_value_picks
     from hibs_racing.place.paper_ledger import settle_paper_bets
 
     result = settle_paper_bets()
+    slippage = join_sp_to_value_picks(days=14)
+    result["execution_slippage_join"] = slippage
     print(json.dumps(result, indent=2))
     return 0
 
@@ -983,7 +1022,34 @@ def main(argv: list[str] | None = None) -> int:
     p_poll.add_argument("--once", action="store_true", help="Single poll cycle")
     p_poll.add_argument("--interval", type=int, default=120, help="Seconds between polls")
     p_poll.add_argument("--max-cycles", type=int, help="Stop after N cycles (default: infinite)")
+    p_poll.add_argument(
+        "--milestone",
+        default="pre_race_30m",
+        help="Poll label stored in exchange_quotes (e.g. pre_race_30m, baseline)",
+    )
     p_poll.set_defaults(func=cmd_poll_odds)
+
+    p_drq = sub.add_parser(
+        "dry-run-quotes",
+        help="Fetch Matchbook quotes for upcoming cards and persist to exchange_quotes (no score)",
+    )
+    p_drq.set_defaults(func=cmd_dry_run_quotes)
+
+    p_join = sub.add_parser(
+        "join-execution-slippage",
+        help="Join official SP to value_pick_execution after results ingest",
+    )
+    p_join.add_argument("--days", type=int, default=14, help="Lookback days when --card-dates omitted")
+    p_join.add_argument("--card-dates", help="Comma-separated card dates (YYYY-MM-DD)")
+    p_join.set_defaults(func=cmd_join_execution_slippage)
+
+    p_wge = sub.add_parser(
+        "weekly-gate-efficacy",
+        help="Build weekly gate lane table (SP vs executed ROI) and append reports/weekly_gate_efficacy.md",
+    )
+    p_wge.add_argument("--week-ended", help="ISO week end date (default: today)")
+    p_wge.add_argument("--no-append", action="store_true", help="Print JSON only; do not append markdown")
+    p_wge.set_defaults(func=cmd_weekly_gate_efficacy)
 
     p_fc = sub.add_parser("fetch-cards", help="Fetch upcoming racecards (rpscrape or Racing API)")
     p_fc.add_argument("--day", type=int, default=1, help="Single day: 1=today, 2=tomorrow")
@@ -1023,6 +1089,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_refresh.add_argument("--paper", action="store_true", help="Log paper EW bets for value flags")
     p_refresh.add_argument("--workers", type=int, help="Parallel workers for fetch + RP verdict (default: config)")
+    p_refresh.add_argument(
+        "--poll-milestone",
+        help="exchange_quotes label (default: baseline via HIBS_POLL_MILESTONE or baseline)",
+    )
     p_refresh.set_defaults(func=cmd_refresh_cards)
 
     p_exec = sub.add_parser(

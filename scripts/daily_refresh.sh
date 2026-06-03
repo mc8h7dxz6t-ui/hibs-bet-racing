@@ -10,6 +10,14 @@ source "${SCRIPT_DIR}/_lib.sh"
 activate_venv
 load_env
 
+for arg in "$@"; do
+  if [[ "${arg}" == "--dry-run-quotes" ]]; then
+    echo "hibs-racing dry-run quotes (Matchbook → exchange_quotes)"
+    run_logged "dry-run-quotes" hibs-racing dry-run-quotes
+    exit $?
+  fi
+done
+
 LOOKBACK_DAYS="${HIBS_LOOKBACK_DAYS:-7}"
 START_DATE="$(lookback_date "${LOOKBACK_DAYS}")"
 RFDB="$(raceform_db)"
@@ -23,6 +31,8 @@ run_logged "daily-scrape-results" \
   hibs-racing scrape --days "${LOOKBACK_DAYS}" --region gb --ingest --from-cache || true
 # Prefer --from-cache on daily cron; live scrape uses rp_scrape_day_pause_sec pacing in config.
 
+export HIBS_POLL_MILESTONE=baseline
+
 run_logged "daily-refresh-cards" \
   hibs-racing refresh-cards \
     --source racing_api \
@@ -30,10 +40,14 @@ run_logged "daily-refresh-cards" \
     --regions gb,ire \
     --workers 1 \
     --odds-source "${HIBS_ODDS_SOURCE:-matchbook}" \
+    --poll-milestone baseline \
     --paper || true
 
 run_logged "daily-settle-paper" \
   hibs-racing settle-paper || true
+
+run_logged "daily-join-execution-slippage" \
+  hibs-racing join-execution-slippage --days 14 || true
 
 run_logged "daily-notify" \
   hibs-racing notify-daily --top "${HIBS_DAILY_PICKS_TOP:-3}" || true
@@ -47,3 +61,4 @@ run_logged "daily-institutional-check" \
 
 echo "Daily refresh completed successfully."
 echo "Public track record: /tracker (paper bets logged: see refresh-cards --paper)"
+echo "Exchange quotes: exchange_quotes table (baseline milestone on morning refresh)"

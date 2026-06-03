@@ -306,3 +306,41 @@ CREATE TABLE IF NOT EXISTS ledger_events (
 
 CREATE INDEX IF NOT EXISTS idx_ledger_events_type ON ledger_events (event_type, created_at);
 CREATE INDEX IF NOT EXISTS idx_ledger_events_manifest ON ledger_events (manifest_id);
+
+-- Exchange order-book snapshots (Matchbook back/lay + top-of-book liquidity)
+CREATE TABLE IF NOT EXISTS exchange_quotes (
+    runner_id               TEXT NOT NULL,
+    timestamp               TEXT NOT NULL,
+    odds_source             TEXT NOT NULL DEFAULT 'matchbook',
+    poll_milestone          TEXT NOT NULL DEFAULT 'intraday',
+    card_date               TEXT,
+    race_id                 TEXT,
+    back_price              REAL,
+    back_liquidity          REAL,
+    lay_price               REAL,
+    lay_liquidity           REAL,
+    exchange_spread_bps     REAL,
+    PRIMARY KEY (runner_id, timestamp)
+);
+
+CREATE INDEX IF NOT EXISTS idx_exchange_quotes_date ON exchange_quotes (card_date, poll_milestone);
+CREATE INDEX IF NOT EXISTS idx_exchange_quotes_runner ON exchange_quotes (runner_id, poll_milestone, timestamp);
+
+-- Post-race SP join for value picks (baseline / pre-race quotes vs official SP)
+CREATE TABLE IF NOT EXISTS value_pick_execution (
+    runner_id               TEXT NOT NULL,
+    card_date               TEXT NOT NULL,
+    race_id                 TEXT,
+    baseline_back           REAL,
+    baseline_ts             TEXT,
+    pre_race_30m_back       REAL,
+    pre_race_30m_ts         TEXT,
+    closing_sp              REAL,
+    sp_captured_at          TEXT,
+    slippage_bps            REAL,
+    spread_bps_at_baseline  REAL,
+    liquidity_at_baseline   REAL,
+    PRIMARY KEY (runner_id, card_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_value_pick_exec_date ON value_pick_execution (card_date);

@@ -447,7 +447,12 @@ def detect_steam_drift(
     return triggers, current
 
 
-def poll_matchbook_odds_once(*, persist: bool = True, pre_race_only: bool = True) -> PollCycleReport:
+def poll_matchbook_odds_once(
+    *,
+    persist: bool = True,
+    pre_race_only: bool = True,
+    poll_milestone: str = "pre_race_30m",
+) -> PollCycleReport:
     polled_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     report = PollCycleReport(polled_at=polled_at, runners_priced=0)
 
@@ -471,6 +476,11 @@ def poll_matchbook_odds_once(*, persist: bool = True, pre_race_only: bool = True
         report.errors.append(str(exc))
         return report
 
+    if "card_date" not in odds.columns:
+        odds = odds.merge(fetch_cards[["runner_id", "card_date", "race_id"]], on="runner_id", how="left")
+    from hibs_racing.odds.exchange_quotes import persist_exchange_quotes
+
+    persist_exchange_quotes(odds, poll_milestone=poll_milestone, polled_at=polled_at)
     history = append_odds_history(odds, polled_at=polled_at)
     prev = _load_state()
     triggers, current = detect_steam_drift(odds, previous=prev, history=history)

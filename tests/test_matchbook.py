@@ -7,6 +7,7 @@ from hibs_racing.odds.matchbook import (
     _match_event_to_race,
     _select_place_market,
     _select_win_market,
+    _top_of_book,
     fetch_matchbook_odds,
 )
 

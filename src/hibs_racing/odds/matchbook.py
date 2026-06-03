@@ -13,6 +13,7 @@ import pandas as pd
 from hibs_racing.config import load_config
 from hibs_racing.entity.natural_key import generate_natural_key
 from hibs_racing.entity.timezone import LONDON, matchbook_event_local_date, normalize_matchbook_time_to_london
+from hibs_racing.odds.exchange_quotes import exchange_spread_bps
 from hibs_racing.odds.matching import horse_names_match
 
 HORSE_RACING_SPORT_ID = 24735152712200
@@ -260,22 +261,55 @@ def _runner_by_horse_name(market: dict, horse_name: str | None) -> dict | None:
     return None
 
 
-def _best_back_price(runner: dict) -> float | None:
-    prices = runner.get("prices") or []
-    backs = [p for p in prices if str(p.get("side", "")).lower() == "back"]
-    if not backs:
+def _price_decimal(price: dict) -> float | None:
+    val = price.get("decimal-odds") or price.get("odds")
+    if val is None:
         return None
-    decimals: list[float] = []
-    for p in backs:
-        val = p.get("decimal-odds") or p.get("odds")
-        if val is not None:
-            try:
-                dec = float(val)
-                if dec > 1.0:
-                    decimals.append(dec)
-            except (TypeError, ValueError):
-                continue
-    return max(decimals) if decimals else None
+    try:
+        dec = float(val)
+    except (TypeError, ValueError):
+        return None
+    return dec if dec > 1.0 else None
+
+
+def _price_liquidity(price: dict) -> float | None:
+    for key in ("available-amount", "available_amount", "liquidity", "stake"):
+        val = price.get(key)
+        if val is None:
+            continue
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _top_of_book(runner: dict, side: str) -> tuple[float | None, float | None]:
+    """Best back (max decimal) or best lay (min decimal) with liquidity at that level."""
+    prices = runner.get("prices") or []
+    side_l = side.lower()
+    matching = [p for p in prices if str(p.get("side", "")).lower() == side_l]
+    if not matching:
+        return None, None
+    best_dec: float | None = None
+    best_liq: float | None = None
+    for p in matching:
+        dec = _price_decimal(p)
+        if dec is None:
+            continue
+        liq = _price_liquidity(p)
+        if side_l == "back":
+            if best_dec is None or dec > best_dec:
+                best_dec, best_liq = dec, liq
+        else:
+            if best_dec is None or dec < best_dec:
+                best_dec, best_liq = dec, liq
+    return best_dec, best_liq
+
+
+def _best_back_price(runner: dict) -> float | None:
+    back, _ = _top_of_book(runner, "back")
+    return back
 
 
 def _is_gb_ire_event(event: dict) -> bool:
@@ -418,9 +452,10 @@ def fetch_matchbook_odds(
                     break
             if mb_runner is None:
                 continue
-            back = _best_back_price(mb_runner)
+            back, back_liq = _top_of_book(mb_runner, "back")
             if back is None:
                 continue
+            lay, lay_liq = _top_of_book(mb_runner, "lay")
 
             place_runner = _runner_by_horse_name(place_market, horse) if place_market else None
             place_back = _best_back_price(place_runner) if place_runner else None
@@ -429,8 +464,14 @@ def fetch_matchbook_odds(
                 {
                     "race_id": race_id,
                     "runner_id": card_row.get("runner_id"),
+                    "card_date": card_date,
                     "horse_name": horse,
                     "win_decimal": back,
+                    "back_price": back,
+                    "back_liquidity": back_liq,
+                    "lay_price": lay,
+                    "lay_liquidity": lay_liq,
+                    "exchange_spread_bps": exchange_spread_bps(back, lay),
                     "place_decimal": place_back,
                     "best_book": "matchbook",
                     "matchbook_runner_id": mb_runner.get("id"),

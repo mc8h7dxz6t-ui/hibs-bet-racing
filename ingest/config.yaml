@@ -54,6 +54,7 @@ ranker:
   scoring_mode: auto  # auto | ranker | heuristic
   production_scoring_mode: ranker  # enforced when HIBS_RACING_PRODUCTION=1
 
+# Production stack: gate1 (DQ 75%, steam, OR/suitability) + gate2 (regime EV/combo, caps).
 paper:
   min_place_ev: 0.05
   min_combo_bayes_place: 0.22
@@ -147,6 +148,14 @@ oddschecker:
   default_place_fraction: 0.25
   default_places: 3
   request_pause_sec: 1.5
+
+exchange_profiling:
+  enabled: true
+  min_coverage_ratio: 0.80          # manifest warning if Matchbook prices < 80% of card
+  poll_milestones:
+    baseline: baseline                # daily_refresh.sh @ ~06:00
+    pre_race_30m: pre_race_30m        # scripts/intraday_poll_30m.sh
+  weekly_report_path: reports/weekly_gate_efficacy.md
 
 matchbook:
   enabled: true

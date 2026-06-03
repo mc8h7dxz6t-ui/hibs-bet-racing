@@ -274,6 +274,9 @@ def paper_log_value_picks(
                 "steam_gate": rec.get("steam_gate"),
                 "value_gate_reason": rec.get("value_gate_reason"),
                 "engine_profile": engine_profile,
+                "exchange_spread_bps": rec.get("exchange_spread_bps"),
+                "back_liquidity": rec.get("back_liquidity"),
+                "lay_price": rec.get("lay_price"),
             },
         )
         bet_ids.append(bet_id)

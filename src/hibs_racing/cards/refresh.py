@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+from datetime import datetime, timezone
 
 import pandas as pd
 
@@ -100,6 +101,7 @@ def refresh_cards(
     regions: tuple[str, ...] | None = None,
     paper: bool = False,
     parallel_workers: int | None = None,
+    poll_milestone: str | None = None,
 ) -> dict:
     workers = parallel_workers if parallel_workers is not None else _parallel_workers()
     timings: dict[str, float] = {}
@@ -148,10 +150,34 @@ def refresh_cards(
 
     (odds, odds_meta), timings["odds_ms"] = timed_ms(lambda: resolve_scoring_odds(cards, odds_source=odds_source))
 
+    milestone = poll_milestone or os.environ.get("HIBS_POLL_MILESTONE", "baseline")
+    polled_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    exchange_audit: dict = {"poll_milestone": milestone}
+
     if odds is not None and not odds.empty:
+        from hibs_racing.odds.exchange_quotes import persist_exchange_quotes, quote_coverage_ratio
         from hibs_racing.odds.market_steam import append_odds_history
 
-        append_odds_history(odds)
+        if "card_date" not in odds.columns:
+            odds = odds.merge(cards[["runner_id", "card_date", "race_id"]], on="runner_id", how="left")
+        append_odds_history(odds, polled_at=polled_at)
+        exchange_audit["persist"] = persist_exchange_quotes(
+            odds, poll_milestone=milestone, polled_at=polled_at
+        )
+        exchange_audit["coverage_ratio"] = quote_coverage_ratio(odds, card_runners=len(cards))
+        if "exchange_spread_bps" in odds.columns:
+            spreads = odds["exchange_spread_bps"].dropna()
+            if not spreads.empty:
+                exchange_audit["median_spread_bps"] = float(spreads.median())
+        report = odds_meta.get("report") or {}
+        exchange_audit["runners_priced"] = report.get("runners_priced", len(odds))
+        prof_cfg = load_config().get("exchange_profiling", {})
+        min_cov = float(prof_cfg.get("min_coverage_ratio", 0.80))
+        cov = exchange_audit.get("coverage_ratio")
+        if cov is not None and cov < min_cov:
+            exchange_audit["coverage_warning"] = (
+                f"Matchbook priced {cov:.0%} of card runners (floor {min_cov:.0%})"
+            )
 
     from hibs_racing.cards.engine_profile import build_engine_profile
 
@@ -185,6 +211,7 @@ def refresh_cards(
             "source": src,
             "timings_ms": timings,
             "engine_profile": engine_profile,
+            "exchange_audit": exchange_audit,
         },
     )
     manifest_id = persist_run_manifest(manifest)
@@ -227,6 +254,10 @@ def refresh_cards(
                     "clean": recon.is_clean,
                 }
             )
+        if milestone in ("baseline", "pre_race_30m"):
+            from hibs_racing.odds.exchange_quotes import sync_value_picks_from_scored
+
+            sync_value_picks_from_scored(scored, poll_milestone=milestone)
 
     timings["total_ms"] = round(sum(timings.values()), 1)
 
@@ -238,7 +269,9 @@ def refresh_cards(
         "regions": sorted(cards.get("region", pd.Series(dtype=str)).dropna().astype(str).str.upper().unique().tolist()),
         "source": src,
         "odds_source": odds_meta.get("source"),
-        "odds_runners": odds_meta.get("runners_priced", 0),
+        "odds_runners": exchange_audit.get("runners_priced")
+        or (odds_meta.get("report") or {}).get("runners_priced", 0),
+        "exchange_audit": exchange_audit,
         "value_flags": int((scored["value_flag"] == 1).sum()) if "value_flag" in scored.columns else 0,
         "value_gates_blocked": int(scored["value_gate_reason"].notna().sum())
         if "value_gate_reason" in scored.columns
