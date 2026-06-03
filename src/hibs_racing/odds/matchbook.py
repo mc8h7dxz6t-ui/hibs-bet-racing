@@ -1,20 +1,67 @@
 from __future__ import annotations
 
+import logging
 import os
+import re
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from datetime import time as dt_time
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 from hibs_racing.config import load_config
-from hibs_racing.entity.natural_key import generate_natural_key
+from hibs_racing.entity.natural_key import courses_match, generate_natural_key, normalize_course, normalize_off_time
 from hibs_racing.entity.timezone import LONDON, matchbook_event_local_date, normalize_matchbook_time_to_london
 from hibs_racing.odds.exchange_quotes import exchange_spread_bps
 from hibs_racing.odds.matching import horse_names_match
+
+logger = logging.getLogger(__name__)
+
+# Canonical slug → substrings to match in Matchbook event name / venue tags.
+COURSE_ALIASES: dict[str, list[str]] = {
+    "newton_abbot": ["newton abbot", "newton-abbot"],
+    "stratford": ["stratford-on-avon", "stratford on avon", "stratford"],
+    "fontwell": ["fontwell park", "fontwell"],
+    "leopardstown": ["leopardstown (ire)", "leopardstown"],
+    "newcastle": ["newcastle (aw)", "newcastle aw", "newcastle"],
+    "kempton": ["kempton park", "kempton (aw)", "kempton"],
+    "lingfield": ["lingfield park", "lingfield (aw)", "lingfield"],
+    "wolverhampton": ["wolverhampton (aw)", "wolverhampton"],
+    "southwell": ["southwell (aw)", "southwell"],
+    "chelmsford": ["chelmsford city", "chelmsford (aw)", "chelmsford"],
+    "brighton": ["brighton", "brighton & hove", "brighton and hove"],
+    "great_yarmouth": ["great yarmouth", "yarmouth"],
+    "hamilton": ["hamilton park", "hamilton"],
+    "ayr": ["ayr", "ayr (scot)"],
+    "perth": ["perth", "perth (scot)"],
+    "downpatrick": ["downpatrick", "downpatrick (ni)"],
+    "down_royal": ["down royal", "down royal (ni)"],
+    "curragh": ["curragh", "curragh (ire)"],
+    "galway": ["galway", "galway (ire)"],
+    "punchestown": ["punchestown", "punchestown (ire)"],
+    "naas": ["naas", "naas (ire)"],
+    "tipperary": ["tipperary", "tipperary (ire)"],
+    "wexford": ["wexford", "wexford (ire)"],
+    "killarney": ["killarney", "killarney (ire)"],
+    "roscommon": ["roscommon", "roscommon (ire)"],
+    "sligo": ["sligo", "sligo (ire)"],
+    "listowel": ["listowel", "listowel (ire)"],
+    "bath": ["bath"],
+    "salisbury": ["salisbury"],
+    "goodwood": ["goodwood"],
+    "york": ["york"],
+    "doncaster": ["doncaster"],
+    "ascot": ["ascot", "royal ascot"],
+    "epsom": ["epsom", "epsom downs"],
+    "sandown": ["sandown", "sandown park"],
+    "kempton_park": ["kempton park", "kempton"],
+}
+
+_COURSE_SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 HORSE_RACING_SPORT_ID = 24735152712200
 BPAPI_REST_BASE = "https://api.matchbook.com/bpapi/rest"
@@ -27,6 +74,8 @@ class MatchbookFetchReport:
     races_matched: int = 0
     runners_priced: int = 0
     events_loaded: int = 0
+    near_miss_count: int = 0
+    exchange_venues_on_card_dates: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -35,6 +84,8 @@ class MatchbookFetchReport:
             "races_matched": self.races_matched,
             "runners_priced": self.runners_priced,
             "events_loaded": self.events_loaded,
+            "near_miss_count": self.near_miss_count,
+            "exchange_venues_on_card_dates": self.exchange_venues_on_card_dates,
             "errors": self.errors,
         }
 
@@ -218,20 +269,145 @@ def _event_course_hint(event: dict) -> str:
     return str(event.get("name") or "")
 
 
-def _match_event_to_race(event: dict, course: str | None, card_date: str | None, off_time: str | None) -> bool:
-    from hibs_racing.entity.natural_key import courses_match, normalize_off_time
+def _course_slug(course: str | None) -> str:
+    if not course:
+        return ""
+    return normalize_course(course) or _COURSE_SLUG_RE.sub("_", str(course).lower().strip()).strip("_")
 
-    ev_date, ev_time = _parse_event_start(event.get("start"))
-    if card_date and ev_date and str(card_date) != ev_date:
-        return False
-    if off_time and ev_time:
-        if normalize_off_time(off_time) != normalize_off_time(ev_time):
-            return False
-    if course:
-        hint = _event_course_hint(event)
-        if not courses_match(course, hint) and course.lower() not in (event.get("name") or "").lower():
-            return False
-    return True
+
+def _course_alias_tokens(course: str | None) -> list[str]:
+    if not course:
+        return []
+    slug = _course_slug(course)
+    tokens = list(COURSE_ALIASES.get(slug, []))
+    base = str(course).lower().split("(")[0].strip()
+    tokens.extend([base, slug.replace("_", " ")])
+    tokens.append(slug)
+    # de-dupe preserving order
+    seen: set[str] = set()
+    out: list[str] = []
+    for t in tokens:
+        t = t.strip().lower()
+        if t and t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
+
+
+def _exchange_course_strings(event: dict) -> list[str]:
+    strings: list[str] = []
+    for raw in (_event_course_hint(event), str(event.get("name") or "")):
+        text = str(raw).lower().strip()
+        if text and text not in strings:
+            strings.append(text)
+    return strings
+
+
+def _venue_matches(card_course: str | None, event: dict) -> bool:
+    if not card_course:
+        return True
+    aliases = _course_alias_tokens(card_course)
+    for exch in _exchange_course_strings(event):
+        if courses_match(card_course, exch):
+            return True
+        for alias in aliases:
+            if alias in exch or exch in alias:
+                return True
+    return False
+
+
+def _card_off_datetime(card_date: str | None, off_time: str | None) -> datetime | None:
+    if not card_date or not off_time:
+        return None
+    try:
+        d = date.fromisoformat(str(card_date)[:10])
+    except ValueError:
+        return None
+    hm = normalize_off_time(off_time)
+    try:
+        hour, minute = (int(x) for x in hm.split(":", 1))
+    except ValueError:
+        return None
+    return datetime.combine(d, dt_time(hour, minute), tzinfo=LONDON)
+
+
+def _event_off_datetime(event: dict) -> datetime | None:
+    start = event.get("start")
+    if not start:
+        return None
+    text = str(start).strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    return dt.astimezone(LONDON)
+
+
+def find_matching_exchange_event(
+    exchange_events: list[dict],
+    *,
+    course: str | None,
+    card_date: str | None,
+    off_time: str | None,
+    time_tolerance_sec: int = 120,
+    near_miss_sec: int = 600,
+    near_miss_counter: list[int] | None = None,
+) -> dict | None:
+    """
+    Match card race → exchange event via venue aliases and ±time_tolerance_sec off-time.
+    Logs NEAR_MISS when venue aligns but delta is within near_miss_sec (operational tuning).
+    """
+    card_dt = _card_off_datetime(card_date, off_time)
+    best: tuple[float, dict] | None = None
+
+    for event in exchange_events:
+        ev_date = matchbook_event_local_date(event.get("start"))
+        if card_date and ev_date and str(card_date)[:10] != ev_date:
+            continue
+        if not _venue_matches(course, event):
+            continue
+
+        ev_dt = _event_off_datetime(event)
+        if card_dt is None or ev_dt is None:
+            if best is None:
+                best = (0.0, event)
+            continue
+
+        delta = abs((card_dt - ev_dt).total_seconds())
+        if delta <= time_tolerance_sec:
+            if best is None or delta < best[0]:
+                best = (delta, event)
+        elif delta <= near_miss_sec:
+            if near_miss_counter is not None:
+                near_miss_counter[0] += 1
+            logger.warning(
+                "NEAR_MISS: Venue matched (%s), but time delta was %ss. Card: %s, Exchange: %s",
+                course,
+                int(delta),
+                card_dt.isoformat(),
+                ev_dt.isoformat(),
+            )
+
+    return best[1] if best else None
+
+
+def _match_event_to_race(event: dict, course: str | None, card_date: str | None, off_time: str | None) -> bool:
+    """Strict single-event check (used in tests); production uses find_matching_exchange_event."""
+    return (
+        find_matching_exchange_event(
+            [event],
+            course=course,
+            card_date=card_date,
+            off_time=off_time,
+            time_tolerance_sec=0,
+            near_miss_sec=0,
+        )
+        is not None
+    )
 
 
 def _select_win_market(markets: list[dict]) -> dict | None:
@@ -414,6 +590,10 @@ def fetch_matchbook_odds(
         report.errors.append(str(exc))
         return pd.DataFrame(), report
 
+    time_tol = int(mb_cfg.get("event_time_tolerance_sec", 120))
+    near_miss_sec = int(mb_cfg.get("event_near_miss_sec", 600))
+    near_miss_counter = [0]
+
     priced: list[dict] = []
     races = list(cards.groupby("race_id", sort=False))
     report.races_attempted = len(races)
@@ -424,9 +604,14 @@ def fetch_matchbook_odds(
         card_date = str(first.get("card_date") or "")
         off_time = first.get("off_time")
 
-        event = next(
-            (ev for ev in events if _match_event_to_race(ev, course, card_date, off_time)),
-            None,
+        event = find_matching_exchange_event(
+            events,
+            course=course,
+            card_date=card_date,
+            off_time=off_time,
+            time_tolerance_sec=time_tol,
+            near_miss_sec=near_miss_sec,
+            near_miss_counter=near_miss_counter,
         )
         if event is None:
             if len(report.errors) < 5:
@@ -487,4 +672,5 @@ def fetch_matchbook_odds(
             )
 
     report.runners_priced = len(priced)
+    report.near_miss_count = near_miss_counter[0]
     return pd.DataFrame(priced), report

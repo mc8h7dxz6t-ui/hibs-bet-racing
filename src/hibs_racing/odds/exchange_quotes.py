@@ -286,6 +286,7 @@ def dry_run_exchange_quotes(*, database: Path | None = None) -> dict:
     if "exchange_spread_bps" in odds.columns:
         s = odds["exchange_spread_bps"].dropna()
         med_spread = float(s.median()) if not s.empty else None
+    card_venues = sorted(cards["course"].dropna().astype(str).unique().tolist()) if "course" in cards.columns else []
     return {
         "ok": True,
         "runners_on_card": len(cards),
@@ -293,5 +294,7 @@ def dry_run_exchange_quotes(*, database: Path | None = None) -> dict:
         "coverage_ratio": ratio,
         "median_spread_bps": med_spread,
         "persist": persist,
+        "card_venues": card_venues[:20],
+        "exchange_venues": report.to_dict().get("exchange_venues_on_card_dates", []),
         "report": report.to_dict(),
     }

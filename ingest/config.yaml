@@ -159,6 +159,8 @@ exchange_profiling:
 
 matchbook:
   enabled: true
+  event_time_tolerance_sec: 120       # ±2 min off-time vs card for event pairing
+  event_near_miss_sec: 600            # log venue match with 2–10 min skew for alias tuning
   login_base: https://api.matchbook.com/bpapi/rest
   api_base: https://api.matchbook.com/edge/rest
   sport_id: 24735152712200        # Horse Racing

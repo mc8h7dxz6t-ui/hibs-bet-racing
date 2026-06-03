@@ -5,6 +5,8 @@ from hibs_racing.odds.matchbook import (
     MatchbookClient,
     _best_back_price,
     _match_event_to_race,
+    _venue_matches,
+    find_matching_exchange_event,
     _select_place_market,
     _select_win_market,
     _top_of_book,
@@ -40,6 +42,81 @@ def test_match_event_to_race():
         "meta-tags": [{"type": "VENUE", "name": "Newcastle"}],
     }
     assert _match_event_to_race(event, "Newcastle (AW)", "2026-06-15", "15:30")
+
+
+def test_venue_matches_newton_abbot_event_title():
+    event = {"name": "15:00 Newton Abbot", "meta-tags": [{"type": "VENUE", "name": "Newton Abbot"}]}
+    assert _venue_matches("Newton Abbot", event)
+
+
+def test_fuzzy_match_two_minute_slip():
+    events = [
+        {
+            "id": 1,
+            "start": "2026-06-15T14:32:00.000Z",
+            "name": "15:32 Newcastle",
+            "meta-tags": [{"type": "VENUE", "name": "Newcastle"}],
+        }
+    ]
+    matched = find_matching_exchange_event(
+        events,
+        course="Newcastle (AW)",
+        card_date="2026-06-15",
+        off_time="15:30",
+        time_tolerance_sec=120,
+    )
+    assert matched is not None
+    assert matched["id"] == 1
+
+
+def test_fuzzy_picks_closest_time_when_multiple_events():
+    events = [
+        {
+            "id": 10,
+            "start": "2026-06-15T14:40:00.000Z",
+            "name": "15:40 Newcastle",
+            "meta-tags": [{"type": "VENUE", "name": "Newcastle"}],
+        },
+        {
+            "id": 11,
+            "start": "2026-06-15T14:31:00.000Z",
+            "name": "15:31 Newcastle",
+            "meta-tags": [{"type": "VENUE", "name": "Newcastle"}],
+        },
+    ]
+    matched = find_matching_exchange_event(
+        events,
+        course="Newcastle (AW)",
+        card_date="2026-06-15",
+        off_time="15:30",
+        time_tolerance_sec=120,
+    )
+    assert matched is not None
+    assert matched["id"] == 11
+
+
+def test_fuzzy_near_miss_logs(caplog):
+    import logging
+
+    events = [
+        {
+            "id": 2,
+            "start": "2026-06-15T14:38:00.000Z",
+            "name": "15:38 Newcastle",
+            "meta-tags": [{"type": "VENUE", "name": "Newcastle"}],
+        }
+    ]
+    with caplog.at_level(logging.WARNING):
+        matched = find_matching_exchange_event(
+            events,
+            course="Newcastle (AW)",
+            card_date="2026-06-15",
+            off_time="15:30",
+            time_tolerance_sec=120,
+            near_miss_sec=600,
+        )
+    assert matched is None
+    assert any("NEAR_MISS" in r.message for r in caplog.records)
 
 
 class FakeMatchbookClient:
