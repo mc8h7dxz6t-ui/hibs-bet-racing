@@ -161,6 +161,14 @@ hibs-racing web --port 5003
 # → http://127.0.0.1:5003
 ```
 
+### Desktop launcher (macOS)
+
+```bash
+bash scripts/install_desktop_launcher.sh ~/Desktop
+```
+
+Installs **HIBS Racing.app** — starts the local dashboard and opens your browser (same pattern as hibs-bet football).
+
 Pages: **Cards** (top places + monitor), **Tracker** (paper P&L + strike rates), **Backtest**, **Status**.
 
 ```bash

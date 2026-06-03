@@ -13,13 +13,21 @@ from hibs_racing.web_service import dashboard_context, novice_pick_candidates
 
 
 def filter_smart_picks(candidates: list[dict[str, Any]], *, limit: int = 3) -> list[dict[str, Any]]:
-    allowed_gates = {"proceed", "scale_up"}
+    from hibs_racing.config import load_config
+
+    paper = load_config().get("paper", {})
+    raw_gates = paper.get("allowed_steam_gates", ["proceed", "scale_up", "unknown"])
+    if isinstance(raw_gates, (list, tuple)):
+        allowed_gates = {str(g).lower() for g in raw_gates}
+    else:
+        allowed_gates = {"proceed", "scale_up", "unknown"}
+    min_dq = int(paper.get("min_data_quality_pct") or 75)
     filtered = [
         c
         for c in candidates
         if c.get("value_flag")
         and not c.get("value_gate_reason")
-        and int(c.get("data_quality_pct") or 0) >= 75
+        and int(c.get("data_quality_pct") or 0) >= min_dq
         and str(c.get("steam_gate") or "proceed").lower() in allowed_gates
     ]
     filtered.sort(

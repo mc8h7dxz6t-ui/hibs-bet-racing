@@ -2,6 +2,7 @@ import pandas as pd
 
 from hibs_racing.cards.actionability import (
     apply_value_gates,
+    attach_steam_gates,
     cap_place_prob,
     value_gate_reason,
 )
@@ -34,6 +35,25 @@ def test_value_gate_low_or():
         {"min_official_rating": 45, "exempt_unrated_races": True},
     )
     assert reason == "below_or_floor"
+
+
+def test_attach_steam_gates_handles_nan_value_flag(monkeypatch):
+    def fake_steam_gate_by_runner(value_ids, cards=None):
+        return {rid: "proceed" for rid in (value_ids or [])}
+
+    monkeypatch.setattr(
+        "hibs_racing.odds.market_steam.steam_gate_by_runner",
+        fake_steam_gate_by_runner,
+    )
+    frame = pd.DataFrame(
+        [
+            {"runner_id": "r1", "value_flag": float("nan"), "race_id": "x"},
+            {"runner_id": "r2", "value_flag": 1, "race_id": "x"},
+        ]
+    )
+    out = attach_steam_gates(frame, {"enforce_steam_gate": True})
+    assert "steam_gate" in out.columns
+    assert len(out) == 2
 
 
 def test_apply_value_gates_clears_flag():

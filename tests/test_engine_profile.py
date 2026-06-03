@@ -21,6 +21,25 @@ def test_runner_data_quality_maiden_exempt():
     assert pct == 100
 
 
+def test_runner_data_quality_pandas_na_enrich_field():
+    pct = runner_data_quality_pct(
+        {
+            "race_name": "Class 4 Handicap",
+            "official_rating": 70,
+            "win_decimal": 5.0,
+            "model_win_prob": 0.1,
+            "model_place_prob": 0.3,
+            "jockey": "A",
+            "trainer": "B",
+            "card_comment": "held up",
+            "enrich_source": "rp",
+            "form_string": pd.NA,
+            "horse_course_win_rate": 0.2,
+        }
+    )
+    assert pct == 100
+
+
 def test_value_gate_below_data_quality():
     reason = value_gate_reason(
         {

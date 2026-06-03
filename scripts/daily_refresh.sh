@@ -30,10 +30,10 @@ run_logged "daily-refresh-cards" \
     --regions gb,ire \
     --workers 1 \
     --odds-source "${HIBS_ODDS_SOURCE:-matchbook}" \
-    --paper
+    --paper || true
 
 run_logged "daily-settle-paper" \
-  hibs-racing settle-paper
+  hibs-racing settle-paper || true
 
 run_logged "daily-notify" \
   hibs-racing notify-daily --top "${HIBS_DAILY_PICKS_TOP:-3}" || true

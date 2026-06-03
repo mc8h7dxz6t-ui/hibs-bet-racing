@@ -20,6 +20,20 @@ def is_exempt_unrated_race(row: pd.Series | dict) -> bool:
     return bool(_UNRATED_RACE_RE.search(name))
 
 
+def _present(val: object) -> bool:
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return False
+    return bool(str(val).strip())
+
+
+def _first_present(row: pd.Series, *keys: str) -> object | None:
+    for key in keys:
+        val = row.get(key)
+        if _present(val):
+            return val
+    return None
+
+
 def runner_data_quality_pct(row: pd.Series | dict) -> int:
     """
     Percentage of required display/actionability fields present.
@@ -38,11 +52,10 @@ def runner_data_quality_pct(row: pd.Series | dict) -> int:
     if not exempt:
         checks.extend([row.get("card_comment"), row.get("official_rating")])
     if row.get("enrich_source"):
-        checks.append(row.get("form_string") or row.get("horse_course_win_rate"))
+        checks.append(_first_present(row, "form_string", "horse_course_win_rate"))
     ok = 0
     for val in checks:
-        if val is None or (isinstance(val, float) and pd.isna(val)):
+        if not _present(val):
             continue
-        if str(val).strip():
-            ok += 1
+        ok += 1
     return int(round(100 * ok / max(len(checks), 1)))

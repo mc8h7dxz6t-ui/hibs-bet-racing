@@ -249,7 +249,8 @@ def attach_steam_gates(frame: pd.DataFrame, paper_cfg: dict | None = None) -> pd
         return out
     from hibs_racing.odds.market_steam import steam_gate_by_runner
 
-    value_ids = set(out.loc[out.get("value_flag", 0) == 1, "runner_id"].astype(str).tolist())
+    vf = pd.to_numeric(out["value_flag"], errors="coerce").fillna(0).astype(int)
+    value_ids = set(out.loc[vf == 1, "runner_id"].astype(str).tolist())
     gates = steam_gate_by_runner(value_ids or None, cards=out)
     out["steam_gate"] = out["runner_id"].astype(str).map(lambda rid: gates.get(rid, "unknown"))
     return out
@@ -271,9 +272,22 @@ def apply_value_gates(frame: pd.DataFrame, paper_cfg: dict | None = None) -> pd.
     out = attach_data_quality(frame.copy())
     if "steam_gate" not in out.columns:
         out = attach_steam_gates(out, cfg)
+    def _flag_is_value(val: object) -> bool:
+        if val is None:
+            return False
+        try:
+            if pd.isna(val):
+                return False
+        except (TypeError, ValueError):
+            pass
+        try:
+            return int(val) == 1
+        except (TypeError, ValueError):
+            return False
+
     reasons: list[str | None] = []
     for _, row in out.iterrows():
-        if int(row.get("value_flag") or 0) != 1:
+        if not _flag_is_value(row.get("value_flag")):
             reasons.append(None)
             continue
         reason = value_gate_reason(row, cfg)
