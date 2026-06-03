@@ -70,6 +70,7 @@ def test_send_email_mock_smtp(monkeypatch):
     monkeypatch.setenv("HIBS_DAILY_EMAIL_TO", "trial@example.com")
     monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
     monkeypatch.setenv("SMTP_FROM", "sender@example.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "secret")
     fake_payload = {
         "ok": True,
         "pick_count": 1,

@@ -17,7 +17,12 @@ def email_digest_configured() -> bool:
     to_addr = os.environ.get("HIBS_DAILY_EMAIL_TO", "").strip()
     host = os.environ.get("SMTP_HOST", "").strip()
     from_addr = os.environ.get("SMTP_FROM", "").strip() or os.environ.get("SMTP_USER", "").strip()
-    return bool(to_addr and host and from_addr)
+    password = os.environ.get("SMTP_PASSWORD", "").strip()
+    if not (to_addr and host and from_addr and password):
+        return False
+    if "your_name@" in to_addr.lower():
+        return False
+    return True
 
 
 def _env_flag(name: str) -> bool | None:
