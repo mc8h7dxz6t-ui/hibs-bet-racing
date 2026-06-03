@@ -34,11 +34,15 @@ class GateBenchmarkReport:
     none: dict[str, float | int | None]
     gate1: dict[str, float | int | None]
     gate2: dict[str, float | int | None]
+    production: dict[str, float | int | None]
     delta_gate1_vs_none: dict[str, float | int | None]
     delta_gate2_vs_gate1: dict[str, float | int | None]
     delta_gate2_vs_none: dict[str, float | int | None]
+    delta_production_vs_none: dict[str, float | int | None]
+    delta_production_vs_gate2: dict[str, float | int | None]
     blocked_reasons_gate1: dict[str, int]
     blocked_reasons_gate2: dict[str, int]
+    blocked_reasons_production: dict[str, int]
     slippage: dict[str, dict[str, float | int | None]] = field(default_factory=dict)
     snapshot_source: str = "scored"
     message: str = ""
@@ -53,11 +57,15 @@ class GateBenchmarkReport:
             "none": self.none,
             "gate1": self.gate1,
             "gate2": self.gate2,
+            "production": self.production,
             "delta_gate1_vs_none": self.delta_gate1_vs_none,
             "delta_gate2_vs_gate1": self.delta_gate2_vs_gate1,
             "delta_gate2_vs_none": self.delta_gate2_vs_none,
+            "delta_production_vs_none": self.delta_production_vs_none,
+            "delta_production_vs_gate2": self.delta_production_vs_gate2,
             "blocked_reasons_gate1": self.blocked_reasons_gate1,
             "blocked_reasons_gate2": self.blocked_reasons_gate2,
+            "blocked_reasons_production": self.blocked_reasons_production,
             "snapshot_source": self.snapshot_source,
             "message": self.message,
         }
@@ -101,7 +109,7 @@ def _gate_configs(paper_cfg: dict, *, gate2_caps: bool = True) -> tuple[dict, di
 
 
 def _apply_gate_flags(scored: pd.DataFrame, paper_cfg: dict) -> pd.DataFrame:
-    """Attach flag_none, flag_gate1, flag_gate2 and gate reasons from pre-gate ``flag_raw``."""
+    """Attach flag_none, gate1, gate2 (isolated lanes), production (live config) from ``flag_raw``."""
     gate1_cfg, gate2_cfg = _gate_configs(paper_cfg, gate2_caps=True)
     out = scored.copy()
     out["flag_none"] = pd.to_numeric(out["flag_raw"], errors="coerce").fillna(0).astype(int)
@@ -119,6 +127,13 @@ def _apply_gate_flags(scored: pd.DataFrame, paper_cfg: dict) -> pd.DataFrame:
     g2 = apply_value_gates(g2in, gate2_cfg)
     out["flag_gate2"] = pd.to_numeric(g2["value_flag"], errors="coerce").fillna(0).astype(int)
     out["gate2_reason"] = g2.get("value_gate_reason")
+
+    pin = out.copy()
+    pin["value_flag"] = pin["flag_none"]
+    pin = pin.drop(columns=["value_gate_reason"], errors="ignore")
+    prod = apply_value_gates(pin, paper_cfg)
+    out["flag_production"] = pd.to_numeric(prod["value_flag"], errors="coerce").fillna(0).astype(int)
+    out["production_reason"] = prod.get("value_gate_reason")
     return out
 
 
@@ -197,11 +212,15 @@ def _empty_report(start: str, end: str, message: str) -> GateBenchmarkReport:
         none=z,
         gate1=z,
         gate2=z,
+        production=z,
         delta_gate1_vs_none={},
         delta_gate2_vs_gate1={},
         delta_gate2_vs_none={},
+        delta_production_vs_none={},
+        delta_production_vs_gate2={},
         blocked_reasons_gate1={},
         blocked_reasons_gate2={},
+        blocked_reasons_production={},
         message=message,
     )
 
@@ -439,6 +458,7 @@ def run_gate_benchmark(
     none_stats = _settle(frame, "flag_none")
     gate1_stats = _settle(frame, "flag_gate1")
     gate2_stats = _settle(frame, "flag_gate2")
+    production_stats = _settle(frame, "flag_production")
     blocked1 = (
         frame.loc[frame["flag_none"].eq(1) & frame["flag_gate1"].eq(0), "gate1_reason"]
         .dropna()
@@ -448,6 +468,13 @@ def run_gate_benchmark(
     )
     blocked2 = (
         frame.loc[frame["flag_none"].eq(1) & frame["flag_gate2"].eq(0), "gate2_reason"]
+        .dropna()
+        .astype(str)
+        .value_counts()
+        .to_dict()
+    )
+    blocked_prod = (
+        frame.loc[frame["flag_none"].eq(1) & frame["flag_production"].eq(0), "production_reason"]
         .dropna()
         .astype(str)
         .value_counts()
@@ -467,11 +494,13 @@ def run_gate_benchmark(
                 "none": _settle(stressed, "flag_none"),
                 "gate1": _settle(stressed, "flag_gate1"),
                 "gate2": _settle(stressed, "flag_gate2"),
+                "production": _settle(stressed, "flag_production"),
             }
 
     msg = (
         f"Benchmark {start_s} → {end_s} [{source}]: none={int(none_stats['picks'])} picks, "
-        f"gate1={int(gate1_stats['picks'])}, gate2={int(gate2_stats['picks'])}."
+        f"gate1={int(gate1_stats['picks'])}, gate2={int(gate2_stats['picks'])}, "
+        f"production={int(production_stats['picks'])}."
     )
     return GateBenchmarkReport(
         start=start_s,
@@ -482,11 +511,15 @@ def run_gate_benchmark(
         none=none_stats,
         gate1=gate1_stats,
         gate2=gate2_stats,
+        production=production_stats,
         delta_gate1_vs_none=_delta(gate1_stats, none_stats),
         delta_gate2_vs_gate1=_delta(gate2_stats, gate1_stats),
         delta_gate2_vs_none=_delta(gate2_stats, none_stats),
+        delta_production_vs_none=_delta(production_stats, none_stats),
+        delta_production_vs_gate2=_delta(production_stats, gate2_stats),
         blocked_reasons_gate1=blocked1,
         blocked_reasons_gate2=blocked2,
+        blocked_reasons_production=blocked_prod,
         slippage=slip_report,
         snapshot_source=source,
         message=msg,

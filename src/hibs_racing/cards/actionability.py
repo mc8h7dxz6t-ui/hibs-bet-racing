@@ -298,12 +298,17 @@ def apply_value_gates(frame: pd.DataFrame, paper_cfg: dict | None = None) -> pd.
 
     gate2 = cfg.get("gate2", {}) if isinstance(cfg.get("gate2"), dict) else {}
     if gate2.get("enabled", False):
+        rank_col = (
+            "ew_combined_ev"
+            if "ew_combined_ev" in out.columns
+            else ("place_ev" if "place_ev" in out.columns else "combo_bayes_place")
+        )
         # Optional portfolio concentration controls.
         per_race_cap = gate2.get("max_value_per_race")
         if per_race_cap is not None and "race_id" in out.columns:
             keep_idx = (
                 out[out["value_flag"] == 1]
-                .sort_values(["race_id", "ew_combined_ev"], ascending=[True, False], na_position="last")
+                .sort_values(["race_id", rank_col], ascending=[True, False], na_position="last")
                 .groupby("race_id", sort=False)
                 .head(int(per_race_cap))
                 .index
@@ -317,7 +322,7 @@ def apply_value_gates(frame: pd.DataFrame, paper_cfg: dict | None = None) -> pd.
         if per_meeting_cap is not None and {"card_date", "course"}.issubset(out.columns):
             keep_idx = (
                 out[out["value_flag"] == 1]
-                .sort_values(["card_date", "course", "ew_combined_ev"], ascending=[True, True, False], na_position="last")
+                .sort_values(["card_date", "course", rank_col], ascending=[True, True, False], na_position="last")
                 .groupby(["card_date", "course"], sort=False)
                 .head(int(per_meeting_cap))
                 .index
