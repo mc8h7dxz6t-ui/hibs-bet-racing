@@ -645,6 +645,7 @@ def record_paper_bet(
     backtest: bool = False,
     created_at: str | None = None,
     database: Path | None = None,
+    audit_extra: dict | None = None,
 ) -> str:
     import uuid
 
@@ -691,19 +692,22 @@ def record_paper_bet(
         try:
             from hibs_racing.institutional.ledger_events import append_ledger_event
 
+            payload = {
+                "bet_id": bet_id,
+                "bet_type": bet_type,
+                "stake_units": stake_units,
+                "offered_win": offered_win,
+                "model_ev": model_ev,
+                "is_value_pick": True,
+            }
+            if audit_extra:
+                payload["audit"] = audit_extra
             append_ledger_event(
                 event_type="bet_placed",
                 runner_id=runner_id,
                 race_id=race_id,
                 verification_hash=vhash,
-                payload={
-                    "bet_id": bet_id,
-                    "bet_type": bet_type,
-                    "stake_units": stake_units,
-                    "offered_win": offered_win,
-                    "model_ev": model_ev,
-                    "is_value_pick": True,
-                },
+                payload=payload,
                 database=db,
             )
         except Exception:

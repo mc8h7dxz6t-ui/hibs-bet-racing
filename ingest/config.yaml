@@ -64,6 +64,9 @@ paper:
   default_stake: 1.0
   sync_ledger_on_score: true         # prune stale paper rows whenever card_scores refresh
   log_on_refresh: true                # refresh-cards / API refresh logs value picks
+  min_data_quality_pct: 75            # Gate1: same floor as Smart Portfolio / digest (hash-versioned)
+  enforce_steam_gate: true            # Gate1: block abort; unknown OK for morning Matchbook batch
+  allowed_steam_gates: [proceed, scale_up, unknown]
   # Actionability gates (ranker still scores all runners; value/paper only when allowed)
   value_gates_enabled: true
   exempt_unrated_races: true          # maidens/novices → rank-only, not missing data

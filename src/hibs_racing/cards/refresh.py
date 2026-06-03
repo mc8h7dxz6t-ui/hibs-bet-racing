@@ -148,6 +148,15 @@ def refresh_cards(
 
     (odds, odds_meta), timings["odds_ms"] = timed_ms(lambda: resolve_scoring_odds(cards, odds_source=odds_source))
 
+    if odds is not None and not odds.empty:
+        from hibs_racing.odds.market_steam import append_odds_history
+
+        append_odds_history(odds)
+
+    from hibs_racing.cards.engine_profile import build_engine_profile
+
+    engine_profile = build_engine_profile()
+
     scored, timings["score_ms"] = timed_ms(
         lambda: score_upcoming_cards(
             cards,
@@ -175,6 +184,7 @@ def refresh_cards(
             "enrich_matched": enrich_meta.get("matched"),
             "source": src,
             "timings_ms": timings,
+            "engine_profile": engine_profile,
         },
     )
     manifest_id = persist_run_manifest(manifest)
@@ -199,6 +209,8 @@ def refresh_cards(
             card_date=str(primary_date),
             stake=stake,
             manifest_id=manifest_id,
+            odds_source=str(odds_meta.get("source")),
+            engine_profile=engine_profile,
         )
         paper_bets = recon.expected_value_picks
         recon_clean = recon.is_clean
@@ -227,6 +239,8 @@ def refresh_cards(
         "paper_recon_clean": recon_clean,
         "manifest_id": manifest_id,
         "shadow_intents": shadow_count,
+        "engine_profile": engine_profile,
+        "config_hash": manifest.config_hash,
         "parallel_workers": workers,
         "timings_ms": timings,
     }

@@ -10,6 +10,7 @@ from typing import Any
 from hibs_racing.backtest.gate_regression import run_gate_regression_check
 from hibs_racing.backtest.snapshot_store import snapshot_coverage
 from hibs_racing.config import db_path, load_config
+from hibs_racing.cards.engine_profile import build_engine_profile
 from hibs_racing.institutional.paper_reconciliation import reconcile_paper_ledger
 
 
@@ -65,6 +66,21 @@ def run_institutional_check(
         require_snapshots=require_snapshots,
     )
     checks.extend(gate.checks)
+
+    profile = build_engine_profile(cfg)
+    detail = (
+        f"{profile.get('ranker_tier')} manifest={profile.get('ranker_feature_manifest')} "
+        f"({profile.get('ranker_feature_count')} features)"
+    )
+    if profile.get("warning"):
+        detail = f"{detail} — {profile['warning']}"
+    checks.append(
+        {
+            "name": "ranker_profile",
+            "passed": True,
+            "detail": detail,
+        }
+    )
 
     recon_dict: dict[str, Any] | None = None
     if card_date:

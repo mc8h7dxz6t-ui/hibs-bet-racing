@@ -25,9 +25,21 @@ jobs:
       - name: Install package
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[ranker,web]"
+          pip install -e ".[dev,ranker,web]"
       - name: Pytest (gate + snapshot + institutional suite)
-        run: pytest tests/test_snapshot_store.py tests/test_slippage_stress.py tests/test_gate_regression.py tests/test_gate2_sensitivity.py tests/test_gate_benchmark_walkforward.py tests/test_actionability_gate2.py tests/test_institutional.py -q
+        run: |
+          pytest \
+            tests/test_snapshot_store.py \
+            tests/test_slippage_stress.py \
+            tests/test_gate_regression.py \
+            tests/test_gate2_sensitivity.py \
+            tests/test_gate_benchmark_walkforward.py \
+            tests/test_actionability.py \
+            tests/test_actionability_gate2.py \
+            tests/test_engine_profile.py \
+            tests/test_log_retention.py \
+            tests/test_institutional.py \
+            -q
 
   gate-regression-cli:
     runs-on: ubuntu-latest
@@ -41,7 +53,7 @@ jobs:
       - name: Install package
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[ranker,web]"
+          pip install -e ".[dev,ranker,web]"
       - name: Gate regression (requires local DB artifact)
         run: |
           echo "Scheduled job: run gate-regression on host with raceform DB + snapshots."

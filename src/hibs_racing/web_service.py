@@ -315,28 +315,10 @@ def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
 
 
 def _ui_data_completeness(row: dict) -> int:
-    """UI-only completeness — maidens skip OR/comment penalties; enrich counts separately."""
-    from hibs_racing.cards.actionability import is_exempt_unrated_race
+    """UI completeness — same logic as Gate1 min_data_quality_pct."""
+    from hibs_racing.cards.data_quality import runner_data_quality_pct
 
-    exempt = is_exempt_unrated_race(row)
-    checks = [
-        row.get("win_decimal"),
-        row.get("model_win_prob"),
-        row.get("model_place_prob"),
-        row.get("jockey"),
-        row.get("trainer"),
-    ]
-    if not exempt:
-        checks.extend([row.get("card_comment"), row.get("official_rating")])
-    if row.get("enrich_source"):
-        checks.append(row.get("form_string") or row.get("horse_course_win_rate"))
-    ok = 0
-    for val in checks:
-        if val is None or (isinstance(val, float) and pd.isna(val)):
-            continue
-        if str(val).strip():
-            ok += 1
-    return int(round(100 * ok / max(len(checks), 1)))
+    return runner_data_quality_pct(row)
 
 
 def novice_pick_candidates(meetings: list[dict]) -> list[dict]:

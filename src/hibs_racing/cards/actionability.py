@@ -1,21 +1,8 @@
 from __future__ import annotations
 
-import re
-
 import pandas as pd
 
-_UNRATED_RACE_RE = re.compile(
-    r"\b(maiden|novices?|nursery|seller|introductory|amateur|conditional\s+jockeys)\b",
-    re.I,
-)
-
-
-def is_exempt_unrated_race(row: pd.Series | dict) -> bool:
-    """Maidens/novices etc. — no OR expected; rank-only for value/paper."""
-    if isinstance(row, dict):
-        row = pd.Series(row)
-    name = str(row.get("race_name") or "")
-    return bool(_UNRATED_RACE_RE.search(name))
+from hibs_racing.cards.data_quality import is_exempt_unrated_race, runner_data_quality_pct
 
 
 def _official_rating(row: pd.Series | dict) -> float | None:
@@ -148,6 +135,39 @@ def _gate2_confidence(row: pd.Series | dict, paper_cfg: dict) -> float:
     return (ok / seen) if seen else 0.0
 
 
+def _allowed_steam_gates(paper_cfg: dict) -> set[str]:
+    raw = paper_cfg.get("allowed_steam_gates", ["proceed", "scale_up", "unknown"])
+    if not isinstance(raw, (list, tuple)):
+        return {"proceed", "scale_up", "unknown"}
+    return {str(g).strip().lower() for g in raw if str(g).strip()}
+
+
+def _steam_gate_reason(row: pd.Series | dict, paper_cfg: dict) -> str | None:
+    if not paper_cfg.get("enforce_steam_gate", False):
+        return None
+    if isinstance(row, dict):
+        row = pd.Series(row)
+    gate = str(row.get("steam_gate") or "unknown").strip().lower()
+    if gate not in _allowed_steam_gates(paper_cfg):
+        return f"steam_gate_{gate}"
+    return None
+
+
+def _data_quality_reason(row: pd.Series | dict, paper_cfg: dict) -> str | None:
+    floor = paper_cfg.get("min_data_quality_pct")
+    if floor is None:
+        return None
+    try:
+        min_pct = int(floor)
+    except (TypeError, ValueError):
+        return None
+    if min_pct <= 0:
+        return None
+    if runner_data_quality_pct(row) < min_pct:
+        return "below_data_quality"
+    return None
+
+
 def _gate2_reason(row: pd.Series | dict, paper_cfg: dict) -> str | None:
     gate2 = paper_cfg.get("gate2", {}) if isinstance(paper_cfg.get("gate2"), dict) else {}
     if not gate2.get("enabled", False):
@@ -203,6 +223,14 @@ def value_gate_reason(row: pd.Series | dict, paper_cfg: dict) -> str | None:
     if suit:
         return suit
 
+    dq = _data_quality_reason(row, paper_cfg)
+    if dq:
+        return dq
+
+    steam = _steam_gate_reason(row, paper_cfg)
+    if steam:
+        return steam
+
     gate2 = _gate2_reason(row, paper_cfg)
     if gate2:
         return gate2
@@ -210,12 +238,39 @@ def value_gate_reason(row: pd.Series | dict, paper_cfg: dict) -> str | None:
     return None
 
 
+def attach_steam_gates(frame: pd.DataFrame, paper_cfg: dict | None = None) -> pd.DataFrame:
+    """Set steam_gate per runner (unknown when no poll history — allowed for morning Matchbook batch)."""
+    if frame.empty:
+        return frame
+    cfg = paper_cfg or {}
+    out = frame.copy()
+    if not cfg.get("enforce_steam_gate", False):
+        out["steam_gate"] = "proceed"
+        return out
+    from hibs_racing.odds.market_steam import steam_gate_by_runner
+
+    value_ids = set(out.loc[out.get("value_flag", 0) == 1, "runner_id"].astype(str).tolist())
+    gates = steam_gate_by_runner(value_ids or None, cards=out)
+    out["steam_gate"] = out["runner_id"].astype(str).map(lambda rid: gates.get(rid, "unknown"))
+    return out
+
+
+def attach_data_quality(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    out = frame.copy()
+    out["data_quality_pct"] = [runner_data_quality_pct(row) for _, row in out.iterrows()]
+    return out
+
+
 def apply_value_gates(frame: pd.DataFrame, paper_cfg: dict | None = None) -> pd.DataFrame:
     """Clear value_flag where actionability gates fail; set value_gate_reason on blocked rows."""
     if frame.empty:
         return frame
     cfg = paper_cfg or {}
-    out = frame.copy()
+    out = attach_data_quality(frame.copy())
+    if "steam_gate" not in out.columns:
+        out = attach_steam_gates(out, cfg)
     reasons: list[str | None] = []
     for _, row in out.iterrows():
         if int(row.get("value_flag") or 0) != 1:

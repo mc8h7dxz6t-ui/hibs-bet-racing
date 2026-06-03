@@ -3,9 +3,9 @@ import pandas as pd
 from hibs_racing.cards.actionability import (
     apply_value_gates,
     cap_place_prob,
-    is_exempt_unrated_race,
     value_gate_reason,
 )
+from hibs_racing.cards.data_quality import is_exempt_unrated_race
 
 
 def test_is_exempt_unrated_race():
@@ -53,7 +53,13 @@ def test_apply_value_gates_clears_flag():
             },
         ]
     )
-    cfg = {"exempt_unrated_races": True, "require_official_rating_for_value": True, "min_official_rating": 45}
+    cfg = {
+        "exempt_unrated_races": True,
+        "require_official_rating_for_value": True,
+        "min_official_rating": 45,
+        "enforce_steam_gate": False,
+        "min_data_quality_pct": None,
+    }
     out = apply_value_gates(frame, cfg)
     assert int(out.iloc[0]["value_flag"]) == 0
     assert out.iloc[0]["value_gate_reason"] == "unrated_race_expected"

@@ -10,6 +10,7 @@ from typing import Any
 
 import pandas as pd
 
+from hibs_racing.cards.harville_config import harville_runtime_config
 from hibs_racing.config import load_config
 from hibs_racing.features.store import connect, init_db
 
@@ -74,17 +75,24 @@ _CONFIG_HASH_KEYS: tuple[str, ...] = (
     "max_trip_change_f",
     "max_form_poor_runs_3",
     "min_trainer_rtf",
+    "min_data_quality_pct",
+    "enforce_steam_gate",
+    "allowed_steam_gates",
     "gate2",
 )
 
 
 def scoring_config_hash(paper_cfg: dict | None = None) -> str:
     """Stable hash of paper config fields that affect scoring and gates."""
-    cfg = paper_cfg if paper_cfg is not None else load_config().get("paper", {})
+    full = load_config()
+    cfg = paper_cfg if paper_cfg is not None else full.get("paper", {})
     subset: dict[str, Any] = {}
     for key in _CONFIG_HASH_KEYS:
         if key in cfg:
             subset[key] = cfg[key]
+    hv = harville_runtime_config(full)
+    subset["harville_effective_discount"] = hv["effective_discount"]
+    subset["harville_correction_env"] = hv["correction_env"]
     payload = json.dumps(subset, sort_keys=True, default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 

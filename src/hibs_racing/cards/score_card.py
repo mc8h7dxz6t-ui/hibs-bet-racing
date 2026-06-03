@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -9,6 +8,7 @@ import pandas as pd
 
 from hibs_racing.backtest.snapshot_store import scoring_config_hash, upsert_snapshots
 from hibs_racing.cards.actionability import apply_value_gates, cap_place_prob
+from hibs_racing.cards.harville_config import harville_longshot_discount
 from hibs_racing.config import db_path, load_config
 from hibs_racing.features.ranker_matrix import build_card_feature_frame
 from hibs_racing.features.store import connect, init_db
@@ -16,16 +16,6 @@ from hibs_racing.place.ew_ev import EachWayQuote, each_way_ev
 from hibs_racing.place.harville import harville_place_probs
 from hibs_racing.place.paper_ledger import record_paper_bet
 from hibs_racing.racing_engine.score_card import apply_scoring
-
-
-def _harville_longshot_discount(configured: float) -> float:
-    """HIBS_HARVILLE_CORRECTION=0 disables trim; =1 forces config discount (default 0.85)."""
-    raw = os.environ.get("HIBS_HARVILLE_CORRECTION", "").strip().lower()
-    if raw in ("0", "false", "no", "off"):
-        return 1.0
-    if raw in ("1", "true", "yes", "on"):
-        return configured if configured < 1.0 else 0.85
-    return configured
 
 
 def score_upcoming_cards(
@@ -47,7 +37,7 @@ def score_upcoming_cards(
     min_place_ev = paper_cfg.get("min_place_ev", 0.05)
     min_combo_place = paper_cfg.get("min_combo_bayes_place", 0.22)
     longshot_threshold = float(paper_cfg.get("harville_longshot_win_prob_threshold", 0.03))
-    longshot_discount = _harville_longshot_discount(
+    longshot_discount = harville_longshot_discount(
         float(paper_cfg.get("harville_longshot_discount", 1.0))
     )
 
@@ -252,10 +242,13 @@ def paper_log_value_picks(
     stake: float = 1.0,
     backtest: bool = False,
     created_at: str | None = None,
+    odds_source: str | None = None,
+    engine_profile: dict | None = None,
 ) -> list[str]:
-    """Record paper EW bets for rows flagged as value."""
+    """Record paper EW bets for rows that passed value + DQ + steam gates."""
     bet_ids: list[str] = []
-    for rec in frame[frame["value_flag"] == 1].to_dict(orient="records"):
+    picks = frame[frame["value_flag"] == 1]
+    for rec in picks.to_dict(orient="records"):
         bet_id = record_paper_bet(
             rec["race_id"],
             rec["runner_id"],
@@ -267,6 +260,13 @@ def paper_log_value_picks(
             is_value_pick=True,
             backtest=backtest,
             created_at=created_at,
+            audit_extra={
+                "odds_source": odds_source or rec.get("odds_source"),
+                "data_quality_pct": rec.get("data_quality_pct"),
+                "steam_gate": rec.get("steam_gate"),
+                "value_gate_reason": rec.get("value_gate_reason"),
+                "engine_profile": engine_profile,
+            },
         )
         bet_ids.append(bet_id)
     return bet_ids

@@ -85,9 +85,13 @@ def _historical_bounds(db: Path) -> tuple[str | None, str | None]:
 
 def _gate_configs(paper_cfg: dict, *, gate2_caps: bool = True) -> tuple[dict, dict]:
     gate1_cfg = deepcopy(paper_cfg)
+    gate1_cfg["enforce_steam_gate"] = False
+    gate1_cfg["min_data_quality_pct"] = None
     if isinstance(gate1_cfg.get("gate2"), dict):
         gate1_cfg["gate2"]["enabled"] = False
     gate2_cfg = deepcopy(paper_cfg)
+    gate2_cfg["enforce_steam_gate"] = False
+    gate2_cfg["min_data_quality_pct"] = None
     gate2_cfg.setdefault("gate2", {})
     gate2_cfg["gate2"]["enabled"] = True
     if not gate2_caps and isinstance(gate2_cfg["gate2"], dict):

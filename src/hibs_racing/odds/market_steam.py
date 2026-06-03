@@ -263,6 +263,41 @@ def drift_direction_index(
     return {"delta": delta, "odds_now": odds_now, "odds_ref": ref_price, "direction": direction}
 
 
+def steam_gate_by_runner(
+    runner_ids: set[str] | None = None,
+    *,
+    cards: pd.DataFrame | None = None,
+    history: dict[str, list[dict]] | None = None,
+) -> dict[str, str]:
+    """
+    Map runner_id → steam gate for paper/actionability (no pre-race window filter).
+
+    ``unknown`` when no price history yet (morning Matchbook batch — typically allowed).
+    """
+    cfg = _steam_cfg()
+    history = history or _load_history()
+    cards = cards if cards is not None else load_upcoming_runners()
+    out: dict[str, str] = {}
+    for _, row in cards.iterrows():
+        rid = str(row.get("runner_id") or "")
+        if not rid:
+            continue
+        if runner_ids is not None and rid not in runner_ids:
+            continue
+        drift = drift_direction_index(rid, history=history)
+        delta = drift.get("delta")
+        if delta is None:
+            out[rid] = "unknown"
+            continue
+        gate = "proceed"
+        if delta <= -0.5:
+            gate = "scale_up"
+        if delta >= cfg["drift_abort_delta"]:
+            gate = "abort"
+        out[rid] = gate
+    return out
+
+
 def evaluate_market_gauges(
     *,
     history: dict[str, list[dict]] | None = None,

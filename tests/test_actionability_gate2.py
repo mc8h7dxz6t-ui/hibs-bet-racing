@@ -9,6 +9,8 @@ def _cfg() -> dict:
         "exempt_unrated_races": True,
         "require_official_rating_for_value": False,
         "min_official_rating": 45,
+        "enforce_steam_gate": False,
+        "min_data_quality_pct": None,
         "gate2": {
             "enabled": True,
             "min_confidence": 0.6,

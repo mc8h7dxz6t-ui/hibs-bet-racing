@@ -86,6 +86,8 @@ def sync_paper_ledger_to_scored(
     database: Path | None = None,
     stake: float = 1.0,
     manifest_id: str | None = None,
+    odds_source: str | None = None,
+    engine_profile: dict | None = None,
 ) -> PaperReconciliationResult:
     """
     Align live paper_bets with current scored value_flag rows for one card date.
@@ -106,7 +108,12 @@ def sync_paper_ledger_to_scored(
         )
     value = scored[scored.get("value_flag", 0) == 1] if not scored.empty else scored
     if not value.empty:
-        paper_log_value_picks(value, stake=stake)
+        paper_log_value_picks(
+            value,
+            stake=stake,
+            odds_source=odds_source,
+            engine_profile=engine_profile,
+        )
     return reconcile_paper_ledger_from_scores(scored, card_date=card_date, database=db)
 
 
