@@ -12,6 +12,7 @@ from hibs_racing.backtest.retrospective import _load_historical_cards
 from hibs_racing.backtest.slippage_stress import apply_slippage_to_frame, default_slip_bps_list
 from hibs_racing.backtest.snapshot_store import (
     load_snapshots,
+    merge_upcoming_enrich,
     scoring_config_hash,
     snapshot_coverage,
     upsert_snapshots,
@@ -235,6 +236,7 @@ def _score_day_rows(
     write_snapshots: bool,
     config_hash: str,
 ) -> list[dict]:
+    day = merge_upcoming_enrich(db, day, str(card_date))
     odds = day[["runner_id", "win_decimal", "place_fraction", "places"]].copy()
     outcomes = day.set_index("runner_id")["finish_pos"].to_dict()
     min_place_ev = float(paper_cfg.get("min_place_ev", 0.05))
@@ -307,6 +309,7 @@ def _build_benchmark_frame(
         day = day[day["win_decimal"].notna() & (day["win_decimal"] >= 1.01)]
         if day.empty:
             continue
+        day = merge_upcoming_enrich(db, day, str(card_date))
         rows.extend(
             _score_day_rows(
                 card_date=str(card_date),
@@ -356,6 +359,7 @@ def backfill_scored_snapshots(
         day = day[day["win_decimal"].notna() & (day["win_decimal"] >= 1.01)]
         if day.empty:
             continue
+        day = merge_upcoming_enrich(db, day, str(card_date))
         odds = day[["runner_id", "win_decimal", "place_fraction", "places"]].copy()
         outcomes = day.set_index("runner_id")["finish_pos"].to_dict()
         min_place_ev = float(paper_cfg.get("min_place_ev", 0.05))

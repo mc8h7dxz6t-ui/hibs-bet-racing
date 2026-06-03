@@ -27,6 +27,11 @@ SELECT
     region,
     race_type,
     race_class,
+    TRIM(
+        COALESCE(race_class, '') || CASE
+            WHEN race_type IS NOT NULL AND TRIM(race_type) != ''
+            THEN ' ' || race_type ELSE '' END
+    ) AS race_name,
     going,
     field_size,
     distance_f,

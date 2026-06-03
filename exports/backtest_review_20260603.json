@@ -1,22 +1,21 @@
 {
-  "window": "2026-03-04 to 2026-06-02",
-  "snapshot_rows": 28117,
-  "snapshot_days": 79,
-  "lanes_note": "gate1/gate2 in benchmark are isolated ablations; production is live config (DQ+steam+gate2).",
-  "results": {
-    "none": {"picks": 7686, "hit_rate": 0.260, "roi_pct": -5.39},
-    "gate1_ablation": {"picks": 5440, "hit_rate": 0.280, "roi_pct": -5.04},
-    "gate2_isolated": {"picks": 2442, "hit_rate": 0.341, "roi_pct": 48.49},
-    "production_on_snapshots": {"picks": 0, "note": "all raw value blocked by below_data_quality — snapshots lack enrich/DQ fields"},
-    "gate2_with_caps_60d_export": {"picks": 1593, "hit_rate": 0.328, "roi_pct": 51.46},
-    "gate2_without_caps_60d": {"picks": 3166, "hit_rate": 0.279, "roi_pct": -1.47}
+  "updated": "2026-06-03",
+  "snapshot_backfill_60d": {
+    "start": "2026-04-04",
+    "end": "2026-06-02",
+    "rows_written": 18314,
+    "card_days": 47,
+    "config_hash": "6763fedf92f4b4ff",
+    "coverage_pct": 100.0
   },
-  "blocked_production_on_snapshots": {
-    "below_data_quality": 5440,
-    "missing_or": 2024,
-    "below_or_floor": 222
+  "production_benchmark_60d": {
+    "none": {"picks": 5007, "hit_rate": 0.253, "roi_pct": -4.55},
+    "gate1_ablation": {"picks": 3465, "hit_rate": 0.271, "roi_pct": -2.35},
+    "gate2_isolated": {"picks": 1593, "hit_rate": 0.328, "roi_pct": 51.46},
+    "production": {"picks": 1593, "hit_rate": 0.328, "roi_pct": 51.46},
+    "note": "On SP replay, production matches gate2 (steam=unknown OK; DQ passes with full gates_json)."
   },
-  "blocked_gate2_60d": {
+  "blocked_production": {
     "missing_or": 1405,
     "gate2_race_cap": 942,
     "gate2_meeting_cap": 631,
@@ -25,17 +24,13 @@
     "gate2_regime_combo": 109,
     "gate2_regime_ev": 20
   },
-  "ranker_backtest": {
-    "tag_coverage_pct": 89.35,
-    "logistic_tag_auc": 0.587,
-    "message": "Tags add signal"
-  },
-  "top_improvement_areas": [
-    "Snapshot backfill: persist card_comment, enrich_source, form_string for honest DQ replay",
-    "Keep gate2 race/meeting caps (material +52pp ROI vs no caps)",
-    "Train enrich_48 ranker (base_36 booster; enrich only feeds gates today)",
-    "Raw value lane still negative ROI at SP — tune min_place_ev / combo thresholds",
-    "Reduce missing_or blocks (1405) via data ingest or maiden handling",
-    "Re-run snapshot-backfill after config hash change for forward OOS"
+  "slippage_production_50bps": {"roi_pct": 50.86, "picks": 1592},
+  "improvement_priorities": [
+    "Keep gate2 caps (material)",
+    "missing_or: 1405 blocks — improve OR on API cards or exclude maidens earlier in flag_raw",
+    "Tune gate2_regime_combo (109) / gate2_price_fragile (170) via min_confidence A/B",
+    "train-ranker --with-enrich for base_36 → enrich_48 scoring",
+    "Review min_place_ev / min_combo after enrich retrain (raw none still -4.5% ROI)",
+    "Optional: snapshot-backfill --start 2026-03-04 for full 90d OOS"
   ]
 }

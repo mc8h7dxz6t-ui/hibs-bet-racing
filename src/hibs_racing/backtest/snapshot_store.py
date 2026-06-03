@@ -45,9 +45,15 @@ SNAPSHOT_CORE_KEYS: frozenset[str] = frozenset(
     }
 )
 
-# Legacy explicit gate keys (also stored via full-context blob below).
+# Explicit gate / DQ replay keys (merged into gates_json even if also in frame).
 GATE_CONTEXT_KEYS: tuple[str, ...] = (
     "race_name",
+    "card_comment",
+    "jockey",
+    "trainer",
+    "enrich_source",
+    "form_string",
+    "horse_course_win_rate",
     "trainer_rtf",
     "horse_distance_runs",
     "horse_distance_wins",
@@ -55,6 +61,7 @@ GATE_CONTEXT_KEYS: tuple[str, ...] = (
     "form_poor_runs_3",
     "jockey_bayes_place",
     "trainer_bayes_place",
+    "steam_gate",
 )
 
 # Keys that affect scoring / gate replay — bump invalidates snapshot rows.
@@ -109,11 +116,62 @@ def _gates_blob(rec: dict) -> str | None:
             continue
         ctx[key] = val
     for key in GATE_CONTEXT_KEYS:
-        if key in rec and key not in ctx:
-            val = rec[key]
-            if val is not None and not (isinstance(val, float) and pd.isna(val)):
-                ctx[key] = val
+        if key not in rec:
+            continue
+        val = rec[key]
+        if val is None or (isinstance(val, float) and pd.isna(val)):
+            continue
+        if isinstance(val, str) and not val.strip():
+            continue
+        ctx[key] = val
     return json.dumps(ctx, sort_keys=True, default=str) if ctx else None
+
+
+def merge_upcoming_enrich(db: Path, day: pd.DataFrame, card_date: str) -> pd.DataFrame:
+    """Overlay RP enrich columns from upcoming_runners when stored for this card date."""
+    if day.empty:
+        return day
+    init_db(db)
+    enrich_cols = [
+        "runner_id",
+        "race_name",
+        "form_string",
+        "enrich_source",
+        "horse_course_win_rate",
+        "horse_distance_runs",
+        "horse_distance_wins",
+        "form_trip_change_f",
+        "form_poor_runs_3",
+        "trainer_rtf",
+    ]
+    with connect(db) as conn:
+        try:
+            up = pd.read_sql_query(
+                f"""
+                SELECT {", ".join(enrich_cols)}
+                FROM upcoming_runners
+                WHERE card_date = ?
+                """,
+                conn,
+                params=(str(card_date),),
+            )
+        except Exception:
+            return day
+    if up.empty:
+        return day
+    base = day.drop(columns=[c for c in enrich_cols if c != "runner_id" and c in day.columns], errors="ignore")
+    merged = base.merge(up, on="runner_id", how="left", suffixes=("", "_up"))
+    for col in enrich_cols:
+        if col == "runner_id":
+            continue
+        up_col = f"{col}_up"
+        if up_col in merged.columns:
+            if col in merged.columns:
+                merged[col] = merged[col].combine_first(merged[up_col])
+            else:
+                merged[col] = merged[up_col]
+            merged = merged.drop(columns=[up_col], errors="ignore")
+    return merged
 
 
 def _expand_gates_json(frame: pd.DataFrame) -> pd.DataFrame:
