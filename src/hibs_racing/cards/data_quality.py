@@ -51,7 +51,7 @@ def runner_data_quality_pct(row: pd.Series | dict) -> int:
     ]
     if not exempt:
         checks.extend([row.get("card_comment"), row.get("official_rating")])
-    if row.get("enrich_source"):
+    if _present(row.get("enrich_source")):
         checks.append(_first_present(row, "form_string", "horse_course_win_rate"))
     ok = 0
     for val in checks:
