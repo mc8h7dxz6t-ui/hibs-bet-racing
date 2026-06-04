@@ -21,7 +21,6 @@ done
 
 activate_venv
 load_env
-export HIBS_RACING_SKIP_VENV=1  # preflight: venv already activated above
 
 FAIL=0
 WARN=0
@@ -87,15 +86,19 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
   fi
 fi
 
-# 7. Matchbook dry-run (soft fail when no GB/IRE cards tonight)
+# 7. Matchbook dry-run (soft fail when no GB/IRE cards off-hours)
 echo "--- dry-run-quotes ---"
 set +e
 bash "${SCRIPT_DIR}/daily_refresh.sh" --dry-run-quotes >/dev/null 2>&1
 DRY_RC=$?
 set -e
-DRY_TAIL="$(tail -25 "$(log_file dry-run-quotes)" 2>/dev/null || true)"
+DRY_LOG="$(log_file dry-run-quotes)"
+DRY_TAIL="$(tail -40 "${DRY_LOG}" 2>/dev/null || true)"
 echo "${DRY_TAIL}" | tail -15
-if echo "${DRY_TAIL}" | grep -q '"ok": true'; then
+DRY_LAST="$(tail -1 "${DRY_LOG}" 2>/dev/null | tr -d '\r' || true)"
+if [[ "${DRY_LAST}" == "OK: dry-run-quotes" ]]; then
+  pass "Matchbook dry-run completed"
+elif echo "${DRY_TAIL}" | grep -q '"ok": true'; then
   pass "Matchbook dry-run completed"
 elif echo "${DRY_TAIL}" | grep -qiE 'no quotes|no GB/IRE markets|no runners in card'; then
   warn "Matchbook dry-run: no card markets now (expected off-hours) — retry after 06:00 UK"
