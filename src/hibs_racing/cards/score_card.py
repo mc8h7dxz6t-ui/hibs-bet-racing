@@ -198,6 +198,12 @@ def _persist_runner_odds(db: Path, frame: pd.DataFrame) -> None:
         conn.commit()
 
 
+def _normalize_gate_reason_for_db(reason: object) -> str | None:
+    from hibs_racing.cards.ui_frame import normalize_gate_reason_for_db
+
+    return normalize_gate_reason_for_db(reason)
+
+
 def _persist_scores(db: Path, frame: pd.DataFrame, scored_at: str) -> None:
     init_db(db)
     runner_ids = frame["runner_id"].astype(str).tolist() if "runner_id" in frame.columns else []
@@ -236,12 +242,16 @@ def _persist_scores(db: Path, frame: pd.DataFrame, scored_at: str) -> None:
                     rec.get("place_ev") if pd.notna(rec.get("place_ev")) else None,
                     rec.get("ew_combined_ev") if pd.notna(rec.get("ew_combined_ev")) else None,
                     int(rec.get("value_flag") or 0),
-                    rec.get("value_gate_reason"),
+                    _normalize_gate_reason_for_db(rec.get("value_gate_reason")),
                     rec.get("scoring_method"),
                     scored_at,
                 ),
             )
         conn.commit()
+    from hibs_racing.cards.ui_frame import prune_orphan_card_scores, repair_value_gate_reasons
+
+    prune_orphan_card_scores(database=db)
+    repair_value_gate_reasons(database=db)
 
 
 def paper_log_value_picks(
@@ -255,7 +265,9 @@ def paper_log_value_picks(
 ) -> list[str]:
     """Record paper EW bets for rows that passed value + DQ + steam gates."""
     bet_ids: list[str] = []
-    picks = frame[frame["value_flag"] == 1]
+    from hibs_racing.cards.ui_frame import safe_value_mask
+
+    picks = frame[safe_value_mask(frame)]
     for rec in picks.to_dict(orient="records"):
         bet_id = record_paper_bet(
             rec["race_id"],

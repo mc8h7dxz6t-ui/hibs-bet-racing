@@ -261,7 +261,7 @@ def refresh_cards(
 
     timings["total_ms"] = round(sum(timings.values()), 1)
 
-    return {
+    result = {
         "runners": len(cards),
         "races": int(cards["race_id"].nunique()),
         "meetings": int(cards.groupby(["card_date", "course"]).ngroups),
@@ -291,3 +291,17 @@ def refresh_cards(
         "parallel_workers": workers,
         "timings_ms": timings,
     }
+    from hibs_racing.institutional.telemetry_balance import record_telemetry_balance
+
+    observation_lane = os.environ.get("HIBS_OBSERVATION_LANE", "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    telemetry = record_telemetry_balance(
+        result,
+        manifest_id=manifest_id,
+        observation_lane=observation_lane,
+    )
+    result["telemetry_balance"] = telemetry.to_dict()
+    return result

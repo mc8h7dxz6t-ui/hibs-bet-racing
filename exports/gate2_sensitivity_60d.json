@@ -1,0 +1,76 @@
+{
+  "start": "2026-04-04",
+  "end": "2026-06-02",
+  "with_caps": {
+    "none": {
+      "picks": 5007,
+      "settled": 5007,
+      "hit_rate": 0.25324545636109447,
+      "roi_pct": -4.5479132245159795,
+      "pnl_units": -227.7140151515151
+    },
+    "gate1": {
+      "picks": 3465,
+      "settled": 3465,
+      "hit_rate": 0.27070707070707073,
+      "roi_pct": -2.3506466176920706,
+      "pnl_units": -81.44990530303025
+    },
+    "gate2": {
+      "picks": 1593,
+      "settled": 1593,
+      "hit_rate": 0.3283113622096673,
+      "roi_pct": 51.464283845992874,
+      "pnl_units": 819.8260416666666
+    },
+    "blocked_reasons_gate2": {
+      "missing_or": 1405,
+      "gate2_race_cap": 942,
+      "gate2_meeting_cap": 631,
+      "gate2_price_fragile": 170,
+      "below_or_floor": 137,
+      "gate2_regime_combo": 109,
+      "gate2_regime_ev": 20
+    },
+    "snapshot_source": "snapshots"
+  },
+  "without_caps": {
+    "none": {
+      "picks": 5007,
+      "settled": 5007,
+      "hit_rate": 0.25324545636109447,
+      "roi_pct": -4.5479132245159795,
+      "pnl_units": -227.7140151515151
+    },
+    "gate1": {
+      "picks": 3465,
+      "settled": 3465,
+      "hit_rate": 0.27070707070707073,
+      "roi_pct": -2.3506466176920706,
+      "pnl_units": -81.44990530303025
+    },
+    "gate2": {
+      "picks": 3166,
+      "settled": 3166,
+      "hit_rate": 0.2789008212255212,
+      "roi_pct": -1.4669864708359657,
+      "pnl_units": -46.444791666666674
+    },
+    "blocked_reasons_gate2": {
+      "missing_or": 1405,
+      "gate2_price_fragile": 170,
+      "below_or_floor": 137,
+      "gate2_regime_combo": 109,
+      "gate2_regime_ev": 20
+    },
+    "snapshot_source": "snapshots"
+  },
+  "delta_without_vs_with": {
+    "pick_change": 1573,
+    "hit_rate_change_pp": -4.94105409841461,
+    "roi_change_pp": -52.93127031682884,
+    "pnl_change_units": -866.2708333333333
+  },
+  "caps_material": true,
+  "message": "Gate2 caps sensitivity 2026-04-04 \u2192 2026-06-02: with_caps picks=1593, without_caps picks=3166, ROI delta (no caps - caps)=-52.93127031682884pp."
+}

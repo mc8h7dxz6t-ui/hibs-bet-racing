@@ -1,0 +1,15 @@
+{
+  "start": "2026-03-04",
+  "end": "2026-06-02",
+  "card_days_written": 78,
+  "rows_written": 27881,
+  "manifest_id": "8289d709bba743e0",
+  "message": "Wrote 27881 snapshot rows across 78 card days.",
+  "config_hash": "6763fedf92f4b4ff",
+  "expected_card_days": 78,
+  "snapshot_card_days": 78,
+  "coverage_pct": 100.0,
+  "missing_dates": [],
+  "missing_count": 0,
+  "complete": true
+}

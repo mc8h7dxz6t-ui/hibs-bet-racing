@@ -188,9 +188,16 @@ def _gate2_reason(row: pd.Series | dict, paper_cfg: dict) -> str | None:
     if combo is not None and combo < min_combo:
         return "gate2_regime_combo"
 
+    win_dec = _num(row, "win_decimal")
+    min_win = gate2.get("min_win_decimal")
+    max_win = gate2.get("max_win_decimal")
+    if min_win is not None and win_dec is not None and win_dec < float(min_win):
+        return "gate2_price_band"
+    if max_win is not None and win_dec is not None and win_dec > float(max_win):
+        return "gate2_price_band"
+
     # Robustness check: implied edge should survive small odds deterioration.
     shock = float(gate2.get("price_shock_per_decimal", 0.01))
-    win_dec = _num(row, "win_decimal")
     if place_ev is not None and win_dec is not None:
         stressed_ev = place_ev - max(0.0, win_dec - 1.0) * shock
         if stressed_ev < float(gate2.get("min_stressed_place_ev", 0.0)):
@@ -331,4 +338,8 @@ def apply_value_gates(frame: pd.DataFrame, paper_cfg: dict | None = None) -> pd.
             if len(drop_idx):
                 out.loc[drop_idx, "value_flag"] = 0
                 out.loc[drop_idx, "value_gate_reason"] = "gate2_meeting_cap"
+
+    still_value = pd.to_numeric(out["value_flag"], errors="coerce").fillna(0).astype(int).eq(1)
+    out["value_gate_reason"] = out["value_gate_reason"].astype(object)
+    out.loc[still_value, "value_gate_reason"] = None
     return out

@@ -93,6 +93,26 @@ def fetch_racecards(
     return paths
 
 
+def fetch_racecards_on_date(
+    card_date: str,
+    *,
+    region: str | None = None,
+    timeout_sec: int = 300,
+) -> Path | None:
+    """
+    Fetch RP racecards for an absolute calendar date (not day-offset from today).
+    Uses API-only historical path (meetings + cardrunners + free-stats-tab).
+    """
+    from hibs_racing.ingest.historical_racecards import fetch_historical_racecards_on_date
+
+    regions = (region.lower(),) if region else ("gb", "ire")
+    return fetch_historical_racecards_on_date(
+        card_date,
+        regions=regions,
+        timeout_sec=timeout_sec,
+    )
+
+
 def load_racecard_frames(*, day: int | None = 1, days: int | None = None, region: str = "gb") -> pd.DataFrame:
     """Fetch + parse racecard JSON into a single runner-level frame."""
     json_paths = fetch_racecards(day=day, days=days, region=region)

@@ -21,6 +21,10 @@ class RankerTrainReport:
     top1_delta: float | None
     model_path: str | None
     message: str
+    stable_hash: str | None = None
+    ranker_tier: str | None = None
+    enrich_coverage_pct: dict[str, float] | None = None
+    manifest_path: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -34,6 +38,10 @@ class RankerTrainReport:
             "top1_delta": round(self.top1_delta, 4) if self.top1_delta is not None else None,
             "model_path": self.model_path,
             "message": self.message,
+            "stable_hash": self.stable_hash,
+            "ranker_tier": self.ranker_tier,
+            "enrich_coverage_pct": self.enrich_coverage_pct,
+            "manifest_path": self.manifest_path,
         }
 
 
@@ -131,6 +139,7 @@ def train_lgbm_ranker(
     min_races: int | None = None,
     save: bool = True,
     with_enrich: bool = False,
+    save_stable_hash: bool = False,
 ) -> RankerTrainReport:
     """
     Learning-to-rank with LightGBM (optional dependency).
@@ -146,15 +155,44 @@ def train_lgbm_ranker(
     min_rows = min_rows if min_rows is not None else ranker_cfg.get("min_rows", 500)
     min_races = min_races if min_races is not None else ranker_cfg.get("min_races", 50)
 
+    from hibs_racing.features.ranker_matrix import (
+        RankerMatrixValidationError,
+        build_ranker_matrix,
+        ranker_enrich_feature_columns,
+        ranker_feature_columns,
+        validate_ranker_matrix,
+    )
+
     if frame is None:
-        frame = build_ranker_matrix(export_parquet=False, config_path=config_path)
+        frame = build_ranker_matrix(export_parquet=False, config_path=config_path, with_enrich=with_enrich)
+
+    raw_enrich_coverage = frame.attrs.get("enrich_coverage_raw_pct") if with_enrich else None
 
     if frame.empty:
         return RankerTrainReport(0, 0, None, None, None, None, None, "No rows — ingest + tag first.")
 
-    from hibs_racing.features.ranker_matrix import ranker_enrich_feature_columns, ranker_feature_columns
-
     feature_cols = ranker_enrich_feature_columns() if with_enrich else ranker_feature_columns()
+    try:
+        enrich_coverage = validate_ranker_matrix(
+            frame,
+            with_enrich=with_enrich,
+            feature_cols=feature_cols,
+            min_enrich_coverage_pct=0.0,
+        )
+    except RankerMatrixValidationError as exc:
+        return RankerTrainReport(
+            len(frame),
+            frame["race_id"].nunique(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            str(exc),
+        )
+    if raw_enrich_coverage:
+        enrich_coverage = raw_enrich_coverage
+
     features = [c for c in feature_cols if c in frame.columns]
     df = frame.dropna(subset=["finish_pos"]).copy()
     df = df.sort_values(["race_date", "race_id"])
@@ -222,7 +260,25 @@ def train_lgbm_ranker(
             previous_top1 = None
     top1_delta = float(top1_hit - previous_top1) if previous_top1 is not None else None
 
+    min_holdout = float(ranker_cfg.get("min_holdout_top1_enrich", 0.28))
+    if with_enrich and save_stable_hash and float(top1_hit) < min_holdout:
+        return RankerTrainReport(
+            len(df),
+            df["race_id"].nunique(),
+            None,
+            float(top1_hit),
+            previous_top1,
+            top1_delta,
+            None,
+            f"Holdout top-1 {top1_hit:.1%} below enrich safety bar {min_holdout:.1%} — model not saved.",
+            enrich_coverage_pct=enrich_coverage or None,
+            ranker_tier="enrich_48" if with_enrich else "base_36",
+        )
+
     model_path_str: str | None = None
+    stable_hash: str | None = None
+    manifest_path: str | None = None
+    ranker_tier = "enrich_48" if with_enrich else "base_36"
     if save:
         final = _fit(df)
         fp = ranker_enrich_feature_path(cfg) if with_enrich else ranker_feature_path(cfg)
@@ -240,12 +296,34 @@ def train_lgbm_ranker(
         except Exception:
             pass  # training succeeds even if chart export fails
 
+        if save_stable_hash:
+            from hibs_racing.models.ranker_manifest import write_ranker_manifest
+
+            manifest = write_ranker_manifest(
+                features=features,
+                ranker_tier=ranker_tier,
+                holdout_top1=float(top1_hit),
+                enrich_coverage=enrich_coverage or None,
+                metrics={
+                    "previous_top1_hit_rate": previous_top1,
+                    "top1_delta": top1_delta,
+                    "rows": len(df),
+                    "races": int(df["race_id"].nunique()),
+                },
+                config_path=config_path,
+            )
+            stable_hash = manifest.get("stable_hash")
+            manifest_path = manifest.get("manifest_path")
+
     msg = "Ranker trained and saved — score-card uses model when artifact exists."
+    if stable_hash:
+        msg = f"Ranker pinned stable_hash={stable_hash} tier={ranker_tier} top-1={top1_hit:.1%}."
     if previous_top1 is not None and top1_delta is not None:
         sign = "+" if top1_delta >= 0 else ""
         msg = (
             f"Holdout top-1: {top1_hit:.1%} vs prior model {previous_top1:.1%} "
-            f"({sign}{top1_delta:.1%}). Model saved."
+            f"({sign}{top1_delta:.1%}). "
+            + (f"stable_hash={stable_hash}." if stable_hash else "Model saved.")
         )
 
     return RankerTrainReport(
@@ -257,4 +335,8 @@ def train_lgbm_ranker(
         top1_delta=top1_delta,
         model_path=model_path_str,
         message=msg,
+        stable_hash=stable_hash,
+        ranker_tier=ranker_tier,
+        enrich_coverage_pct=enrich_coverage or None,
+        manifest_path=manifest_path,
     )

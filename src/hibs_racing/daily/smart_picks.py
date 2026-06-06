@@ -8,6 +8,7 @@ from typing import Any
 import pandas as pd
 
 from hibs_racing.cards.query import load_scored_cards
+from hibs_racing.cards.ui_frame import gate_reason_is_clear, is_value_pick
 from hibs_racing.pick_explain import attach_pick_explanations
 from hibs_racing.web_service import dashboard_context, novice_pick_candidates
 
@@ -25,8 +26,8 @@ def filter_smart_picks(candidates: list[dict[str, Any]], *, limit: int = 3) -> l
     filtered = [
         c
         for c in candidates
-        if c.get("value_flag")
-        and not c.get("value_gate_reason")
+        if is_value_pick(c.get("value_flag"))
+        and gate_reason_is_clear(c.get("value_gate_reason"))
         and int(c.get("data_quality_pct") or 0) >= min_dq
         and str(c.get("steam_gate") or "proceed").lower() in allowed_gates
     ]

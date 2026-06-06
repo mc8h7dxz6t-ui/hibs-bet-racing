@@ -50,7 +50,21 @@ ranker:
   model_file: lgbm_ranker.txt
   feature_file: lgbm_ranker_features.json
   enrich_feature_file: lgbm_ranker_features_enrich.json
+  manifest_file: ranker_manifest.json
   use_enrich_features: auto          # auto | true | false — auto matches booster to manifest
+  min_enrich_coverage_pct: 5.0        # raw DB coverage required for --with-enrich train
+  min_holdout_top1_enrich: 0.28      # enforced with train-ranker --save-stable-hash
+
+# Batch historical enrich recovery (dense snapshot window)
+batch_enrich_recovery:
+  start: "2025-11-01"
+  end: "2026-05-22"
+  target_coverage_pct: 5.0           # stop early once raw mean coverage clears this
+  fetch_timeout_sec: 300
+  fetch_stats: true
+  backup_derived: true               # raceform PIT fallback when RP API fails
+  checkpoint_file: batch_scrape_checkpoint.txt
+  progress_file: batch_enrich_recovery_progress.json
   scoring_mode: auto  # auto | ranker | heuristic
   production_scoring_mode: ranker  # enforced when HIBS_RACING_PRODUCTION=1
 
@@ -103,6 +117,63 @@ paper:
     max_value_per_meeting: 6
   # Value picks auto-logged when refresh-cards runs with --paper (daily_refresh.sh)
 
+# Replay-only experimental lanes (Gate3–8). Never applied to production paper until promoted.
+experimental_replay_lanes:
+  promotion_criteria:
+    min_picks_per_month_gate5: 15      # below → too thin for statistical meaning
+    min_aggregate_roi_pct: 10.0        # fb9402-era upgrade bar vs Gate3
+    min_months_beat_gate2: 6           # of dense months with Gate2 picks
+    min_months_beat_gate3: 6           # required to claim upgrade over Gate3
+    min_gate_data_density_pct: 85.0    # gate-coverage-audit floor before re-testing Gate5/7
+  gate5_sniper:
+    min_official_rating: 60
+    min_trainer_rtf: 15
+    gate2:
+      min_confidence: 0.65
+      min_stressed_place_ev: 0.05
+      max_value_per_race: 1
+      max_value_per_meeting: 2
+  gate6_market_bounded:
+    min_official_rating: 50
+    min_trainer_rtf: 10
+    gate2:
+      min_confidence: 0.60
+      min_stressed_place_ev: 0.02
+      min_win_decimal: 2.0
+      max_win_decimal: 10.0
+      max_value_per_race: 2
+      max_value_per_meeting: 4
+  gate7_true_sniper:
+    min_official_rating: 65
+    min_trainer_rtf: 20
+    min_confidence: 0.65
+    min_stressed_place_ev: 0.05
+    max_value_per_race: 1
+    max_value_per_meeting: 1
+  gate8_regime_blend:
+    base_lane: gate3
+    trigger_confidence: 0.70
+    default_max_value_per_race: 2
+    default_max_value_per_meeting: 4
+    escalated_max_value_per_race: 1
+    escalated_max_value_per_meeting: 2
+
+institutional:
+  infrastructure:
+    wal_mode: true                    # PRAGMA journal_mode=WAL on every connect()
+    busy_timeout_ms: 30000            # writer waits for readers (dry-run + refresh overlap)
+    sqlite_connect_timeout_sec: 30
+    cron_fd_limit: 4096               # ulimit -n in cron_refresh_wrapper.sh
+    job_lock_name: daily_refresh      # exclusive lock under data/locks/
+  telemetry_balance:
+    min_matchbook_coverage: 0.50       # production: Matchbook priced / card runners
+    min_matchbook_coverage_obs: 0.35   # observation lane (Jun 4–10)
+    max_total_ms: 120000               # daily refresh SLA (ms)
+    min_fetch_ms: 50                   # Racing API must contribute fetch time
+    min_odds_ms: 10                    # Matchbook odds stage must run
+    max_score_share_pct: 92            # score dominates but should not be 100% with no odds
+    max_odds_share_pct: 45             # odds pass should not swamp API budget alone
+
 analytics:
   mode: true
   # Batch-only: morning odds at daily_refresh; no live exchange routing or polling.
@@ -152,6 +223,7 @@ oddschecker:
 exchange_profiling:
   enabled: true
   min_coverage_ratio: 0.80          # manifest warning if Matchbook prices < 80% of card
+  min_races_before_vps: 300         # keep Mac-local until slippage ledger has 300+ races
   poll_milestones:
     baseline: baseline                # daily_refresh.sh @ ~06:00
     pre_race_30m: pre_race_30m        # scripts/intraday_poll_30m.sh

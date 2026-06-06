@@ -84,4 +84,4 @@ def test_apply_value_gates_clears_flag():
     assert int(out.iloc[0]["value_flag"]) == 0
     assert out.iloc[0]["value_gate_reason"] == "unrated_race_expected"
     assert int(out.iloc[1]["value_flag"]) == 1
-    assert pd.isna(out.iloc[1]["value_gate_reason"])
+    assert out.iloc[1]["value_gate_reason"] is None or pd.isna(out.iloc[1]["value_gate_reason"])

@@ -89,6 +89,7 @@ def cmd_benchmark_gates(args: argparse.Namespace) -> int:
     end = getattr(args, "end", None)
     use_snapshots = not getattr(args, "no_snapshots", False)
     write_snapshots = getattr(args, "write_snapshots", False)
+    snap_hash = getattr(args, "snapshot_config_hash", None)
     if getattr(args, "walkforward", False):
         out = getattr(args, "output", None) or (ROOT / "exports" / "gate_walkforward.json")
         progress = out.with_name("gate_walkforward_progress.json")
@@ -98,6 +99,7 @@ def cmd_benchmark_gates(args: argparse.Namespace) -> int:
             progress_path=progress,
             use_snapshots=use_snapshots,
             write_snapshots=write_snapshots,
+            snapshot_config_hash=snap_hash,
         )
         payload = report.to_dict()
         Path(out).parent.mkdir(parents=True, exist_ok=True)
@@ -113,6 +115,7 @@ def cmd_benchmark_gates(args: argparse.Namespace) -> int:
         use_snapshots=use_snapshots,
         write_snapshots=write_snapshots,
         include_slippage=not getattr(args, "no_slippage", False),
+        snapshot_config_hash=snap_hash,
     )
     print(json.dumps(report.to_dict(), indent=2))
     return 0 if report.runners > 0 else 1
@@ -160,6 +163,84 @@ def cmd_gate_regression(args: argparse.Namespace) -> int:
     return 0 if check.passed else 1
 
 
+def cmd_gate_coverage_audit(args: argparse.Namespace) -> int:
+    from hibs_racing.analytics.gate_audit import run_gate_coverage_audit
+
+    lanes_raw = getattr(args, "lanes", None)
+    lanes = tuple(s.strip() for s in lanes_raw.split(",") if s.strip()) if lanes_raw else None
+    report = run_gate_coverage_audit(
+        start=getattr(args, "start", None),
+        end=getattr(args, "end", None),
+        snapshot_config_hash=getattr(args, "snapshot_config_hash", None),
+        lanes=lanes,
+        min_density_pct=getattr(args, "min_density", None),
+        source=getattr(args, "source", "both"),
+    )
+    print(json.dumps(report, indent=2))
+    if report.get("error"):
+        return 1
+    return 0 if report.get("retest_ready") else 1
+
+
+def cmd_gate_impact(args: argparse.Namespace) -> int:
+    from hibs_racing.config import ROOT
+    from hibs_racing.backtest.gate_impact import run_gate_impact, run_gate_lane_walkforward
+
+    start = getattr(args, "start", None)
+    end = getattr(args, "end", None)
+    snap_hash = getattr(args, "snapshot_config_hash", None)
+    if getattr(args, "walkforward", False):
+        out = getattr(args, "output", None) or (ROOT / "exports" / "gate_lane_walkforward.json")
+        progress = out.with_name("gate_lane_walkforward_progress.json")
+        report = run_gate_lane_walkforward(
+            start=start,
+            end=end,
+            snapshot_config_hash=snap_hash,
+            progress_path=progress,
+        )
+        payload = dict(report)
+        if not report.get("error"):
+            Path(out).parent.mkdir(parents=True, exist_ok=True)
+            Path(out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            payload["output_path"] = str(out)
+            payload["progress_path"] = str(progress)
+        print(json.dumps(payload, indent=2))
+        if report.get("error"):
+            return 1
+        return 0 if report.get("months_with_data", 0) > 0 else 1
+
+    report = run_gate_impact(
+        start=start,
+        end=end,
+        snapshot_config_hash=snap_hash,
+        baseline_col=getattr(args, "baseline_lane", "flag_gate2"),
+    )
+    print(json.dumps(report, indent=2))
+    if report.get("error"):
+        return 1
+    return 0 if report.get("runners", 0) > 0 else 1
+
+
+def cmd_data_integrity_check(args: argparse.Namespace) -> int:
+    from hibs_racing.cards.ui_frame import prune_orphan_card_scores
+    from hibs_racing.monitoring.nan_alert import run_nan_integrity_check
+
+    if getattr(args, "repair", False):
+        from hibs_racing.cards.ui_frame import repair_value_gate_reasons
+
+        pruned = prune_orphan_card_scores()
+        repaired = repair_value_gate_reasons()
+        print(
+            json.dumps(
+                {"orphan_card_scores_pruned": pruned, "value_gate_reasons_nulled": repaired},
+                indent=2,
+            )
+        )
+    report = run_nan_integrity_check(strict=bool(getattr(args, "strict", True)))
+    print(json.dumps(report.to_dict(), indent=2))
+    return 0 if report.passed else 1
+
+
 def cmd_institutional_check(args: argparse.Namespace) -> int:
     from hibs_racing.institutional.check import run_institutional_check
 
@@ -168,6 +249,8 @@ def cmd_institutional_check(args: argparse.Namespace) -> int:
         card_date=getattr(args, "card_date", None),
         require_snapshots=getattr(args, "require_snapshots", True),
         require_recon_clean=getattr(args, "require_recon_clean", False),
+        observation_lane=bool(getattr(args, "observation_lane", False)),
+        min_card_days=getattr(args, "min_card_days", None),
     )
     print(json.dumps(report.to_dict(), indent=2))
     return 0 if report.passed else 1
@@ -391,10 +474,55 @@ def cmd_train_ranker(args: argparse.Namespace) -> int:
     from hibs_racing.models.lgbm_ranker import train_lgbm_ranker
 
     try:
-        report = train_lgbm_ranker(with_enrich=bool(getattr(args, "with_enrich", False)))
+        report = train_lgbm_ranker(
+            with_enrich=bool(getattr(args, "with_enrich", False)),
+            save_stable_hash=bool(getattr(args, "save_stable_hash", False)),
+        )
     except ImportError as exc:
         print(json.dumps({"message": str(exc)}, indent=2))
         return 1
+    print(json.dumps(report.to_dict(), indent=2))
+    return 0 if report.model_path or not getattr(args, "save_stable_hash", False) else 1
+
+
+def cmd_backfill_runner_enrich(args: argparse.Namespace) -> int:
+    from hibs_racing.features.runner_enrich_backfill import backfill_runner_enrich
+
+    result = backfill_runner_enrich(
+        racecards_dir=getattr(args, "racecards_dir", None),
+        include_upcoming=not getattr(args, "skip_upcoming", False),
+        card_date=getattr(args, "card_date", None),
+    )
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def cmd_backfill_derived_enrich(args: argparse.Namespace) -> int:
+    from hibs_racing.ingest.enrich_backup import derive_enrich_for_date
+
+    result = derive_enrich_for_date(
+        args.card_date,
+        only_missing=not getattr(args, "refill", False),
+    )
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def cmd_batch_enrich_recovery(args: argparse.Namespace) -> int:
+    import logging
+
+    from hibs_racing.ingest.batch_enrich_recovery import run_batch_enrich_recovery
+
+    if getattr(args, "verbose", False):
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+
+    report = run_batch_enrich_recovery(
+        start=getattr(args, "start", None),
+        end=getattr(args, "end", None),
+        resume=not getattr(args, "no_resume", False),
+        max_days=getattr(args, "max_days", None),
+        skip_existing_json=not getattr(args, "refetch", False),
+    )
     print(json.dumps(report.to_dict(), indent=2))
     return 0
 
@@ -908,6 +1036,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Skip slippage stress lanes in single-window benchmark",
     )
+    p_bg.add_argument(
+        "--snapshot-config-hash",
+        metavar="HASH",
+        help="Snapshot config_hash to replay (prefix OK). Use 'best' for largest backfill in DB.",
+    )
     p_bg.set_defaults(func=cmd_benchmark_gates)
 
     p_snap = sub.add_parser(
@@ -943,6 +1076,72 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_gr.set_defaults(func=cmd_gate_regression)
 
+    p_gi = sub.add_parser(
+        "gate-impact",
+        help="Marginal ROI per block reason + Gate3/Gate4 experimental lanes (snapshot replay)",
+    )
+    p_gi.add_argument("--start", help="Start date YYYY-MM-DD")
+    p_gi.add_argument("--end", help="End date YYYY-MM-DD")
+    p_gi.add_argument(
+        "--snapshot-config-hash",
+        metavar="HASH",
+        help="Snapshot config_hash (prefix OK). Use 'best' for largest backfill.",
+    )
+    p_gi.add_argument(
+        "--baseline-lane",
+        default="flag_gate2",
+        choices=["flag_gate2", "flag_gate1", "flag_production"],
+        help="Lane whose block reasons to stress-test (default: flag_gate2)",
+    )
+    p_gi.add_argument(
+        "--walkforward",
+        action="store_true",
+        help="Month-by-month Gate2 vs Gate3 vs Gate4 comparison",
+    )
+    p_gi.add_argument(
+        "--output",
+        type=Path,
+        help="Write walk-forward JSON (default: exports/gate_lane_walkforward.json)",
+    )
+    p_gi.set_defaults(func=cmd_gate_impact)
+
+    p_gca = sub.add_parser(
+        "gate-coverage-audit",
+        help="Audit snapshot replay window for gate data deprivation before archiving lanes",
+    )
+    p_gca.add_argument("--start", help="Start date YYYY-MM-DD")
+    p_gca.add_argument("--end", help="End date YYYY-MM-DD")
+    p_gca.add_argument(
+        "--snapshot-config-hash",
+        metavar="HASH",
+        help="Snapshot config_hash (prefix OK). Use 'best' for largest backfill.",
+    )
+    p_gca.add_argument(
+        "--lanes",
+        help="Comma-separated lanes (default: gate2,gate3,gate5,gate6,gate7,gate8)",
+    )
+    p_gca.add_argument(
+        "--min-density",
+        type=float,
+        help="Override min_gate_data_density_pct (default from config)",
+    )
+    p_gca.add_argument(
+        "--source",
+        choices=["both", "snapshots", "runners"],
+        default="both",
+        help="Audit snapshots (replay), runners DB (batch inject), or both",
+    )
+    p_gca.set_defaults(func=cmd_gate_coverage_audit)
+
+    p_dic = sub.add_parser(
+        "data-integrity-check",
+        help="Strict NaN + DB/UI sync audit (local Mac — no email)",
+    )
+    p_dic.add_argument("--strict", action="store_true", default=True)
+    p_dic.add_argument("--no-strict", action="store_false", dest="strict")
+    p_dic.add_argument("--repair", action="store_true", help="Prune orphan card_scores before check")
+    p_dic.set_defaults(func=cmd_data_integrity_check)
+
     p_ic = sub.add_parser(
         "institutional-check",
         help="Phase 3: snapshots + gate regression + optional paper recon",
@@ -952,6 +1151,17 @@ def main(argv: list[str] | None = None) -> int:
     p_ic.add_argument("--require-snapshots", action="store_true", default=True)
     p_ic.add_argument("--no-require-snapshots", action="store_false", dest="require_snapshots")
     p_ic.add_argument("--require-recon-clean", action="store_true")
+    p_ic.add_argument(
+        "--observation-lane",
+        action="store_true",
+        help="Pre-WC lane: require today's snapshot + clean paper recon; skip 7d gate regression",
+    )
+    p_ic.add_argument(
+        "--min-card-days",
+        type=int,
+        default=None,
+        help="Override paper.regression.min_card_days for gate regression",
+    )
     p_ic.set_defaults(func=cmd_institutional_check)
 
     p_rp = sub.add_parser("reconcile-paper", help="Reconcile paper_bets vs production value picks")
@@ -1012,7 +1222,53 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Train with RP enrich features (48 cols); saves lgbm_ranker_features_enrich.json",
     )
+    p_ranker.add_argument(
+        "--save-stable-hash",
+        action="store_true",
+        help="Pin ranker_manifest.json with content hash; enforce min_holdout_top1_enrich",
+    )
     p_ranker.set_defaults(func=cmd_train_ranker)
+
+    p_enrich_bf = sub.add_parser(
+        "backfill-runner-enrich",
+        help="Backfill historical runners enrich columns from upcoming_runners + RP racecard JSON",
+    )
+    p_enrich_bf.add_argument(
+        "--racecards-dir",
+        type=Path,
+        help="Override rpscrape racecards directory (default: vendor/rpscrape/racecards)",
+    )
+    p_enrich_bf.add_argument(
+        "--skip-upcoming",
+        action="store_true",
+        help="Only backfill from cached RP racecard JSON",
+    )
+    p_enrich_bf.add_argument("--card-date", help="Backfill only this YYYY-MM-DD racecard")
+    p_enrich_bf.set_defaults(func=cmd_backfill_runner_enrich)
+
+    p_derived = sub.add_parser(
+        "backfill-derived-enrich",
+        help="Offline enrich from raceform history (backup when RP scrape unavailable)",
+    )
+    p_derived.add_argument("--card-date", required=True, help="YYYY-MM-DD card to derive")
+    p_derived.add_argument(
+        "--refill",
+        action="store_true",
+        help="Overwrite rows even if enrich_source is already set",
+    )
+    p_derived.set_defaults(func=cmd_backfill_derived_enrich)
+
+    p_batch = sub.add_parser(
+        "batch-enrich-recovery",
+        help="Scrape historical RP racecards + backfill runner enrich (checkpoint resume)",
+    )
+    p_batch.add_argument("--start", help="Start YYYY-MM-DD (default: batch_enrich_recovery.start)")
+    p_batch.add_argument("--end", help="End YYYY-MM-DD (default: batch_enrich_recovery.end)")
+    p_batch.add_argument("--max-days", type=int, help="Pilot: process at most N days")
+    p_batch.add_argument("--no-resume", action="store_true", help="Ignore checkpoint")
+    p_batch.add_argument("--refetch", action="store_true", help="Re-fetch JSON even if cached")
+    p_batch.add_argument("-v", "--verbose", action="store_true", help="INFO logging to stderr")
+    p_batch.set_defaults(func=cmd_batch_enrich_recovery)
 
     p_fi = sub.add_parser("feature-importance", help="Feature importance matrix + holdout AUC diagnostic")
     p_fi.add_argument("--json", action="store_true", help="Output JSON")

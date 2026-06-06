@@ -13,6 +13,7 @@ from hibs_racing.backtest.slippage_stress import apply_slippage_to_frame, defaul
 from hibs_racing.backtest.snapshot_store import (
     load_snapshots,
     merge_upcoming_enrich,
+    resolve_snapshot_config_hash,
     scoring_config_hash,
     snapshot_coverage,
     upsert_snapshots,
@@ -46,6 +47,7 @@ class GateBenchmarkReport:
     blocked_reasons_production: dict[str, int]
     slippage: dict[str, dict[str, float | int | None]] = field(default_factory=dict)
     snapshot_source: str = "scored"
+    snapshot_config_hash: str | None = None
     message: str = ""
 
     def to_dict(self) -> dict:
@@ -68,6 +70,7 @@ class GateBenchmarkReport:
             "blocked_reasons_gate2": self.blocked_reasons_gate2,
             "blocked_reasons_production": self.blocked_reasons_production,
             "snapshot_source": self.snapshot_source,
+            "snapshot_config_hash": self.snapshot_config_hash,
             "message": self.message,
         }
         if self.slippage:
@@ -289,18 +292,21 @@ def _build_benchmark_frame(
     paper_cfg: dict,
     use_snapshots: bool,
     write_snapshots: bool,
-) -> tuple[pd.DataFrame, str]:
-    config_hash = scoring_config_hash(paper_cfg)
+    snapshot_config_hash: str | None = None,
+) -> tuple[pd.DataFrame, str, str]:
+    config_hash = resolve_snapshot_config_hash(
+        db, paper_cfg, explicit=snapshot_config_hash
+    )
     if use_snapshots:
         snap = load_snapshots(db, start, end, config_hash=config_hash)
         if not snap.empty:
             gated = _apply_gate_flags(snap, paper_cfg)
             gated = gated[gated["finish_pos"].notna()].copy()
-            return gated, "snapshots"
+            return gated, "snapshots", config_hash
 
     cards = _load_historical_cards(db, start, end)
     if cards.empty:
-        return pd.DataFrame(), "scored"
+        return pd.DataFrame(), "scored", config_hash
 
     full_hist = load_runner_frame(db)
     rows: list[dict] = []
@@ -321,7 +327,7 @@ def _build_benchmark_frame(
                 config_hash=config_hash,
             )
         )
-    return pd.DataFrame(rows), "scored"
+    return pd.DataFrame(rows), "scored", config_hash
 
 
 def backfill_scored_snapshots(
@@ -423,6 +429,7 @@ def run_gate_benchmark(
     write_snapshots: bool = False,
     include_slippage: bool = True,
     gate2_caps: bool = True,
+    snapshot_config_hash: str | None = None,
 ) -> GateBenchmarkReport:
     cfg = load_config()
     db = database or db_path(cfg)
@@ -433,13 +440,14 @@ def run_gate_benchmark(
     if not start_s or not end_s:
         return _empty_report("", "", "No historical settled runners with SP available.")
 
-    frame, source = _build_benchmark_frame(
+    frame, source, snap_hash = _build_benchmark_frame(
         db=db,
         start=start_s,
         end=end_s,
         paper_cfg=paper_cfg,
         use_snapshots=use_snapshots,
         write_snapshots=write_snapshots,
+        snapshot_config_hash=snapshot_config_hash,
     )
 
     if gate2_caps is False and not frame.empty:
@@ -526,6 +534,7 @@ def run_gate_benchmark(
         blocked_reasons_production=blocked_prod,
         slippage=slip_report,
         snapshot_source=source,
+        snapshot_config_hash=snap_hash,
         message=msg,
     )
 
@@ -606,6 +615,7 @@ def run_gate_benchmark_walkforward(
     progress_path: Path | None = None,
     use_snapshots: bool = True,
     write_snapshots: bool = False,
+    snapshot_config_hash: str | None = None,
 ) -> GateWalkforwardReport:
     """Month-by-month OOS-style gate benchmark; aggregates pooled totals + per-period rows."""
     cfg = load_config()
@@ -642,6 +652,7 @@ def run_gate_benchmark_walkforward(
             use_snapshots=use_snapshots,
             write_snapshots=write_snapshots,
             include_slippage=False,
+            snapshot_config_hash=snapshot_config_hash,
         )
         row = {
             "period": label,

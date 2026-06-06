@@ -1,0 +1,40 @@
+{
+  "hash": "6763fedf92f4b4ff",
+  "card_days": 213,
+  "runners": 65910,
+  "variants": {
+    "production": {
+      "picks": 5682,
+      "hit_rate": 0.3495248152059134,
+      "roi_pct": 52.22677874308026,
+      "delta_vs_none": {
+        "pick_change": -13218,
+        "hit_rate_change_pp": 8.582111150220967,
+        "roi_change_pp": 58.64713540141311,
+        "pnl_change_units": 4180.9729766067285
+      }
+    },
+    "tweak_looser": {
+      "picks": 7307,
+      "hit_rate": 0.3420008211304229,
+      "roi_pct": 33.45715606869296,
+      "delta_vs_none": {
+        "pick_change": -11593,
+        "hit_rate_change_pp": 7.829711742671918,
+        "roi_change_pp": 39.87751272702581,
+        "pnl_change_units": 3658.161802364303
+      }
+    },
+    "gate1_only": {
+      "picks": 13294,
+      "hit_rate": 0.291409658492553,
+      "roi_pct": -4.4741314800740115,
+      "delta_vs_none": {
+        "pick_change": -5606,
+        "hit_rate_change_pp": 2.7705954788849296,
+        "roi_change_pp": 1.946225178258839,
+        "pnl_change_units": 618.6563694638695
+      }
+    }
+  }
+}

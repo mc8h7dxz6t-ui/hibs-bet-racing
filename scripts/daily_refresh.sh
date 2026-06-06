@@ -7,6 +7,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/_lib.sh"
 
+# When invoked directly (not via cron_refresh_wrapper.sh), still harden FD + lock.
+if [[ -z "${HIBS_CRON_WRAPPED:-}" ]]; then
+  raise_fd_limit
+  if ! acquire_job_lock "daily_refresh"; then
+    exit 1
+  fi
+fi
+
 activate_venv
 load_env
 
@@ -41,7 +49,7 @@ run_logged "daily-refresh-cards" \
     --workers 1 \
     --odds-source "${HIBS_ODDS_SOURCE:-matchbook}" \
     --poll-milestone baseline \
-    --paper || true
+    --paper
 
 run_logged "daily-settle-paper" \
   hibs-racing settle-paper || true
@@ -56,9 +64,19 @@ run_logged "daily-log-retention" \
   hibs-racing retain-logs || true
 
 PRIMARY_DATE="$(date -u +%F)"
+# Backfill any missing snapshot days in the lookback (best-effort; no-op when complete).
+hibs-racing snapshot-backfill --start "${START_DATE}" --end "${PRIMARY_DATE}" >/dev/null 2>&1 || true
+
+INST_FLAGS=(--days 14 --card-date "${PRIMARY_DATE}" --require-recon-clean)
+if [[ "${HIBS_OBSERVATION_LANE:-1}" == "1" ]]; then
+  INST_FLAGS+=(--observation-lane)
+fi
 run_logged "daily-institutional-check" \
-  hibs-racing institutional-check --days 14 --card-date "${PRIMARY_DATE}" --require-recon-clean
+  hibs-racing institutional-check "${INST_FLAGS[@]}"
 
 echo "Daily refresh completed successfully."
 echo "Public track record: /tracker (paper bets logged: see refresh-cards --paper)"
 echo "Exchange quotes: exchange_quotes table (baseline milestone on morning refresh)"
+# Mirror completion line for cron_daily.log audits (cron redirects full stdout here).
+_CRON_LOG="${ROOT}/logs/cron_daily.log"
+echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) daily_refresh complete ===" >>"${_CRON_LOG}" 2>/dev/null || true

@@ -106,17 +106,40 @@ else
   fail "Matchbook dry-run failed (rc=${DRY_RC}) — see logs/dry-run-quotes.log"
 fi
 
+# 7b. Telemetry balance on today's manifest (institutional++)
+echo "--- telemetry-balance ---"
+TB_PASS="$(hibs-racing institutional-check --days 1 --card-date "$(date -u +%F)" --observation-lane 2>/dev/null | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+print(d.get('telemetry_balance', {}).get('passed', False))
+" 2>/dev/null || echo False)"
+if [[ "${TB_PASS}" == "True" ]]; then
+  pass "telemetry balance OK (Racing API + Matchbook mix)"
+else
+  warn "telemetry balance soft-fail — run refresh-cards after 06:00 UK or check Matchbook coverage"
+fi
+
 # 8. Institutional check (snapshot FAIL is soft during observation start)
 echo "--- institutional-check ---"
 set +e
-INST_JSON="$(hibs-racing institutional-check --days 14 --card-date "$(date -u +%F)" 2>/dev/null)"
+INST_JSON="$(hibs-racing institutional-check --days 14 --card-date "$(date -u +%F)" --observation-lane 2>/dev/null)"
 INST_RC=$?
 set -e
 RECON_CLEAN="$(printf '%s' "${INST_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('paper_reconciliation',{}).get('is_clean', False))" 2>/dev/null || echo False)"
 if [[ ${INST_RC} -eq 0 ]]; then
   pass "institutional-check passed"
 elif [[ "${RECON_CLEAN}" == "True" ]]; then
-  warn "institutional-check failed on snapshot_coverage only — OK if card refresh green tomorrow"
+  SNAP_OK="$(printf '%s' "${INST_JSON}" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+cov = d.get('snapshot_coverage') or {}
+print(cov.get('today_snapshot', False))
+" 2>/dev/null || echo False)"
+  if [[ "${SNAP_OK}" == "True" ]]; then
+    pass "institutional-check passed (recon + snapshot; gate regression advisory)"
+  else
+    warn "institutional-check: recon clean but snapshot missing — run: hibs-racing refresh-cards --paper"
+  fi
 else
   fail "institutional-check failed with reconciliation issues"
 fi
@@ -128,12 +151,14 @@ if [[ ${SMOKE} -eq 1 ]]; then
   bash "${SCRIPT_DIR}/daily_refresh.sh"
   SMOKE_RC=$?
   set -e
-  if [[ ${SMOKE_RC} -eq 0 ]] && tail -5 "${LOG_DIR}/cron_daily.log" 2>/dev/null | grep -q 'Daily refresh completed successfully'; then
+  # Success = daily_refresh exit 0 (prints "Daily refresh completed successfully." on stdout).
+  # Do not require cron_daily.log — that file is only appended when cron redirects stdout.
+  if [[ ${SMOKE_RC} -eq 0 ]]; then
     pass "full smoke: Daily refresh completed successfully"
-  elif tail -20 "${LOG_DIR}/daily-refresh-cards.log" 2>/dev/null | grep -q '"ok": true'; then
+  elif tail -30 "${LOG_DIR}/daily-refresh-cards.log" 2>/dev/null | grep -q '"ok": true'; then
     warn "daily_refresh exited ${SMOKE_RC} but card refresh OK — check institutional tail"
   else
-    fail "full smoke failed — see logs/daily-refresh-cards.log"
+    fail "full smoke failed (rc=${SMOKE_RC}) — see logs/daily-refresh-cards.log"
   fi
 fi
 

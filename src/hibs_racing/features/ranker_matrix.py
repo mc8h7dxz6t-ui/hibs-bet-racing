@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,7 +17,35 @@ from hibs_racing.features.store import connect, init_db
 from hibs_racing.nlp.pipeline import parse_comment
 from hibs_racing.odds.matching import normalize_horse_name
 
-RANKER_QUERY = """
+logger = logging.getLogger(__name__)
+
+EXPECTED_BASE_FEATURE_COUNT = 36
+EXPECTED_ENRICH_FEATURE_COUNT = 48
+
+RUNNER_ENRICH_QUERY_COLUMNS: tuple[str, ...] = (
+    "form_string",
+    "trainer_14d_wins",
+    "trainer_14d_runs",
+    "horse_course_win_rate",
+    "horse_distance_win_rate",
+    "horse_going_win_rate",
+    "jockey_rp_14d_win_rate",
+    "trainer_rp_14d_win_rate",
+    "trainer_rtf",
+    "trainer_14d_strike",
+    "form_lto_position",
+    "form_trip_change_f",
+    "form_cd_flag",
+    "form_bf_flag",
+    "form_poor_runs_3",
+)
+
+
+class RankerMatrixValidationError(ValueError):
+    """Raised when ranker matrix fails structural integrity checks."""
+
+
+RANKER_QUERY_BASE = """
 SELECT
     r.runner_id,
     r.race_id,
@@ -42,12 +71,103 @@ WHERE r.finish_pos IS NOT NULL
 """
 
 
-def load_runner_frame(database: Path | None = None) -> pd.DataFrame:
+def _runner_select_sql(db: Path, *, with_enrich: bool) -> str:
+    init_db(db)
+    with connect(db) as conn:
+        existing = {row[1] for row in conn.execute("PRAGMA table_info(runners)").fetchall()}
+    enrich_cols = [c for c in RUNNER_ENRICH_QUERY_COLUMNS if c in existing] if with_enrich else []
+    enrich_sql = ""
+    if enrich_cols:
+        enrich_sql = ",\n    " + ",\n    ".join(f"r.{col}" for col in enrich_cols)
+    return RANKER_QUERY_BASE.replace(
+        "COALESCE(t.late_pace_level, 0) AS late_pace_level",
+        f"COALESCE(t.late_pace_level, 0) AS late_pace_level{enrich_sql}",
+    )
+
+
+def load_runner_frame(database: Path | None = None, *, with_enrich: bool = False) -> pd.DataFrame:
     cfg = load_config()
     db = database or db_path(cfg)
     init_db(db)
+    query = _runner_select_sql(db, with_enrich=with_enrich)
     with connect(db) as conn:
-        return pd.read_sql_query(RANKER_QUERY, conn)
+        return pd.read_sql_query(query, conn)
+
+
+def enrich_feature_coverage(frame: pd.DataFrame) -> dict[str, float]:
+    if frame.empty:
+        return {col: 0.0 for col in ENRICH_RANKER_FEATURES}
+    out: dict[str, float] = {}
+    n = len(frame)
+    for col in ENRICH_RANKER_FEATURES:
+        if col not in frame.columns:
+            out[col] = 0.0
+            continue
+        filled = int(frame[col].notna().sum())
+        out[col] = round(100.0 * filled / n, 2)
+    return out
+
+
+def impute_enrich_features(frame: pd.DataFrame, *, log_warnings: bool = True) -> pd.DataFrame:
+    """Training-safe imputation for sparse historical enrich coverage."""
+    out = compute_enrich_ranker_fields(frame)
+    for col in ENRICH_RANKER_FEATURES:
+        if col not in out.columns:
+            out[col] = 0.0 if "flag" in col or "win_rate" in col else np.nan
+        series = pd.to_numeric(out[col], errors="coerce")
+        null_count = int(series.isna().sum())
+        if null_count and log_warnings:
+            coverage = 100.0 * (len(out) - null_count) / len(out)
+            logger.warning(
+                "Enrich feature '%s' missing %s rows (coverage %.2f%%)",
+                col,
+                null_count,
+                coverage,
+            )
+        if "win_rate" in col or "flag" in col or col.endswith("_position"):
+            out[col] = series.fillna(0.0)
+        elif col == "form_trip_change_f":
+            out[col] = series.fillna(0.0)
+        else:
+            median = float(series.median()) if series.notna().any() else 0.0
+            out[col] = series.fillna(median)
+    return out
+
+
+def validate_ranker_matrix(
+    frame: pd.DataFrame,
+    *,
+    with_enrich: bool,
+    feature_cols: list[str],
+    min_enrich_coverage_pct: float = 0.0,
+) -> dict[str, float]:
+    """Crash safely instead of silently down-training."""
+    if frame.empty:
+        raise RankerMatrixValidationError("Ranker matrix is empty — ingest + tag first.")
+
+    present = [c for c in feature_cols if c in frame.columns]
+    expected = EXPECTED_ENRICH_FEATURE_COUNT if with_enrich else EXPECTED_BASE_FEATURE_COUNT
+    if len(present) != expected:
+        missing = [c for c in feature_cols if c not in frame.columns]
+        raise RankerMatrixValidationError(
+            f"Feature count mismatch: expected {expected}, compiled {len(present)}. "
+            f"Missing: {missing}. Run migrations + backfill-runner-enrich before --with-enrich."
+        )
+
+    coverage = enrich_feature_coverage(frame) if with_enrich else {}
+    if with_enrich:
+        missing_schema = [c for c in ENRICH_RANKER_FEATURES if c not in frame.columns]
+        if missing_schema:
+            raise RankerMatrixValidationError(
+                f"Missing enrich schema columns in matrix: {missing_schema}"
+            )
+        mean_cov = sum(coverage.values()) / len(coverage) if coverage else 0.0
+        if min_enrich_coverage_pct > 0 and mean_cov < min_enrich_coverage_pct:
+            raise RankerMatrixValidationError(
+                f"Enrich coverage {mean_cov:.2f}% below minimum {min_enrich_coverage_pct:.2f}%. "
+                "Run backfill-runner-enrich and scrape historical RP racecards before training."
+            )
+    return coverage
 
 
 def add_within_race_features(frame: pd.DataFrame) -> pd.DataFrame:
@@ -95,6 +215,7 @@ def build_ranker_matrix(
     *,
     config_path: Path | None = None,
     export_parquet: bool = True,
+    with_enrich: bool = False,
 ) -> pd.DataFrame:
     """
     Unified LTR feature matrix: one row per runner, grouped by race_id.
@@ -105,7 +226,12 @@ def build_ranker_matrix(
     alpha = cfg.get("ranker", {}).get("combo_alpha", 8.0)
     place_cutoff = cfg["backtest"].get("place_cutoff_default", 3)
 
-    frame = load_runner_frame(db)
+    logger.info(
+        "Compiling ranker matrix mode=%s",
+        "enrich_48" if with_enrich else "base_36",
+    )
+
+    frame = load_runner_frame(db, with_enrich=with_enrich)
     if frame.empty:
         return frame
 
@@ -115,6 +241,26 @@ def build_ranker_matrix(
     frame = add_discrepancy_features(frame)
     frame = add_within_race_features(frame)
 
+    if with_enrich:
+        raw_coverage = enrich_feature_coverage(frame)
+        mean_raw = sum(raw_coverage.values()) / len(raw_coverage) if raw_coverage else 0.0
+        min_cov = float(cfg.get("ranker", {}).get("min_enrich_coverage_pct", 0.0))
+        if min_cov > 0 and mean_raw < min_cov:
+            raise RankerMatrixValidationError(
+                f"Raw enrich coverage {mean_raw:.2f}% below minimum {min_cov:.2f}%. "
+                "Run backfill-runner-enrich and scrape historical RP racecards before training."
+            )
+        frame = impute_enrich_features(frame)
+        frame.attrs["enrich_coverage_raw_pct"] = raw_coverage
+
+    feature_cols = ranker_enrich_feature_columns() if with_enrich else ranker_feature_columns()
+    validate_ranker_matrix(
+        frame,
+        with_enrich=with_enrich,
+        feature_cols=feature_cols,
+        min_enrich_coverage_pct=0.0,
+    )
+
     frame["won"] = (frame["finish_pos"] == 1).astype(int)
     frame["placed"] = (frame["finish_pos"] <= place_cutoff).astype(int)
     frame["hidden_potential"] = frame["hidden_potential"].fillna(0.0)
@@ -123,7 +269,9 @@ def build_ranker_matrix(
     _persist_ranker_features(db, frame, built_at)
 
     if export_parquet:
-        out_path = Path(cfg["paths"]["parquet_dir"]) / "ranker_matrix.parquet"
+        out_path = Path(cfg["paths"]["parquet_dir"]) / (
+            "ranker_matrix_enrich.parquet" if with_enrich else "ranker_matrix.parquet"
+        )
         out_path.parent.mkdir(parents=True, exist_ok=True)
         frame.to_parquet(out_path, index=False)
 

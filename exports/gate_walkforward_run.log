@@ -1,0 +1,1105 @@
+{
+  "start": "2024-03-15",
+  "end": "2026-05-22",
+  "months_total": 27,
+  "months_with_data": 16,
+  "gate1_roi_wins_vs_none": 5,
+  "gate2_roi_wins_vs_gate1": 8,
+  "gate2_roi_wins_vs_none": 8,
+  "aggregate": {
+    "none": {
+      "picks": 18905,
+      "settled": 18905,
+      "hit_rate": 0.2644802962179318,
+      "roi_pct": -6.336298033712741,
+      "pnl_units": -1197.8771432733936
+    },
+    "gate1": {
+      "picks": 13295,
+      "settled": 13295,
+      "hit_rate": 0.2923655509590071,
+      "roi_pct": -4.389596205161268,
+      "pnl_units": -583.5968154761905
+    },
+    "gate2": {
+      "picks": 5683,
+      "settled": 5683,
+      "hit_rate": 0.35087101882808375,
+      "roi_pct": 52.29838526919733,
+      "pnl_units": 2972.1172348484847
+    },
+    "delta_gate1_vs_none": {
+      "pick_change": -5610,
+      "hit_rate_change_pp": 2.7885254741075336,
+      "roi_change_pp": 1.9467018285514737,
+      "pnl_change_units": 614.2803277972031
+    },
+    "delta_gate2_vs_gate1": {
+      "pick_change": -7612,
+      "hit_rate_change_pp": 5.850546786907662,
+      "roi_change_pp": 56.6879814743586,
+      "pnl_change_units": 3555.714050324675
+    },
+    "delta_gate2_vs_none": {
+      "pick_change": -13222,
+      "hit_rate_change_pp": 8.639072261015196,
+      "roi_change_pp": 58.63468330291008,
+      "pnl_change_units": 4169.994378121878
+    }
+  },
+  "periods": [
+    {
+      "period": "2024-03",
+      "start": "2024-03-15",
+      "end": "2024-03-31",
+      "card_days": 1,
+      "none": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": 0,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.0
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": 0,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.0
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": 0,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.0
+      }
+    },
+    {
+      "period": "2024-04",
+      "start": "2024-04-01",
+      "end": "2024-04-30",
+      "card_days": 2,
+      "none": {
+        "picks": 5,
+        "settled": 5,
+        "hit_rate": 0.6,
+        "roi_pct": 43.75,
+        "pnl_units": 2.1875
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -5,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": -2.1875
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": 0,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.0
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -5,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": -2.1875
+      }
+    },
+    {
+      "period": "2024-05",
+      "start": "2024-05-01",
+      "end": "2024-05-31",
+      "card_days": 6,
+      "none": {
+        "picks": 196,
+        "settled": 196,
+        "hit_rate": 0.2653061224489796,
+        "roi_pct": 39.638392857142854,
+        "pnl_units": 77.69125
+      },
+      "gate1": {
+        "picks": 162,
+        "settled": 162,
+        "hit_rate": 0.25925925925925924,
+        "roi_pct": 26.401234567901238,
+        "pnl_units": 42.77
+      },
+      "gate2": {
+        "picks": 62,
+        "settled": 62,
+        "hit_rate": 0.3387096774193548,
+        "roi_pct": 134.1733870967742,
+        "pnl_units": 83.1875
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -34,
+        "hit_rate_change_pp": -0.6046863189720364,
+        "roi_change_pp": -13.237158289241616,
+        "pnl_change_units": -34.92124999999999
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": -100,
+        "hit_rate_change_pp": 7.945041816009557,
+        "roi_change_pp": 107.77215252887297,
+        "pnl_change_units": 40.4175
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -134,
+        "hit_rate_change_pp": 7.340355497037521,
+        "roi_change_pp": 94.53499423963135,
+        "pnl_change_units": 5.496250000000003
+      }
+    },
+    {
+      "period": "2024-06",
+      "start": "2024-06-01",
+      "end": "2024-06-30",
+      "card_days": 1,
+      "none": {
+        "picks": 2,
+        "settled": 2,
+        "hit_rate": 0.5,
+        "roi_pct": -28.125,
+        "pnl_units": -0.5625
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -2,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.5625
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": 0,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.0
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -2,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.5625
+      }
+    },
+    {
+      "period": "2024-07",
+      "start": "2024-07-01",
+      "end": "2024-07-31",
+      "card_days": 1,
+      "none": {
+        "picks": 2,
+        "settled": 2,
+        "hit_rate": 1.0,
+        "roi_pct": 118.75,
+        "pnl_units": 2.375
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -2,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": -2.375
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": 0,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.0
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -2,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": -2.375
+      }
+    },
+    {
+      "period": "2024-08",
+      "start": "2024-08-01",
+      "end": "2024-08-31",
+      "card_days": 1,
+      "none": {
+        "picks": 2,
+        "settled": 2,
+        "hit_rate": 0.5,
+        "roi_pct": -37.5,
+        "pnl_units": -0.75
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -2,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.75
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": 0,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.0
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -2,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.75
+      }
+    },
+    {
+      "period": "2024-09",
+      "start": "2024-09-01",
+      "end": "2024-09-30",
+      "card_days": 1,
+      "none": {
+        "picks": 2,
+        "settled": 2,
+        "hit_rate": 0.5,
+        "roi_pct": 121.875,
+        "pnl_units": 2.4375
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -2,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": -2.4375
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": 0,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.0
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -2,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": -2.4375
+      }
+    },
+    {
+      "period": "2024-10",
+      "start": "2024-10-01",
+      "end": "2024-10-31",
+      "card_days": 1,
+      "none": {
+        "picks": 2,
+        "settled": 2,
+        "hit_rate": 0.5,
+        "roi_pct": -12.5,
+        "pnl_units": -0.25
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -2,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.25
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": 0,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.0
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -2,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.25
+      }
+    },
+    {
+      "period": "2024-11",
+      "start": "2024-11-01",
+      "end": "2024-11-30",
+      "card_days": 1,
+      "none": {
+        "picks": 2,
+        "settled": 2,
+        "hit_rate": 0.5,
+        "roi_pct": -21.875,
+        "pnl_units": -0.4375
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -2,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.4375
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": 0,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.0
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -2,
+        "hit_rate_change_pp": null,
+        "roi_change_pp": null,
+        "pnl_change_units": 0.4375
+      }
+    },
+    {
+      "period": "2024-12",
+      "start": "2024-12-01",
+      "end": "2024-12-31",
+      "card_days": 0,
+      "none": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {},
+      "delta_gate2_vs_gate1": {},
+      "delta_gate2_vs_none": {}
+    },
+    {
+      "period": "2025-01",
+      "start": "2025-01-01",
+      "end": "2025-01-31",
+      "card_days": 0,
+      "none": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {},
+      "delta_gate2_vs_gate1": {},
+      "delta_gate2_vs_none": {}
+    },
+    {
+      "period": "2025-02",
+      "start": "2025-02-01",
+      "end": "2025-02-28",
+      "card_days": 0,
+      "none": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {},
+      "delta_gate2_vs_gate1": {},
+      "delta_gate2_vs_none": {}
+    },
+    {
+      "period": "2025-03",
+      "start": "2025-03-01",
+      "end": "2025-03-31",
+      "card_days": 0,
+      "none": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {},
+      "delta_gate2_vs_gate1": {},
+      "delta_gate2_vs_none": {}
+    },
+    {
+      "period": "2025-04",
+      "start": "2025-04-01",
+      "end": "2025-04-30",
+      "card_days": 0,
+      "none": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {},
+      "delta_gate2_vs_gate1": {},
+      "delta_gate2_vs_none": {}
+    },
+    {
+      "period": "2025-05",
+      "start": "2025-05-01",
+      "end": "2025-05-31",
+      "card_days": 0,
+      "none": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {},
+      "delta_gate2_vs_gate1": {},
+      "delta_gate2_vs_none": {}
+    },
+    {
+      "period": "2025-06",
+      "start": "2025-06-01",
+      "end": "2025-06-30",
+      "card_days": 0,
+      "none": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {},
+      "delta_gate2_vs_gate1": {},
+      "delta_gate2_vs_none": {}
+    },
+    {
+      "period": "2025-07",
+      "start": "2025-07-01",
+      "end": "2025-07-31",
+      "card_days": 0,
+      "none": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {},
+      "delta_gate2_vs_gate1": {},
+      "delta_gate2_vs_none": {}
+    },
+    {
+      "period": "2025-08",
+      "start": "2025-08-01",
+      "end": "2025-08-31",
+      "card_days": 0,
+      "none": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {},
+      "delta_gate2_vs_gate1": {},
+      "delta_gate2_vs_none": {}
+    },
+    {
+      "period": "2025-09",
+      "start": "2025-09-01",
+      "end": "2025-09-30",
+      "card_days": 0,
+      "none": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {},
+      "delta_gate2_vs_gate1": {},
+      "delta_gate2_vs_none": {}
+    },
+    {
+      "period": "2025-10",
+      "start": "2025-10-01",
+      "end": "2025-10-31",
+      "card_days": 0,
+      "none": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate1": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "gate2": {
+        "picks": 0,
+        "settled": 0,
+        "hit_rate": null,
+        "roi_pct": null,
+        "pnl_units": 0.0
+      },
+      "delta_gate1_vs_none": {},
+      "delta_gate2_vs_gate1": {},
+      "delta_gate2_vs_none": {}
+    },
+    {
+      "period": "2025-11",
+      "start": "2025-11-01",
+      "end": "2025-11-30",
+      "card_days": 30,
+      "none": {
+        "picks": 3244,
+        "settled": 3244,
+        "hit_rate": 0.2564734895191122,
+        "roi_pct": -14.425382057317943,
+        "pnl_units": -467.95939393939403
+      },
+      "gate1": {
+        "picks": 2154,
+        "settled": 2154,
+        "hit_rate": 0.2938718662952646,
+        "roi_pct": -6.866743690385752,
+        "pnl_units": -147.9096590909091
+      },
+      "gate2": {
+        "picks": 827,
+        "settled": 827,
+        "hit_rate": 0.34582829504232165,
+        "roi_pct": 49.89171109523286,
+        "pnl_units": 412.6044507575757
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -1090,
+        "hit_rate_change_pp": 3.739837677615243,
+        "roi_change_pp": 7.5586383669321915,
+        "pnl_change_units": 320.04973484848495
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": -1327,
+        "hit_rate_change_pp": 5.195642874705703,
+        "roi_change_pp": 56.75845478561861,
+        "pnl_change_units": 560.5141098484848
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -2417,
+        "hit_rate_change_pp": 8.935480552320946,
+        "roi_change_pp": 64.3170931525508,
+        "pnl_change_units": 880.5638446969697
+      }
+    },
+    {
+      "period": "2025-12",
+      "start": "2025-12-01",
+      "end": "2025-12-31",
+      "card_days": 29,
+      "none": {
+        "picks": 2774,
+        "settled": 2774,
+        "hit_rate": 0.2595529920692141,
+        "roi_pct": -1.8464816696161335,
+        "pnl_units": -51.22140151515154
+      },
+      "gate1": {
+        "picks": 1851,
+        "settled": 1851,
+        "hit_rate": 0.28687196110210694,
+        "roi_pct": -7.849360705924727,
+        "pnl_units": -145.29166666666669
+      },
+      "gate2": {
+        "picks": 796,
+        "settled": 796,
+        "hit_rate": 0.3492462311557789,
+        "roi_pct": 49.036850921273036,
+        "pnl_units": 390.33333333333337
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -923,
+        "hit_rate_change_pp": 2.7318969032892824,
+        "roi_change_pp": -6.0028790363085935,
+        "pnl_change_units": -94.07026515151514
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": -1055,
+        "hit_rate_change_pp": 6.237427005367197,
+        "roi_change_pp": 56.88621162719776,
+        "pnl_change_units": 535.625
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -1978,
+        "hit_rate_change_pp": 8.969323908656479,
+        "roi_change_pp": 50.88333259088917,
+        "pnl_change_units": 441.55473484848494
+      }
+    },
+    {
+      "period": "2026-01",
+      "start": "2026-01-01",
+      "end": "2026-01-31",
+      "card_days": 30,
+      "none": {
+        "picks": 2541,
+        "settled": 2541,
+        "hit_rate": 0.2581660763478945,
+        "roi_pct": -10.686353648647035,
+        "pnl_units": -271.54024621212113
+      },
+      "gate1": {
+        "picks": 1877,
+        "settled": 1877,
+        "hit_rate": 0.2903569525839105,
+        "roi_pct": -7.160397596099512,
+        "pnl_units": -134.40066287878784
+      },
+      "gate2": {
+        "picks": 769,
+        "settled": 769,
+        "hit_rate": 0.34980494148244473,
+        "roi_pct": 52.27785002167317,
+        "pnl_units": 402.01666666666665
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -664,
+        "hit_rate_change_pp": 3.219087623601596,
+        "roi_change_pp": 3.5259560525475235,
+        "pnl_change_units": 137.1395833333333
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": -1108,
+        "hit_rate_change_pp": 5.944798889853425,
+        "roi_change_pp": 59.43824761777268,
+        "pnl_change_units": 536.4173295454545
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -1772,
+        "hit_rate_change_pp": 9.163886513455022,
+        "roi_change_pp": 62.9642036703202,
+        "pnl_change_units": 673.5569128787878
+      }
+    },
+    {
+      "period": "2026-02",
+      "start": "2026-02-01",
+      "end": "2026-02-28",
+      "card_days": 28,
+      "none": {
+        "picks": 2268,
+        "settled": 2268,
+        "hit_rate": 0.29717813051146386,
+        "roi_pct": -2.9929336352947455,
+        "pnl_units": -67.87973484848483
+      },
+      "gate1": {
+        "picks": 1684,
+        "settled": 1684,
+        "hit_rate": 0.3355106888361045,
+        "roi_pct": 4.7725192093140425,
+        "pnl_units": 80.36922348484848
+      },
+      "gate2": {
+        "picks": 732,
+        "settled": 732,
+        "hit_rate": 0.38114754098360654,
+        "roi_pct": 65.24746698542803,
+        "pnl_units": 477.61145833333325
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -584,
+        "hit_rate_change_pp": 3.8332558324640664,
+        "roi_change_pp": 7.765452844608788,
+        "pnl_change_units": 148.2489583333333
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": -952,
+        "hit_rate_change_pp": 4.563685214750201,
+        "roi_change_pp": 60.47494777611399,
+        "pnl_change_units": 397.24223484848477
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -1536,
+        "hit_rate_change_pp": 8.396941047214268,
+        "roi_change_pp": 68.24040062072278,
+        "pnl_change_units": 545.4911931818181
+      }
+    },
+    {
+      "period": "2026-03",
+      "start": "2026-03-01",
+      "end": "2026-03-31",
+      "card_days": 31,
+      "none": {
+        "picks": 2637,
+        "settled": 2637,
+        "hit_rate": 0.27607129313613954,
+        "roi_pct": -15.301655035016811,
+        "pnl_units": -403.50464327339336
+      },
+      "gate1": {
+        "picks": 1951,
+        "settled": 1951,
+        "hit_rate": 0.30035879036391594,
+        "roi_pct": -8.870279088756797,
+        "pnl_units": -173.0591450216451
+      },
+      "gate2": {
+        "picks": 833,
+        "settled": 833,
+        "hit_rate": 0.37334933973589435,
+        "roi_pct": 45.228875641165544,
+        "pnl_units": 376.756534090909
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -686,
+        "hit_rate_change_pp": 2.4287497227776402,
+        "roi_change_pp": 6.4313759462600135,
+        "pnl_change_units": 230.44549825174826
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": -1118,
+        "hit_rate_change_pp": 7.299054937197841,
+        "roi_change_pp": 54.09915472992234,
+        "pnl_change_units": 549.8156791125541
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -1804,
+        "hit_rate_change_pp": 9.727804659975481,
+        "roi_change_pp": 60.53053067618235,
+        "pnl_change_units": 780.2611773643023
+      }
+    },
+    {
+      "period": "2026-04",
+      "start": "2026-04-01",
+      "end": "2026-04-30",
+      "card_days": 30,
+      "none": {
+        "picks": 3043,
+        "settled": 3043,
+        "hit_rate": 0.2596122247781794,
+        "roi_pct": 1.6188264919985231,
+        "pnl_units": 49.26089015151506
+      },
+      "gate1": {
+        "picks": 2097,
+        "settled": 2097,
+        "hit_rate": 0.28469241773962806,
+        "roi_pct": -6.0464850580193925,
+        "pnl_units": -126.79479166666667
+      },
+      "gate2": {
+        "picks": 957,
+        "settled": 957,
+        "hit_rate": 0.34691745036572624,
+        "roi_pct": 43.76382358063392,
+        "pnl_units": 418.8197916666666
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -946,
+        "hit_rate_change_pp": 2.508019296144864,
+        "roi_change_pp": -7.665311550017916,
+        "pnl_change_units": -176.05568181818174
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": -1140,
+        "hit_rate_change_pp": 6.222503262609819,
+        "roi_change_pp": 49.81030863865331,
+        "pnl_change_units": 545.6145833333333
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -2086,
+        "hit_rate_change_pp": 8.730522558754682,
+        "roi_change_pp": 42.14499708863539,
+        "pnl_change_units": 369.55890151515155
+      }
+    },
+    {
+      "period": "2026-05",
+      "start": "2026-05-01",
+      "end": "2026-05-22",
+      "card_days": 20,
+      "none": {
+        "picks": 2185,
+        "settled": 2185,
+        "hit_rate": 0.24622425629290617,
+        "roi_pct": -3.099490326607032,
+        "pnl_units": -67.72386363636365
+      },
+      "gate1": {
+        "picks": 1519,
+        "settled": 1519,
+        "hit_rate": 0.2554312047399605,
+        "roi_pct": 1.3640478185409068,
+        "pnl_units": 20.719886363636377
+      },
+      "gate2": {
+        "picks": 707,
+        "settled": 707,
+        "hit_rate": 0.30834512022630833,
+        "roi_pct": 58.10289957567185,
+        "pnl_units": 410.7875
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -666,
+        "hit_rate_change_pp": 0.9206948447054331,
+        "roi_change_pp": 4.463538145147939,
+        "pnl_change_units": 88.44375000000002
+      },
+      "delta_gate2_vs_gate1": {
+        "pick_change": -812,
+        "hit_rate_change_pp": 5.291391548634783,
+        "roi_change_pp": 56.738851757130945,
+        "pnl_change_units": 390.06761363636366
+      },
+      "delta_gate2_vs_none": {
+        "pick_change": -1478,
+        "hit_rate_change_pp": 6.212086393340216,
+        "roi_change_pp": 61.20238990227888,
+        "pnl_change_units": 478.5113636363637
+      }
+    }
+  ],
+  "message": "Walk-forward 2024-03-15 \u2192 2026-05-22: 16/27 months with data. Gate1 ROI beat none in 5 months; gate2 beat gate1 in 8 months.",
+  "output_path": "exports/gate_walkforward.json",
+  "progress_path": "exports/gate_walkforward_progress.json"
+}

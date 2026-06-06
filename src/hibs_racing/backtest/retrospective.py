@@ -46,7 +46,15 @@ SELECT
     comment_norm AS card_comment,
     sp_decimal AS win_decimal,
     finish_pos,
-    race_natural_key
+    race_natural_key,
+    trainer_rtf,
+    enrich_source,
+    form_string,
+    horse_course_win_rate,
+    horse_distance_win_rate,
+    horse_going_win_rate,
+    form_trip_change_f,
+    form_poor_runs_3
 FROM runners
 WHERE race_date >= ?
   AND race_date <= ?

@@ -146,6 +146,15 @@ class MatchbookClient:
         self._token_at: float = 0.0
         self._sport_id = int(mb.get("sport_id", HORSE_RACING_SPORT_ID))
 
+    def close(self) -> None:
+        self._session.close()
+
+    def __enter__(self) -> MatchbookClient:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
     def login(self, *, force: bool = False) -> str:
         if self._token and not force and (time.time() - self._token_at) < 5 * 3600:
             return self._token
@@ -579,98 +588,109 @@ def fetch_matchbook_odds(
     places = int(mb_cfg.get("default_places", 3))
     report = MatchbookFetchReport()
 
+    owns_client = client is None
+    client = client or MatchbookClient(config_path=config_path)
     try:
-        client = client or MatchbookClient(config_path=config_path)
-        events, _card_dates = _load_gb_ire_events_for_cards(client, cards, mb_cfg=mb_cfg)
-        report.events_loaded = len(events)
-    except ValueError as exc:
-        report.errors.append(str(exc))
-        return pd.DataFrame(), report
-    except Exception as exc:
-        report.errors.append(str(exc))
-        return pd.DataFrame(), report
+        try:
+            events, _card_dates = _load_gb_ire_events_for_cards(client, cards, mb_cfg=mb_cfg)
+            report.events_loaded = len(events)
+            venues: list[str] = []
+            for ev in events:
+                hint = _event_course_hint(ev)
+                if hint and hint not in venues:
+                    venues.append(hint)
+            report.exchange_venues_on_card_dates = sorted(venues)[:30]
+        except ValueError as exc:
+            report.errors.append(str(exc))
+            return pd.DataFrame(), report
+        except Exception as exc:
+            report.errors.append(str(exc))
+            return pd.DataFrame(), report
 
-    time_tol = int(mb_cfg.get("event_time_tolerance_sec", 120))
-    near_miss_sec = int(mb_cfg.get("event_near_miss_sec", 600))
-    near_miss_counter = [0]
+        time_tol = int(mb_cfg.get("event_time_tolerance_sec", 120))
+        near_miss_sec = int(mb_cfg.get("event_near_miss_sec", 600))
+        near_miss_counter = [0]
 
-    priced: list[dict] = []
-    races = list(cards.groupby("race_id", sort=False))
-    report.races_attempted = len(races)
+        priced: list[dict] = []
+        races = list(cards.groupby("race_id", sort=False))
+        report.races_attempted = len(races)
 
-    for race_id, race_df in races:
-        first = race_df.iloc[0]
-        course = first.get("course")
-        card_date = str(first.get("card_date") or "")
-        off_time = first.get("off_time")
+        for race_id, race_df in races:
+            first = race_df.iloc[0]
+            course = first.get("course")
+            card_date = str(first.get("card_date") or "")
+            off_time = first.get("off_time")
 
-        event = find_matching_exchange_event(
-            events,
-            course=course,
-            card_date=card_date,
-            off_time=off_time,
-            time_tolerance_sec=time_tol,
-            near_miss_sec=near_miss_sec,
-            near_miss_counter=near_miss_counter,
-        )
-        if event is None:
-            if len(report.errors) < 5:
-                report.errors.append(f"{race_id}: no Matchbook event for {course} {off_time}")
-            continue
-
-        market = _select_win_market(event.get("markets") or [])
-        if market is None:
-            report.errors.append(f"{race_id}: no win market on event {event.get('id')}")
-            continue
-
-        place_market = _select_place_market(event.get("markets") or [])
-
-        report.races_matched += 1
-        runners = {str(r.get("name") or ""): r for r in market.get("runners") or []}
-
-        for _, card_row in race_df.iterrows():
-            horse = card_row.get("horse_name")
-            mb_runner = None
-            for name, runner in runners.items():
-                if horse_names_match(horse, name):
-                    mb_runner = runner
-                    break
-            if mb_runner is None:
-                continue
-            back, back_liq = _top_of_book(mb_runner, "back")
-            if back is None:
-                continue
-            lay, lay_liq = _top_of_book(mb_runner, "lay")
-
-            place_runner = _runner_by_horse_name(place_market, horse) if place_market else None
-            place_back = _best_back_price(place_runner) if place_runner else None
-
-            priced.append(
-                {
-                    "race_id": race_id,
-                    "runner_id": card_row.get("runner_id"),
-                    "card_date": card_date,
-                    "horse_name": horse,
-                    "win_decimal": back,
-                    "back_price": back,
-                    "back_liquidity": back_liq,
-                    "lay_price": lay,
-                    "lay_liquidity": lay_liq,
-                    "exchange_spread_bps": exchange_spread_bps(back, lay),
-                    "place_decimal": place_back,
-                    "best_book": "matchbook",
-                    "matchbook_runner_id": mb_runner.get("id"),
-                    "matchbook_market_id": market.get("id"),
-                    "matchbook_place_runner_id": place_runner.get("id") if place_runner else None,
-                    "matchbook_place_market_id": place_market.get("id") if place_market else None,
-                    "matchbook_event_id": event.get("id"),
-                    "race_natural_key": build_matchbook_natural_key(event),
-                    "place_fraction": place_fraction,
-                    "places": places,
-                    "odds_source": "matchbook",
-                }
+            event = find_matching_exchange_event(
+                events,
+                course=course,
+                card_date=card_date,
+                off_time=off_time,
+                time_tolerance_sec=time_tol,
+                near_miss_sec=near_miss_sec,
+                near_miss_counter=near_miss_counter,
             )
+            if event is None:
+                if len(report.errors) < 5:
+                    report.errors.append(f"{race_id}: no Matchbook event for {course} {off_time}")
+                continue
 
-    report.runners_priced = len(priced)
-    report.near_miss_count = near_miss_counter[0]
-    return pd.DataFrame(priced), report
+            market = _select_win_market(event.get("markets") or [])
+            if market is None:
+                report.errors.append(f"{race_id}: no win market on event {event.get('id')}")
+                continue
+
+            place_market = _select_place_market(event.get("markets") or [])
+
+            report.races_matched += 1
+            runners = {str(r.get("name") or ""): r for r in market.get("runners") or []}
+
+            for _, card_row in race_df.iterrows():
+                horse = card_row.get("horse_name")
+                mb_runner = None
+                for name, runner in runners.items():
+                    if horse_names_match(horse, name):
+                        mb_runner = runner
+                        break
+                if mb_runner is None:
+                    continue
+                back, back_liq = _top_of_book(mb_runner, "back")
+                if back is None:
+                    continue
+                lay, lay_liq = _top_of_book(mb_runner, "lay")
+
+                place_runner = _runner_by_horse_name(place_market, horse) if place_market else None
+                place_back = _best_back_price(place_runner) if place_runner else None
+
+                priced.append(
+                    {
+                        "race_id": race_id,
+                        "runner_id": card_row.get("runner_id"),
+                        "card_date": card_date,
+                        "horse_name": horse,
+                        "win_decimal": back,
+                        "back_price": back,
+                        "back_liquidity": back_liq,
+                        "lay_price": lay,
+                        "lay_liquidity": lay_liq,
+                        "exchange_spread_bps": exchange_spread_bps(back, lay),
+                        "place_decimal": place_back,
+                        "best_book": "matchbook",
+                        "matchbook_runner_id": mb_runner.get("id"),
+                        "matchbook_market_id": market.get("id"),
+                        "matchbook_place_runner_id": place_runner.get("id") if place_runner else None,
+                        "matchbook_place_market_id": place_market.get("id") if place_market else None,
+                        "matchbook_event_id": event.get("id"),
+                        "race_natural_key": build_matchbook_natural_key(event),
+                        "place_fraction": place_fraction,
+                        "places": places,
+                        "odds_source": "matchbook",
+                    }
+                )
+
+        report.runners_priced = len(priced)
+        report.near_miss_count = near_miss_counter[0]
+        return pd.DataFrame(priced), report
+    finally:
+        if owns_client:
+            client.close()

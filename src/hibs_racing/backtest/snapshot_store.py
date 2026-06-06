@@ -91,6 +91,12 @@ _CONFIG_HASH_KEYS: tuple[str, ...] = (
 
 def _model_version_stamp(cfg: dict) -> str:
     """Ranker artifact identity — snapshots must not mix scores across retrains."""
+    try:
+        from hibs_racing.models.ranker_manifest import model_version_stamp
+
+        return model_version_stamp(cfg)
+    except Exception:
+        pass
     model_dir = Path(cfg.get("paths", {}).get("model_dir", "data/models"))
     ranker = cfg.get("ranker", {})
     model_file = str(ranker.get("model_file", "lgbm_ranker.txt"))
@@ -122,6 +128,47 @@ def scoring_config_hash(paper_cfg: dict | None = None) -> str:
         pass
     payload = json.dumps(subset, sort_keys=True, default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def resolve_snapshot_config_hash(
+    db: Path,
+    paper_cfg: dict | None = None,
+    *,
+    explicit: str | None = None,
+) -> str:
+    """Resolve which snapshot rows to load: live hash, DB ``best``, or explicit/prefix."""
+    if not explicit:
+        return scoring_config_hash(paper_cfg)
+    token = explicit.strip().lower()
+    if token in ("best", "largest"):
+        init_db(db)
+        with connect(db) as conn:
+            row = conn.execute(
+                """
+                SELECT config_hash
+                FROM scored_runner_snapshots
+                GROUP BY config_hash
+                ORDER BY COUNT(*) DESC
+                LIMIT 1
+                """
+            ).fetchone()
+        if row:
+            return str(row[0])
+        return scoring_config_hash(paper_cfg)
+    init_db(db)
+    with connect(db) as conn:
+        row = conn.execute(
+            """
+            SELECT config_hash
+            FROM scored_runner_snapshots
+            WHERE config_hash = ? OR config_hash LIKE ?
+            GROUP BY config_hash
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+            """,
+            (explicit, f"{explicit}%"),
+        ).fetchone()
+    return str(row[0]) if row else explicit.strip()
 
 
 def _gates_blob(rec: dict) -> str | None:
@@ -198,16 +245,27 @@ def _expand_gates_json(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty or "gates_json" not in frame.columns:
         return frame
     out = frame.copy()
-    for idx, raw in out["gates_json"].items():
+
+    def _parse_ctx(raw: object) -> dict:
         if not raw or not isinstance(raw, str):
-            continue
+            return {}
         try:
             ctx = json.loads(raw)
         except json.JSONDecodeError:
-            continue
-        if isinstance(ctx, dict):
-            for key, val in ctx.items():
-                out.at[idx, key] = val
+            return {}
+        return ctx if isinstance(ctx, dict) else {}
+
+    ctx_frame = out["gates_json"].map(_parse_ctx)
+    if ctx_frame.empty or not ctx_frame.map(bool).any():
+        return out
+    extra = pd.json_normalize(ctx_frame.tolist()).astype(object)
+    extra.index = out.index
+    overlap = [c for c in extra.columns if c in out.columns]
+    for col in overlap:
+        out[col] = out[col].combine_first(extra[col])
+    new_cols = [c for c in extra.columns if c not in out.columns]
+    if new_cols:
+        out = pd.concat([out, extra[new_cols]], axis=1)
     return out
 
 
@@ -388,6 +446,49 @@ def load_snapshots_for_card(
         if not frame.empty:
             return frame
     return load_snapshots(db, card_date, card_date, odds_source=None, config_hash=config_hash)
+
+
+def snapshot_row_count_for_date(
+    db: Path,
+    card_date: str,
+    *,
+    config_hash: str | None = None,
+) -> int:
+    """Count snapshot rows for a card date (optional config_hash filter)."""
+    init_db(db)
+    with connect(db) as conn:
+        if config_hash:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) FROM scored_runner_snapshots
+                WHERE card_date = ? AND config_hash = ?
+                """,
+                (card_date, config_hash),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) FROM scored_runner_snapshots
+                WHERE card_date = ?
+                """,
+                (card_date,),
+            ).fetchone()
+    return int(row[0] or 0)
+
+
+def card_snapshot_present(
+    db: Path,
+    card_date: str,
+    *,
+    config_hash: str | None = None,
+    allow_any_hash: bool = False,
+) -> bool:
+    """True when scored_runner_snapshots exist for card_date."""
+    if config_hash and snapshot_row_count_for_date(db, card_date, config_hash=config_hash) > 0:
+        return True
+    if allow_any_hash:
+        return snapshot_row_count_for_date(db, card_date, config_hash=None) > 0
+    return False
 
 
 def snapshot_card_dates(db: Path, start: str, end: str, *, config_hash: str | None = None) -> list[str]:

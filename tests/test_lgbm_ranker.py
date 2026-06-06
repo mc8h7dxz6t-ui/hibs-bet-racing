@@ -4,8 +4,8 @@ import pandas as pd
 import pytest
 
 from hibs_racing.cards.score_card import score_upcoming_cards
-from hibs_racing.config import ranker_feature_path, ranker_model_path
-from hibs_racing.features.ranker_matrix import build_card_feature_frame, build_ranker_matrix, ranker_feature_columns
+from hibs_racing.config import load_config, ranker_feature_path, ranker_model_path
+from hibs_racing.features.ranker_matrix import build_card_feature_frame, ranker_feature_columns
 from hibs_racing.features.store import connect, init_db
 from hibs_racing.models.lgbm_ranker import load_ranker, train_lgbm_ranker
 
@@ -196,6 +196,8 @@ backtest:
     monkeypatch.setenv("HIBS_RACING_DB_PATH", str(db))
     init_db(db)
     _seed_history(db)
+
+    from hibs_racing.features.ranker_matrix import build_ranker_matrix
 
     matrix = build_ranker_matrix(database=db, config_path=cfg_dir / "config.yaml", export_parquet=False)
     report = train_lgbm_ranker(matrix, config_path=cfg_dir / "config.yaml", min_rows=50, min_races=10)

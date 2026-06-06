@@ -1,0 +1,340 @@
+{
+  "start": "2025-11-01",
+  "end": "2025-11-30",
+  "days_processed": 18,
+  "days_fetched": 18,
+  "days_skipped_existing": 0,
+  "days_failed": 0,
+  "rows_backfilled": 4513,
+  "initial_coverage_pct": 0.38,
+  "final_coverage_pct": 5.13,
+  "checkpoint": "2025-11-19",
+  "day_log": [
+    {
+      "date": "2025-11-02",
+      "fetched": true,
+      "backfill_rows": 326,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 326
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 0.73
+    },
+    {
+      "date": "2025-11-03",
+      "fetched": true,
+      "backfill_rows": 323,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 323
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 1.07
+    },
+    {
+      "date": "2025-11-04",
+      "fetched": true,
+      "backfill_rows": 328,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 328
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 1.41
+    },
+    {
+      "date": "2025-11-05",
+      "fetched": true,
+      "backfill_rows": 323,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 323
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 1.75
+    },
+    {
+      "date": "2025-11-06",
+      "fetched": true,
+      "backfill_rows": 347,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 347
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 2.12
+    },
+    {
+      "date": "2025-11-07",
+      "fetched": true,
+      "backfill_rows": 333,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 333
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 2.47
+    },
+    {
+      "date": "2025-11-08",
+      "fetched": true,
+      "backfill_rows": 461,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 461
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 2.96
+    },
+    {
+      "date": "2025-11-09",
+      "fetched": true,
+      "backfill_rows": 157,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 157
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 3.12
+    },
+    {
+      "date": "2025-11-10",
+      "fetched": true,
+      "backfill_rows": 99,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 99
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 3.23
+    },
+    {
+      "date": "2025-11-11",
+      "fetched": true,
+      "backfill_rows": 129,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 129
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 3.36
+    },
+    {
+      "date": "2025-11-12",
+      "fetched": true,
+      "backfill_rows": 191,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 191
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 3.56
+    },
+    {
+      "date": "2025-11-13",
+      "fetched": true,
+      "backfill_rows": 159,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 159
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 3.72
+    },
+    {
+      "date": "2025-11-14",
+      "fetched": true,
+      "backfill_rows": 224,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 224
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 3.96
+    },
+    {
+      "date": "2025-11-15",
+      "fetched": true,
+      "backfill_rows": 150,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 150
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 4.12
+    },
+    {
+      "date": "2025-11-16",
+      "fetched": true,
+      "backfill_rows": 214,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 214
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 4.34
+    },
+    {
+      "date": "2025-11-17",
+      "fetched": true,
+      "backfill_rows": 257,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 257
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 4.61
+    },
+    {
+      "date": "2025-11-18",
+      "fetched": true,
+      "backfill_rows": 246,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 246
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 4.87
+    },
+    {
+      "date": "2025-11-19",
+      "fetched": true,
+      "backfill_rows": 246,
+      "stages": [
+        {
+          "stage": "rp_api",
+          "ok": true
+        },
+        {
+          "stage": "backfill",
+          "ok": true,
+          "rows": 246
+        }
+      ],
+      "source": "rpscrape_racecards",
+      "coverage_pct": 5.13
+    }
+  ],
+  "errors": [],
+  "message": "Batch recovery 2025-11-01 \u2192 2025-11-30: coverage 0.38% \u2192 5.13% (18 fetched, 4513 runner rows updated)."
+}

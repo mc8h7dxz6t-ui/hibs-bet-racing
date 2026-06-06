@@ -8,6 +8,12 @@ import pandas as pd
 
 from hibs_racing.cards.enrich_display import build_enrich_display
 from hibs_racing.cards.query import load_scored_cards
+from hibs_racing.cards.ui_frame import (
+    db_ui_sync_report,
+    gate_reason_is_clear,
+    is_value_pick,
+    safe_value_mask,
+)
 from hibs_racing.cards.window import filter_next_hours, off_minutes
 from hibs_racing.backtest.place_signal import run_place_backtest
 from hibs_racing.cards.refresh import refresh_cards
@@ -38,6 +44,11 @@ class HealthStatus:
     paper_recon_clean: bool | None = None
     manifest_id: str | None = None
     snapshot_coverage_pct: float | None = None
+    telemetry_balance: dict | None = None
+    db_ui_in_sync: bool | None = None
+    unscored_runners: int | None = None
+    nan_integrity_passed: bool | None = None
+    production_value_count: int | None = None
 
     def to_dict(self) -> dict:
         out = {
@@ -62,6 +73,16 @@ class HealthStatus:
             out["manifest_id"] = self.manifest_id
         if self.snapshot_coverage_pct is not None:
             out["snapshot_coverage_pct"] = self.snapshot_coverage_pct
+        if self.telemetry_balance is not None:
+            out["telemetry_balance"] = self.telemetry_balance
+        if self.db_ui_in_sync is not None:
+            out["db_ui_in_sync"] = self.db_ui_in_sync
+        if self.unscored_runners is not None:
+            out["unscored_runners"] = self.unscored_runners
+        if self.nan_integrity_passed is not None:
+            out["nan_integrity_passed"] = self.nan_integrity_passed
+        if self.production_value_count is not None:
+            out["production_value_count"] = self.production_value_count
         return out
 
 
@@ -98,6 +119,19 @@ def health_status() -> HealthStatus:
     start_dt = (end_dt - timedelta(days=7)).isoformat()
     cov = snapshot_coverage(db, start_dt, end_dt.isoformat())
     manifest = latest_manifest_for_date(today, database=db)
+    telemetry_balance = None
+    if manifest:
+        from hibs_racing.institutional.telemetry_balance import evaluate_telemetry_balance
+
+        observation_lane = os.environ.get("HIBS_OBSERVATION_LANE", "1").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        telemetry_balance = evaluate_telemetry_balance(
+            manifest=manifest,
+            observation_lane=observation_lane,
+        ).to_dict()
     recon_clean = None
     if runners is not None and len(runners) > 0:
         try:
@@ -105,6 +139,12 @@ def health_status() -> HealthStatus:
             recon_clean = recon.is_clean
         except Exception:
             recon_clean = None
+    sync = db_ui_sync_report(database=db)
+    from hibs_racing.monitoring.nan_alert import run_nan_integrity_check
+
+    scored = load_scored_cards()
+    prod_n = int(safe_value_mask(scored).sum()) if not scored.empty else 0
+    nan_report = run_nan_integrity_check(database=db, strict=False)
     return HealthStatus(
         db_ok=db.exists(),
         runners_loaded=len(runners),
@@ -121,6 +161,11 @@ def health_status() -> HealthStatus:
         paper_recon_clean=recon_clean,
         manifest_id=manifest.manifest_id if manifest else None,
         snapshot_coverage_pct=cov.get("coverage_pct"),
+        telemetry_balance=telemetry_balance,
+        db_ui_in_sync=bool(sync.get("in_sync")),
+        unscored_runners=int(sync.get("unscored_on_card") or 0),
+        nan_integrity_passed=nan_report.passed,
+        production_value_count=prod_n,
     )
 
 
@@ -182,7 +227,7 @@ def group_meetings(frame: pd.DataFrame) -> list[dict]:
             rp_verdict_short = (
                 (rp_verdict[:160] + "…") if rp_verdict and len(rp_verdict) > 160 else rp_verdict
             )
-            value_n = int((race_df.get("value_flag", 0) == 1).sum()) if "value_flag" in race_df.columns else 0
+            value_n = int(safe_value_mask(race_df).sum()) if "value_flag" in race_df.columns else 0
             races.append(
                 {
                     "race_id": race_id,
@@ -219,7 +264,7 @@ def group_meetings(frame: pd.DataFrame) -> list[dict]:
                 "races": races,
                 "race_count": len(races),
                 "runner_count": len(course_df),
-                "value_count": int((course_df.get("value_flag", 0) == 1).sum()) if "value_flag" in course_df.columns else 0,
+                "value_count": int(safe_value_mask(course_df).sum()) if "value_flag" in course_df.columns else 0,
                 "first_off_minutes": races[0]["off_minutes"] if races else 9999,
             }
         )
@@ -396,8 +441,10 @@ def novice_pick_candidates(meetings: list[dict]) -> list[dict]:
                         "model_place_prob": row.get("model_place_prob"),
                         "place_score": row.get("place_score") or row.get("model_place_prob"),
                         "ew_combined_ev": row.get("ew_combined_ev"),
-                        "value_flag": bool(row.get("value_flag")),
-                        "value_gate_reason": row.get("value_gate_reason"),
+                        "value_flag": is_value_pick(row.get("value_flag")),
+                        "value_gate_reason": None
+                        if gate_reason_is_clear(row.get("value_gate_reason"))
+                        else row.get("value_gate_reason"),
                         "enrich_source": row.get("enrich_source"),
                         "steam_gate": str(gauge.get("gate") or "proceed"),
                         "kelly_multiplier": float(gauge.get("kelly_multiplier") or 1.0),
@@ -422,7 +469,7 @@ def novice_pick_candidates(meetings: list[dict]) -> list[dict]:
 def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -> dict:
     frame = _base_frame(card_date=card_date, window_hours=window_hours)
     health = health_status()
-    value = frame[frame["value_flag"] == 1] if not frame.empty and "value_flag" in frame.columns else frame.iloc[0:0]
+    value = frame[safe_value_mask(frame)] if not frame.empty else frame.iloc[0:0]
     from hibs_racing.monitor import monitor_snapshot, top_places_of_day
 
     monitor = monitor_snapshot(refresh=False, settle=True)

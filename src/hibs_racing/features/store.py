@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "data" / "schema.sql"
 
@@ -81,6 +83,27 @@ RUNNER_NATURAL_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("distance_f", "REAL"),
 )
 
+# Enrich spine for historical LTR — mirrors upcoming_runners ranker inputs.
+RUNNER_ENRICH_MIGRATIONS: tuple[tuple[str, str], ...] = (
+    ("form_string", "TEXT"),
+    ("trainer_14d_wins", "INTEGER"),
+    ("trainer_14d_runs", "INTEGER"),
+    ("horse_course_win_rate", "REAL"),
+    ("horse_distance_win_rate", "REAL"),
+    ("horse_going_win_rate", "REAL"),
+    ("jockey_rp_14d_win_rate", "REAL"),
+    ("trainer_rp_14d_win_rate", "REAL"),
+    ("trainer_rtf", "REAL"),
+    ("trainer_14d_strike", "REAL"),
+    ("form_lto_position", "INTEGER"),
+    ("form_trip_change_f", "REAL"),
+    ("form_cd_flag", "INTEGER"),
+    ("form_bf_flag", "INTEGER"),
+    ("form_poor_runs_3", "INTEGER"),
+    ("enrich_source", "TEXT"),
+    ("enriched_at", "TEXT"),
+)
+
 EXECUTION_LOG_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("matchbook_place_market_id", "INTEGER"),
     ("betfair_place_market_id", "TEXT"),
@@ -100,12 +123,35 @@ SNAPSHOT_MIGRATIONS: tuple[tuple[str, str], ...] = (
 )
 
 
-def connect(db: Path) -> sqlite3.Connection:
-    db.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db)
+def _configure_connection(conn: sqlite3.Connection) -> sqlite3.Connection:
+    """Institutional++ SQLite defaults — WAL readers, writer busy wait, FK enforcement."""
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 30000")
+    conn.execute("PRAGMA synchronous = NORMAL")
     return conn
+
+
+@contextmanager
+def connect(db: Path) -> Iterator[sqlite3.Connection]:
+    """
+    Open SQLite with guaranteed close on exit.
+
+    Python's sqlite3 connection context manager commits but does not close —
+    leaking file descriptors across refresh loops until EMFILE (Jun 5 cron).
+    """
+    db.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db), timeout=30.0)
+    _configure_connection(conn)
+    try:
+        yield conn
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _migrate_columns(conn: sqlite3.Connection, table: str, migrations: tuple[tuple[str, str], ...]) -> None:
@@ -124,6 +170,7 @@ def init_db(db: Path) -> None:
         _migrate_columns(conn, "comment_tags", SECTIONAL_MIGRATIONS)
         _migrate_columns(conn, "runners", RUNNER_MIGRATIONS)
         _migrate_columns(conn, "runners", RUNNER_NATURAL_MIGRATIONS)
+        _migrate_columns(conn, "runners", RUNNER_ENRICH_MIGRATIONS)
         _migrate_columns(conn, "upcoming_runners", UPCOMING_MIGRATIONS)
         _migrate_columns(conn, "paper_bets", PAPER_BETS_MIGRATIONS)
         _migrate_columns(conn, "card_scores", CARD_SCORES_MIGRATIONS)
@@ -132,6 +179,8 @@ def init_db(db: Path) -> None:
         for stmt in (
             "CREATE INDEX IF NOT EXISTS idx_upcoming_natural ON upcoming_runners (race_natural_key)",
             "CREATE INDEX IF NOT EXISTS idx_runners_natural ON runners (race_natural_key)",
+            "CREATE INDEX IF NOT EXISTS idx_runners_enrich_backfill_lookup ON runners (race_id, runner_id)",
+            "CREATE INDEX IF NOT EXISTS idx_runners_race_date ON runners (race_date)",
         ):
             try:
                 conn.execute(stmt)

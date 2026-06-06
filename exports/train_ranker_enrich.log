@@ -1,0 +1,10 @@
+{
+  "rows": 66627,
+  "races": 7823,
+  "ndcg_at_3": null,
+  "top1_hit_rate": 0.831,
+  "previous_top1_hit_rate": 0.8493,
+  "top1_delta": -0.0183,
+  "model_path": "data/models/lgbm_ranker.txt",
+  "message": "Holdout top-1: 83.1% vs prior model 84.9% (-1.8%). Model saved."
+}

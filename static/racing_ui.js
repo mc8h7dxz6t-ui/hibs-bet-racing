@@ -506,10 +506,27 @@
     }
   }
 
+  function gateReasonIsClear(reason) {
+    if (reason == null) return true;
+    if (typeof reason === 'number' && Number.isNaN(reason)) return true;
+    if (typeof reason === 'string' && !reason.trim()) return true;
+    return false;
+  }
+
+  function isValuePick(flag) {
+    return flag === true || flag === 1 || flag === '1';
+  }
+
   function filterSmartPicks(candidates) {
-    const allowedGates = new Set(['proceed', 'scale_up']);
+    const allowedGates = new Set(['proceed', 'scale_up', 'unknown']);
     return candidates
-      .filter((c) => c.value_flag && (c.data_quality_pct || 0) >= 75 && allowedGates.has(String(c.steam_gate || 'proceed').toLowerCase()))
+      .filter(
+        (c) =>
+          isValuePick(c.value_flag) &&
+          gateReasonIsClear(c.value_gate_reason) &&
+          (c.data_quality_pct || 0) >= 75 &&
+          allowedGates.has(String(c.steam_gate || 'proceed').toLowerCase()),
+      )
       .sort((a, b) => {
         const sa = parseFloat(a.place_score || a.model_place_prob || 0);
         const sb = parseFloat(b.place_score || b.model_place_prob || 0);

@@ -1,0 +1,14 @@
+{
+  "start": "2024-03-15",
+  "end": "2026-05-22",
+  "card_days_written": 213,
+  "rows_written": 65910,
+  "message": "Wrote 65910 snapshot rows across 213 card days.",
+  "config_hash": "47ca00189847dcfe",
+  "expected_card_days": 213,
+  "snapshot_card_days": 213,
+  "coverage_pct": 100.0,
+  "missing_dates": [],
+  "missing_count": 0,
+  "complete": true
+}

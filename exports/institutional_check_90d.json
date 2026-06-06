@@ -1,0 +1,75 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "name": "snapshot_coverage",
+      "passed": true,
+      "detail": "78/78 days (100.0%)"
+    },
+    {
+      "name": "gate1_roi_vs_none",
+      "passed": true,
+      "detail": "ROI delta gate1-none = 0.35077113255549186pp (min 0.0pp)."
+    },
+    {
+      "name": "gate1_hit_rate_vs_none",
+      "passed": true,
+      "detail": "Hit-rate delta = 2.0324003918507305pp (min 0.0pp)."
+    }
+  ],
+  "gate_regression": {
+    "passed": true,
+    "start": "2026-03-04",
+    "end": "2026-06-02",
+    "checks": [
+      {
+        "name": "gate1_roi_vs_none",
+        "passed": true,
+        "detail": "ROI delta gate1-none = 0.35077113255549186pp (min 0.0pp)."
+      },
+      {
+        "name": "gate1_hit_rate_vs_none",
+        "passed": true,
+        "detail": "Hit-rate delta = 2.0324003918507305pp (min 0.0pp)."
+      }
+    ],
+    "report_summary": {
+      "card_days": 78,
+      "none": {
+        "picks": 7686,
+        "settled": 7686,
+        "hit_rate": 0.2598230549050221,
+        "roi_pct": -5.389514328697585,
+        "pnl_units": -414.23807130369636
+      },
+      "gate1": {
+        "picks": 5440,
+        "settled": 5440,
+        "hit_rate": 0.2801470588235294,
+        "roi_pct": -5.038743196142093,
+        "pnl_units": -274.10762987012987
+      },
+      "delta_gate1_vs_none": {
+        "pick_change": -2246,
+        "hit_rate_change_pp": 2.0324003918507305,
+        "roi_change_pp": 0.35077113255549186,
+        "pnl_change_units": 140.1304414335665
+      },
+      "snapshot_source": "snapshots"
+    },
+    "message": "Gate regression PASSED."
+  },
+  "snapshot_coverage": {
+    "start": "2026-03-04",
+    "end": "2026-06-02",
+    "config_hash": "47ca00189847dcfe",
+    "expected_card_days": 78,
+    "snapshot_card_days": 78,
+    "coverage_pct": 100.0,
+    "missing_dates": [],
+    "missing_count": 0,
+    "complete": true
+  },
+  "paper_reconciliation": null,
+  "message": "Institutional check PASSED."
+}
