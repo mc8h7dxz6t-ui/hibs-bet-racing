@@ -254,3 +254,17 @@ logging:
   retention:
     detailed_days: 30               # full ledger payloads + cron log sections
     brief_days: 120                   # compact summaries only; then purge
+
+# Strict Phase 1 Validation Limits
+model_training_guards:
+  min_enrich_coverage_pct: 70.0
+  phase1_critical_metrics:
+    min_trainer_14d_coverage_pct: 50.0
+    min_form_trip_coverage_pct: 80.0
+    min_gate3_selectivity_pct: 25.0
+
+batch_enrich_recovery:
+  target_coverage_pct: 95.0
+
+batch_enrich_recovery:
+  target_coverage_pct: 95.0

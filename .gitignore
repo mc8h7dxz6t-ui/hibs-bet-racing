@@ -50,3 +50,23 @@ exports/*.csv
 *.pem
 credentials.json
 secrets/
+
+# Institutional++ Local Containment Rules
+.env
+.env.save
+*.db
+*.sqlite
+Library/
+.venv/
+exports/*.json
+exports/*.log
+data/batch_*.json
+
+.env
+.env.save
+*.db
+*.sqlite
+Library/
+.venv/
+exports/
+data/batch_*

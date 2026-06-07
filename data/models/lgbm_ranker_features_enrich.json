@@ -35,6 +35,18 @@
     "draw_bias_z",
     "sectional_composite",
     "finishing_burst_level",
-    "days_since_last_run"
+    "days_since_last_run",
+    "horse_course_win_rate",
+    "horse_distance_win_rate",
+    "horse_going_win_rate",
+    "jockey_rp_14d_win_rate",
+    "trainer_rp_14d_win_rate",
+    "trainer_rtf",
+    "trainer_14d_strike",
+    "form_lto_position",
+    "form_trip_change_f",
+    "form_cd_flag",
+    "form_bf_flag",
+    "form_poor_runs_3"
   ]
 }

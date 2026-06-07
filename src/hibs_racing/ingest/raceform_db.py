@@ -174,7 +174,7 @@ def ingest_raceform_db(
             race_class, days_since_last_run, off_time, race_natural_key,
             comment_raw, comment_norm, source_file,
             source_hash, ingested_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(runner_id) DO UPDATE SET
             finish_pos = excluded.finish_pos,
             jockey = excluded.jockey,
