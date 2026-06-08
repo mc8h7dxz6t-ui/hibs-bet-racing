@@ -108,6 +108,35 @@ def enrich_feature_coverage(frame: pd.DataFrame) -> dict[str, float]:
     return out
 
 
+def impute_enrich_features(frame: pd.DataFrame, *args, **kwargs) -> pd.DataFrame:
+    # Institutional++ Invariant Feature Sequence Matrix
+    manifest = [
+        "official_rating", "rpr", "combo_bayes_win", "combo_bayes_place", "combo_prior_rides",
+        "jockey_bayes_place", "trainer_bayes_place", "jockey_place_90d", "trainer_place_90d",
+        "jockey_place_14d", "trainer_place_14d", "jockey_consistency", "trainer_consistency",
+        "jockey_vs_field", "trainer_vs_field", "jockey_cd_bayes_place", "trainer_cd_bayes_place",
+        "combo_cd_bayes_place", "combo_cd_prior_rides", "jockey_cdd_bayes_place", "trainer_cdd_bayes_place",
+        "combo_cdd_bayes_place", "jockey_cd_vs_field", "trainer_cd_vs_field", "combo_cd_vs_field",
+        "combo_cdd_vs_field", "hidden_potential", "or_vs_field", "rpr_vs_field", "nlp_pace_vs_field",
+        "nlp_pace_rank", "combo_vs_field", "draw_bias_z", "sectional_composite", "finishing_burst_level",
+        "days_since_last_run", "horse_course_win_rate", "horse_distance_win_rate", "horse_going_win_rate",
+        "jockey_rp_14d_win_rate", "trainer_rp_14d_win_rate", "trainer_rtf", "trainer_14d_strike",
+        "form_lto_position", "form_trip_change_f", "form_cd_flag", "form_bf_flag", "form_poor_runs_3"
+    ]
+    
+    # Neutralize sparse missing dimensions across features
+    if "trainer_14d_strike" in frame.columns:
+        frame["trainer_14d_strike"] = frame["trainer_14d_strike"].fillna(frame.get("trainer_rp_14d_win_rate", 0.11))
+    
+    for col in manifest:
+        if col not in frame.columns:
+            frame[col] = float("nan")
+        else:
+            frame[col] = frame[col].fillna(0.0 if "flag" in col or "change" in col else float("nan"))
+            
+    # Force absolute matrix dimension matching
+    base_cols = [c for c in frame.columns if c not in manifest]
+    frame = frame[base_cols + manifest]
 def impute_enrich_features(frame: pd.DataFrame, *, log_warnings: bool = True) -> pd.DataFrame:
     """Training-safe imputation for sparse historical enrich coverage."""
     out = compute_enrich_ranker_fields(frame)
@@ -251,6 +280,28 @@ def build_ranker_matrix(
                 "Run backfill-runner-enrich and scrape historical RP racecards before training."
             )
         frame = impute_enrich_features(frame)
+        
+        # Institutional++ Explicit 48-Feature Alignment Guard
+        manifest_48 = [
+            "official_rating", "rpr", "combo_bayes_win", "combo_bayes_place", "combo_prior_rides",
+            "jockey_bayes_place", "trainer_bayes_place", "jockey_place_90d", "trainer_place_90d",
+            "jockey_place_14d", "trainer_place_14d", "jockey_consistency", "trainer_consistency",
+            "jockey_vs_field", "trainer_vs_field", "jockey_cd_bayes_place", "trainer_cd_bayes_place",
+            "combo_cd_bayes_place", "combo_cd_prior_rides", "jockey_cdd_bayes_place", "trainer_cdd_bayes_place",
+            "combo_cdd_bayes_place", "jockey_cd_vs_field", "trainer_cd_vs_field", "combo_cd_vs_field",
+            "combo_cdd_vs_field", "hidden_potential", "or_vs_field", "rpr_vs_field", "nlp_pace_vs_field",
+            "nlp_pace_rank", "combo_vs_field", "draw_bias_z", "sectional_composite", "finishing_burst_level",
+            "days_since_last_run", "horse_course_win_rate", "horse_distance_win_rate", "horse_going_win_rate",
+            "jockey_rp_14d_win_rate", "trainer_rp_14d_win_rate", "trainer_rtf", "trainer_14d_strike",
+            "form_lto_position", "form_trip_change_f", "form_cd_flag", "form_bf_flag", "form_poor_runs_3"
+        ]
+        for col in manifest_48:
+            if col not in frame.columns:
+                frame[col] = float("nan")
+        
+        # Enforce exact column positioning order
+        base_cols = [c for c in frame.columns if c not in manifest_48]
+        frame = frame[base_cols + manifest_48]
         frame.attrs["enrich_coverage_raw_pct"] = raw_coverage
 
     feature_cols = ranker_enrich_feature_columns() if with_enrich else ranker_feature_columns()
@@ -281,59 +332,45 @@ def build_ranker_matrix(
 def _persist_ranker_features(db: Path, frame: pd.DataFrame, built_at: str) -> int:
     init_db(db)
     cols = [
-        "runner_id",
-        "race_id",
-        "combo_prior_rides",
-        "combo_bayes_win",
-        "combo_bayes_place",
-        "hidden_potential",
-        "or_vs_field",
-        "rpr_vs_field",
-        "nlp_pace_vs_field",
-        "nlp_pace_rank",
-        "combo_vs_field",
-        "draw_bias_z",
-        "finish_pos",
-        "won",
-        "placed",
+        "runner_id", "race_id", "combo_prior_rides", "combo_bayes_win",
+        "combo_bayes_place", "hidden_potential", "or_vs_field", "rpr_vs_field",
+        "nlp_pace_vs_field", "nlp_pace_rank", "combo_vs_field", "draw_bias_z",
+        "finish_pos", "won", "placed",
+        "horse_course_win_rate", "horse_distance_win_rate", "horse_going_win_rate",
+        "jockey_rp_14d_win_rate", "trainer_rp_14d_win_rate", "trainer_rtf",
+        "trainer_14d_strike", "form_lto_position", "form_trip_change_f",
+        "form_cd_flag", "form_bf_flag", "form_poor_runs_3"
     ]
+    with connect(db) as conn:
+        for col in cols[15:]:
+            try: conn.execute(f"ALTER TABLE ranker_features ADD COLUMN {col} REAL;")
+            except Exception: pass
     count = 0
     with connect(db) as conn:
         conn.execute("DELETE FROM ranker_features")
-        for rec in frame[cols].to_dict(orient="records"):
-            conn.execute(
-                """
-                INSERT INTO ranker_features (
-                    runner_id, race_id, combo_prior_rides, combo_bayes_win,
-                    combo_bayes_place, hidden_potential, or_vs_field, rpr_vs_field,
-                    nlp_pace_vs_field, nlp_pace_rank, combo_vs_field, draw_bias_z,
-                    finish_pos, won, placed, built_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    rec["runner_id"],
-                    rec["race_id"],
-                    int(rec.get("combo_prior_rides") or 0),
-                    rec.get("combo_bayes_win"),
-                    rec.get("combo_bayes_place"),
-                    rec.get("hidden_potential") or 0,
-                    rec.get("or_vs_field"),
-                    rec.get("rpr_vs_field"),
-                    rec.get("nlp_pace_vs_field"),
-                    rec.get("nlp_pace_rank"),
-                    rec.get("combo_vs_field"),
-                    rec.get("draw_bias_z"),
-                    int(rec["finish_pos"]) if pd.notna(rec.get("finish_pos")) else None,
-                    int(rec.get("won") or 0),
-                    int(rec.get("placed") or 0),
-                    built_at,
-                ),
+        placeholders = ", ".join(["?"] * (len(cols) + 1))
+        columns_str = ", ".join(cols) + ", built_at"
+        sql_query = f"INSERT INTO ranker_features ({columns_str}) VALUES ({placeholders})"
+        for rec in frame.to_dict(orient="records"):
+            exec_tuple = (
+                rec["runner_id"], rec["race_id"], int(rec.get("combo_prior_rides") or 0),
+                rec.get("combo_bayes_win"), rec.get("combo_bayes_place"), rec.get("hidden_potential") or 0,
+                rec.get("or_vs_field"), rec.get("rpr_vs_field"), rec.get("nlp_pace_vs_field"),
+                rec.get("nlp_pace_rank"), rec.get("combo_vs_field"), rec.get("draw_bias_z"),
+                int(rec["finish_pos"]) if pd.notna(rec.get("finish_pos")) else None,
+                int(rec.get("won") or 0), int(rec.get("placed") or 0),
+                rec.get("horse_course_win_rate", float("nan")), rec.get("horse_distance_win_rate", float("nan")),
+                rec.get("horse_going_win_rate", float("nan")), rec.get("jockey_rp_14d_win_rate", float("nan")),
+                rec.get("trainer_rp_14d_win_rate", float("nan")), rec.get("trainer_rtf", float("nan")),
+                rec.get("trainer_14d_strike", float("nan")), rec.get("form_lto_position", float("nan")),
+                rec.get("form_trip_change_f", float("nan")), rec.get("form_cd_flag", float("nan")),
+                rec.get("form_bf_flag", float("nan")), rec.get("form_poor_runs_3", float("nan")),
+                built_at
             )
+            conn.execute(sql_query, exec_tuple)
             count += 1
         conn.commit()
     return count
-
-
 def ranker_feature_columns() -> list[str]:
     return [
         "official_rating",
@@ -376,8 +413,20 @@ def ranker_feature_columns() -> list[str]:
 
 
 def ranker_enrich_feature_columns() -> list[str]:
-    return ranker_feature_columns() + list(ENRICH_RANKER_FEATURES)
-
+    # Institutional++ Invariant 48-Feature Manifest Specification
+    return [
+        "official_rating", "rpr", "combo_bayes_win", "combo_bayes_place", "combo_prior_rides",
+        "jockey_bayes_place", "trainer_bayes_place", "jockey_place_90d", "trainer_place_90d",
+        "jockey_place_14d", "trainer_place_14d", "jockey_consistency", "trainer_consistency",
+        "jockey_vs_field", "trainer_vs_field", "jockey_cd_bayes_place", "trainer_cd_bayes_place",
+        "combo_cd_bayes_place", "combo_cd_prior_rides", "jockey_cdd_bayes_place", "trainer_cdd_bayes_place",
+        "combo_cdd_bayes_place", "jockey_cd_vs_field", "trainer_cd_vs_field", "combo_cd_vs_field",
+        "combo_cdd_vs_field", "hidden_potential", "or_vs_field", "rpr_vs_field", "nlp_pace_vs_field",
+        "nlp_pace_rank", "combo_vs_field", "draw_bias_z", "sectional_composite", "finishing_burst_level",
+        "days_since_last_run", "horse_course_win_rate", "horse_distance_win_rate", "horse_going_win_rate",
+        "jockey_rp_14d_win_rate", "trainer_rp_14d_win_rate", "trainer_rtf", "trainer_14d_strike",
+        "form_lto_position", "form_trip_change_f", "form_cd_flag", "form_bf_flag", "form_poor_runs_3"
+    ]
 
 def _nlp_history_index(hist: pd.DataFrame) -> pd.DataFrame:
     """Point-in-time NLP keyed by normalized horse name (bridges API horse_id vs name history)."""

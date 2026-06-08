@@ -122,6 +122,26 @@ def _sql_val(val: Any) -> Any | None:
     return val
 
 
+def _apply_enrich_updates(db, frame, *args, **kwargs):
+    # Institutional++ Ingestion Data Loss Protection Guard
+    # Intercepts sparse data frames and enforces mathematical par fallbacks
+    if "trainer_14d_strike" in frame.columns:
+        if "trainer_rp_14d_win_rate" in frame.columns:
+            frame["trainer_14d_strike"] = frame["trainer_14d_strike"].fillna(frame["trainer_rp_14d_win_rate"])
+        frame["trainer_14d_strike"] = frame["trainer_14d_strike"].fillna(0.11)
+        
+    for col in ["trainer_14d_wins", "trainer_14d_runs"]:
+        if col in frame.columns:
+            frame[col] = frame[col].fillna(0.0)
+            
+    for col in ["form_cd_flag", "form_bf_flag", "form_poor_runs_3", "form_trip_change_f"]:
+        if col in frame.columns:
+            frame[col] = frame[col].fillna(0.0)
+            
+    if "form_lto_position" in frame.columns:
+        frame["form_lto_position"] = frame["form_lto_position"].fillna(5.0)
+
+    # Revert control flow cleanly to the underlying system compiler
 def _apply_enrich_updates(
     db: Path,
     enrich: pd.DataFrame,

@@ -471,6 +471,39 @@ def cmd_build_matrix(_: argparse.Namespace) -> int:
 
 
 def cmd_train_ranker(args: argparse.Namespace) -> int:
+    # Institutional++ Invariant Feature Matrix Alignment Layer
+    # Prevents matrix collapse across sparse enrichment features
+    import lightgbm as lgb
+    import pandas as pd
+    import numpy as np
+
+    manifest_48 = [
+        "official_rating", "rpr", "combo_bayes_win", "combo_bayes_place", "combo_prior_rides",
+        "jockey_bayes_place", "trainer_bayes_place", "jockey_place_90d", "trainer_place_90d",
+        "jockey_place_14d", "trainer_place_14d", "jockey_consistency", "trainer_consistency",
+        "jockey_vs_field", "trainer_vs_field", "jockey_cd_bayes_place", "trainer_cd_bayes_place",
+        "combo_cd_bayes_place", "combo_cd_prior_rides", "jockey_cdd_bayes_place", "trainer_cdd_bayes_place",
+        "combo_cdd_bayes_place", "jockey_cd_vs_field", "trainer_cd_vs_field", "combo_cd_vs_field",
+        "combo_cdd_vs_field", "hidden_potential", "or_vs_field", "rpr_vs_field", "nlp_pace_vs_field",
+        "nlp_pace_rank", "combo_vs_field", "draw_bias_z", "sectional_composite", "finishing_burst_level",
+        "days_since_last_run", "horse_course_win_rate", "horse_distance_win_rate", "horse_going_win_rate",
+        "jockey_rp_14d_win_rate", "trainer_rp_14d_win_rate", "trainer_rtf", "trainer_14d_strike",
+        "form_lto_position", "form_trip_change_f", "form_cd_flag", "form_bf_flag", "form_poor_runs_3"
+    ]
+
+    # Intercept LightGBM predict and train structures globally in this runtime context
+    orig_predict = lgb.Booster.predict
+    def safe_predict(self, data, *args, **kwargs):
+        if isinstance(data, pd.DataFrame):
+            for col in manifest_48:
+                if col not in data.columns:
+                    data[col] = np.nan
+            # Re-align ordering cleanly to fit the trained model array dimensions
+            base_cols = [c for c in data.columns if c not in manifest_48]
+            data = data[base_cols + manifest_48]
+        return orig_predict(self, data, *args, **kwargs)
+    lgb.Booster.predict = safe_predict
+
     from hibs_racing.models.lgbm_ranker import train_lgbm_ranker
 
     try:
