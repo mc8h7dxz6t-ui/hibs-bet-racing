@@ -1,732 +1,72 @@
 {
-  "start": "2024-03-15",
+  "start": "2025-11-01",
   "end": "2026-05-22",
-  "snapshot_config_hash": "fb9402aad992b226",
+  "snapshot_config_hash": "c8545efb790f0686",
   "completed_periods": [
-    {
-      "period": "2024-03",
-      "start": "2024-03-15",
-      "end": "2024-03-31",
-      "card_days": 1,
-      "gate2": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate3": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate5": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate6": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate7": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate8": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "delta_gate3_vs_gate2": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate7_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate8_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      }
-    },
-    {
-      "period": "2024-04",
-      "start": "2024-04-01",
-      "end": "2024-04-30",
-      "card_days": 2,
-      "gate2": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate3": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate5": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate6": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate7": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate8": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "delta_gate3_vs_gate2": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate7_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate8_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      }
-    },
-    {
-      "period": "2024-05",
-      "start": "2024-05-01",
-      "end": "2024-05-31",
-      "card_days": 6,
-      "gate2": {
-        "picks": 65,
-        "settled": 65,
-        "hit_rate": 0.18461538461538463,
-        "roi_pct": 68.5576923076923,
-        "pnl_units": 44.5625
-      },
-      "gate3": {
-        "picks": 47,
-        "settled": 47,
-        "hit_rate": 0.23404255319148937,
-        "roi_pct": 120.34574468085107,
-        "pnl_units": 56.5625
-      },
-      "gate5": {
-        "picks": 24,
-        "settled": 24,
-        "hit_rate": 0.25,
-        "roi_pct": 83.59375,
-        "pnl_units": 20.0625
-      },
-      "gate6": {
-        "picks": 29,
-        "settled": 29,
-        "hit_rate": 0.3793103448275862,
-        "roi_pct": 28.01724137931034,
-        "pnl_units": 8.125
-      },
-      "gate7": {
-        "picks": 12,
-        "settled": 12,
-        "hit_rate": 0.16666666666666666,
-        "roi_pct": -16.666666666666664,
-        "pnl_units": -2.0
-      },
-      "gate8": {
-        "picks": 26,
-        "settled": 26,
-        "hit_rate": 0.2692307692307692,
-        "roi_pct": 214.1826923076923,
-        "pnl_units": 55.6875
-      },
-      "delta_gate3_vs_gate2": {
-        "pick_change": -18,
-        "hit_rate_change_pp": 4.942716857610474,
-        "roi_change_pp": 51.78805237315876,
-        "pnl_change_units": 12.0
-      },
-      "delta_gate7_vs_gate3": {
-        "pick_change": -35,
-        "hit_rate_change_pp": -6.737588652482271,
-        "roi_change_pp": -137.01241134751774,
-        "pnl_change_units": -58.5625
-      },
-      "delta_gate8_vs_gate3": {
-        "pick_change": -21,
-        "hit_rate_change_pp": 3.518821603927985,
-        "roi_change_pp": 93.83694762684122,
-        "pnl_change_units": -0.875
-      }
-    },
-    {
-      "period": "2024-06",
-      "start": "2024-06-01",
-      "end": "2024-06-30",
-      "card_days": 1,
-      "gate2": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate3": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate5": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate6": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate7": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate8": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "delta_gate3_vs_gate2": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate7_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate8_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      }
-    },
-    {
-      "period": "2024-07",
-      "start": "2024-07-01",
-      "end": "2024-07-31",
-      "card_days": 1,
-      "gate2": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate3": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate5": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate6": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate7": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate8": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "delta_gate3_vs_gate2": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate7_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate8_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      }
-    },
-    {
-      "period": "2024-08",
-      "start": "2024-08-01",
-      "end": "2024-08-31",
-      "card_days": 1,
-      "gate2": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate3": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate5": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate6": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate7": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate8": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "delta_gate3_vs_gate2": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate7_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate8_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      }
-    },
-    {
-      "period": "2024-09",
-      "start": "2024-09-01",
-      "end": "2024-09-30",
-      "card_days": 1,
-      "gate2": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate3": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate5": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate6": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate7": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate8": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "delta_gate3_vs_gate2": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate7_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate8_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      }
-    },
-    {
-      "period": "2024-10",
-      "start": "2024-10-01",
-      "end": "2024-10-31",
-      "card_days": 1,
-      "gate2": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate3": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate5": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate6": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate7": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate8": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "delta_gate3_vs_gate2": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate7_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate8_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      }
-    },
-    {
-      "period": "2024-11",
-      "start": "2024-11-01",
-      "end": "2024-11-30",
-      "card_days": 1,
-      "gate2": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate3": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate5": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate6": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate7": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "gate8": {
-        "picks": 0,
-        "settled": 0,
-        "hit_rate": null,
-        "roi_pct": null,
-        "pnl_units": 0.0
-      },
-      "delta_gate3_vs_gate2": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate7_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      },
-      "delta_gate8_vs_gate3": {
-        "pick_change": 0,
-        "hit_rate_change_pp": null,
-        "roi_change_pp": null,
-        "pnl_change_units": 0.0
-      }
-    },
-    {
-      "period": "2024-12",
-      "start": "2024-12-01",
-      "end": "2024-12-31",
-      "card_days": 0
-    },
-    {
-      "period": "2025-01",
-      "start": "2025-01-01",
-      "end": "2025-01-31",
-      "card_days": 0
-    },
-    {
-      "period": "2025-02",
-      "start": "2025-02-01",
-      "end": "2025-02-28",
-      "card_days": 0
-    },
-    {
-      "period": "2025-03",
-      "start": "2025-03-01",
-      "end": "2025-03-31",
-      "card_days": 0
-    },
-    {
-      "period": "2025-04",
-      "start": "2025-04-01",
-      "end": "2025-04-30",
-      "card_days": 0
-    },
-    {
-      "period": "2025-05",
-      "start": "2025-05-01",
-      "end": "2025-05-31",
-      "card_days": 0
-    },
-    {
-      "period": "2025-06",
-      "start": "2025-06-01",
-      "end": "2025-06-30",
-      "card_days": 0
-    },
-    {
-      "period": "2025-07",
-      "start": "2025-07-01",
-      "end": "2025-07-31",
-      "card_days": 0
-    },
-    {
-      "period": "2025-08",
-      "start": "2025-08-01",
-      "end": "2025-08-31",
-      "card_days": 0
-    },
-    {
-      "period": "2025-09",
-      "start": "2025-09-01",
-      "end": "2025-09-30",
-      "card_days": 0
-    },
-    {
-      "period": "2025-10",
-      "start": "2025-10-01",
-      "end": "2025-10-31",
-      "card_days": 0
-    },
     {
       "period": "2025-11",
       "start": "2025-11-01",
       "end": "2025-11-30",
       "card_days": 30,
       "gate2": {
-        "picks": 816,
-        "settled": 816,
-        "hit_rate": 0.22303921568627452,
-        "roi_pct": 6.824831495098039,
-        "pnl_units": 55.690625
+        "picks": 828,
+        "settled": 828,
+        "hit_rate": 0.35144927536231885,
+        "roi_pct": 56.60040166154297,
+        "pnl_units": 468.65132575757576
       },
       "gate3": {
-        "picks": 577,
-        "settled": 577,
-        "hit_rate": 0.23570190641247835,
-        "roi_pct": 22.69786250722126,
-        "pnl_units": 130.96666666666667
+        "picks": 573,
+        "settled": 573,
+        "hit_rate": 0.3647469458987784,
+        "roi_pct": 72.4828124173674,
+        "pnl_units": 415.32651515151514
       },
       "gate5": {
         "picks": 290,
         "settled": 290,
-        "hit_rate": 0.2,
-        "roi_pct": 4.385775862068965,
-        "pnl_units": 12.71875
+        "hit_rate": 0.38620689655172413,
+        "roi_pct": 111.78464602925811,
+        "pnl_units": 324.1754734848485
       },
       "gate6": {
-        "picks": 421,
-        "settled": 421,
-        "hit_rate": 0.48693586698337293,
-        "roi_pct": -4.0206848772763255,
-        "pnl_units": -16.927083333333332
+        "picks": 460,
+        "settled": 460,
+        "hit_rate": 0.5673913043478261,
+        "roi_pct": 21.42957427536232,
+        "pnl_units": 98.57604166666667
       },
       "gate7": {
-        "picks": 146,
-        "settled": 146,
-        "hit_rate": 0.14383561643835616,
-        "roi_pct": -10.059931506849315,
-        "pnl_units": -14.6875
+        "picks": 147,
+        "settled": 147,
+        "hit_rate": 0.42857142857142855,
+        "roi_pct": 208.374433106576,
+        "pnl_units": 306.3104166666667
       },
       "gate8": {
-        "picks": 295,
-        "settled": 295,
-        "hit_rate": 0.20677966101694914,
-        "roi_pct": 1.1970338983050848,
-        "pnl_units": 3.53125
+        "picks": 293,
+        "settled": 293,
+        "hit_rate": 0.3993174061433447,
+        "roi_pct": 139.96141017685386,
+        "pnl_units": 410.0869318181818
       },
       "delta_gate3_vs_gate2": {
-        "pick_change": -239,
-        "hit_rate_change_pp": 1.2662690726203825,
-        "roi_change_pp": 15.87303101212322,
-        "pnl_change_units": 75.27604166666667
+        "pick_change": -255,
+        "hit_rate_change_pp": 1.3297670536459527,
+        "roi_change_pp": 15.88241075582443,
+        "pnl_change_units": -53.32481060606062
       },
       "delta_gate7_vs_gate3": {
-        "pick_change": -431,
-        "hit_rate_change_pp": -9.18662899741222,
-        "roi_change_pp": -32.757794014070576,
-        "pnl_change_units": -145.65416666666667
+        "pick_change": -426,
+        "hit_rate_change_pp": 6.382448267265017,
+        "roi_change_pp": 135.8916206892086,
+        "pnl_change_units": -109.01609848484844
       },
       "delta_gate8_vs_gate3": {
-        "pick_change": -282,
-        "hit_rate_change_pp": -2.8922245395529207,
-        "roi_change_pp": -21.500828608916173,
-        "pnl_change_units": -127.43541666666667
+        "pick_change": -280,
+        "hit_rate_change_pp": 3.4570460244566337,
+        "roi_change_pp": 67.47859775948646,
+        "pnl_change_units": -5.239583333333314
       }
     },
     {
@@ -735,64 +75,64 @@
       "end": "2025-12-31",
       "card_days": 29,
       "gate2": {
-        "picks": 781,
-        "settled": 781,
-        "hit_rate": 0.24455825864276567,
-        "roi_pct": -23.958333333333332,
-        "pnl_units": -187.11458333333331
+        "picks": 800,
+        "settled": 800,
+        "hit_rate": 0.3425,
+        "roi_pct": 48.182291666666664,
+        "pnl_units": 385.4583333333333
       },
       "gate3": {
-        "picks": 554,
-        "settled": 554,
-        "hit_rate": 0.24187725631768953,
-        "roi_pct": -14.139590854392296,
-        "pnl_units": -78.33333333333331
+        "picks": 552,
+        "settled": 552,
+        "hit_rate": 0.3278985507246377,
+        "roi_pct": 53.516568538647334,
+        "pnl_units": 295.4114583333333
       },
       "gate5": {
-        "picks": 282,
-        "settled": 282,
-        "hit_rate": 0.1879432624113475,
-        "roi_pct": -30.125221631205672,
-        "pnl_units": -84.953125
+        "picks": 284,
+        "settled": 284,
+        "hit_rate": 0.3485915492957746,
+        "roi_pct": 90.4617811032864,
+        "pnl_units": 256.91145833333337
       },
       "gate6": {
-        "picks": 463,
-        "settled": 463,
-        "hit_rate": 0.4708423326133909,
-        "roi_pct": -3.019033477321816,
-        "pnl_units": -13.97812500000001
+        "picks": 451,
+        "settled": 451,
+        "hit_rate": 0.5299334811529933,
+        "roi_pct": 11.364329268292686,
+        "pnl_units": 51.25312500000001
       },
       "gate7": {
         "picks": 143,
         "settled": 143,
-        "hit_rate": 0.15384615384615385,
-        "roi_pct": -40.57036713286713,
-        "pnl_units": -58.015625
+        "hit_rate": 0.3916083916083916,
+        "roi_pct": 143.24737762237763,
+        "pnl_units": 204.84375
       },
       "gate8": {
-        "picks": 282,
-        "settled": 282,
-        "hit_rate": 0.18085106382978725,
-        "roi_pct": -18.977171985815602,
-        "pnl_units": -53.515625
+        "picks": 285,
+        "settled": 285,
+        "hit_rate": 0.3473684210526316,
+        "roi_pct": 115.84247076023391,
+        "pnl_units": 330.15104166666663
       },
       "delta_gate3_vs_gate2": {
-        "pick_change": -227,
-        "hit_rate_change_pp": -0.26810023250761483,
-        "roi_change_pp": 9.818742478941036,
-        "pnl_change_units": 108.78125
+        "pick_change": -248,
+        "hit_rate_change_pp": -1.4601449275362333,
+        "roi_change_pp": 5.33427687198067,
+        "pnl_change_units": -90.046875
       },
       "delta_gate7_vs_gate3": {
-        "pick_change": -411,
-        "hit_rate_change_pp": -8.803110247153567,
-        "roi_change_pp": -26.430776278474838,
-        "pnl_change_units": 20.317708333333314
+        "pick_change": -409,
+        "hit_rate_change_pp": 6.370984088375392,
+        "roi_change_pp": 89.73080908373029,
+        "pnl_change_units": -90.56770833333331
       },
       "delta_gate8_vs_gate3": {
-        "pick_change": -272,
-        "hit_rate_change_pp": -6.102619248790228,
-        "roi_change_pp": -4.837581131423306,
-        "pnl_change_units": 24.817708333333314
+        "pick_change": -267,
+        "hit_rate_change_pp": 1.946987032799391,
+        "roi_change_pp": 62.325902221586574,
+        "pnl_change_units": 34.739583333333314
       }
     },
     {
@@ -801,64 +141,64 @@
       "end": "2026-01-31",
       "card_days": 30,
       "gate2": {
-        "picks": 756,
-        "settled": 756,
-        "hit_rate": 0.24206349206349206,
-        "roi_pct": -7.003141534391534,
-        "pnl_units": -52.943749999999994
+        "picks": 768,
+        "settled": 768,
+        "hit_rate": 0.3411458333333333,
+        "roi_pct": 53.745659722222214,
+        "pnl_units": 412.7666666666666
       },
       "gate3": {
-        "picks": 527,
-        "settled": 527,
-        "hit_rate": 0.2333965844402277,
-        "roi_pct": -3.557784917486057,
-        "pnl_units": -18.749526515151523
+        "picks": 523,
+        "settled": 523,
+        "hit_rate": 0.34990439770554493,
+        "roi_pct": 65.21669853409816,
+        "pnl_units": 341.0833333333333
       },
       "gate5": {
-        "picks": 264,
-        "settled": 264,
-        "hit_rate": 0.24621212121212122,
-        "roi_pct": -6.065269168962351,
-        "pnl_units": -16.012310606060606
+        "picks": 263,
+        "settled": 263,
+        "hit_rate": 0.34600760456273766,
+        "roi_pct": 81.4975443599493,
+        "pnl_units": 214.33854166666666
       },
       "gate6": {
-        "picks": 418,
-        "settled": 418,
-        "hit_rate": 0.507177033492823,
-        "roi_pct": 7.025767543859648,
-        "pnl_units": 29.367708333333333
+        "picks": 419,
+        "settled": 419,
+        "hit_rate": 0.5918854415274463,
+        "roi_pct": 32.38116547334924,
+        "pnl_units": 135.67708333333334
       },
       "gate7": {
-        "picks": 132,
-        "settled": 132,
-        "hit_rate": 0.21212121212121213,
-        "roi_pct": -29.679608585858585,
-        "pnl_units": -39.177083333333336
+        "picks": 131,
+        "settled": 131,
+        "hit_rate": 0.33587786259541985,
+        "roi_pct": 120.28864503816794,
+        "pnl_units": 157.578125
       },
       "gate8": {
         "picks": 266,
         "settled": 266,
-        "hit_rate": 0.20300751879699247,
-        "roi_pct": -7.107612781954888,
-        "pnl_units": -18.90625
+        "hit_rate": 0.35714285714285715,
+        "roi_pct": 117.3891760651629,
+        "pnl_units": 312.2552083333333
       },
       "delta_gate3_vs_gate2": {
-        "pick_change": -229,
-        "hit_rate_change_pp": -0.8666907623264358,
-        "roi_change_pp": 3.445356616905477,
-        "pnl_change_units": 34.19422348484847
+        "pick_change": -245,
+        "hit_rate_change_pp": 0.8758564372211619,
+        "roi_change_pp": 11.471038811875943,
+        "pnl_change_units": -71.68333333333328
       },
       "delta_gate7_vs_gate3": {
-        "pick_change": -395,
-        "hit_rate_change_pp": -2.1275372319015577,
-        "roi_change_pp": -26.121823668372528,
-        "pnl_change_units": -20.427556818181813
+        "pick_change": -392,
+        "hit_rate_change_pp": -1.4026535110125082,
+        "roi_change_pp": 55.071946504069786,
+        "pnl_change_units": -183.50520833333331
       },
       "delta_gate8_vs_gate3": {
-        "pick_change": -261,
-        "hit_rate_change_pp": -3.038906564323524,
-        "roi_change_pp": -3.549827864468831,
-        "pnl_change_units": -0.1567234848484773
+        "pick_change": -257,
+        "hit_rate_change_pp": 0.7238459437312217,
+        "roi_change_pp": 52.17247753106474,
+        "pnl_change_units": -28.828125
       }
     },
     {
@@ -867,64 +207,64 @@
       "end": "2026-02-28",
       "card_days": 28,
       "gate2": {
-        "picks": 731,
-        "settled": 731,
-        "hit_rate": 0.2954856361149111,
-        "roi_pct": -4.994740496621483,
-        "pnl_units": -36.511553030303034
+        "picks": 733,
+        "settled": 733,
+        "hit_rate": 0.3765347885402456,
+        "roi_pct": 65.55550818553887,
+        "pnl_units": 480.5218749999999
       },
       "gate3": {
-        "picks": 516,
-        "settled": 516,
-        "hit_rate": 0.2713178294573643,
-        "roi_pct": -12.335473191214469,
-        "pnl_units": -63.65104166666666
+        "picks": 508,
+        "settled": 508,
+        "hit_rate": 0.3641732283464567,
+        "roi_pct": 79.87573818897638,
+        "pnl_units": 405.76875000000007
       },
       "gate5": {
-        "picks": 262,
-        "settled": 262,
-        "hit_rate": 0.22900763358778625,
-        "roi_pct": -17.392255089058526,
-        "pnl_units": -45.567708333333336
+        "picks": 257,
+        "settled": 257,
+        "hit_rate": 0.42412451361867703,
+        "roi_pct": 146.6184338521401,
+        "pnl_units": 376.80937500000005
       },
       "gate6": {
-        "picks": 417,
-        "settled": 417,
-        "hit_rate": 0.513189448441247,
-        "roi_pct": -4.957783772981615,
-        "pnl_units": -20.67395833333333
+        "picks": 423,
+        "settled": 423,
+        "hit_rate": 0.6028368794326241,
+        "roi_pct": 24.06323877068558,
+        "pnl_units": 101.78750000000001
       },
       "gate7": {
-        "picks": 133,
-        "settled": 133,
-        "hit_rate": 0.21052631578947367,
-        "roi_pct": -7.393483709273182,
-        "pnl_units": -9.833333333333332
+        "picks": 134,
+        "settled": 134,
+        "hit_rate": 0.40298507462686567,
+        "roi_pct": 202.2978855721393,
+        "pnl_units": 271.07916666666665
       },
       "gate8": {
-        "picks": 265,
-        "settled": 265,
-        "hit_rate": 0.2188679245283019,
-        "roi_pct": -18.98938679245283,
-        "pnl_units": -50.321875
+        "picks": 261,
+        "settled": 261,
+        "hit_rate": 0.41762452107279696,
+        "roi_pct": 174.65158045977012,
+        "pnl_units": 455.840625
       },
       "delta_gate3_vs_gate2": {
-        "pick_change": -215,
-        "hit_rate_change_pp": -2.4167806657546755,
-        "roi_change_pp": -7.340732694592986,
-        "pnl_change_units": -27.139488636363623
+        "pick_change": -225,
+        "hit_rate_change_pp": -1.2361560193788868,
+        "roi_change_pp": 14.320230003437516,
+        "pnl_change_units": -74.75312499999984
       },
       "delta_gate7_vs_gate3": {
-        "pick_change": -383,
-        "hit_rate_change_pp": -6.079151366789065,
-        "roi_change_pp": 4.941989481941286,
-        "pnl_change_units": 53.81770833333333
+        "pick_change": -374,
+        "hit_rate_change_pp": 3.881184628040896,
+        "roi_change_pp": 122.42214738316292,
+        "pnl_change_units": -134.68958333333342
       },
       "delta_gate8_vs_gate3": {
-        "pick_change": -251,
-        "hit_rate_change_pp": -5.244990492906243,
-        "roi_change_pp": -6.6539136012383615,
-        "pnl_change_units": 13.329166666666659
+        "pick_change": -247,
+        "hit_rate_change_pp": 5.345129272634025,
+        "roi_change_pp": 94.77584227079373,
+        "pnl_change_units": 50.07187499999992
       }
     },
     {
@@ -933,64 +273,64 @@
       "end": "2026-03-31",
       "card_days": 31,
       "gate2": {
-        "picks": 817,
-        "settled": 817,
-        "hit_rate": 0.29008567931456547,
-        "roi_pct": -7.5608633767293485,
-        "pnl_units": -61.77225378787878
+        "picks": 831,
+        "settled": 831,
+        "hit_rate": 0.36462093862815886,
+        "roi_pct": 47.30962604383181,
+        "pnl_units": 393.1429924242423
       },
       "gate3": {
-        "picks": 583,
-        "settled": 583,
-        "hit_rate": 0.30360205831903947,
-        "roi_pct": 1.810563828681323,
-        "pnl_units": 10.555587121212113
+        "picks": 572,
+        "settled": 572,
+        "hit_rate": 0.3881118881118881,
+        "roi_pct": 75.0792673235855,
+        "pnl_units": 429.453409090909
       },
       "gate5": {
-        "picks": 295,
-        "settled": 295,
-        "hit_rate": 0.28135593220338984,
-        "roi_pct": 1.4336158192090387,
-        "pnl_units": 4.229166666666664
+        "picks": 290,
+        "settled": 290,
+        "hit_rate": 0.4103448275862069,
+        "roi_pct": 108.67538531870429,
+        "pnl_units": 315.15861742424244
       },
       "gate6": {
-        "picks": 467,
-        "settled": 467,
-        "hit_rate": 0.49678800856531047,
-        "roi_pct": -1.7425053533190564,
-        "pnl_units": -8.137499999999994
+        "picks": 463,
+        "settled": 463,
+        "hit_rate": 0.5658747300215983,
+        "roi_pct": 28.97093232541397,
+        "pnl_units": 134.13541666666666
       },
       "gate7": {
-        "picks": 152,
-        "settled": 152,
-        "hit_rate": 0.2565789473684211,
-        "roi_pct": 10.803865131578947,
-        "pnl_units": 16.421875
+        "picks": 151,
+        "settled": 151,
+        "hit_rate": 0.41721854304635764,
+        "roi_pct": 168.36713576158942,
+        "pnl_units": 254.234375
       },
       "gate8": {
-        "picks": 299,
-        "settled": 299,
-        "hit_rate": 0.2608695652173913,
-        "roi_pct": -6.209935897435897,
-        "pnl_units": -18.567708333333332
+        "picks": 296,
+        "settled": 296,
+        "hit_rate": 0.42567567567567566,
+        "roi_pct": 145.4699017199017,
+        "pnl_units": 430.59090909090907
       },
       "delta_gate3_vs_gate2": {
-        "pick_change": -234,
-        "hit_rate_change_pp": 1.3516379004474,
-        "roi_change_pp": 9.371427205410672,
-        "pnl_change_units": 72.3278409090909
+        "pick_change": -259,
+        "hit_rate_change_pp": 2.349094948372926,
+        "roi_change_pp": 27.769641279753685,
+        "pnl_change_units": 36.3104166666667
       },
       "delta_gate7_vs_gate3": {
-        "pick_change": -431,
-        "hit_rate_change_pp": -4.702311095061839,
-        "roi_change_pp": 8.993301302897624,
-        "pnl_change_units": 5.866287878787887
+        "pick_change": -421,
+        "hit_rate_change_pp": 2.910665493446951,
+        "roi_change_pp": 93.28786843800393,
+        "pnl_change_units": -175.21903409090902
       },
       "delta_gate8_vs_gate3": {
-        "pick_change": -284,
-        "hit_rate_change_pp": -4.273249310164817,
-        "roi_change_pp": -8.02049972611722,
-        "pnl_change_units": -29.123295454545445
+        "pick_change": -276,
+        "hit_rate_change_pp": 3.756378756378753,
+        "roi_change_pp": 70.39063439631622,
+        "pnl_change_units": 1.1375000000000455
       }
     },
     {
@@ -999,64 +339,64 @@
       "end": "2026-04-30",
       "card_days": 30,
       "gate2": {
-        "picks": 945,
-        "settled": 945,
-        "hit_rate": 0.2613756613756614,
-        "roi_pct": -5.6855158730158735,
-        "pnl_units": -53.728125000000006
+        "picks": 960,
+        "settled": 960,
+        "hit_rate": 0.3416666666666667,
+        "roi_pct": 47.47016059027777,
+        "pnl_units": 455.71354166666663
       },
       "gate3": {
-        "picks": 661,
-        "settled": 661,
-        "hit_rate": 0.25718608169440244,
-        "roi_pct": -0.8965267271810393,
-        "pnl_units": -5.92604166666667
+        "picks": 654,
+        "settled": 654,
+        "hit_rate": 0.3532110091743119,
+        "roi_pct": 72.29150739041795,
+        "pnl_units": 472.7864583333333
       },
       "gate5": {
-        "picks": 334,
-        "settled": 334,
-        "hit_rate": 0.2634730538922156,
-        "roi_pct": 5.673652694610778,
-        "pnl_units": 18.95
+        "picks": 331,
+        "settled": 331,
+        "hit_rate": 0.41389728096676737,
+        "roi_pct": 146.71450151057402,
+        "pnl_units": 485.625
       },
       "gate6": {
-        "picks": 536,
-        "settled": 536,
-        "hit_rate": 0.5093283582089553,
-        "roi_pct": 10.532493781094528,
-        "pnl_units": 56.454166666666666
+        "picks": 530,
+        "settled": 530,
+        "hit_rate": 0.5339622641509434,
+        "roi_pct": 23.099449685534594,
+        "pnl_units": 122.42708333333336
       },
       "gate7": {
-        "picks": 172,
-        "settled": 172,
-        "hit_rate": 0.2558139534883721,
-        "roi_pct": 10.227713178294573,
-        "pnl_units": 17.591666666666665
+        "picks": 169,
+        "settled": 169,
+        "hit_rate": 0.40236686390532544,
+        "roi_pct": 220.52514792899407,
+        "pnl_units": 372.6875
       },
       "gate8": {
-        "picks": 337,
-        "settled": 337,
-        "hit_rate": 0.24629080118694363,
-        "roi_pct": 7.244683481701288,
-        "pnl_units": 24.41458333333334
+        "picks": 334,
+        "settled": 334,
+        "hit_rate": 0.39520958083832336,
+        "roi_pct": 150.92159431137728,
+        "pnl_units": 504.0781250000001
       },
       "delta_gate3_vs_gate2": {
-        "pick_change": -284,
-        "hit_rate_change_pp": -0.4189579681258937,
-        "roi_change_pp": 4.788989145834834,
-        "pnl_change_units": 47.802083333333336
+        "pick_change": -306,
+        "hit_rate_change_pp": 1.1544342507645244,
+        "roi_change_pp": 24.821346800140176,
+        "pnl_change_units": 17.072916666666686
       },
       "delta_gate7_vs_gate3": {
-        "pick_change": -489,
-        "hit_rate_change_pp": -0.1372128206030332,
-        "roi_change_pp": 11.124239905475612,
-        "pnl_change_units": 23.517708333333335
+        "pick_change": -485,
+        "hit_rate_change_pp": 4.915585473101353,
+        "roi_change_pp": 148.23364053857614,
+        "pnl_change_units": -100.09895833333331
       },
       "delta_gate8_vs_gate3": {
-        "pick_change": -324,
-        "hit_rate_change_pp": -1.0895280507458804,
-        "roi_change_pp": 8.141210208882327,
-        "pnl_change_units": 30.34062500000001
+        "pick_change": -320,
+        "hit_rate_change_pp": 4.199857166401144,
+        "roi_change_pp": 78.63008692095933,
+        "pnl_change_units": 31.2916666666668
       }
     },
     {
@@ -1065,64 +405,64 @@
       "end": "2026-05-22",
       "card_days": 20,
       "gate2": {
-        "picks": 696,
-        "settled": 696,
-        "hit_rate": 0.2686781609195402,
-        "roi_pct": 22.46503287182166,
-        "pnl_units": 156.35662878787875
+        "picks": 704,
+        "settled": 704,
+        "hit_rate": 0.3039772727272727,
+        "roi_pct": 62.429421164772734,
+        "pnl_units": 439.50312500000007
       },
       "gate3": {
-        "picks": 490,
-        "settled": 490,
-        "hit_rate": 0.26326530612244897,
-        "roi_pct": 36.315978664192954,
-        "pnl_units": 177.94829545454547
+        "picks": 489,
+        "settled": 489,
+        "hit_rate": 0.3496932515337423,
+        "roi_pct": 108.42152351738244,
+        "pnl_units": 530.1812500000001
       },
       "gate5": {
         "picks": 243,
         "settled": 243,
-        "hit_rate": 0.25102880658436216,
-        "roi_pct": 7.70763187429854,
-        "pnl_units": 18.729545454545452
+        "hit_rate": 0.345679012345679,
+        "roi_pct": 128.17601165980795,
+        "pnl_units": 311.46770833333335
       },
       "gate6": {
-        "picks": 374,
-        "settled": 374,
-        "hit_rate": 0.4679144385026738,
-        "roi_pct": -13.796791443850267,
-        "pnl_units": -51.6
+        "picks": 385,
+        "settled": 385,
+        "hit_rate": 0.4779220779220779,
+        "roi_pct": 15.52759740259741,
+        "pnl_units": 59.78125000000003
       },
       "gate7": {
-        "picks": 125,
-        "settled": 125,
-        "hit_rate": 0.264,
-        "roi_pct": 11.142500000000002,
-        "pnl_units": 13.928125000000001
+        "picks": 128,
+        "settled": 128,
+        "hit_rate": 0.3515625,
+        "roi_pct": 175.06510416666666,
+        "pnl_units": 224.08333333333331
       },
       "gate8": {
         "picks": 251,
         "settled": 251,
-        "hit_rate": 0.2350597609561753,
-        "roi_pct": 47.034362549800804,
-        "pnl_units": 118.05625
+        "hit_rate": 0.3466135458167331,
+        "roi_pct": 194.47460159362552,
+        "pnl_units": 488.1312500000001
       },
       "delta_gate3_vs_gate2": {
-        "pick_change": -206,
-        "hit_rate_change_pp": -0.5412854797091249,
-        "roi_change_pp": 13.850945792371295,
-        "pnl_change_units": 21.591666666666725
+        "pick_change": -215,
+        "hit_rate_change_pp": 4.57159788064696,
+        "roi_change_pp": 45.992102352609706,
+        "pnl_change_units": 90.67812500000002
       },
       "delta_gate7_vs_gate3": {
-        "pick_change": -365,
-        "hit_rate_change_pp": 0.07346938775510403,
-        "roi_change_pp": -25.173478664192952,
-        "pnl_change_units": -164.02017045454548
+        "pick_change": -361,
+        "hit_rate_change_pp": 0.18692484662576891,
+        "roi_change_pp": 66.64358064928422,
+        "pnl_change_units": -306.0979166666668
       },
       "delta_gate8_vs_gate3": {
-        "pick_change": -239,
-        "hit_rate_change_pp": -2.8205545166273662,
-        "roi_change_pp": 10.71838388560785,
-        "pnl_change_units": -59.89204545454547
+        "pick_change": -238,
+        "hit_rate_change_pp": -0.3079705717009218,
+        "roi_change_pp": 86.05307807624308,
+        "pnl_change_units": -42.05000000000001
       }
     }
   ],

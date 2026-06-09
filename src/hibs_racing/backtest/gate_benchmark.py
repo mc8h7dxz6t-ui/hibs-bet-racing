@@ -342,8 +342,21 @@ def backfill_scored_snapshots(
     db = database or db_path(cfg)
     paper_cfg = cfg.get("paper", {})
     config_hash = scoring_config_hash(paper_cfg)
-    if not force:
+
+    def _coverage_payload() -> dict:
         cov = snapshot_coverage(db, start, end, config_hash=config_hash)
+        from hibs_racing.features.runner_enrich_backfill import coverage_report
+
+        enrich_cov = coverage_report(db, start=start, end=end)
+        return {
+            **cov,
+            "coverage_kind": "snapshot_card_day_coverage",
+            "snapshot_coverage_pct": cov.get("coverage_pct"),
+            "enrich_coverage": enrich_cov,
+        }
+
+    if not force:
+        cov = _coverage_payload()
         if cov["complete"]:
             return {
                 "start": start,
@@ -396,7 +409,7 @@ def backfill_scored_snapshots(
         )
         days += 1
 
-    cov = snapshot_coverage(db, start, end, config_hash=config_hash)
+    cov = _coverage_payload()
     from hibs_racing.institutional.run_manifest import build_run_manifest, persist_run_manifest
     from hibs_racing.institutional.ledger_events import append_ledger_event
 

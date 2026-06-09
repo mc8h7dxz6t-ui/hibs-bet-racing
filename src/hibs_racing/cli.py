@@ -175,11 +175,26 @@ def cmd_gate_coverage_audit(args: argparse.Namespace) -> int:
         lanes=lanes,
         min_density_pct=getattr(args, "min_density", None),
         source=getattr(args, "source", "both"),
+        coverage_universe=getattr(args, "coverage_universe", "domestic_gb_ire"),
     )
     print(json.dumps(report, indent=2))
     if report.get("error"):
         return 1
     return 0 if report.get("retest_ready") else 1
+
+
+def cmd_repair_dense_fields(args: argparse.Namespace) -> int:
+    from hibs_racing.ingest.dense_field_repair import run_dense_field_repair
+
+    report = run_dense_field_repair(
+        start=getattr(args, "start"),
+        end=getattr(args, "end"),
+        fetch_missing=getattr(args, "fetch_missing", False),
+        refill=getattr(args, "refill", False),
+        max_days=getattr(args, "max_days", None),
+    )
+    print(json.dumps(report, indent=2))
+    return 0
 
 
 def cmd_gate_impact(args: argparse.Namespace) -> int:
@@ -1164,6 +1179,12 @@ def main(argv: list[str] | None = None) -> int:
         default="both",
         help="Audit snapshots (replay), runners DB (batch inject), or both",
     )
+    p_gca.add_argument(
+        "--coverage-universe",
+        choices=["domestic_gb_ire", "all", "international"],
+        default="domestic_gb_ire",
+        help="Runner universe for retest_ready (default: UK/IRE domestic replay)",
+    )
     p_gca.set_defaults(func=cmd_gate_coverage_audit)
 
     p_dic = sub.add_parser(
@@ -1302,6 +1323,25 @@ def main(argv: list[str] | None = None) -> int:
     p_batch.add_argument("--refetch", action="store_true", help="Re-fetch JSON even if cached")
     p_batch.add_argument("-v", "--verbose", action="store_true", help="INFO logging to stderr")
     p_batch.set_defaults(func=cmd_batch_enrich_recovery)
+
+    p_dense = sub.add_parser(
+        "repair-dense-fields",
+        help="Repair historical official_rating/trainer_rtf from cached or fetched RP racecards",
+    )
+    p_dense.add_argument("--start", required=True, help="Start YYYY-MM-DD")
+    p_dense.add_argument("--end", required=True, help="End YYYY-MM-DD")
+    p_dense.add_argument(
+        "--fetch-missing",
+        action="store_true",
+        help="Fetch RP racecard JSON for missing dates before repair",
+    )
+    p_dense.add_argument(
+        "--refill",
+        action="store_true",
+        help="Overwrite existing official_rating/trainer_rtf values from RP payloads",
+    )
+    p_dense.add_argument("--max-days", type=int, help="Pilot: process at most N days")
+    p_dense.set_defaults(func=cmd_repair_dense_fields)
 
     p_fi = sub.add_parser("feature-importance", help="Feature importance matrix + holdout AUC diagnostic")
     p_fi.add_argument("--json", action="store_true", help="Output JSON")

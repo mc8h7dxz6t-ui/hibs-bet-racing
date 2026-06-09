@@ -195,6 +195,7 @@ def fetch_racecards_with_fallback(
     from hibs_racing.ingest.historical_racecards import fetch_historical_racecards_on_date
     from hibs_racing.ingest.racecards import RPSCRAPE_RACECARDS
     from hibs_racing.features.runner_enrich_backfill import backfill_runner_enrich
+    from hibs_racing.ingest.dense_field_repair import repair_dense_fields_for_date
 
     result: dict[str, Any] = {"card_date": card_date, "stages": []}
     json_path = RPSCRAPE_RACECARDS / f"{card_date}.json"
@@ -218,6 +219,10 @@ def fetch_racecards_with_fallback(
 
     if not json_path.exists():
         return result
+
+    dense = repair_dense_fields_for_date(card_date, database=db)
+    result["stages"].append({"stage": "dense_field_repair", "ok": not dense.get("error"), **dense})
+    result["dense_fields_updated"] = int(dense.get("rows_updated", 0))
 
     bf = backfill_runner_enrich(database=db, include_upcoming=False, card_date=card_date)
     result["rows_backfilled"] = int(bf.get("rows_updated", 0))

@@ -48,13 +48,19 @@ def _load_scored_cards_for_dates(db: Path, dates: list[str]) -> pd.DataFrame:
         u.race_name,
         u.official_rating,
         u.field_size,
+        u.win_decimal,
+        u.jockey,
+        u.trainer,
+        u.card_comment,
         u.horse_distance_runs,
         u.horse_distance_wins,
         u.form_trip_change_f,
         u.trainer_rtf,
         u.form_poor_runs_3,
         c.place_ev,
-        c.combo_bayes_place
+        c.combo_bayes_place,
+        c.model_win_prob,
+        c.model_place_prob
     FROM upcoming_runners u
     JOIN card_scores c ON c.runner_id = u.runner_id
     WHERE u.card_date IN ({placeholders})

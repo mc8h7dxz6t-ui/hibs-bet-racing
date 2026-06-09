@@ -10,8 +10,9 @@ def test_compare_value_gates_counts(tmp_path):
             """
             INSERT INTO upcoming_runners (
                 runner_id, race_id, card_date, race_name, official_rating,
+                field_size, win_decimal, jockey, trainer, card_comment,
                 horse_distance_runs, horse_distance_wins, form_trip_change_f, horse_id, source, fetched_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "r1",
@@ -19,6 +20,11 @@ def test_compare_value_gates_counts(tmp_path):
                 "2026-06-01",
                 "Class 4 Handicap",
                 70,
+                8,
+                5.0,
+                "J A",
+                "T A",
+                "stays well",
                 4,
                 0,
                 3.0,
@@ -30,8 +36,10 @@ def test_compare_value_gates_counts(tmp_path):
         conn.execute(
             """
             INSERT INTO upcoming_runners (
-                runner_id, race_id, card_date, race_name, official_rating, horse_id, source, fetched_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                runner_id, race_id, card_date, race_name, official_rating,
+                field_size, win_decimal, jockey, trainer, card_comment,
+                horse_id, source, fetched_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "r2",
@@ -39,6 +47,11 @@ def test_compare_value_gates_counts(tmp_path):
                 "2026-06-01",
                 "Class 4 Handicap",
                 72,
+                8,
+                6.0,
+                "J B",
+                "T B",
+                "travels strongly",
                 "h2",
                 "test",
                 "2026-06-01T00:00:00+00:00",
@@ -47,18 +60,20 @@ def test_compare_value_gates_counts(tmp_path):
         conn.execute(
             """
             INSERT INTO card_scores (
-                runner_id, race_id, model_score, place_ev, combo_bayes_place, value_flag, scored_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                runner_id, race_id, model_score, model_win_prob, model_place_prob,
+                place_ev, combo_bayes_place, value_flag, scored_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            ("r1", "race1", 0.5, 0.30, 0.5, 0, "2026-06-01T00:00:00+00:00"),
+            ("r1", "race1", 0.5, 0.2, 0.45, 0.30, 0.5, 0, "2026-06-01T00:00:00+00:00"),
         )
         conn.execute(
             """
             INSERT INTO card_scores (
-                runner_id, race_id, model_score, place_ev, combo_bayes_place, value_flag, scored_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                runner_id, race_id, model_score, model_win_prob, model_place_prob,
+                place_ev, combo_bayes_place, value_flag, scored_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            ("r2", "race1", 0.5, 0.30, 0.5, 0, "2026-06-01T00:00:00+00:00"),
+            ("r2", "race1", 0.5, 0.2, 0.45, 0.30, 0.5, 0, "2026-06-01T00:00:00+00:00"),
         )
         conn.commit()
 

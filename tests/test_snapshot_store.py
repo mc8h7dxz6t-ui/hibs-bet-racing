@@ -2,6 +2,7 @@ import json
 
 import pandas as pd
 
+from hibs_racing.backtest.gate_benchmark import backfill_scored_snapshots
 from hibs_racing.backtest.snapshot_store import (
     _expand_gates_json,
     load_snapshots,
@@ -10,7 +11,7 @@ from hibs_racing.backtest.snapshot_store import (
     upsert_snapshots,
 )
 from hibs_racing.cards.data_quality import runner_data_quality_pct
-from hibs_racing.features.store import init_db
+from hibs_racing.features.store import connect, init_db
 
 
 def test_snapshot_roundtrip(tmp_path):
@@ -89,3 +90,56 @@ def test_snapshot_gates_json_includes_dq_fields(tmp_path):
 def test_config_hash_stable():
     cfg = {"min_place_ev": 0.05, "gate2": {"enabled": False}}
     assert scoring_config_hash(cfg) == scoring_config_hash(cfg)
+
+
+def test_snapshot_backfill_reports_enrich_coverage_when_snapshots_complete(tmp_path):
+    db = tmp_path / "complete.db"
+    init_db(db)
+    with connect(db) as conn:
+        conn.execute(
+            """
+            INSERT INTO runners (
+                runner_id, race_id, horse_id, race_date, course, finish_pos,
+                sp_decimal, ingested_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("r1", "race1", "horse1", "2026-06-01", "Ascot", 2, 5.0, "2026-06-02T00:00:00Z"),
+        )
+    frame = pd.DataFrame(
+        [
+            {
+                "runner_id": "r1",
+                "race_id": "race1",
+                "course": "Ascot",
+                "race_name": "Handicap",
+                "field_size": 10,
+                "official_rating": 80,
+                "win_decimal": 5.0,
+                "place_fraction": 0.25,
+                "places": 3,
+                "model_score": 0.9,
+                "model_win_prob": 0.2,
+                "model_place_prob": 0.45,
+                "combo_bayes_place": 0.3,
+                "place_ev": 0.08,
+                "ew_combined_ev": 0.1,
+                "flag_raw": 1,
+            }
+        ]
+    )
+    upsert_snapshots(db, "2026-06-01", frame, finish_by_runner={"r1": 2})
+
+    result = backfill_scored_snapshots(
+        start="2026-06-01",
+        end="2026-06-01",
+        database=db,
+        force=False,
+    )
+
+    assert result["complete"] is True
+    assert result["coverage_pct"] == 100.0
+    assert result["coverage_kind"] == "snapshot_card_day_coverage"
+    assert result["snapshot_coverage_pct"] == 100.0
+    assert result["enrich_coverage"]["finished_runners"] == 1
+    assert result["enrich_coverage"]["enriched_pct"] == 0.0
+    assert result["enrich_coverage"]["mean_enrich_coverage_pct"] == 0.0

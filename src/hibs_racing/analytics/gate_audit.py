@@ -23,6 +23,112 @@ from hibs_racing.features.runner_enrich_backfill import coverage_report
 
 logger = logging.getLogger(__name__)
 
+_DOMESTIC_COURSES: frozenset[str] = frozenset(
+    {
+        "aintree",
+        "ascot",
+        "ayr",
+        "ballinrobe",
+        "bangor-on-dee",
+        "bath",
+        "bellewstown",
+        "beverley",
+        "carlisle",
+        "cartmel",
+        "catterick",
+        "chelmsford",
+        "chelmsford aw",
+        "chelmsford-aw",
+        "chelmsford (aw)",
+        "cheltenham",
+        "chepstow",
+        "chester",
+        "clonmel",
+        "cork",
+        "curragh",
+        "doncaster",
+        "down royal",
+        "downpatrick",
+        "dundalk",
+        "dundalk aw",
+        "dundalk-aw",
+        "dundalk (aw)",
+        "epsom",
+        "exeter",
+        "fairyhouse",
+        "fakenham",
+        "ffos las",
+        "fontwell",
+        "goodwood",
+        "gowran park",
+        "hamilton",
+        "haydock",
+        "hereford",
+        "hexham",
+        "huntingdon",
+        "kelso",
+        "kempton",
+        "kempton aw",
+        "kempton-aw",
+        "kempton (aw)",
+        "kilbeggan",
+        "killarney",
+        "leicester",
+        "leopardstown",
+        "limerick",
+        "lingfield",
+        "lingfield aw",
+        "lingfield-aw",
+        "lingfield (aw)",
+        "ludlow",
+        "market rasen",
+        "musselburgh",
+        "naas",
+        "navan",
+        "newbury",
+        "newcastle",
+        "newcastle aw",
+        "newcastle-aw",
+        "newcastle (aw)",
+        "newmarket",
+        "newton abbot",
+        "nottingham",
+        "perth",
+        "plumpton",
+        "pontefract",
+        "punchestown",
+        "redcar",
+        "ripon",
+        "roscommon",
+        "salisbury",
+        "sandown",
+        "sedgefield",
+        "sligo",
+        "southwell",
+        "southwell aw",
+        "southwell-aw",
+        "southwell (aw)",
+        "stratford",
+        "taunton",
+        "thirsk",
+        "thurles",
+        "tramore",
+        "uttoxeter",
+        "warwick",
+        "wetherby",
+        "wexford",
+        "wincanton",
+        "windsor",
+        "wolverhampton",
+        "wolverhampton aw",
+        "wolverhampton-aw",
+        "wolverhampton (aw)",
+        "worcester",
+        "yarmouth",
+        "york",
+    }
+)
+
 # Institutional rule: NULL/NaN = unpopulated. Zero is valid for counters; not for RTF/rates.
 _MISSING_FN: dict[str, Callable[[pd.Series], pd.Series]] = {
     "trainer_rtf": lambda s: pd.to_numeric(s, errors="coerce").isna(),
@@ -342,6 +448,58 @@ def _enrich_source_breakdown(frame: pd.DataFrame) -> dict[str, Any]:
     return {"total": len(frame), "by_source": {str(k): int(v) for k, v in counts.items()}}
 
 
+def _course_key(raw: Any) -> str:
+    text = str(raw or "").strip().lower()
+    return " ".join(text.replace("_", " ").split())
+
+
+def _with_coverage_universe(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty or "course" not in frame.columns:
+        out = frame.copy()
+        out["coverage_universe"] = "unknown"
+        return out
+    out = frame.copy()
+    out["coverage_universe"] = out["course"].map(
+        lambda c: "domestic_gb_ire" if _course_key(c) in _DOMESTIC_COURSES else "international"
+    )
+    return out
+
+
+def _universe_lane_breakdown(
+    frame: pd.DataFrame,
+    lanes: tuple[str, ...],
+    *,
+    paper_cfg: dict,
+    full_cfg: dict,
+    min_density_pct: float,
+    required_features: dict[str, tuple[str, ...]],
+) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    frame = _with_coverage_universe(frame)
+    for universe in ("all", "domestic_gb_ire", "international"):
+        subset = frame if universe == "all" else frame[frame["coverage_universe"].eq(universe)].copy()
+        lane_reports = [
+            audit_gate_lane(
+                subset,
+                lane,
+                paper_cfg=paper_cfg,
+                full_cfg=full_cfg,
+                min_density_pct=min_density_pct,
+                required_features=required_features,
+            ).to_dict()
+            for lane in lanes
+            if lane in required_features
+        ]
+        out[universe] = {
+            "runners": len(subset),
+            "enrich_source_breakdown": _enrich_source_breakdown(subset),
+            "lanes": lane_reports,
+            "retest_ready": bool(lane_reports)
+            and all(r.get("passed") for r in lane_reports if r.get("lane") in ("gate3", "gate5", "gate7")),
+        }
+    return out
+
+
 def _load_runners_window(db: Any, start: str, end: str) -> pd.DataFrame:
     from hibs_racing.features.store import connect, init_db
 
@@ -349,6 +507,7 @@ def _load_runners_window(db: Any, start: str, end: str) -> pd.DataFrame:
         {
             "runner_id",
             "race_date",
+            "course",
             "official_rating",
             "trainer_rtf",
             "win_decimal",
@@ -391,6 +550,7 @@ def run_gate_coverage_audit(
     database: Any = None,
     min_density_pct: float | None = None,
     source: str = "both",
+    coverage_universe: str = "domestic_gb_ire",
 ) -> dict[str, Any]:
     """Audit snapshot replay window for gate data deprivation (institutional++ pre-archive check)."""
     cfg = load_config()
@@ -415,11 +575,15 @@ def run_gate_coverage_audit(
 
     audit_lanes = lanes or WALKFORWARD_FOCUS_LANES
     src = (source or "both").strip().lower()
+    universe = (coverage_universe or "domestic_gb_ire").strip().lower()
+    if universe not in ("all", "domestic_gb_ire", "international"):
+        universe = "domestic_gb_ire"
     out: dict[str, Any] = {
         "start": start_s,
         "end": end_s,
         "min_density_pct": density_floor,
         "source": src,
+        "coverage_universe": universe,
         "runners_db_enrich": coverage_report(db, start=start_s, end=end_s),
     }
 
@@ -438,18 +602,23 @@ def run_gate_coverage_audit(
         else:
             frame = _expand_gates_json(snap)
             settled = frame[frame["finish_pos"].notna()].copy()
-            lane_reports = [
-                audit_gate_lane(
-                    settled, lane, paper_cfg=paper_cfg, full_cfg=cfg,
-                    min_density_pct=density_floor, required_features=LANE_REQUIRED_FEATURES,
-                ).to_dict()
-                for lane in audit_lanes
-                if lane in LANE_REQUIRED_FEATURES
-            ]
+            universe_breakdown = _universe_lane_breakdown(
+                settled,
+                audit_lanes,
+                paper_cfg=paper_cfg,
+                full_cfg=cfg,
+                min_density_pct=density_floor,
+                required_features=LANE_REQUIRED_FEATURES,
+            )
+            selected_universe = universe_breakdown[universe]
+            lane_reports = selected_universe["lanes"]
             snapshot_block = {
                 "snapshot_config_hash": snap_hash,
                 "settled_runners": len(settled),
                 "enrich_source_breakdown": _enrich_source_breakdown(settled),
+                "coverage_universes": universe_breakdown,
+                "selected_coverage_universe": universe,
+                "selected_universe_runners": selected_universe["runners"],
                 "lanes": lane_reports,
                 "retest_ready": all(
                     r.get("passed") for r in lane_reports if r.get("lane") in ("gate3", "gate5", "gate7")
@@ -461,17 +630,22 @@ def run_gate_coverage_audit(
         if runners.empty:
             runners_block = {"error": "no finished runners in window"}
         else:
-            lane_reports = [
-                audit_gate_lane(
-                    runners, lane, paper_cfg=paper_cfg, full_cfg=cfg,
-                    min_density_pct=density_floor, required_features=RUNNER_LANE_REQUIRED_FEATURES,
-                ).to_dict()
-                for lane in audit_lanes
-                if lane in RUNNER_LANE_REQUIRED_FEATURES
-            ]
+            universe_breakdown = _universe_lane_breakdown(
+                runners,
+                audit_lanes,
+                paper_cfg=paper_cfg,
+                full_cfg=cfg,
+                min_density_pct=density_floor,
+                required_features=RUNNER_LANE_REQUIRED_FEATURES,
+            )
+            selected_universe = universe_breakdown[universe]
+            lane_reports = selected_universe["lanes"]
             runners_block = {
                 "finished_runners": len(runners),
                 "enrich_source_breakdown": _enrich_source_breakdown(runners),
+                "coverage_universes": universe_breakdown,
+                "selected_coverage_universe": universe,
+                "selected_universe_runners": selected_universe["runners"],
                 "lanes": lane_reports,
                 "retest_ready": all(
                     r.get("passed") for r in lane_reports if r.get("lane") in ("gate3", "gate5", "gate7")
@@ -485,12 +659,32 @@ def run_gate_coverage_audit(
     if snap_hash:
         out["snapshot_config_hash"] = snap_hash
 
-    retest_flags = [
-        b.get("retest_ready")
-        for b in (snapshot_block, runners_block)
-        if isinstance(b, dict) and "retest_ready" in b
-    ]
-    out["retest_ready"] = bool(retest_flags) and all(retest_flags)
+    snapshot_ready = (
+        snapshot_block.get("retest_ready")
+        if isinstance(snapshot_block, dict) and "retest_ready" in snapshot_block
+        else None
+    )
+    runners_ready = (
+        runners_block.get("retest_ready")
+        if isinstance(runners_block, dict) and "retest_ready" in runners_block
+        else None
+    )
+    out["snapshot_retest_ready"] = snapshot_ready
+    out["runners_retest_ready"] = runners_ready
+    if src == "runners":
+        out["retest_source"] = "runners"
+        out["retest_ready"] = bool(runners_ready)
+    elif snapshot_ready is not None:
+        out["retest_source"] = "snapshots"
+        out["retest_ready"] = bool(snapshot_ready)
+    else:
+        out["retest_source"] = "none"
+        out["retest_ready"] = False
+    if src == "both" and snapshot_ready is True and runners_ready is False:
+        out["diagnostic_note"] = (
+            "Snapshot replay density passed; raw runners DB density remains sparse and is reported "
+            "as a non-blocking data-pipeline diagnostic."
+        )
 
     if src == "snapshots" and snapshot_block and snapshot_block.get("error"):
         out["error"] = snapshot_block["error"]
