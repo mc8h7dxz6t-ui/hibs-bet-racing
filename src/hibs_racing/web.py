@@ -420,7 +420,8 @@ def create_app() -> Flask:
     def api_runner_fields(runner_id: str):
         from hibs_racing.cards.runner_field_api import resolve_runner_fields
 
-        payload = resolve_runner_fields(runner_id)
+        rescue = request.args.get("rescue", "0") == "1"
+        payload = resolve_runner_fields(runner_id, rescue=rescue)
         if not payload:
             return jsonify({"ok": False, "error": "runner_not_found", "runner_id": runner_id}), 404
         return jsonify({"ok": True, **payload})

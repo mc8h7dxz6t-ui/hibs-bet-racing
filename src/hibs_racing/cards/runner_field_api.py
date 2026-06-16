@@ -37,12 +37,26 @@ def load_runner_row(runner_id: str) -> Optional[Dict[str, Any]]:
     return _row_to_dict(hit.iloc[0])
 
 
-def resolve_runner_fields(runner_id: str) -> Optional[Dict[str, Any]]:
+def resolve_runner_fields(runner_id: str, *, rescue: bool = False) -> Optional[Dict[str, Any]]:
     row = load_runner_row(runner_id)
     if not row:
         return None
+    ladder_steps: Dict[str, Any] = {}
+    if rescue:
+        frame = load_scored_cards()
+        race_id = row.get("race_id")
+        race_slice = (
+            frame.loc[frame["race_id"].astype(str) == str(race_id)]
+            if race_id is not None and not frame.empty and "race_id" in frame.columns
+            else frame.iloc[0:0]
+        )
+        from hibs_racing.scrapers.field_resolver import rescue_runner_fields
+
+        rescued = rescue_runner_fields(row, race_slice=race_slice)
+        row = rescued["row"]
+        ladder_steps = rescued.get("ladder_steps") or {}
     blocks = runner_quality_blocks(row)
-    return {
+    payload = {
         "runner_id": row.get("runner_id"),
         "race_id": row.get("race_id"),
         "horse_name": row.get("horse_name"),
@@ -57,6 +71,10 @@ def resolve_runner_fields(runner_id: str) -> Optional[Dict[str, Any]]:
         "value_gate_reason": row.get("value_gate_reason"),
         "enrich_source": row.get("enrich_source"),
     }
+    if ladder_steps:
+        payload["rescued"] = True
+        payload["ladder_steps"] = ladder_steps
+    return payload
 
 
 def _public_field_keys() -> tuple[str, ...]:
