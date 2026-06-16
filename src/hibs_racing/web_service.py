@@ -49,6 +49,8 @@ class HealthStatus:
     unscored_runners: int | None = None
     nan_integrity_passed: bool | None = None
     production_value_count: int | None = None
+    paper: dict | None = None
+    cron: dict | None = None
 
     def to_dict(self) -> dict:
         out = {
@@ -69,6 +71,7 @@ class HealthStatus:
             out["engine_profile"] = self.engine_profile
         if self.paper_recon_clean is not None:
             out["paper_recon_clean"] = self.paper_recon_clean
+            out["recon_clean"] = self.paper_recon_clean
         if self.manifest_id is not None:
             out["manifest_id"] = self.manifest_id
         if self.snapshot_coverage_pct is not None:
@@ -83,6 +86,10 @@ class HealthStatus:
             out["nan_integrity_passed"] = self.nan_integrity_passed
         if self.production_value_count is not None:
             out["production_value_count"] = self.production_value_count
+        if self.paper is not None:
+            out["paper"] = self.paper
+        if self.cron is not None:
+            out["cron"] = self.cron
         return out
 
 
@@ -91,6 +98,49 @@ def _env_ok(*keys: str) -> bool:
         if not os.environ.get(key, "").strip():
             return False
     return True
+
+
+def _health_light_mode() -> bool:
+    return os.environ.get("HIBS_HEALTH_LIGHT", "0").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _paper_health_summary(database) -> dict:
+    """Fast COUNT-only paper ledger summary for R7 parity."""
+    from hibs_racing.features.store import connect, init_db
+
+    init_db(database)
+    out = {"n_rows": 0, "open": 0, "settled": 0}
+    try:
+        with connect(database) as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS n,
+                    SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open_n,
+                    SUM(CASE WHEN status = 'settled' THEN 1 ELSE 0 END) AS settled_n
+                FROM paper_bets
+                """
+            ).fetchone()
+            if row:
+                out["n_rows"] = int(row[0] or 0)
+                out["open"] = int(row[1] or 0)
+                out["settled"] = int(row[2] or 0)
+    except Exception:
+        pass
+    return out
+
+
+def _cron_health_summary(database) -> dict:
+    from hibs_racing.place.public_tracker import automation_ops_status
+
+    ops = automation_ops_status(database=database)
+    ok_n = sum(1 for step in ops if step.get("status") == "success")
+    return {
+        "steps": len(ops),
+        "ok": ok_n,
+        "healthy": ok_n == len(ops) if ops else False,
+        "ingestion_ok": any(s.get("id") == "ingestion" and s.get("status") == "success" for s in ops),
+    }
 
 
 def health_status() -> HealthStatus:
@@ -133,7 +183,7 @@ def health_status() -> HealthStatus:
             observation_lane=observation_lane,
         ).to_dict()
     recon_clean = None
-    if runners is not None and len(runners) > 0:
+    if not _health_light_mode() and runners is not None and len(runners) > 0:
         try:
             recon = reconcile_paper_ledger(today, database=db)
             recon_clean = recon.is_clean
@@ -142,9 +192,14 @@ def health_status() -> HealthStatus:
     sync = db_ui_sync_report(database=db)
     from hibs_racing.monitoring.nan_alert import run_nan_integrity_check
 
-    scored = load_scored_cards()
-    prod_n = int(safe_value_mask(scored).sum()) if not scored.empty else 0
-    nan_report = run_nan_integrity_check(database=db, strict=False)
+    scored = load_scored_cards() if not _health_light_mode() else pd.DataFrame()
+    prod_n = int(safe_value_mask(scored).sum()) if not scored.empty else None
+    nan_report = run_nan_integrity_check(database=db, strict=False) if not _health_light_mode() else None
+    paper_summary = _paper_health_summary(db)
+    cron_summary = _cron_health_summary(db)
+    tel = telemetry_balance if isinstance(telemetry_balance, dict) else {}
+    if cov.get("coverage_pct") is not None and "coverage_pct" not in tel:
+        tel = {**tel, "coverage_pct": float(cov.get("coverage_pct"))}
     return HealthStatus(
         db_ok=db.exists(),
         runners_loaded=len(runners),
@@ -161,11 +216,13 @@ def health_status() -> HealthStatus:
         paper_recon_clean=recon_clean,
         manifest_id=manifest.manifest_id if manifest else None,
         snapshot_coverage_pct=cov.get("coverage_pct"),
-        telemetry_balance=telemetry_balance,
+        telemetry_balance=tel or None,
         db_ui_in_sync=bool(sync.get("in_sync")),
         unscored_runners=int(sync.get("unscored_on_card") or 0),
-        nan_integrity_passed=nan_report.passed,
+        nan_integrity_passed=nan_report.passed if nan_report is not None else None,
         production_value_count=prod_n,
+        paper=paper_summary,
+        cron=cron_summary,
     )
 
 
