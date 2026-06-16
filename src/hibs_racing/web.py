@@ -133,16 +133,13 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_brand() -> dict:
+        from hibs_racing.product_links import product_bar_context
+
         ctx = hibs_brand_context()
+        ctx.update(product_bar_context(active="racing"))
         ctx["portfolio_api_url"] = "/api/portfolio/summary"
         ctx["portfolio_full_url"] = "/portfolio"
         ctx["health"] = health_status()
-        football_base = os.environ.get("HIBS_FOOTBALL_BASE_URL", "http://127.0.0.1:5000").rstrip("/")
-        ctx["hibs_football_base_url"] = football_base
-        ctx["hibs_racing_base_url"] = os.environ.get("HIBS_RACING_PUBLIC_URL", "").rstrip("/") or ""
-        ctx["hibs_football_home_url"] = football_base + "/"
-        ctx["hibs_racing_home_url"] = "/cards"
-        ctx["hibs_product_active"] = "racing"
         return ctx
 
     def _cors_summary(resp):

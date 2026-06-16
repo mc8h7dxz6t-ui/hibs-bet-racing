@@ -325,37 +325,24 @@
 {% include '_launch_wait_overlay.html' %}
 <div class="ref-page">
     {% include '_product_switcher.html' %}
-    {% from '_hibs_brand.html' import site_crests, heritage_strip %}
     <header class="site-top">
         <div class="site-top-left">
-            {{ site_crests(height=56) }}
-            <div>
-                <div class="site-wordmark" id="site-wordmark">{{ product_name }}</div>
-                <div class="site-tagline" id="site-tagline">{{ product_tagline }}</div>
-            </div>
+            <nav class="site-links" aria-label="Racing">
+                <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Cards</a>
+                <a href="{{ url_for('insights_page') }}" class="nav-primary-only {% if request.endpoint == 'insights_page' %}active{% endif %}">Insights</a>
+                <a href="{{ url_for('tracker_page') }}" class="nav-primary-only {% if request.endpoint == 'tracker_page' %}active{% endif %}">Track Record</a>
+                <details class="nav-more">
+                    <summary>More ▾</summary>
+                    <div class="nav-more-menu">
+                        <a href="{{ url_for('portfolio_page') }}">Ledger</a>
+                        <a href="{{ url_for('backtest_page') }}">Backtest</a>
+                        <a href="{{ url_for('status_page') }}">Status</a>
+                        <a href="{{ url_for('tips_page') }}">Tips</a>
+                        <a href="{{ url_for('settings_monetization_page') }}">Settings</a>
+                    </div>
+                </details>
+            </nav>
         </div>
-        <nav class="site-links">
-            <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Cards</a>
-            <a href="{{ url_for('insights_page') }}" class="nav-primary-only {% if request.endpoint == 'insights_page' %}active{% endif %}">Insights</a>
-            <a href="{{ url_for('portfolio_page') }}" class="nav-primary-only {% if request.endpoint == 'portfolio_page' %}active{% endif %}">Ledger</a>
-            <a href="{{ url_for('tracker_page') }}" class="nav-primary-only {% if request.endpoint == 'tracker_page' %}active{% endif %}">Track Record</a>
-            <a href="{{ url_for('tips_page') }}" class="nav-primary-only {% if request.endpoint == 'tips_page' %}active{% endif %}">Tips</a>
-            <details class="nav-more">
-                <summary>Menu ▾</summary>
-                <div class="nav-more-menu">
-                    <a href="{{ url_for('insights_page') }}">Insights</a>
-                    <a href="{{ url_for('portfolio_page') }}">Ledger</a>
-                    <a href="{{ url_for('tracker_page') }}">Track Record</a>
-                    <a href="{{ url_for('tips_page') }}">Tips</a>
-                    <a href="{{ url_for('backtest_page') }}">Backtest</a>
-                    <a href="{{ url_for('status_page') }}">Status</a>
-                    <a href="{{ url_for('admin_branding_page') }}">Branding</a>
-                    <a href="{{ url_for('settings_monetization_page') }}">Monetization</a>
-                </div>
-            </details>
-            <a href="{{ url_for('backtest_page') }}" class="nav-primary-only {% if request.endpoint == 'backtest_page' %}active{% endif %}">Backtest</a>
-            <a href="{{ url_for('status_page') }}" class="nav-primary-only {% if request.endpoint == 'status_page' %}active{% endif %}">Status</a>
-        </nav>
         <div class="site-top-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             {% if ranker_loaded %}<span class="pill ok">Ranker live</span>{% else %}<span class="pill warn">No ranker</span>{% endif %}
             <button type="button" class="btn" id="btn-refresh" title="Fetch next 24h GB+IRE cards, score with LightGBM, pull odds">Refresh 24h</button>
