@@ -7,7 +7,7 @@ from inst_spine.gates.circuit import CircuitBreaker, CircuitState
 from inst_spine.gates.engine import GateEngine, GateResult
 from inst_spine.hash import chain_hash, verify_chain
 from inst_spine.ledger import AppendOnlyLedger
-from inst_spine.rates import TokenBucket, ZScoreDriftDetector
+from inst_spine.rates import TokenBucket, ZScoreConfig, ZScoreDriftDetector, token_bucket_backend_from_env
 
 __all__ = [
     "ApiIntent",
@@ -20,8 +20,10 @@ __all__ = [
     "LedgerEntry",
     "RunManifest",
     "TokenBucket",
+    "ZScoreConfig",
     "VectorClock",
     "ZScoreDriftDetector",
+    "token_bucket_backend_from_env",
     "chain_hash",
     "monotonic_seconds",
     "run_institutional_check",

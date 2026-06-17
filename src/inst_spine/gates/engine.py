@@ -58,7 +58,11 @@ def _f1_snapshot_completeness(ctx: dict[str, Any]) -> tuple[bool, str]:
 
 def _f2_manifest_linkage(ctx: dict[str, Any]) -> tuple[bool, str]:
     entries = ctx.get("ledger_entries") or []
-    missing = sum(1 for e in entries if not e.get("manifest_id"))
+    missing = sum(
+        1
+        for e in entries
+        if e.get("event_type") != "genesis" and not e.get("manifest_id")
+    )
     ok = missing == 0 if entries else True
     return ok, f"manifest missing on {missing} entries"
 

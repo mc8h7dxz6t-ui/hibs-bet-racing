@@ -17,7 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-asyncio>=0.23"]
-instpp = ["aiohttp>=3.9", "uvloop>=0.19; sys_platform != 'win32'"]
+instpp = ["aiohttp>=3.9", "redis>=5.0", "uvloop>=0.19; sys_platform != 'win32'"]
 nlp = ["spacy>=3.7"]
 ranker = ["lightgbm>=4.0", "scikit-learn>=1.3", "shap>=0.44"]
 api = ["requests>=2.28"]

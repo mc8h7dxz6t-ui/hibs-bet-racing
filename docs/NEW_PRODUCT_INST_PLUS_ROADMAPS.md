@@ -4,7 +4,52 @@
 **Bar:** Institutional++ = does one job extremely well, with tamper-evident audit, staged enforcement, and operational kill switches  
 **Source patterns:** Extracted from `hibs-racing` institutional layer — **decoupled at build time, never imported at runtime**
 
-> **v2 changes:** Addresses B2B infrastructure gaps — async hot path, formal math, Lamport ordering, structural scrape fallback, revised `inst-spine/` layout.
+> **v2 changes:** Addresses B2B infrastructure gaps — async hot path, formal math, Lamport ordering, structural scrape fallback, revised `inst-spine/` layout.  
+> **v3 implemented:** Sync WAL before SQLite write-behind, Genesis Block protocol + anchor sidecar, pluggable token-bucket backends (memory / Redis Lua).
+
+---
+
+## v3 Hardening — Implemented in Code
+
+### 1. WAL + write-behind (ledger crash safety)
+
+**Problem:** Async SQLite write-behind alone loses `H_{n-1}` state on crash before buffer flush.
+
+**Fix (`inst_spine/wal.py` + `ledger.py`):**
+
+```
+SYNC (request path):  append JSON line to .wal + fsync  →  sub-ms durability
+ASYNC (background):   SQLite indexing / query surface
+RECOVERY (startup):   replay WAL → SQLite for any missing entry_ids
+```
+
+`list_entries()` reads from **WAL** (authoritative), not SQLite lag.
+
+### 2. Pluggable token bucket (multi-instance Proxy-Risk)
+
+**Problem:** In-memory buckets double effective rate across two Docker instances.
+
+**Fix (`inst_spine/rates.py`):**
+
+| Backend | Use case | Activation |
+|---------|----------|------------|
+| `MemoryTokenBucketBackend` | AI Kit, single-process proxy | Default |
+| `RedisTokenBucketBackend` | Multi-instance Proxy-Risk | `INST_REDIS_URL=redis://...` |
+
+Atomic consume via Redis Lua script. Shared `key` per `client_id` enforces global rate.
+
+### 3. Genesis Block protocol (anti wipe-and-rebuild)
+
+**Problem:** Empty `H_0 = null` lets an attacker wipe SQLite and start a fake chain.
+
+**Fix (`inst_spine/hash.py`):**
+
+- **Block 0** written at install: `instance_uuid`, `config_hash`, `lamport_seq=0`, `prev_hash=GENESIS_PREV_HASH`
+- **Anchor sidecar** `{db}.genesis.json` — `genesis_hash` + `instance_uuid` (immutable install receipt)
+- `verify_chain()` **fails** on empty chain or missing/tampered genesis
+- `verify_genesis_block()` cross-checks anchor vs block 0
+
+Wipe SQLite only → WAL + anchor recover. Wipe WAL + SQLite without anchor → new install (old chain dead — correct).
 
 ---
 

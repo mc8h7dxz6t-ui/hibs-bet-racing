@@ -10,7 +10,7 @@ from typing import Any
 
 from inst_spine.gates.circuit import CircuitBreaker, CredentialVault
 from inst_spine.ledger import AppendOnlyLedger, IdempotencyGuard
-from inst_spine.rates import TokenBucket, ZScoreDriftDetector
+from inst_spine.rates import TokenBucket, ZScoreDriftDetector, token_bucket_backend_from_env
 
 
 class GateDecision(str, Enum):
@@ -49,13 +49,19 @@ class ProxyRiskGateway:
         *,
         ledger: AppendOnlyLedger | None = None,
         bucket: TokenBucket | None = None,
+        bucket_capacity: float = 30.0,
+        bucket_refill: float = 5.0,
         drift: ZScoreDriftDetector | None = None,
         circuit: CircuitBreaker | None = None,
         vault: CredentialVault | None = None,
         shadow_mode: bool = True,
+        rate_backend: Any | None = None,
     ) -> None:
         self.ledger = ledger
-        self.bucket = bucket or TokenBucket(capacity=30.0, refill_rate=5.0)
+        self._rate_backend = rate_backend or token_bucket_backend_from_env()
+        self._bucket_capacity = bucket_capacity
+        self._bucket_refill = bucket_refill
+        self.bucket = bucket
         self.drift = drift or ZScoreDriftDetector()
         self.circuit = circuit or CircuitBreaker()
         self.vault = vault or CredentialVault()
@@ -72,7 +78,13 @@ class ProxyRiskGateway:
         if not req.client_id or not req.method or not req.path:
             return ProxyResponse(decision=GateDecision.REJECT, reason="schema: missing required fields")
 
-        if not self.bucket.consume(1.0):
+        bucket = self.bucket or TokenBucket(
+            capacity=self._bucket_capacity,
+            refill_rate=self._bucket_refill,
+            key=f"proxy:{req.client_id}",
+            backend=self._rate_backend,
+        )
+        if not bucket.consume(1.0):
             return ProxyResponse(decision=GateDecision.REJECT, reason="token_bucket: rate exceeded")
 
         idem_key = req.idempotency_key or f"{req.client_id}:{req.method}:{req.path}:{json.dumps(req.body, sort_keys=True)}"

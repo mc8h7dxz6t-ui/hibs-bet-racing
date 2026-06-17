@@ -13,6 +13,7 @@ from altdata.structural_rescue import structural_rescue
 from ai_kit.pipeline import AgentLoop
 from compliance_log.ingest import log_decision
 from inst_spine.check import run_institutional_check
+from inst_spine.hash import GENESIS_EVENT, verify_chain
 from inst_spine.ledger import AppendOnlyLedger
 from proxy_risk.router import ProxyRequest, ProxyRiskGateway
 
@@ -35,9 +36,9 @@ def test_compliance_clock_attack_chain_still_valid(tmp_path: Path):
     ledger = AppendOnlyLedger(db, writer_id="w")
     ledger.append(event_type="e", payload={"n": 1}, manifest_id="m")
     entries = ledger.list_entries()
-    entries[0]["wall_time_utc"] = "1999-01-01T00:00:00+00:00"
-    from inst_spine.hash import verify_chain
-
+    for row in entries:
+        if row.get("event_type") != GENESIS_EVENT:
+            row["wall_time_utc"] = "1999-01-01T00:00:00+00:00"
     assert verify_chain(entries).ok
 
 
@@ -46,17 +47,18 @@ async def test_proxy_risk_token_bucket_blocks_burst(tmp_path: Path):
     db = tmp_path / "proxy.sqlite"
     ledger = AppendOnlyLedger(db, async_writes=True)
     ledger.start_async_writer()
-    from inst_spine.rates import TokenBucket
+    from inst_spine.rates import MemoryTokenBucketBackend, TokenBucket
 
+    backend = MemoryTokenBucketBackend()
     gw = ProxyRiskGateway(
         ledger=ledger,
-        bucket=TokenBucket(capacity=2.0, refill_rate=0.01),
+        bucket=TokenBucket(capacity=2.0, refill_rate=0.01, key="proxy:c1", backend=backend),
         shadow_mode=True,
     )
     req = ProxyRequest(client_id="c1", method="POST", path="/o", body={})
     r1 = await gw.evaluate(req)
-    r2 = await gw.evaluate(ProxyRequest(client_id="c2", method="POST", path="/o2", body={}))
-    r3 = await gw.evaluate(ProxyRequest(client_id="c3", method="POST", path="/o3", body={}))
+    r2 = await gw.evaluate(ProxyRequest(client_id="c1", method="POST", path="/o2", body={}))
+    r3 = await gw.evaluate(ProxyRequest(client_id="c1", method="POST", path="/o3", body={}))
     assert r1.decision.value == "approve"
     assert r2.decision.value == "approve"
     assert r3.decision.value == "reject"
@@ -126,12 +128,13 @@ def test_institutional_check_passes_clean_ledger(tmp_path: Path):
     db = tmp_path / "inst.sqlite"
     ledger = AppendOnlyLedger(db)
     ledger.append(event_type="x", payload={"a": 1}, manifest_id="m")
+    entries = ledger.list_entries()
     report = run_institutional_check(
         ledger=ledger,
         context={
-            "ledger_entries": ledger.list_entries(),
-            "expected_count": 1,
-            "actual_count": 1,
+            "ledger_entries": entries,
+            "expected_count": len(entries),
+            "actual_count": len(entries),
             "source_coverage_pct": 100.0,
         },
     )

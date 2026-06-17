@@ -49,6 +49,14 @@ def run_institutional_check(
         checks.insert(
             1,
             {
+                "name": "genesis_block",
+                "passed": bool(verify.get("genesis_ok")),
+                "detail": str(verify.get("genesis_message")),
+            },
+        )
+        checks.insert(
+            2,
+            {
                 "name": "lamport_order",
                 "passed": bool(ctx.get("lamport_monotonic")),
                 "detail": str(ctx.get("lamport_monotonic")),
@@ -56,7 +64,7 @@ def run_institutional_check(
         )
 
     if observation_lane:
-        blocking = {"F3", "F4", "ledger_chain", "lamport_order"}
+        blocking = {"F3", "F4", "ledger_chain", "genesis_block", "lamport_order"}
         passed = all(c["passed"] for c in checks if c["name"] in blocking)
         msg = (
             "Institutional check PASSED (observation lane)."

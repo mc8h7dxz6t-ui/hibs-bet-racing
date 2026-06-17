@@ -26,9 +26,20 @@ report = run_institutional_check(ledger=ledger)
 (out / "ledger_entries.json").write_text(json.dumps(entries, indent=2), encoding="utf-8")
 (out / "verify.json").write_text(json.dumps(verify, indent=2), encoding="utf-8")
 (out / "institutional_check.json").write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")
+(out / "genesis_anchor.json").write_text(
+    (db.parent / f"{db.stem}.genesis.json").read_text(encoding="utf-8")
+    if (db.parent / f"{db.stem}.genesis.json").exists()
+    else "{}",
+    encoding="utf-8",
+)
+(out / "wal_tail.json").write_text(
+    json.dumps(ledger.wal.read_all()[-5:], indent=2),
+    encoding="utf-8",
+)
 (out / "README.txt").write_text(
     "Inst++ audit bundle\n"
     f"entries: {len(entries)}\n"
+    f"genesis_ok: {verify.get('genesis_ok')}\n"
     f"chain_ok: {verify.get('chain_ok')}\n"
     f"lamport_monotonic: {verify.get('lamport_monotonic')}\n"
     f"check_passed: {report.passed}\n",
