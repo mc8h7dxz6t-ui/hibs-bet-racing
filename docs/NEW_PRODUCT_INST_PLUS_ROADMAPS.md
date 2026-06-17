@@ -110,8 +110,8 @@ Moving from a single-tenant cron sports loop to open B2B infrastructure exposes 
 [HOT PATH — memory only, <5ms]
   auth → schema → token_bucket → idempotency bitmap → z_score_drift → APPROVE|REJECT|KILL
 
-[COLD PATH — async queue, non-blocking]
-  ledger append → hash chain → manifest → export_audit_room (scheduled)
+[COLD PATH (async queue, non-blocking)]
+  SYNC WAL fsync (mandatory) → async SQLite index → export_audit.sh
 ```
 
 ### Gap 2: Compliance logger clock drift vulnerability
@@ -168,7 +168,7 @@ T_t = \min\!\left(B,\; T_{\text{last}} + (t - t_{\text{last}}) \times R\right)
 
 **Rule:** A request of cost \(C\) is **rejected** (or delayed in AI Kit) if \(T_t < C\). On accept: \(T_t \leftarrow T_t - C\).
 
-Implementation: in-memory per `(client_id, endpoint)` in Proxy-Risk; per `(provider, model)` in AI Kit. Redis `INCR` + TTL for multi-instance Proxy-Risk.
+Implementation: in-memory per `(client_id, endpoint)` for dev; **Redis Lua** when `INST_REDIS_URL` set (Proxy-Risk production).
 
 ### 2. Sequential hash chain (Compliance Logger + all products)
 
@@ -512,6 +512,10 @@ ai-kit run --steps 3
 ```
 
 Optional async server: `pip install -e ".[instpp]"` then `proxy-risk serve`.
+
+Multi-instance Proxy-Risk: `export INST_REDIS_URL=redis://127.0.0.1:6379/0`
+
+**26 tests passing** (WAL crash recovery, genesis anchor, shared token bucket).
 
 
 ---
