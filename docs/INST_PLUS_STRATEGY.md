@@ -64,11 +64,11 @@ Built on `src/inst_spine/` — **zero sports imports**. Sell **individually**, n
 
 All three are **thin product layers** on existing `inst_spine/` — no core file changes required. Each is a new package (`webhook_mesh/`, `ad_guard/`, `health_telemetry/`) importing spine only.
 
-| # | Product | Difficulty | Spine reuse | New work | Sales velocity |
-|---|---------|------------|-------------|----------|----------------|
-| **5** | **Webhook Idempotency Mesh** | **Easy** | ~75% | Delivery FSM, provider sigs | **High** |
-| **6** | **Ad-Tech Budget Guardrail** | **Easy–Medium** | ~85% | Spend metric extraction | Medium |
-| **7** | **Health Telemetry Recorder** | **Medium (tech) / Hard (GTM)** | ~90% | HIPAA/DTAC packaging | Slow, high ticket |
+| # | Product | Difficulty | Spine reuse | New work | Sales velocity | Status |
+|---|---------|------------|-------------|----------|----------------|--------|
+| **5** | **Webhook Idempotency Mesh** | **Easy** | ~75% | Delivery FSM, provider sigs | **High** | **P0 scaffolded** |
+| **6** | **Ad-Tech Budget Guardrail** | **Easy–Medium** | ~85% | Spend metric extraction | Medium | Planned |
+| **7** | **Health Telemetry Recorder** | **Medium (tech) / Hard (GTM)** | ~90% | HIPAA/DTAC packaging | Slow, high ticket | Planned |
 
 **Difficulty key:** Easy = fork `proxy_risk` + config; Medium = new domain logic + compliance docs; Hard = regulatory sales cycle, not Python.
 
@@ -113,12 +113,11 @@ All three are **thin product layers** on existing `inst_spine/` — no core file
 
 | Component | Invasiveness | Notes |
 |-----------|--------------|-------|
-| `webhook_mesh/ingress.py` | New ~400 LOC | Fork `proxy_risk/router.py` |
-| `webhook_mesh/delivery.py` | New ~300 LOC | Retry queue + DLQ |
-| `RedisIdempotencyBackend` | New ~80 LOC | Copy `RedisTokenBucketBackend` pattern |
-| Stripe sig verify | New ~60 LOC | Well-documented HMAC |
-| Tests | New ~200 LOC | Duplicate delivery, crash-before-forward |
-| **Core `inst_spine/` changes** | **Zero** | |
+| `webhook_mesh/serve.py` | New ~150 LOC | FastAPI ingress: sig → CAS → WAL → 200 |
+| `webhook_mesh/fsm.py` | New ~90 LOC | Retry queue + DLQ |
+| `inst_spine/rates.py` | +~80 LOC | `IdempotencyBackend` Redis Lua CAS + memory |
+| `webhook_mesh/hmac_verify.py` | New ~30 LOC | Constant-time HMAC |
+| Tests | New ~150 LOC | Duplicate delivery, fail-closed Redis, ingress |
 
 **Verdict: Easy** — build immediately after Proxy-Risk P2. Highest ARPU velocity of the three.
 
@@ -268,10 +267,11 @@ LATER:
 
 ```
 src/
-├── inst_spine/          # unchanged core
-├── webhook_mesh/        # P5 — inbound idempotency proxy
-│   ├── ingress.py
-│   ├── delivery.py
+├── inst_spine/          # core + IdempotencyBackend in rates.py
+├── webhook_mesh/        # P5 — inbound idempotency proxy (P0)
+│   ├── serve.py         # FastAPI ingress
+│   ├── fsm.py           # delivery FSM + DLQ
+│   ├── hmac_verify.py
 │   └── cli.py
 ├── ad_guard/            # P6 — outbound spend guard (fork proxy_risk)
 │   ├── proxy.py
@@ -281,7 +281,7 @@ src/
     └── cli.py
 ```
 
-**Zero sports imports. Zero changes to `inst_spine/` core files.**
+**Zero sports imports. Minimal spine extension (`rates.IdempotencyBackend`, `wal.WALWriter`).**
 
 ---
 

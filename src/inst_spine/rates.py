@@ -206,3 +206,87 @@ class ZScoreDriftDetector:
         if z is None:
             return False, None
         return abs(z) > self.z_max, z
+
+
+# --- Atomic idempotency mesh (Redis Lua CAS / memory) ---
+
+_REDIS_IDEMPOTENCY_LUA = """
+local exists = redis.call('EXISTS', KEYS[1])
+if exists == 1 then
+    return 0
+else
+    redis.call('SET', KEYS[1], '1')
+    redis.call('EXPIRE', KEYS[1], ARGV[1])
+    return 1
+end
+"""
+
+
+class IdempotencyBackend(ABC):
+    """Distributed deduplication — True if unique token registered."""
+
+    @abstractmethod
+    async def consume_idempotency_token(self, key: str, ttl_seconds: int) -> bool:
+        """
+        Return True if payload token is unique and registered.
+        Return False if already processed within TTL.
+        """
+
+
+class MemoryIdempotencyBackend(IdempotencyBackend):
+    """Single-process fallback — monotonic expiry ticks."""
+
+    def __init__(self) -> None:
+        self._storage: dict[str, float] = {}
+
+    async def consume_idempotency_token(self, key: str, ttl_seconds: int) -> bool:
+        now = monotonic_seconds()
+        exp = self._storage.get(key)
+        if exp is not None and exp >= now:
+            return False
+        if exp is not None:
+            del self._storage[key]
+        self._storage[key] = now + float(ttl_seconds)
+        return True
+
+
+class RedisIdempotencyBackend(IdempotencyBackend):
+    """Atomic Redis Lua CAS — multi-instance webhook mesh."""
+
+    def __init__(self, redis_client: Any, *, key_prefix: str = "inst:idemp:") -> None:
+        self.redis = redis_client
+        self._prefix = key_prefix
+        self._script = self.redis.register_script(_REDIS_IDEMPOTENCY_LUA)
+
+    def _full_key(self, key: str) -> str:
+        return f"{self._prefix}{key}"
+
+    async def consume_idempotency_token(self, key: str, ttl_seconds: int) -> bool:
+        import logging
+
+        logger = logging.getLogger("inst-spine.rates")
+        try:
+            result = await self._script(keys=[self._full_key(key)], args=[ttl_seconds])
+            return bool(int(result or 0) == 1)
+        except Exception as exc:
+            logger.critical(
+                "IDEMPOTENCY_BACKEND_DISRUPTED: key %s failed (%s) — fail-closed",
+                key,
+                exc,
+            )
+            return False
+
+
+def idempotency_backend_from_env(*, redis_client: Any | None = None) -> IdempotencyBackend:
+    """INST_REDIS_URL → async Redis CAS; else in-memory."""
+    if redis_client is not None:
+        return RedisIdempotencyBackend(redis_client)
+    url = os.environ.get("INST_REDIS_URL", "").strip()
+    if url:
+        try:
+            import redis.asyncio as aioredis
+        except ImportError as exc:
+            raise RuntimeError("Redis idempotency requires: pip install redis") from exc
+        client = aioredis.from_url(url, encoding="utf-8", decode_responses=True)
+        return RedisIdempotencyBackend(client)
+    return MemoryIdempotencyBackend()

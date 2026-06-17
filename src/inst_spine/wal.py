@@ -59,3 +59,37 @@ class AppendOnlyWal:
                 if line.strip():
                     n += 1
         return n
+
+
+class WALWriter:
+    """
+    Sync WAL facade for webhook ingress hot path.
+    Every append fsyncs before HTTP 200 — survives kill -9.
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        self._wal = AppendOnlyWal(Path(path))
+
+    def append(
+        self,
+        *,
+        payload: dict[str, Any],
+        lamport: int,
+        raw_bytes: bytes | None = None,
+    ) -> None:
+        import hashlib
+
+        record = dict(payload)
+        record["lamport_seq"] = lamport
+        if raw_bytes is not None:
+            record["payload_sha256"] = hashlib.sha256(raw_bytes).hexdigest()
+            record["payload_size"] = len(raw_bytes)
+        self._wal.append(record)
+
+    def close(self) -> None:
+        """No persistent handle — append opens/closes per write."""
+        return None
+
+    @property
+    def path(self) -> Path:
+        return self._wal.path
