@@ -51,6 +51,7 @@ class HealthStatus:
     production_value_count: int | None = None
     paper: dict | None = None
     cron: dict | None = None
+    reliability: dict | None = None
 
     def to_dict(self) -> dict:
         out = {
@@ -90,6 +91,8 @@ class HealthStatus:
             out["paper"] = self.paper
         if self.cron is not None:
             out["cron"] = self.cron
+        if self.reliability is not None:
+            out["reliability"] = self.reliability
         return out
 
 
@@ -197,6 +200,14 @@ def health_status() -> HealthStatus:
     nan_report = run_nan_integrity_check(database=db, strict=False) if not _health_light_mode() else None
     paper_summary = _paper_health_summary(db)
     cron_summary = _cron_health_summary(db)
+    reliability_summary = None
+    if not _health_light_mode():
+        try:
+            from hibs_racing.analytics.reliability_bins import settled_paper_calibration
+
+            reliability_summary = settled_paper_calibration(db)
+        except Exception:
+            reliability_summary = None
     tel = telemetry_balance if isinstance(telemetry_balance, dict) else {}
     if cov.get("coverage_pct") is not None and "coverage_pct" not in tel:
         tel = {**tel, "coverage_pct": float(cov.get("coverage_pct"))}
@@ -223,6 +234,7 @@ def health_status() -> HealthStatus:
         production_value_count=prod_n,
         paper=paper_summary,
         cron=cron_summary,
+        reliability=reliability_summary,
     )
 
 
