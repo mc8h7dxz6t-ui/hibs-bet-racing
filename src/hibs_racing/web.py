@@ -35,6 +35,9 @@ from hibs_racing.utils.ui_settings import (
 ROOT = Path(__file__).resolve().parents[2]
 FAQ_PATH = ROOT / "docs" / "TECHNICAL_DUE_DILIGENCE_FAQ.md"
 
+_HEALTH_CACHE: dict = {"t": 0.0, "payload": None}
+_HEALTH_TTL_SEC = float(os.environ.get("HIBS_RACING_HEALTH_TTL_SEC", "20"))
+
 
 def _channel_digest_preview(ctx: dict | None = None) -> str:
     """Render-only digest copy — reuses dashboard ctx so DQ filters match Smart Portfolio."""
@@ -130,16 +133,13 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_brand() -> dict:
+        from hibs_racing.product_links import product_bar_context
+
         ctx = hibs_brand_context()
+        ctx.update(product_bar_context(active="racing"))
         ctx["portfolio_api_url"] = "/api/portfolio/summary"
         ctx["portfolio_full_url"] = "/portfolio"
         ctx["health"] = health_status()
-        football_base = os.environ.get("HIBS_FOOTBALL_BASE_URL", "http://127.0.0.1:5000").rstrip("/")
-        ctx["hibs_football_base_url"] = football_base
-        ctx["hibs_racing_base_url"] = os.environ.get("HIBS_RACING_PUBLIC_URL", "").rstrip("/") or ""
-        ctx["hibs_football_home_url"] = football_base + "/"
-        ctx["hibs_racing_home_url"] = "/cards"
-        ctx["hibs_product_active"] = "racing"
         return ctx
 
     def _cors_summary(resp):
@@ -410,9 +410,38 @@ def create_app() -> Flask:
     def api_ping():
         return jsonify({"ok": True, "product": "hibs-racing"})
 
+    @app.route("/api/scrapers/catalog")
+    def api_scrapers_catalog():
+        from hibs_racing.cards.runner_field_api import scraper_catalog_payload
+
+        return jsonify(scraper_catalog_payload())
+
+    @app.route("/api/runner/<runner_id>")
+    def api_runner_fields(runner_id: str):
+        from hibs_racing.cards.runner_field_api import resolve_runner_fields
+
+        rescue = request.args.get("rescue", "0") == "1"
+        payload = resolve_runner_fields(runner_id, rescue=rescue)
+        if not payload:
+            return jsonify({"ok": False, "error": "runner_not_found", "runner_id": runner_id}), 404
+        return jsonify({"ok": True, **payload})
+
     @app.route("/api/health")
     def api_health():
-        return jsonify(health_status().to_dict())
+        import time as _time
+
+        force = request.args.get("full", "0") == "1"
+        now = _time.monotonic()
+        if (
+            not force
+            and _HEALTH_CACHE["payload"] is not None
+            and (now - float(_HEALTH_CACHE["t"])) < _HEALTH_TTL_SEC
+        ):
+            return jsonify(_HEALTH_CACHE["payload"])
+        payload = health_status().to_dict()
+        _HEALTH_CACHE["t"] = now
+        _HEALTH_CACHE["payload"] = payload
+        return jsonify(payload)
 
     @app.route("/api/dashboard")
     def api_dashboard():

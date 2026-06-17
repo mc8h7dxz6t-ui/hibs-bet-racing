@@ -13,7 +13,9 @@ def test_create_app():
     assert ping.get_json()["product"] == "hibs-racing"
     home = client.get("/")
     assert home.status_code == 200
-    assert b"Hibs Racing" in home.data or b"hibs-racing" in home.data
+    assert b"hibs-product-bar" in home.data
+    assert b"Football" in home.data
+    assert b"Racing" in home.data
     cards = client.get("/cards")
     assert cards.status_code == 200
     tips = client.get("/tips")

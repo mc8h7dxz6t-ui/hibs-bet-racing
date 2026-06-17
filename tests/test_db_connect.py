@@ -16,6 +16,18 @@ def test_connect_closes_and_enables_wal(tmp_path):
         conn.execute("SELECT 1")
 
 
+def test_connect_beefy_pragmas(tmp_path, monkeypatch):
+    monkeypatch.setenv("HIBS_RACING_SQLITE_BEEFY", "1")
+    monkeypatch.setenv("HIBS_RACING_SQLITE_CACHE_KB", "8192")
+    db = tmp_path / "beefy.sqlite"
+    init_db(db)
+    with connect(db) as conn:
+        cache = conn.execute("PRAGMA cache_size").fetchone()[0]
+        assert int(cache) == -8192
+        mmap = conn.execute("PRAGMA mmap_size").fetchone()[0]
+        assert int(mmap) == 268435456
+
+
 def test_connect_rollback_on_error(tmp_path):
     db = tmp_path / "rb.sqlite"
     init_db(db)

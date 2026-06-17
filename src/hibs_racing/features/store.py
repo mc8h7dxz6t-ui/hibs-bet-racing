@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
@@ -123,6 +124,17 @@ SNAPSHOT_MIGRATIONS: tuple[tuple[str, str], ...] = (
 )
 
 
+def _env_flag(name: str) -> bool:
+    return (os.environ.get(name) or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = (os.environ.get(name) or "").strip()
+    if not raw:
+        return default
+    return int(raw)
+
+
 def _configure_connection(conn: sqlite3.Connection) -> sqlite3.Connection:
     """Institutional++ SQLite defaults — WAL readers, writer busy wait, FK enforcement."""
     conn.row_factory = sqlite3.Row
@@ -130,6 +142,14 @@ def _configure_connection(conn: sqlite3.Connection) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA busy_timeout = 30000")
     conn.execute("PRAGMA synchronous = NORMAL")
+    if _env_flag("HIBS_RACING_SQLITE_BEEFY"):
+        # Tuned for VPS + block storage: larger page cache, mmap reads, WAL cap.
+        cache_kb = _env_int("HIBS_RACING_SQLITE_CACHE_KB", 65536)  # 64 MiB
+        mmap_bytes = _env_int("HIBS_RACING_SQLITE_MMAP_BYTES", 268435456)  # 256 MiB
+        wal_limit = _env_int("HIBS_RACING_SQLITE_WAL_LIMIT_BYTES", 67108864)  # 64 MiB
+        conn.execute(f"PRAGMA cache_size = -{cache_kb}")
+        conn.execute(f"PRAGMA mmap_size = {mmap_bytes}")
+        conn.execute(f"PRAGMA journal_size_limit = {wal_limit}")
     return conn
 
 

@@ -7,22 +7,21 @@
     <link rel="icon" href="{{ url_for('static', filename=hibs_harvested_logo|default(hibs_badge_harp)) }}" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='hibs_theme.css') }}">
+    <style id="hibs-launch-critical">
+        html.hibs-launch-boot,body.hibs-launch-active{overflow:hidden;}
+        #hibs-launch-overlay{position:fixed;inset:0;z-index:100010;display:flex;align-items:center;justify-content:center;background:#0b1220;}
+        #hibs-launch-overlay.hibs-launch-hidden{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .35s ease;}
+        .hibs-launch-panel{text-align:center;padding:28px;}
+        .hibs-launch-crest{width:120px;height:auto;margin:0 auto 12px;display:block;}
+        .hibs-launch-tagline{font-size:0.82em;color:var(--muted);margin:0 0 8px;}
+        .hibs-launch-tip{font-size:0.78em;color:var(--text);}
+    </style>
+    <script>document.documentElement.classList.add('hibs-launch-boot');</script>
     <style>
         :root {
-            --primary-brand-color:#007A33;
+            --primary-brand-color: var(--hibs-green, #0d9488);
             --wordmark-font:'Orbitron',monospace;
-            --hibs-green:var(--primary-brand-color);
-            --hibs-green-dark:#052e16;
-            --hibs-navy:#0a1628;
-            --hibs-navy-deep:#060e18;
-            --hibs-neon:#b7f7c8;
-            --neon-value:#a7f3d0;
-            --card:rgba(16,32,24,0.92);
-            --border:rgba(190,220,205,0.16);
-            --gold:#f6d889;
-            --accent:#c5f5d4;
-            --text:#f8fafc;
-            --muted:#94a3b8;
             --radius-md:12px;
             --shadow-md:0 10px 32px rgba(0,0,0,0.32);
         }
@@ -33,9 +32,6 @@
             color:var(--text);
             min-height:100vh;
             padding:12px;
-            background-image:
-                radial-gradient(ellipse at 12% 40%,rgba(0,122,51,0.12) 0%,transparent 48%),
-                radial-gradient(ellipse at 88% 12%,rgba(0,122,51,0.16) 0%,transparent 42%);
         }
         body::before{
             content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.03;
@@ -47,7 +43,7 @@
         .site-top{
             display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
             padding:14px 18px;margin-bottom:16px;
-            background:linear-gradient(135deg,rgba(0,122,51,0.22),rgba(6,14,24,0.92));
+            background:linear-gradient(135deg,var(--hibs-green-soft),rgba(15,23,42,0.92));
             border:1px solid var(--border);border-radius:var(--radius-md);
             box-shadow:var(--shadow-md);
             position:relative;overflow:hidden;isolation:isolate;
@@ -325,40 +321,28 @@
         {% block extra_css %}{% endblock %}
     </style>
 </head>
-<body>
+<body class="hibs-launch-active">
+{% include '_launch_wait_overlay.html' %}
 <div class="ref-page">
     {% include '_product_switcher.html' %}
-    {% from '_hibs_brand.html' import site_crests, heritage_strip %}
     <header class="site-top">
         <div class="site-top-left">
-            {{ site_crests(height=56) }}
-            <div>
-                <div class="site-wordmark" id="site-wordmark">{{ product_name }}</div>
-                <div class="site-tagline" id="site-tagline">{{ product_tagline }}</div>
-            </div>
+            <nav class="site-links" aria-label="Racing">
+                <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Cards</a>
+                <a href="{{ url_for('insights_page') }}" class="nav-primary-only {% if request.endpoint == 'insights_page' %}active{% endif %}">Insights</a>
+                <a href="{{ url_for('tracker_page') }}" class="nav-primary-only {% if request.endpoint == 'tracker_page' %}active{% endif %}">Track Record</a>
+                <details class="nav-more">
+                    <summary>More ▾</summary>
+                    <div class="nav-more-menu">
+                        <a href="{{ url_for('portfolio_page') }}">Ledger</a>
+                        <a href="{{ url_for('backtest_page') }}">Backtest</a>
+                        <a href="{{ url_for('status_page') }}">Status</a>
+                        <a href="{{ url_for('tips_page') }}">Tips</a>
+                        <a href="{{ url_for('settings_monetization_page') }}">Settings</a>
+                    </div>
+                </details>
+            </nav>
         </div>
-        <nav class="site-links">
-            <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Cards</a>
-            <a href="{{ url_for('insights_page') }}" class="nav-primary-only {% if request.endpoint == 'insights_page' %}active{% endif %}">Insights</a>
-            <a href="{{ url_for('portfolio_page') }}" class="nav-primary-only {% if request.endpoint == 'portfolio_page' %}active{% endif %}">Ledger</a>
-            <a href="{{ url_for('tracker_page') }}" class="nav-primary-only {% if request.endpoint == 'tracker_page' %}active{% endif %}">Track Record</a>
-            <a href="{{ url_for('tips_page') }}" class="nav-primary-only {% if request.endpoint == 'tips_page' %}active{% endif %}">Tips</a>
-            <details class="nav-more">
-                <summary>Menu ▾</summary>
-                <div class="nav-more-menu">
-                    <a href="{{ url_for('insights_page') }}">Insights</a>
-                    <a href="{{ url_for('portfolio_page') }}">Ledger</a>
-                    <a href="{{ url_for('tracker_page') }}">Track Record</a>
-                    <a href="{{ url_for('tips_page') }}">Tips</a>
-                    <a href="{{ url_for('backtest_page') }}">Backtest</a>
-                    <a href="{{ url_for('status_page') }}">Status</a>
-                    <a href="{{ url_for('admin_branding_page') }}">Branding</a>
-                    <a href="{{ url_for('settings_monetization_page') }}">Monetization</a>
-                </div>
-            </details>
-            <a href="{{ url_for('backtest_page') }}" class="nav-primary-only {% if request.endpoint == 'backtest_page' %}active{% endif %}">Backtest</a>
-            <a href="{{ url_for('status_page') }}" class="nav-primary-only {% if request.endpoint == 'status_page' %}active{% endif %}">Status</a>
-        </nav>
         <div class="site-top-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             {% if ranker_loaded %}<span class="pill ok">Ranker live</span>{% else %}<span class="pill warn">No ranker</span>{% endif %}
             <button type="button" class="btn" id="btn-refresh" title="Fetch next 24h GB+IRE cards, score with LightGBM, pull odds">Refresh 24h</button>
@@ -457,5 +441,18 @@ document.getElementById('btn-refresh')?.addEventListener('click', async () => {
 document.addEventListener('DOMContentLoaded', () => window.HibsBranding?.apply?.());
 </script>
 {% block extra_js %}{% endblock %}
+<script>
+(function () {
+    var overlay = document.getElementById('hibs-launch-overlay');
+    if (!overlay) return;
+    function hide() {
+        overlay.classList.add('hibs-launch-hidden');
+        document.body.classList.remove('hibs-launch-active');
+        document.documentElement.classList.remove('hibs-launch-boot');
+    }
+    window.addEventListener('load', function () { setTimeout(hide, 600); });
+    setTimeout(hide, 4000);
+})();
+</script>
 </body>
 </html>
