@@ -433,30 +433,41 @@ Production Python kit: **token-bucket rate control**, structured output validati
 
 ---
 
-## Commands (target)
+## Implementation status (started)
+
+Packages live under `src/`:
+
+| Package | Path | CLI | Tests |
+|---------|------|-----|-------|
+| **inst_spine** | `src/inst_spine/` | — | `tests/test_inst_spine_core.py` |
+| **compliance_log** | `src/compliance_log/` | `compliance-log` | `tests/test_inst_products.py` |
+| **proxy_risk** | `src/proxy_risk/` | `proxy-risk` | `tests/test_inst_products.py` |
+| **altdata** | `src/altdata/` | `altdata` | `tests/test_inst_products.py` |
+| **ai_kit** | `src/ai_kit/` | `ai-kit` | `tests/test_inst_products.py` |
 
 ```bash
-# inst-spine
-python -m inst_spine.check --days 30
-./inst-spine/export_audit.sh --output ./audit_bundle.zip
-python -m inst_spine.rates --test-token-bucket
-python -m inst_spine.rates --test-zscore
+pip install -e ".[dev]"
+PYTHONPATH=src python3 -m pytest tests/test_inst_spine_core.py tests/test_inst_products.py -q
 
-# Product 1
-proxy-risk serve --uvloop --shadow
-proxy-risk check --latency-p99 --kill-test
+# Compliance
+compliance-log ingest --snapshot /path/to/snapshot.json --actor auditor
+compliance-log verify-chain
 
-# Product 2
-altdata poll --feed airline_uk_20 --async
-altdata check --coverage --rescue-rate
+# Proxy-Risk (shadow evaluate)
+proxy-risk evaluate --client-id c1 --body '{"qty":1}'
 
-# Product 3
-compliance-log ingest --snapshot decision.json
-compliance-log check --gates F1-F9 --clock-attack
+# Alt-Data demo poll
+altdata poll --feed demo --ctx '{"demo_price":120,"demo_seats":4,"demo_route":"LHR-JFK"}'
 
-# Product 4
-ai-kit run agent.yaml --checkpoint ./state.sqlite --token-bucket
+# AI Kit checkpoint demo
+ai-kit run --steps 3
+
+# Audit export
+./scripts/export_audit.sh data/compliance_ledger.sqlite ./audit_bundle
 ```
+
+Optional async server: `pip install -e ".[instpp]"` then `proxy-risk serve`.
+
 
 ---
 
