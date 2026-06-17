@@ -67,12 +67,24 @@ PRIMARY_DATE="$(date -u +%F)"
 # Backfill any missing snapshot days in the lookback (best-effort; no-op when complete).
 hibs-racing snapshot-backfill --start "${START_DATE}" --end "${PRIMARY_DATE}" >/dev/null 2>&1 || true
 
-INST_FLAGS=(--days 14 --card-date "${PRIMARY_DATE}" --require-recon-clean)
-if [[ "${HIBS_OBSERVATION_LANE:-1}" == "1" ]]; then
+OBS_LANE="${HIBS_OBSERVATION_LANE:-1}"
+INST_FLAGS=(--days 14 --card-date "${PRIMARY_DATE}")
+if [[ "${OBS_LANE}" == "1" ]]; then
   INST_FLAGS+=(--observation-lane)
+else
+  INST_FLAGS+=(--require-recon-clean)
 fi
-run_logged "daily-institutional-check" \
-  hibs-racing institutional-check "${INST_FLAGS[@]}"
+if [[ "${OBS_LANE}" == "1" ]]; then
+  set +e
+  run_logged "daily-institutional-check" hibs-racing institutional-check "${INST_FLAGS[@]}"
+  INST_RC=$?
+  set -e
+  if [[ ${INST_RC} -ne 0 ]]; then
+    echo "WARN: institutional-check returned ${INST_RC} (observation lane — card refresh is the hard gate)" >&2
+  fi
+else
+  run_logged "daily-institutional-check" hibs-racing institutional-check "${INST_FLAGS[@]}"
+fi
 
 echo "Daily refresh completed successfully."
 echo "Public track record: /tracker (paper bets logged: see refresh-cards --paper)"

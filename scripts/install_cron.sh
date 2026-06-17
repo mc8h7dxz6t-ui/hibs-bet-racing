@@ -1,6 +1,9 @@
 #!/bin/bash
 # Install or update cron entries for hibs-racing automation (macOS/Linux).
 # Idempotent: removes prior hibs-racing cron lines before appending fresh ones.
+#
+# During observation freeze (Jun 4–10): use scripts/install_observation_cron.sh instead —
+# this script also installs weekly_retrain.sh which violates the model-freeze rule.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,3 +36,5 @@ echo ""
 echo "Daily:  06:00 local — ${WRAPPER}"
 echo "Weekly: Sun 05:30 local — ${WEEKLY}"
 echo "Logs:   ${ROOT}/logs/"
+echo ""
+echo "NOTE: During observation lane freeze, use: bash scripts/install_observation_cron.sh"
