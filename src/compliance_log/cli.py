@@ -29,6 +29,12 @@ def main(argv: list[str] | None = None) -> int:
     p_verify = sub.add_parser("verify-chain", help="Verify hash chain only")
     p_verify.add_argument("--database", type=Path, default=Path("data/compliance_ledger.sqlite"))
 
+    p_export = sub.add_parser("export", help="P2 deterministic audit bundle (tar + sha256)")
+    p_export.add_argument("--database", type=Path, default=Path("data/compliance_ledger.sqlite"))
+    p_export.add_argument("--out-dir", type=Path, default=None)
+    p_export.add_argument("--tarball", type=Path, default=None)
+    p_export.add_argument("--repro-check", action="store_true", help="F9 reproducibility test")
+
     args = parser.parse_args(argv)
 
     if args.cmd == "ingest":
@@ -67,6 +73,31 @@ def main(argv: list[str] | None = None) -> int:
         ledger = AppendOnlyLedger(args.database)
         print(json.dumps(ledger.verify(), indent=2))
         return 0
+
+    if args.cmd == "export":
+        from inst_spine.export import build_audit_bundle, verify_bundle_reproducible
+
+        if args.repro_check:
+            ok, msg = verify_bundle_reproducible(args.database)
+            print(json.dumps({"ok": ok, "message": msg}, indent=2))
+            return 0 if ok else 1
+        result = build_audit_bundle(
+            args.database,
+            out_dir=args.out_dir,
+            tarball_path=args.tarball,
+        )
+        print(
+            json.dumps(
+                {
+                    "ok": result.ok,
+                    "bundle_sha256": result.bundle_sha256,
+                    "tarball": str(result.tarball_path),
+                    "validation": result.validation.message,
+                },
+                indent=2,
+            )
+        )
+        return 0 if result.ok else 1
 
     return 1
 
