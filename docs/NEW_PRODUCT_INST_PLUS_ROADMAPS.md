@@ -1,8 +1,10 @@
-# Four New Products — Inst++ Grade Roadmaps
+# Four New Products — Inst++ Grade Roadmaps (v2)
 
 **Scope:** Brand-new B2B/B2C products — not extensions of Hibs Racing  
 **Bar:** Institutional++ = does one job extremely well, with tamper-evident audit, staged enforcement, and operational kill switches  
-**Source patterns:** Extracted from `hibs-racing` institutional layer + hibs-bet football analogs referenced in docs
+**Source patterns:** Extracted from `hibs-racing` institutional layer — **decoupled at build time, never imported at runtime**
+
+> **v2 changes:** Addresses B2B infrastructure gaps — async hot path, formal math, Lamport ordering, structural scrape fallback, revised `inst-spine/` layout.
 
 ---
 
@@ -14,10 +16,10 @@ These four products share one architectural spine but serve different buyers:
 flowchart LR
     subgraph Spine["Shared Inst++ Spine"]
         M[RunManifest provenance]
-        L[Append-only LedgerEvent stream]
-        G[Staged Gate Enforcer]
-        R[Risk Kernel / circuit breaker]
-        H[SHA-256 verification_hash]
+        L[Append-only ledger + Lamport order]
+        G[Staged gate engine F1–F9]
+        R[rates.py — token bucket + Z-score]
+        H[Sequential hash chain H_n]
     end
 
     P1[1. Proxy-Risk Gateway]
@@ -31,33 +33,185 @@ flowchart LR
     Spine --> P4
 ```
 
-**Design rule:** Each product is a **standalone package** with zero sports-domain imports. Racing/football code is the reference implementation, not the runtime dependency.
+**Design rule:** Each product is a **standalone package** with zero sports-domain imports. Racing code is the reference implementation only.
 
 | Product | One job | Inst++ means | Price band |
 |---------|---------|--------------|------------|
-| **1. Proxy-Risk Gateway** | Stop bad automation before it hits live APIs | Sub-100ms kill + immutable intent log | £199–499/mo per instance |
-| **2. Alt-Data Extractors** | Deliver one clean telemetry feed | ≥95% field coverage + ladder fallbacks | £500–2,000/mo per feed |
-| **3. Compliance Logger** | Prove what the system decided and when | Auditor-verifiable data room in one export | License + maintenance retainer |
-| **4. AI Boilerplates** | Ship AI apps without rate-limit/state bugs | Structured output + recovery baked in | £99–249 lifetime/seat |
+| **1. Proxy-Risk Gateway** | Stop bad automation before it hits live APIs | p99 gate latency <5ms; Z-score kill; async hot path | £199–499/mo per instance |
+| **2. Alt-Data Extractors** | Deliver one clean telemetry feed | ≥95% coverage + structural fallback when DOM breaks | £500–2,000/mo per feed |
+| **3. Compliance Logger** | Prove what the system decided and when | Lamport-ordered hash chain auditors can replay | License + maintenance retainer |
+| **4. AI Boilerplates** | Ship AI apps without rate-limit/state bugs | Token-bucket burst control + checkpoint recovery | £99–249 lifetime/seat |
+
+---
+
+## Critical Gaps — Sports Loop vs Open B2B (and fixes)
+
+Moving from a single-tenant cron sports loop to open B2B infrastructure exposes three structural flaws in v1. Each has a concrete fix baked into the roadmaps below.
+
+### Gap 1: Proxy-Risk latency & concurrency bottleneck
+
+**Flaw:** The sports execution engine runs on cron/low-frequency webhooks. A B2B proxy must process requests **synchronously**. Piping traffic through a Python Gate1→Gate2→Gate3 chain with synchronous code and SQLite reads on the hot path adds tens of milliseconds per hop — unusable for algorithmic clients.
+
+**Fix:**
+
+| Layer | Requirement |
+|-------|-------------|
+| **Runtime** | `asyncio` + `uvloop` event loop — near-native I/O concurrency |
+| **Hot path state** | Velocity counters, idempotency keys, token buckets → **Redis** (or in-process dict + periodic flush for single-tenant) |
+| **Cold path** | Ledger append, manifest write → **async write-behind queue** to SQLite; never block upstream on disk |
+| **SLA** | p99 gate evaluation <5ms; p99 end-to-end proxy overhead <15ms (excluding upstream RTT) |
+
+```
+[HOT PATH — memory only, <5ms]
+  auth → schema → token_bucket → idempotency bitmap → z_score_drift → APPROVE|REJECT|KILL
+
+[COLD PATH — async queue, non-blocking]
+  ledger append → hash chain → manifest → export_audit_room (scheduled)
+```
+
+### Gap 2: Compliance logger clock drift vulnerability
+
+**Flaw:** F4 "timeline monotonic — no backdating" breaks if Docker/VPS clocks drift, NTP steps backward, or a root actor adjusts system time. Hash chains keyed on `time.time()` become mathematically invalid under clock manipulation.
+
+**Fix:**
+
+| Mechanism | Role |
+|-----------|------|
+| **Lamport clock** | Logical sequence counter per writer — guarantees causal order independent of wall clock |
+| **Vector clock** (optional P3) | Multi-writer deployments — detect concurrent events across nodes |
+| **`time.CLOCK_MONOTONIC`** | Elapsed-time measurements only — never moves backward regardless of NTP |
+| **Wall clock** | Stored as **metadata** (`wall_time_utc`) for human audit — **not** used for chain integrity |
+
+F4 revised pass condition: `lamport_seq` strictly increasing per writer; `verify_chain()` uses `H_n` formula, not timestamp ordering.
+
+### Gap 3: Alt-Data structural fragility
+
+**Flaw:** Sports APIs (API-Football, Racing API) are standardized. Corporate targets (airlines, retail, shipping) use Cloudflare/Akamai and change DOM layouts frequently. A rigid CSS-selector field ladder breaks weekly.
+
+**Fix — structural fallback ladder (fourth rung):**
+
+```
+Rung 1: Primary API / structured JSON endpoint
+Rung 2: Secondary API or cached mirror
+Rung 3: CSS/XPath selector (versioned per target — expect breakage)
+Rung 4: Structural rescue — pipe raw HTML chunk to lightweight local extractor
+        (regex template + optional small token-classification model)
+        → isolate field by semantic label proximity, not brittle selectors
+```
+
+Rung 4 runs **offline from the poll hot path** (async worker). Coverage SLA counts rung 4 rescues separately in manifest extras.
+
+---
+
+## Formal Mathematics (Inst++ requirement)
+
+Three mathematical components are **mandatory** in `inst-spine/rates.py` and `inst-spine/hash.py`. Products import these — they do not reimplement.
+
+### 1. Token bucket rate limiting (Proxy-Risk + AI Kit)
+
+Permits brief bursts while enforcing a sustainable average rate. Replaces vague "velocity caps."
+
+\[
+T_t = \min\!\left(B,\; T_{\text{last}} + (t - t_{\text{last}}) \times R\right)
+\]
+
+| Symbol | Meaning |
+|--------|---------|
+| \(B\) | Maximum bucket capacity (burst size) |
+| \(R\) | Token replenishment rate (tokens per second) |
+| \(T_t\) | Current token count at time \(t\) |
+
+**Rule:** A request of cost \(C\) is **rejected** (or delayed in AI Kit) if \(T_t < C\). On accept: \(T_t \leftarrow T_t - C\).
+
+Implementation: in-memory per `(client_id, endpoint)` in Proxy-Risk; per `(provider, model)` in AI Kit. Redis `INCR` + TTL for multi-instance Proxy-Risk.
+
+### 2. Sequential hash chain (Compliance Logger + all products)
+
+Proves no retroactive alteration or deletion. Each block encapsulates the preceding state.
+
+\[
+H_n = \text{SHA256}\!\left(M_n \,\|\, H_{n-1} \,\|\, \text{lamport}_n\right)
+\]
+
+| Symbol | Meaning |
+|--------|---------|
+| \(M_n\) | Canonical JSON of entry metadata + snapshot payload |
+| \(H_{n-1}\) | Hash of the entire preceding ledger row (genesis: 64 zero hex chars) |
+| \(\text{lamport}_n\) | Lamport sequence integer — **not** wall-clock time |
+
+**Tamper detection:** Deleting or altering entry \(n-5\) invalidates \(H_{n-4}, \ldots, H_n\). `export_audit.sh` walks the chain in O(n) and reports first mismatch index.
+
+This supersedes the racing `bet_verification_hash()` (single-row hash). Inst++ requires **chained** hashes.
+
+### 3. Rolling Z-score drift detection (Proxy-Risk P2)
+
+Flat percentage drift (>X%) fails in high-volatility regimes. Replace with rolling volatility Z-score:
+
+\[
+Z = \frac{P_{\text{current}} - \mu_t}{\sigma_t}
+\]
+
+| Symbol | Meaning |
+|--------|---------|
+| \(\mu_t\) | EMA of reference price over trailing window \(W\) |
+| \(\sigma_t\) | EMA of rolling standard deviation over same window \(W\) |
+| \(P_{\text{current}}\) | Incoming quote or order price |
+
+**Rule:** Kill-switch triggers when \(|Z| > Z_{\max}\) (default \(Z_{\max} = 3.0\) — three sigma). Window \(W\) and \(Z_{\max}\) are per-asset config in `proxy-risk/config.yaml`.
+
+EMA update (per tick):
+
+\[
+\mu_t = \alpha \cdot P_{\text{current}} + (1-\alpha)\cdot\mu_{t-1}, \quad \alpha = \frac{2}{W+1}
+\]
+
+\(\sigma_t\) uses EMA of squared deviations — same \(\alpha\).
 
 ---
 
 ## Universal Inst++ Checklist (all four products)
 
-Every product must ship with these — ported from `institutional/check.py`, `ledger_events.py`, `run_manifest.py`:
+| # | Capability | v1 gap | v2 requirement |
+|---|------------|--------|----------------|
+| 1 | **Run manifest** | — | Every batch/job: `manifest_hash` over config + code version + inputs |
+| 2 | **Append-only ledger** | SQLite on hot path (Proxy) | Hot path memory → async write-behind; SQLite audit only |
+| 3 | **Hash chain** | Single-row `verification_hash` | Sequential \(H_n\) with \(H_{n-1}\) linkage |
+| 4 | **Logical ordering** | Wall-clock F4 | Lamport seq + `CLOCK_MONOTONIC` for durations |
+| 5 | **Staged gates** | — | F1–F9 via `gates/engine.py`; every reject has `gate_reason` |
+| 6 | **Circuit breaker** | — | `gates/circuit.py` — global KILL independent of app |
+| 7 | **Rate limits** | "Polite sleep" only | Formal token bucket in `rates.py` |
+| 8 | **Drift detection** | Flat % threshold | Z-score with configurable \(Z_{\max}\) and EMA window |
+| 9 | **Health orchestrator** | — | `check.py` — single CLI pass/fail |
+| 10 | **Export data room** | — | `export_audit.sh` — chain verify + gate report ZIP |
 
-| # | Capability | Racing reference | Generic requirement |
-|---|------------|------------------|-------------------|
-| 1 | **Run manifest** | `RunManifest` + `manifest_hash` | Every batch/job gets immutable identity (config + code version + inputs) |
-| 2 | **Append-only ledger** | `ledger_events` | No UPDATE/DELETE on audit tables; compaction policy documented |
-| 3 | **Verification hash** | `bet_verification_hash()` | SHA-256 over canonical fields per record |
-| 4 | **Staged gates** | Gate1 → Gate2 → Production | Configurable pass/fail stages with `gate_reason` on every reject |
-| 5 | **Circuit breaker** | `EXECUTION_DISABLED`, steam `abort` | Hard kill path independent of app logic |
-| 6 | **Reconciliation** | `paper_reconciliation.py` | Expected vs actual row counts; blocking in production mode |
-| 7 | **Rate limits** | `ingest/rate_limit.py` | Polite sleep + 429 retry; env overrides |
-| 8 | **Observation mode** | `HIBS_OBSERVATION_LANE` | Soft checks for demo/burn-in without false alarms |
-| 9 | **Health orchestrator** | `run_institutional_check()` | Single CLI/API pass/fail for ops |
-| 10 | **Export data room** | `DATA_ROOM.md` + CSV | One-command auditor bundle |
+---
+
+## Shared Package Structure — `inst-spine/` (canonical)
+
+```
+inst-spine/
+├── __init__.py
+├── contracts.py          # Dataclasses + Pydantic schemas (RunManifest, LedgerEvent, ApiIntent)
+├── ledger.py             # Append-only storage; Lamport clock integration; async write-behind
+├── hash.py               # H_n chain construction + verify_chain()
+├── rates.py              # Token bucket limiter + Z-score EMA drift detector
+├── clocks.py             # LamportClock, optional VectorClock, CLOCK_MONOTONIC helpers
+├── gates/
+│   ├── __init__.py
+│   ├── engine.py         # F1–F9 execution matrix; staged gate protocol
+│   └── circuit.py        # Global kill-switches; credential vault interface
+├── check.py              # Unified institutional verification orchestrator
+└── export_audit.sh       # Hardened bundle compiler — chain walk + gate report
+```
+
+**Dependency rule:** `inst-spine` has zero domain imports. Products import `inst-spine` only. Sports code never imports products.
+
+**Extract order:**
+
+1. `hash.py` + `clocks.py` + `ledger.py` (Compliance Logger P0)
+2. `rates.py` (Proxy-Risk P1 + AI Kit P0)
+3. `gates/engine.py` + `gates/circuit.py` (all products)
+4. `check.py` + `export_audit.sh` (Compliance P2)
 
 ---
 
@@ -65,185 +219,142 @@ Every product must ship with these — ported from `institutional/check.py`, `le
 
 ### One job
 
-Sit between a company's automation scripts and live broker/payment APIs as an **air-gapped circuit breaker** — block runaway loops, price drift, and abnormal request velocity before capital moves.
+Air-gapped circuit breaker between automation scripts and live broker/payment APIs. **Nothing else.**
 
-### Why Inst++ (not just a reverse proxy)
-
-A naive proxy forwards traffic. Inst++ **records intent, enforces policy, and kills independently** of the client process.
-
-### Codebase mapping
-
-| Extract from | Module | Port to |
-|--------------|--------|---------|
-| Staged gates | `cards/actionability.py` | `proxy_risk/gates/` — velocity, drift, stake caps |
-| Risk kernel | `live/execution_router.py` + `execution_config.py` | `proxy_risk/kernel.py` — reject reasons, max_stake |
-| Circuit breaker | `odds/market_steam.py` (`proceed`/`abort`) | `proxy_risk/breaker.py` — drift % + request burst |
-| Intent contracts | `institutional/contracts.py` (`BetIntent`) | `proxy_risk/contracts.py` — generic `ApiIntent` |
-| Shadow path | `institutional/shadow_execution.py` | `proxy_risk/shadow.py` — log-only mode before live |
-| Execution log | `live/execution_log.py` | `proxy_risk/request_log.sqlite` — idempotency keys |
-
-### Architecture
+### Architecture (v2 — async hot path)
 
 ```
-[Client Script] → [Proxy-Risk Gateway :8443] → [Broker/Payment API]
-                         │
-                         ├─ Gate1: auth + schema validate
-                         ├─ Gate2: velocity + duplicate + stake caps
-                         ├─ Gate3: price/reference drift check
-                         ├─ Risk Kernel: APPROVE | REJECT | KILL
-                         └─ ledger_events (append-only)
+[Client] ──async──► [uvloop proxy :8443]
+                          │
+                    HOT PATH (<5ms, memory)
+                          ├─ Gate1: auth + Pydantic schema
+                          ├─ Gate2: token bucket (rates.py) + idempotency (Redis)
+                          ├─ Gate3: Z-score drift (rates.py) — |Z| > 3 → KILL
+                          ├─ circuit.py: global KILL flag
+                          └─ APPROVE → forward async upstream
+                          │
+                    COLD PATH (async queue)
+                          └─ ledger append H_n → SQLite (write-behind)
 ```
 
-**Kill switch:** Gateway holds the API credential; client never sees the live key. `KILL=1` env or signed admin POST severs upstream instantly.
+**Kill switch:** Gateway holds API credential. `circuit.py` KILL severs upstream pool instantly — no client cooperation required.
 
-### Laser-focused roadmap
+### Codebase mapping (reference only)
+
+| Racing reference | Port to |
+|------------------|---------|
+| `execution_router.py` | `proxy-risk/router.py` (async) |
+| `actionability.py` | `proxy-risk/gates/` wrapping `inst-spine/gates/` |
+| `market_steam.py` abort | `rates.py` Z-score — replaces flat % |
+| `shadow_execution.py` | `proxy-risk/shadow.py` — log-only, no upstream |
+
+### Laser-focused roadmap (v2)
 
 | Phase | Deliverable | Exit criteria |
 |-------|-------------|---------------|
-| **P0 — Shadow gateway** | Local Python package `proxy-risk` — intercept HTTP, log intents, forward unchanged | 1,000 requests logged; manifest per session; zero drops |
-| **P1 — Gate enforcer** | Velocity cap (N req/min), duplicate idempotency, JSON schema validation | Integration test: loop script blocked at 10th identical POST |
-| **P2 — Drift breaker** | Reference price/total checker — reject if >X% drift vs last good quote | Drift test: 5% move triggers `abort`; ledger event written |
-| **P3 — Credential vault** | Gateway holds secrets; client uses short-lived proxy tokens | Client compromise does not expose broker API key |
-| **P4 — Inst++ cert** | `proxy-risk check` CLI — manifest coverage, recon, breaker self-test | 7-day burn-in green; export data room for one tenant |
+| **P0 — Shadow gateway** | `asyncio`+`uvloop`; log intents; forward unchanged; cold-path ledger | 10k req; p99 overhead <10ms; zero drops |
+| **P1 — Token bucket + idempotency** | `rates.py` in Redis; loop script blocked at burst exhaustion | 10th identical POST rejected; \(T_t\) math unit-tested |
+| **P2 — Z-score drift** | EMA window per asset; kill at \(\|Z\|>3\) | Volatility simulation: flat 5% passes calm market, fails chaos correctly |
+| **P3 — Credential vault** | `circuit.py` holds secrets; client gets proxy JWT | Compromised client ≠ broker key |
+| **P4 — Inst++ cert** | `proxy-risk check` + `export_audit.sh` bundle | 7-day burn-in; chain verify clean |
 
 ### What NOT to build
 
-- No trading strategy logic
-- No portfolio analytics UI
-- No multi-tenant SaaS until P4 — start **single-tenant per server instance** (£199–499/mo maps to one Docker container)
-
-### Monetization fit
-
-**B2B monthly SaaS per instance** — sell on "minutes of capital saved" not features. Target: prop shops, e-commerce payment automation, crypto bot operators.
+- No sync gate chain on request path
+- No SQLite read in hot path
+- No trading strategy, portfolio UI, multi-tenant SaaS before P4
 
 ---
 
-## Product 2: High-Velocity Alternative Data Extractors (DaaS)
+## Product 2: High-Velocity Alt-Data Extractors (DaaS)
 
 ### One job
 
-Run **one headless scraper feed** continuously — airline fares, retail inventory, shipping delays — and deliver clean JSON via secured API. One product = one feed.
+One headless feed, continuously — clean JSON via secured API. **One feed until ≥95% coverage.**
 
-### Why Inst++
-
-Funds pay for **coverage + freshness + provenance**, not raw HTML. Inst++ = field ladders, immutable snapshots, and coverage SLAs.
-
-### Codebase mapping
-
-| Extract from | Module | Port to |
-|--------------|--------|---------|
-| Provider ladders | `scrapers/multi_scraper_api.py` (`FIELD_LADDERS`) | `altdata/ladders.py` — per-metric source priority |
-| Field resolver | `scrapers/field_resolver.py` | `altdata/resolver.py` — cascade until field filled |
-| Dual-source merge | `cards/enrich.py` | `altdata/merge.py` — spine fields protected |
-| Rate limits | `ingest/rate_limit.py` | `altdata/rate_limit.py` — polite_sleep + 429 |
-| Snapshot store | `backtest/snapshot_store.py` | `altdata/snapshots.sqlite` — point-in-time rows |
-| Telemetry balance | `institutional/telemetry_balance.py` | `altdata/sla.py` — fetch vs parse vs store timing |
-| Recovery | `ingest/batch_enrich_recovery.py` | `altdata/recovery.py` — backfill sparse windows |
-
-### Architecture
+### Architecture (v2 — four-rung ladder)
 
 ```
-[Source A] ─┐
-[Source B] ─┼→ [Extractor worker] → [snapshots.sqlite] → [GET /v1/feed/{metric}]
-[Source C] ─┘         │                                        │
-                      └─ RunManifest per poll                  └─ API key + rate limit
+[Source A: API]     ─┐
+[Source B: mirror]  ─┼→ [async poll worker] → validate → snapshot
+[Source C: scrape]  ─┘         │
+                               ├─ rung 1–3: field_resolver ladder
+                               └─ rung 4: structural_rescue.py (async, offline)
+                                         │
+                                         └→ [snapshots.sqlite] → [GET /v1/feed]
 ```
 
-### Laser-focused roadmap
+**Rung 4 (`structural_rescue.py`):** On ladder failure, queue HTML chunk → regex template library per target + optional lightweight label-proximity extractor. Never blocks poll SLA.
+
+### Laser-focused roadmap (v2)
 
 | Phase | Deliverable | Exit criteria |
 |-------|-------------|---------------|
-| **P0 — One feed MVP** | Pick **one** target (e.g. single airline route basket OR one retail SKU list) | 7-day continuous poll; snapshots queryable |
-| **P1 — Field ladder** | ≥2 sources per critical field; `?rescue=1` overflow path | Coverage ≥85% on primary fields (gate_audit pattern) |
-| **P2 — SLA telemetry** | `altdata check` — poll latency, coverage %, source mix | p95 poll < configured window; Matchbook-style balance report |
-| **P3 — Secured API** | API keys, per-client rate limits, JSON schema versioning | One design partner on £500/mo pilot |
-| **P4 — Inst++ data room** | Daily export bundle: snapshots + manifest + coverage audit CSV | Buyer DD passes without manual explanation |
+| **P0 — One feed MVP** | Single target; async poll; snapshots | 7-day continuous; manifest per poll |
+| **P1 — Field ladder 1–3** | ≥2 sources per field; versioned selectors | ≥85% coverage on primary fields |
+| **P1b — Structural rescue** | Rung 4 worker; rescue count in manifest | DOM-break simulation: coverage stays ≥85% via rung 4 |
+| **P2 — SLA telemetry** | `altdata check` — coverage, rescue rate, p95 latency | Rescue rate <20% of fills (ladder healthy) |
+| **P3 — Secured API** | API keys; token-bucket per client (`rates.py`) | 1 design partner @ £500/mo |
+| **P4 — Data room** | Daily export: snapshots + chain + coverage audit | Buyer DD without vendor call |
 
-### Feed selection (laser focus — pick ONE first)
+### What NOT to build
 
-| Feed | Complexity | Buyer | Notes |
-|------|------------|-------|-------|
-| Airline route fares | Medium | Quant travel/arbitrage desks | High velocity, public pages |
-| Retail inventory drops | Medium | Consumer funds | SKU watchlists |
-| Container/port delays | High | Logistics macro | Slower cadence, higher ticket |
-
-**Do not** launch with multiple feeds. Inst++ = one feed at ≥95% coverage before adding a second SKU.
-
-### Monetization fit
-
-**Premium B2B API** — £500–2,000/mo per feed per client. No freemium; sell exclusivity windows (e.g. 15-min delay tier vs real-time tier).
+- Multiple feeds before one hits ≥95%
+- Rung 4 as default — it's rescue, not primary
+- LLM-per-row extraction (cost + latency) — local lightweight only
 
 ---
 
-## Product 3: "Un-Gameable" Compliance & Audit Trail Logger
+## Product 3: Compliance & Audit Trail Logger
 
 ### One job
 
-Accept business events (decisions, approvals, automated actions) and produce **cryptographically sealed, timeline-accurate audit trails** that satisfy institutional auditors (DORA, UK financial frameworks, internal SOC2).
+Cryptographically sealed, **causally ordered** audit trails for institutional auditors. Log decisions made elsewhere — **do not** make decisions.
 
-### Why Inst++
-
-Spreadsheets and generic logs are gameable. Inst++ = append-only + hash chain + evidence gates + one-click data room.
-
-### Codebase mapping
-
-| Extract from | Module | Port to |
-|--------------|--------|---------|
-| Verification hash | `place/paper_ledger.py` | `compliance_log/hash.py` — canonical field order |
-| Ledger events | `institutional/ledger_events.py` | `compliance_log/events.py` — generic event types |
-| Run manifest | `institutional/run_manifest.py` | `compliance_log/manifest.py` — decision batch provenance |
-| Evidence gates | `institutional/check.py` (10-point) | `compliance_log/gates/` — F1–F9 style checklist |
-| Gate coverage audit | `analytics/gate_audit.py` | `compliance_log/evidence.py` — density per gate |
-| Public verifier | `place/public_tracker.py` | `compliance_log/verifier.py` — `/verify?event_id=` |
-| Retention | `institutional/log_retention.py` | `compliance_log/retention.py` — audit tables only |
-| Data room export | `DATA_ROOM.md` patterns | `scripts/export_audit_room.sh` |
-
-### Generic F1–F9 evidence gates (port from institutional checklist)
+### F1–F9 evidence gates (v2)
 
 | Gate | Name | Pass condition |
 |------|------|----------------|
-| F1 | Snapshot completeness | 100% of decision windows have stored input snapshot |
-| F2 | Manifest linkage | Every event references a `manifest_id` |
-| F3 | Hash integrity | `verify_chain()` returns clean on sample |
-| F4 | Timeline monotonicity | `created_at` ordering preserved; no backdated inserts |
+| F1 | Snapshot completeness | 100% decision windows have input snapshot |
+| F2 | Manifest linkage | Every event has `manifest_id` |
+| F3 | Hash chain integrity | `verify_chain()` → clean; \(H_n\) formula |
+| F4 | **Logical monotonicity** | `lamport_seq` strictly increasing per writer; not wall-clock |
 | F5 | Config drift | `config_hash` stable or re-snapshot documented |
-| F6 | Reconciliation | Expected decision count == logged count |
-| F7 | Source coverage | Required input fields ≥85% populated |
-| F8 | Retention policy | Compaction only on policy schedule; audit trail preserved |
-| F9 | Export reproducibility | `export_audit_room.sh` regenerates identical bundle hash |
+| F6 | Reconciliation | Expected count == logged count |
+| F7 | Source coverage | Required fields ≥85% populated |
+| F8 | Retention policy | Compaction on schedule; chain preserved |
+| F9 | Export reproducibility | `export_audit.sh` → identical bundle hash |
 
-### Architecture
+### Architecture (v2)
 
 ```
-[App / Cron / Human] → [compliance_log ingest API]
-                              │
-                              ├─ snapshot input payload (immutable)
-                              ├─ RunManifest (who/when/what version)
-                              ├─ LedgerEvent + verification_hash
-                              └─ F1–F9 evidence gates (scheduled)
-                                        │
-                                        └─ export_audit_room.sh → ZIP for auditors
+[App] → compliance_log.ingest(snapshot, outcome, actor)
+              │
+              ├─ LamportClock.tick() → lamport_seq
+              ├─ RunManifest
+              ├─ H_n = SHA256(M_n || H_{n-1} || lamport_n)
+              ├─ wall_time_utc (metadata only)
+              └─ async write-behind → ledger.sqlite
+                        │
+                        └─ export_audit.sh → ZIP (chain + F1–F9 report)
 ```
 
-### Laser-focused roadmap
+### Laser-focused roadmap (v2)
 
 | Phase | Deliverable | Exit criteria |
 |-------|-------------|---------------|
-| **P0 — Core logger** | Python SDK: `log_decision(snapshot, outcome, actor)` → SQLite | 10k events; hash chain verifies |
-| **P1 — Evidence gates** | `compliance-log check` runs F1–F9 | All gates pass on synthetic 30-day dataset |
-| **P2 — Export data room** | `export_audit_room.sh` — CSV + manifest + gate report + README | External auditor replay without vendor call |
-| **P3 — Enterprise hooks** | SIEM webhook (Splunk/Datadog), optional HSM signing | One design partner signs maintenance retainer |
-| **P4 — Inst++ cert** | SOC2-friendly docs: retention, access control, immutability proof | Passes buyer security questionnaire template |
+| **P0 — Core logger** | `ingest()` + `hash.py` chain + `clocks.py` Lamport | 10k events; `verify_chain()` clean |
+| **P0b — Clock attack test** | Set system clock backward; chain still verifies | F4 passes on Lamport; wall_time flagged advisory |
+| **P1 — F1–F9 gates** | `gates/engine.py` | All pass on 30-day synthetic set |
+| **P2 — export_audit.sh** | Auditor ZIP — no vendor call needed | External dry-run pass |
+| **P3 — Vector clock** | Multi-writer node support | 2-node concurrent ingest; causal order preserved |
+| **P4 — Enterprise** | SIEM webhook; optional HSM sign on \(H_n\) | Maintenance retainer signed |
 
 ### What NOT to build
 
-- No general-purpose logging (leave that to Datadog)
-- No ML / decision engine — **log decisions made elsewhere**
-- No cloud multi-tenant until P3 — ship **on-prem Docker** first (regulated buyers prefer it)
-
-### Monetization fit
-
-**License + maintenance retainer** — one-time core (£5k–15k) + £500–1,500/mo for gate updates, retention, and audit support.
+- General-purpose logging (Datadog territory)
+- ML decision engine
+- Cloud multi-tenant before P3
 
 ---
 
@@ -251,162 +362,111 @@ Spreadsheets and generic logs are gameable. Inst++ = append-only + hash chain + 
 
 ### One job
 
-Give indie developers a **production-ready Python framework** for the hardest AI app problems: multi-source context injection, rate-limit buffers, structured output validation, and local failure recovery.
+Production Python kit: **token-bucket rate control**, structured output validation, checkpoint recovery. No prompts, no hosting.
 
-### Why Inst++
-
-90% of AI apps fail on ops, not prompts. Inst++ = state loops that survive API 429s, mid-stream token drops, and invalid JSON — with the same manifest/ledger discipline as the other products.
-
-### Codebase mapping
-
-| Extract from | Module | Port to |
-|--------------|--------|---------|
-| Rate limits | `ingest/rate_limit.py` | `ai_kit/rate_limit.py` — token bucket + provider backoff |
-| Pipeline isolation | `cards/refresh.py` + observation lane | `ai_kit/pipeline.py` — staged run with soft-fail mode |
-| Calibrated output | `models/lgbm_ranker.py` (LambdaRank) + hibs-bet Laplace docs | `ai_kit/calibrate.py` — structured output scoring |
-| Manifest per run | `institutional/run_manifest.py` | `ai_kit/manifest.py` — prompt hash + model version |
-| Structured logging | `ledger_events` pattern | `ai_kit/trace_log.py` — per-call append-only trace |
-| Multi-source context | `scrapers/field_resolver.py` + `enrich.py` | `ai_kit/context.py` — RAG source ladder |
-| Gate validation | `cards/actionability.py` (reject with reason) | `ai_kit/validate.py` — schema gate on LLM output |
-
-### Architecture
+### Architecture (v2)
 
 ```
-[User App] → [ai_kit AgentLoop]
+[User App] → ai_kit.AgentLoop (async)
                   │
-                  ├─ context ladder (vector DB → file → web)
-                  ├─ rate_limit buffer (per provider)
-                  ├─ structured output gate (JSON schema / Pydantic)
-                  ├─ recovery (retry partial, resume state)
-                  └─ trace_log.sqlite (manifest + hashes)
+                  ├─ rates.py token bucket per (provider, model)
+                  ├─ context ladder (file → cache → API)
+                  ├─ Pydantic output gate + retry
+                  ├─ checkpoint.sqlite (Lamport-stepped)
+                  └─ trace log → inst-spine hash chain (optional Inst++ tier)
 ```
 
-### Laser-focused roadmap
+### Laser-focused roadmap (v2)
 
 | Phase | Deliverable | Exit criteria |
 |-------|-------------|---------------|
-| **P0 — Rate-limit kit** | `ai_kit.limits` — OpenAI/Anthropic backoff, 429 handling, env config | Survives 100 forced 429s without crash |
-| **P1 — Structured output gate** | Pydantic validator + auto-retry on schema fail (max N) | 95% valid JSON on messy prompts in test suite |
-| **P2 — Agent state loop** | Checkpoint file/SQLite; resume after kill -9 | Mid-run interrupt resumes from last good step |
-| **P3 — Context ladder** | Multi-source inject with priority + fallback | 3-source context demo (local files + API + cache) |
-| **P4 — Boilerplate repo** | `cookiecutter` template + Gumroad/GitBook docs | 10 beta buyers; NPS on "hours saved" |
-
-### What NOT to build
-
-- No hosted LLM proxy (avoid competing with OpenRouter)
-- No no-code UI — **code-first** for developers
-- No agent marketplace — single repo, single job: **reliable AI plumbing**
-
-### Monetization fit
-
-**B2C developer sales** — £99–249 lifetime/seat on Gumroad. Upsell: Inst++ tier (£49 extra) with compliance_log integration for teams needing audit trails.
+| **P0 — Token bucket** | `ai_kit.limits` wraps `inst-spine/rates.py` | 100 forced 429s; burst then sustain; math unit-tested |
+| **P1 — Output gate** | Pydantic + retry on schema fail | 95% valid JSON on messy prompt suite |
+| **P2 — Checkpoint loop** | Resume from last Lamport step after kill -9 | Interrupt mid-run → identical continuation |
+| **P3 — Context ladder** | 3-source inject with fallback | Demo: files + API + cache |
+| **P4 — Boilerplate** | Cookiecutter + Gumroad; Inst++ tier bundles `compliance-log` | 10 beta buyers |
 
 ---
 
-## Build Order (portfolio of four)
-
-Execute sequentially — each product funds and hardens the shared spine:
+## Build Order (unchanged logic, revised dependencies)
 
 ```
-1. Compliance Logger (P0–P2)
-   └─ Establishes hash chain + export_audit_room — reused by all others
+1. inst-spine core (hash.py + clocks.py + ledger.py)
+   └─ Compliance Logger P0–P2
 
-2. Proxy-Risk Gateway (P0–P2)
-   └─ Hardest revenue proof; uses compliance_log for intent audit
+2. inst-spine rates.py
+   └─ Proxy-Risk P0–P2 + AI Kit P0 in parallel (different products, same math)
 
-3. Alt-Data Extractor (P0–P1, ONE feed)
-   └─ Reuses rate_limit + snapshot_store + gate_audit patterns
+3. Proxy-Risk P3–P4 (revenue)
 
-4. AI Boilerplates (P0–P2)
-   └─ Packages rate_limit + manifest + validate for B2C scale
+4. Alt-Data P0–P1b (one feed + structural rescue)
+
+5. AI Kit P1–P4 (B2C scale)
 ```
 
-**Rationale:** Compliance Logger is the fastest path to a sellable Inst++ artifact (export bundle auditors understand). Proxy-Risk has the highest B2B ARPU. Alt-Data and AI kits scale once the spine is proven.
+**Rule:** One product to P2 before starting the next **product**. `inst-spine` extraction can proceed in parallel with Compliance P0.
 
 ---
 
-## Shared Package Structure (target monorepo)
-
-```
-inst-spine/                    # Shared Inst++ primitives (extract first)
-├── contracts.py               # RunManifest, LedgerEvent, ApiIntent
-├── ledger.py                  # Append-only SQLite
-├── hash.py                    # verification_hash
-├── gates/
-│   ├── base.py                # staged gate protocol
-│   └── registry.py
-├── check.py                   # run_institutional_check generic
-└── export_audit_room.sh
-
-proxy-risk/                    # Product 1
-altdata/                       # Product 2
-compliance-log/                # Product 3
-ai-kit/                        # Product 4
-```
-
-**Rule:** `inst-spine` has zero domain imports. Sports code never imports products; products import `inst-spine` only.
-
----
-
-## Risk Matrix
+## Risk Matrix (v2)
 
 | Risk | Product | Mitigation |
 |------|---------|------------|
-| Scope creep into full trading platform | Proxy-Risk | Hard cap: middleware only, no alpha |
-| Legal/scrape ToS | Alt-Data | One feed; legal review per source; robots.txt respect |
-| "Just use Splunk" objection | Compliance | Position as **decision-grade** tamper-proof, not logs |
-| Boilerplate commoditization | AI Kit | Inst++ tier with audit integration; stay Python-native |
-| Building all four at once | All | **One product to P2 before starting next** |
+| Sync Python gate latency | Proxy-Risk | uvloop + memory hot path; SQLite write-behind only |
+| Clock manipulation invalidates audit | Compliance | Lamport order; wall clock metadata-only |
+| DOM breakage kills coverage | Alt-Data | Rung 4 structural rescue; rescue rate monitored |
+| Flat % drift false positives | Proxy-Risk | Z-score with EMA \(\mu_t, \sigma_t\) |
+| Token bucket math wrong | Proxy + AI | Unit tests on \(T_t\) edge cases; property tests |
+| Scope creep | All | One job per product; see "What NOT to build" per section |
 
 ---
 
-## Success Metrics (Inst++ promotion per product)
+## Success Metrics (Inst++ promotion)
 
-| Product | Inst++ promoted when |
-|---------|---------------------|
-| Proxy-Risk | 1 paying tenant; loop-kill demo on video; 30-day ledger with zero gaps |
-| Alt-Data | 1 feed ≥95% coverage 30 days; 1 API subscriber |
-| Compliance | `export_audit_room` passes external auditor dry-run |
-| AI Kit | 50 paid seats; checkpoint recovery demo in docs |
+| Product | Promoted when |
+|---------|---------------|
+| **inst-spine** | `verify_chain()` + token bucket + Z-score unit tests green; exported to 2+ products |
+| **Proxy-Risk** | p99 gate <5ms; 1 paying tenant; Z-score kill demo; 30-day chain zero gaps |
+| **Alt-Data** | 1 feed ≥95% coverage 30d; rung 4 rescue <20% of fills |
+| **Compliance** | Clock-attack test pass; `export_audit.sh` external dry-run |
+| **AI Kit** | 50 paid seats; checkpoint recovery demo |
 
 ---
 
-## Commands (target — not yet implemented)
+## Commands (target)
 
 ```bash
-# Shared spine
-inst-spine check --days 30
-inst-spine export-audit-room --output ./audit_bundle.zip
+# inst-spine
+python -m inst_spine.check --days 30
+./inst-spine/export_audit.sh --output ./audit_bundle.zip
+python -m inst_spine.rates --test-token-bucket
+python -m inst_spine.rates --test-zscore
 
 # Product 1
-proxy-risk serve --shadow          # log-only
-proxy-risk check --kill-test
+proxy-risk serve --uvloop --shadow
+proxy-risk check --latency-p99 --kill-test
 
 # Product 2
-altdata poll --feed airline_uk_20
-altdata check --coverage
+altdata poll --feed airline_uk_20 --async
+altdata check --coverage --rescue-rate
 
 # Product 3
 compliance-log ingest --snapshot decision.json
-compliance-log check --gates F1-F9
+compliance-log check --gates F1-F9 --clock-attack
 
 # Product 4
-ai-kit run agent.yaml --checkpoint ./state.sqlite
+ai-kit run agent.yaml --checkpoint ./state.sqlite --token-bucket
 ```
 
 ---
 
 ## Related references in this repo
 
-| Pattern | Path |
-|---------|------|
-| Institutional check | `src/hibs_racing/institutional/check.py` |
-| Contracts | `src/hibs_racing/institutional/contracts.py` |
-| Ledger events | `src/hibs_racing/institutional/ledger_events.py` |
-| Gate enforcer | `src/hibs_racing/cards/actionability.py` |
-| Execution router | `src/hibs_racing/live/execution_router.py` |
-| Field ladders | `src/hibs_racing/scrapers/multi_scraper_api.py` |
-| Rate limits | `src/hibs_racing/ingest/rate_limit.py` |
-| Verification hash | `src/hibs_racing/place/paper_ledger.py` |
-| Data room | `DATA_ROOM.md` |
-| Portfolio Inst++ bar | `docs/PORTFOLIO_DEEP_DIVE.md` |
+| Pattern | Path | v2 port |
+|---------|------|---------|
+| Single-row hash | `place/paper_ledger.py` | Superseded by `hash.py` chain |
+| Institutional check | `institutional/check.py` | `check.py` + `gates/engine.py` |
+| Rate pause | `ingest/rate_limit.py` | `rates.py` token bucket |
+| Steam abort | `odds/market_steam.py` | `rates.py` Z-score |
+| Field ladders | `scrapers/multi_scraper_api.py` | `altdata/ladders.py` + rung 4 rescue |
+| Portfolio Inst++ bar | `docs/PORTFOLIO_DEEP_DIVE.md` | Racing-specific; not imported |
