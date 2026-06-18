@@ -344,6 +344,9 @@
             </nav>
         </div>
         <div class="site-top-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <a href="{{ url_for('status_page') }}" id="racing-inst-chip" class="pill" title="Racing Inst++ lane — card freshness and paper ledger">
+                Inst++ <span id="racing-inst-card">—</span>
+            </a>
             {% if ranker_loaded %}<span class="pill ok">Ranker live</span>{% else %}<span class="pill warn">No ranker</span>{% endif %}
             <button type="button" class="btn" id="btn-refresh" title="Fetch next 24h GB+IRE cards, score with LightGBM, pull odds">Refresh 24h</button>
         </div>
@@ -372,6 +375,33 @@
         HIBS — {{ product_tagline }} | Gamble Responsibly | 18+
     </footer>
 </div>
+<script>
+(function racingInstChip(){
+    const chip = document.getElementById('racing-inst-chip');
+    const el = document.getElementById('racing-inst-card');
+    if (!chip || !el) return;
+    async function tick(){
+        try {
+            const r = await fetch('/api/health');
+            const h = await r.json();
+            const fresh = h.card_fresh;
+            const tel = (h.telemetry_balance || {}).passed;
+            const settled = (h.paper || {}).settled || 0;
+            let label = fresh ? 'card OK' : 'stale';
+            if (tel === false) label += ' · tel';
+            if (settled < 25) label += ' · n=' + settled;
+            el.textContent = label;
+            chip.classList.toggle('ok', fresh === true && tel !== false);
+            chip.classList.toggle('warn', fresh !== true || tel === false);
+        } catch (e) {
+            el.textContent = 'offline';
+            chip.classList.add('warn');
+        }
+    }
+    tick();
+    setInterval(tick, 120000);
+})();
+</script>
 <script>
 document.getElementById('btn-refresh')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-refresh');
