@@ -156,12 +156,12 @@ Same spine as Proxy-Risk — forked config:
 
 | Component | Status |
 |-----------|--------|
-| `ad_guard/spend.py` | **P0** — provider parsers |
-| `ad_guard/proxy.py` | **P0** — gate chain + ledger |
-| `ad_guard/cli.py` | **P0** — `ad-guard evaluate` |
-| HTTP serve endpoint | **P1** — fork `proxy_risk/serve` |
-| `export_ad_audit.sh` | **P1** — wrapper on `inst_spine/export.py` |
-| Creative approval header gate | **P2** — NeMo/Bedrock integration hook |
+| `ad_guard/spend.py` | **Done** |
+| `ad_guard/proxy.py` | **Done** |
+| `ad_guard/serve.py` | **Done** |
+| `ad_guard/cli.py` | **Done** — `evaluate`, `serve`, `export` |
+| `export_ad_audit.sh` | **Done** |
+| Creative approval header gate | P2 |
 
 ---
 

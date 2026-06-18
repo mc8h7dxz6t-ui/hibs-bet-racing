@@ -66,8 +66,8 @@ All three are **thin product layers** on existing `inst_spine/` — no core file
 
 | # | Product | Difficulty | Spine reuse | New work | Sales velocity | Status |
 |---|---------|------------|-------------|----------|----------------|--------|
-| **5** | **Webhook Idempotency Mesh** | **Easy** | ~75% | Delivery FSM, provider sigs | **High** | **P0 scaffolded** |
-| **6** | **Ad-Tech Budget Guardrail** | **Easy–Medium** | ~85% | Spend metric extraction | Medium | **P0 scaffolded** |
+| **5** | **Webhook Idempotency Mesh** | **Easy** | ~75% | Delivery FSM, provider sigs | **High** | **P1 advertise-ready** |
+| **6** | **Ad-Tech Budget Guardrail** | **Easy–Medium** | ~85% | Spend metric extraction | Medium | **P1 advertise-ready** |
 | **7** | **Health Telemetry Recorder** | **Medium (tech) / Hard (GTM)** | ~90% | HIPAA/DTAC packaging | Slow, high ticket | Planned |
 
 **Difficulty key:** Easy = fork `proxy_risk` + config; Medium = new domain logic + compliance docs; Hard = regulatory sales cycle, not Python.
@@ -113,11 +113,11 @@ All three are **thin product layers** on existing `inst_spine/` — no core file
 
 | Component | Invasiveness | Notes |
 |-----------|--------------|-------|
-| `webhook_mesh/serve.py` | New ~150 LOC | FastAPI ingress: sig → CAS → WAL → 200 |
-| `webhook_mesh/fsm.py` | New ~90 LOC | Retry queue + DLQ |
-| `inst_spine/rates.py` | +~80 LOC | `IdempotencyBackend` Redis Lua CAS + memory |
-| `webhook_mesh/hmac_verify.py` | New ~30 LOC | Constant-time HMAC |
-| Tests | New ~150 LOC | Duplicate delivery, fail-closed Redis, ingress |
+| `webhook_mesh/serve.py` | **Done** | FastAPI ingress + durable queue |
+| `webhook_mesh/fsm.py` | **Done** | Retry, DLQ poison sidecars, httpx limits |
+| `webhook_mesh/queue.py` | **Done** | Redis Stream (prod) / background (dev) |
+| `inst_spine/rates.py` | **Done** | `IdempotencyBackend` Redis Lua CAS + memory |
+| `export_webhook_audit.sh` | **Done** | WAL + DLQ bundle |
 
 **Verdict: Easy** — build immediately after Proxy-Risk P2. Highest ARPU velocity of the three.
 
@@ -172,11 +172,11 @@ Product 6 **is** Proxy-Risk with different config:
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| `ad_guard/spend.py` | **P0 done** | Google / Meta / generic JSON path parsers |
-| `ad_guard/proxy.py` | **P0 done** | Per-campaign bucket + Z-score spend drift |
-| `ad_guard/cli.py` | **P0 done** | `ad-guard evaluate` |
-| HTTP serve endpoint | P1 | Fork `proxy_risk/serve` |
-| `export_ad_audit.sh` | P1 | Wrapper on `export.py` |
+| `ad_guard/spend.py` | **Done** | Google / Meta / generic JSON path parsers |
+| `ad_guard/proxy.py` | **Done** | Per-campaign bucket + Z-score spend drift |
+| `ad_guard/serve.py` | **Done** | HTTP `/v1/guard/{client_id}` |
+| `ad_guard/cli.py` | **Done** | `evaluate`, `serve`, `export` |
+| `export_ad_audit.sh` | **Done** | Wrapper on `export.py` |
 | Creative approval header gate | P2 | NeMo/Bedrock integration hook |
 | **True RTB exchange (<5ms)** | **Not in scope** | Would need Go/Rust — say no |
 
@@ -380,6 +380,7 @@ python3 -m inst_spine.export_cli data/ledger.sqlite --repro-check
 ## Related docs
 
 - `docs/AD_GUARD_INSTITUTIONAL_STACK.md` — enterprise ad guardrail landscape + Inst++ slot
+- `docs/INST_PLUS_TEST_AND_DEMO.md` — test, demo, and advertise playbook
 - `docs/NEW_PRODUCT_INST_PLUS_ROADMAPS.md` — technical roadmaps v3
 - `docs/PORTFOLIO_DEEP_DIVE.md` — racing gate lanes
 - `src/inst_spine/export.py` — P2 bundle implementation
