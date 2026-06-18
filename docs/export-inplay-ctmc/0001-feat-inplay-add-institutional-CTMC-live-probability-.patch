@@ -1,0 +1,2014 @@
+From 5040bcd4b338806e18f5d7fd22715b60f3faa8d3 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Wed, 17 Jun 2026 08:57:09 +0000
+Subject: [PATCH 1/5] feat(inplay): add institutional CTMC live probability
+ engine
+
+Implement the live in-play quant stack: state vector, rolling xG
+feature engineering, non-homogeneous Poisson intensities with time-decay
+spikes, CTMC matrix-exponentiation and Monte Carlo solvers, Redis-backed
+event stack, fractional Kelly risk gates, paper execution router, dashboard
+API (/api/inplay/probabilities), expand-panel live probs, worker script,
+and architecture documentation.
+---
+ .env.example                             |  14 ++
+ docs/INPLAY_TRADING_ARCHITECTURE.md      |  88 +++++++++
+ scripts/run_inplay_quant_worker.sh       |  52 +++++
+ src/hibs_predictor/inplay/__init__.py    |  11 ++
+ src/hibs_predictor/inplay/ctmc.py        | 125 ++++++++++++
+ src/hibs_predictor/inplay/engine.py      | 213 ++++++++++++++++++++
+ src/hibs_predictor/inplay/event_stack.py |  86 +++++++++
+ src/hibs_predictor/inplay/execution.py   | 118 ++++++++++++
+ src/hibs_predictor/inplay/features.py    | 235 +++++++++++++++++++++++
+ src/hibs_predictor/inplay/feeds.py       |  55 ++++++
+ src/hibs_predictor/inplay/integration.py |  64 ++++++
+ src/hibs_predictor/inplay/intensity.py   | 116 +++++++++++
+ src/hibs_predictor/inplay/monte_carlo.py |  60 ++++++
+ src/hibs_predictor/inplay/risk.py        | 134 +++++++++++++
+ src/hibs_predictor/inplay/router.py      | 102 ++++++++++
+ src/hibs_predictor/inplay/state.py       | 175 +++++++++++++++++
+ src/hibs_predictor/web.py                |  26 +++
+ templates/_fixture_expand_panel.html     |  17 ++
+ tests/test_inplay_engine.py              | 134 +++++++++++++
+ 19 files changed, 1825 insertions(+)
+ create mode 100644 docs/INPLAY_TRADING_ARCHITECTURE.md
+ create mode 100755 scripts/run_inplay_quant_worker.sh
+ create mode 100644 src/hibs_predictor/inplay/__init__.py
+ create mode 100644 src/hibs_predictor/inplay/ctmc.py
+ create mode 100644 src/hibs_predictor/inplay/engine.py
+ create mode 100644 src/hibs_predictor/inplay/event_stack.py
+ create mode 100644 src/hibs_predictor/inplay/execution.py
+ create mode 100644 src/hibs_predictor/inplay/features.py
+ create mode 100644 src/hibs_predictor/inplay/feeds.py
+ create mode 100644 src/hibs_predictor/inplay/integration.py
+ create mode 100644 src/hibs_predictor/inplay/intensity.py
+ create mode 100644 src/hibs_predictor/inplay/monte_carlo.py
+ create mode 100644 src/hibs_predictor/inplay/risk.py
+ create mode 100644 src/hibs_predictor/inplay/router.py
+ create mode 100644 src/hibs_predictor/inplay/state.py
+ create mode 100644 tests/test_inplay_engine.py
+
+diff --git a/.env.example b/.env.example
+index 6eb5b53..f39b525 100644
+--- a/.env.example
++++ b/.env.example
+@@ -124,6 +124,20 @@ ODDS_API_KEY=your_odds_api_key_here
+ # HIBS_LIVE_ATTACH_STATS_ON_LOAD=0
+ # HIBS_LIVE_POLL_SEC=60
+ # HIBS_LIVE_POLL_SEC_INPLAY=30
++#
++# Live in-play CTMC probability engine (institutional stack — see docs/INPLAY_TRADING_ARCHITECTURE.md)
++# HIBS_INPLAY_ENABLED=0
++# HIBS_INPLAY_TICK_SEC=15
++# HIBS_INPLAY_SOLVER=ctmc
++# HIBS_INPLAY_MC_PATHS=10000
++# HIBS_INPLAY_MATCH_MINUTES=95
++# HIBS_INPLAY_KELLY_FRACTION=0.25
++# HIBS_INPLAY_MIN_EDGE=0.025
++# HIBS_INPLAY_MAX_STAKE_PCT=10
++# HIBS_INPLAY_REDIS_URL=redis://127.0.0.1:6379/0
++# HIBS_INPLAY_EXECUTE=dry
++# HIBS_INPLAY_CONFIRM_LIVE=NO
++# HIBS_INPLAY_WORKER_EXECUTE=0
+ # HIBS_LIVE_KICKOFF_BEFORE_H=0.25
+ # HIBS_LIVE_KICKOFF_AFTER_H=3
+ #
+diff --git a/docs/INPLAY_TRADING_ARCHITECTURE.md b/docs/INPLAY_TRADING_ARCHITECTURE.md
+new file mode 100644
+index 0000000..ad543d4
+--- /dev/null
++++ b/docs/INPLAY_TRADING_ARCHITECTURE.md
+@@ -0,0 +1,88 @@
++# Live In-Play CTMC Trading Stack
++
++Institutional architecture for live football probability extraction, risk, and execution.
++
++## Architecture
++
++```
++[ LIVE DATA FEEDS ] → [ JSON PARSER ] → [ EVENT STACK (Redis / memory) ]
++                                              │
++              ┌───────────────────────────────┼───────────────────────────────┐
++              ▼                               ▼                               ▼
++   [ QUANT ENGINE: 15s CTMC tick ]   [ SENTIMENT — future ]        [ EXCHANGE MARKS ]
++              │                               │                               │
++              └───────────────────────────────────┴───────────────────────────────┘
++                                              ▼
++                               [ EXECUTION ENGINE (Kelly gate) ]
++                                              ▼
++                               [ SMART ORDER ROUTER (paper / live stub) ]
++```
++
++## Math (v1)
++
++State vector \(X(t) = (G_H, G_A, P, R_H, R_A)\) at minute \(t\).
++
++Hazard rates:
++
++\[
++\lambda_H(t) = \alpha_H \cdot \gamma_{\text{home}} \cdot \delta(t) \cdot \exp\left(\sum_i w_i f_i(t)\right)
++\]
++
++Terminal 1X2 via truncated-score CTMC + matrix exponentiation (`inplay/ctmc.py`) or Monte Carlo (`inplay/monte_carlo.py`).
++
++Execution uses quarter-Kelly with VAR/penalty suspension gates (`inplay/risk.py`).
++
++## Module map
++
++| Module | Role |
++|--------|------|
++| `inplay/state.py` | Match state vector + fixture parsing |
++| `inplay/features.py` | Rolling xG momentum, possession tilt, corners |
++| `inplay/intensity.py` | \(\lambda_H, \lambda_A\) with time-decay spikes at 44′ / 89′ |
++| `inplay/ctmc.py` | Generator \(Q(t)\), forward Kolmogorov solver |
++| `inplay/monte_carlo.py` | 10k–100k Poisson path simulation |
++| `inplay/event_stack.py` | Redis tick ring (in-memory fallback) |
++| `inplay/engine.py` | 15s quant tick orchestrator |
++| `inplay/risk.py` | Fractional Kelly + suspension rules |
++| `inplay/execution.py` | Paper/live execution + JSONL audit |
++| `inplay/router.py` | Multi-venue order splitter (FIX adapters plug-in) |
++| `inplay/integration.py` | Dashboard + API wiring |
++
++## Enable
++
++```bash
++# .env
++HIBS_INPLAY_ENABLED=1
++HIBS_INPLAY_TICK_SEC=15
++HIBS_INPLAY_SOLVER=ctmc          # or mc
++HIBS_INPLAY_MC_PATHS=10000
++HIBS_INPLAY_KELLY_FRACTION=0.25
++HIBS_INPLAY_MIN_EDGE=0.025
++# Optional Redis event stack
++# HIBS_INPLAY_REDIS_URL=redis://127.0.0.1:6379/0
++```
++
++## API
++
++`GET /api/inplay/probabilities` — live CTMC 1X2 + Kelly signals for in-play fixtures.
++
++Optional `?ids=123,456` filter.
++
++## Worker
++
++```bash
++bash scripts/run_inplay_quant_worker.sh
++```
++
++Paper execution audit: `logs/inplay_execution.jsonl` when `HIBS_INPLAY_WORKER_EXECUTE=1`.
++
++Live routing requires `HIBS_INPLAY_EXECUTE=live` and `HIBS_INPLAY_CONFIRM_LIVE=YES` (venue adapters are stubs until wired).
++
++## Roadmap (not in v1)
++
++- Opta / Sportradar binary feed handlers (sub-ms parse)
++- Sentiment scraper lane (injury / red-card social reaction)
++- Rust/C++ intensity kernel for &lt;50ms tick latency
++- Pinnacle / Betfair FIX adapters in `router.py`
++- GPU batch MC (100k paths / 15s)
++- Trained \(w_i\) from rolling Poisson regression on tick archive
+diff --git a/scripts/run_inplay_quant_worker.sh b/scripts/run_inplay_quant_worker.sh
+new file mode 100755
+index 0000000..a87ebb3
+--- /dev/null
++++ b/scripts/run_inplay_quant_worker.sh
+@@ -0,0 +1,52 @@
++#!/usr/bin/env bash
++# 15-second in-play quant tick worker (institutional stack entrypoint).
++set -euo pipefail
++ROOT="$(cd "$(dirname "$0")/.." && pwd)"
++cd "$ROOT"
++export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
++export HIBS_INPLAY_ENABLED="${HIBS_INPLAY_ENABLED:-1}"
++TICK="${HIBS_INPLAY_TICK_SEC:-15}"
++
++if [[ ! -d .venv ]]; then
++  python3 -m venv .venv
++fi
++# shellcheck disable=SC1091
++source .venv/bin/activate
++pip -q install -r requirements.txt >/dev/null
++
++echo "[inplay-worker] tick=${TICK}s enabled=${HIBS_INPLAY_ENABLED} solver=${HIBS_INPLAY_SOLVER:-ctmc}"
++exec python - <<'PY'
++import os
++import time
++
++from hibs_predictor.data_aggregator import DataAggregator
++from hibs_predictor.inplay.engine import inplay_engine_from_env
++from hibs_predictor.inplay.execution import InplayExecutionEngine
++from hibs_predictor.live_scores import attach_live_to_fixtures
++from hibs_predictor.web import fetch_all_fixtures
++
++tick = float(os.getenv("HIBS_INPLAY_TICK_SEC", "15"))
++execute = os.getenv("HIBS_INPLAY_WORKER_EXECUTE", "0").strip().lower() in ("1", "true", "yes")
++bankroll = float(os.getenv("HIBS_INPLAY_BANKROLL", "1000"))
++
++agg = DataAggregator()
++quant = inplay_engine_from_env()
++exec_engine = InplayExecutionEngine(quant=quant)
++
++while True:
++    try:
++        bundle = fetch_all_fixtures()
++        rows = bundle.get("all") if isinstance(bundle, dict) else []
++        attach_live_to_fixtures(rows, agg, include_events=True, include_stats=True)
++        live_rows = [r for r in rows if r.get("is_live")]
++        snaps = quant.tick_many(live_rows)
++        print(f"[tick] live={len(live_rows)} priced={len(snaps)}")
++        if execute:
++            for row in live_rows:
++                result = exec_engine.execute_if_edge(row, bankroll=bankroll)
++                if result.executed or result.reason not in ("not_live", "no_edge"):
++                    print(f"  {row.get('id')} -> {result.reason} orders={len(result.orders)}")
++    except Exception as exc:
++        print(f"[tick] error: {exc!r}")
++    time.sleep(tick)
++PY
+diff --git a/src/hibs_predictor/inplay/__init__.py b/src/hibs_predictor/inplay/__init__.py
+new file mode 100644
+index 0000000..a69fb31
+--- /dev/null
++++ b/src/hibs_predictor/inplay/__init__.py
+@@ -0,0 +1,11 @@
++"""Live in-play CTMC probability engine and institutional execution stack."""
++
++from hibs_predictor.inplay.engine import InplayQuantEngine, inplay_engine_from_env
++from hibs_predictor.inplay.state import MatchState, PitchZone
++
++__all__ = [
++    "InplayQuantEngine",
++    "MatchState",
++    "PitchZone",
++    "inplay_engine_from_env",
++]
+diff --git a/src/hibs_predictor/inplay/ctmc.py b/src/hibs_predictor/inplay/ctmc.py
+new file mode 100644
+index 0000000..f5526db
+--- /dev/null
++++ b/src/hibs_predictor/inplay/ctmc.py
+@@ -0,0 +1,125 @@
++"""CTMC generator Q(t) and forward Kolmogorov solver for 1X2 terminal probs."""
++
++from __future__ import annotations
++
++import math
++from typing import Dict, Tuple
++
++import numpy as np
++
++from hibs_predictor.inplay.state import MatchState
++
++
++def _matrix_expm(q: np.ndarray, dt: float) -> np.ndarray:
++    """Matrix exponential exp(Q dt) — scipy if present, else truncated Taylor."""
++    m = q * float(dt)
++    try:
++        from scipy.linalg import expm  # type: ignore
++
++        return np.asarray(expm(m), dtype=float)
++    except Exception:
++        out = np.eye(q.shape[0], dtype=float)
++        term = np.eye(q.shape[0], dtype=float)
++        for k in range(1, 16):
++            term = term @ m / k
++            out = out + term
++        return out
++
++
++def build_score_generator(n: int, lam_h_per_min: float, lam_a_per_min: float) -> np.ndarray:
++    """Infinitesimal generator on truncated score grid (g_h, g_a) ∈ [0, n-1]."""
++    size = n * n
++    q = np.zeros((size, size), dtype=float)
++    for gh in range(n):
++        for ga in range(n):
++            idx = gh * n + ga
++            rate_out = 0.0
++            if gh + 1 < n:
++                j = (gh + 1) * n + ga
++                q[idx, j] = lam_h_per_min
++                rate_out += lam_h_per_min
++            if ga + 1 < n:
++                j = gh * n + (ga + 1)
++                q[idx, j] = lam_a_per_min
++                rate_out += lam_a_per_min
++            q[idx, idx] = -rate_out
++    return q
++
++
++def state_index(goals_home: int, goals_away: int, n: int) -> int:
++    gh = max(0, min(n - 1, int(goals_home)))
++    ga = max(0, min(n - 1, int(goals_away)))
++    return gh * n + ga
++
++
++def aggregate_1x2(dist: np.ndarray, n: int) -> Dict[str, float]:
++    p_home = p_draw = p_away = 0.0
++    for gh in range(n):
++        for ga in range(n):
++            p = float(dist[gh * n + ga])
++            if gh > ga:
++                p_home += p
++            elif gh == ga:
++                p_draw += p
++            else:
++                p_away += p
++    total = p_home + p_draw + p_away
++    if total <= 0:
++        return {"home": 1 / 3, "draw": 1 / 3, "away": 1 / 3}
++    return {
++        "home": p_home / total,
++        "draw": p_draw / total,
++        "away": p_away / total,
++    }
++
++
++def solve_terminal_1x2_ctmc(
++    state: MatchState,
++    lam_h_remaining: float,
++    lam_a_remaining: float,
++    *,
++    goal_cap: int = 8,
++    step_minutes: float = 1.0,
++) -> Tuple[Dict[str, float], Dict[str, float]]:
++    """
++    Solve d p / dt = p Q(t) via piecewise-homogeneous 1-minute matrix exponentiation.
++
++    λ inputs are expected goals over *remaining* match time; converted to per-minute rates.
++    """
++    n = max(3, int(goal_cap) + 1)
++    remaining = max(0.0, state.minutes_remaining)
++    if remaining <= 0.0:
++        return _terminal_from_current_score(state), {"method": "terminal_score", "steps": 0}
++
++    lam_h_min = max(0.0, lam_h_remaining) / max(remaining, 1.0)
++    lam_a_min = max(0.0, lam_a_remaining) / max(remaining, 1.0)
++
++    idx = state_index(state.goals_home, state.goals_away, n)
++    dist = np.zeros(n * n, dtype=float)
++    dist[idx] = 1.0
++
++    steps = max(1, int(math.ceil(remaining / step_minutes)))
++    dt = remaining / steps
++    q = build_score_generator(n, lam_h_min, lam_a_min)
++    transition = _matrix_expm(q, dt)
++    for _ in range(steps):
++        dist = dist @ transition
++
++    probs = aggregate_1x2(dist, n)
++    meta = {
++        "method": "ctmc_matrix_exp",
++        "steps": steps,
++        "step_minutes": round(dt, 4),
++        "goal_cap": n - 1,
++        "lambda_home_per_min": round(lam_h_min, 5),
++        "lambda_away_per_min": round(lam_a_min, 5),
++    }
++    return probs, meta
++
++
++def _terminal_from_current_score(state: MatchState) -> Dict[str, float]:
++    if state.goals_home > state.goals_away:
++        return {"home": 1.0, "draw": 0.0, "away": 0.0}
++    if state.goals_home < state.goals_away:
++        return {"home": 0.0, "draw": 0.0, "away": 1.0}
++    return {"home": 0.0, "draw": 1.0, "away": 0.0}
+diff --git a/src/hibs_predictor/inplay/engine.py b/src/hibs_predictor/inplay/engine.py
+new file mode 100644
+index 0000000..2cc99fa
+--- /dev/null
++++ b/src/hibs_predictor/inplay/engine.py
+@@ -0,0 +1,213 @@
++"""15-second quant tick — CTMC / MC probability engine."""
++
++from __future__ import annotations
++
++import os
++import time
++from dataclasses import dataclass, field
++from typing import Any, Dict, List, Optional
++
++from hibs_predictor.inplay.ctmc import solve_terminal_1x2_ctmc
++from hibs_predictor.inplay.event_stack import EventStack
++from hibs_predictor.inplay.features import extract_live_features
++from hibs_predictor.inplay.feeds import parse_live_fixture_tick
++from hibs_predictor.inplay.intensity import compute_intensities
++from hibs_predictor.inplay.monte_carlo import simulate_terminal_1x2_mc
++from hibs_predictor.inplay.risk import RiskDecision, evaluate_risk, risk_config_from_env
++from hibs_predictor.inplay.state import MatchState, PrematchPrior, match_state_from_fixture, prematch_prior_from_fixture
++
++
++def _env_float(name: str, default: float) -> float:
++    try:
++        return float(os.getenv(name, str(default)))
++    except ValueError:
++        return default
++
++
++def _env_int(name: str, default: int) -> int:
++    try:
++        return int(os.getenv(name, str(default)))
++    except ValueError:
++        return default
++
++
++def inplay_enabled() -> bool:
++    return os.getenv("HIBS_INPLAY_ENABLED", "0").strip().lower() in ("1", "true", "yes", "on")
++
++
++@dataclass
++class InplayEngineConfig:
++    tick_sec: float = 15.0
++    match_minutes: float = 95.0
++    solver: str = "ctmc"  # ctmc | mc
++    mc_paths: int = 10000
++
++
++@dataclass
++class ProbabilitySnapshot:
++    fixture_id: str
++    state: Dict[str, Any]
++    probabilities: Dict[str, float]
++    probabilities_pct: Dict[str, float]
++    intensities: Dict[str, Any]
++    features: Dict[str, Any]
++    solver_meta: Dict[str, Any]
++    ts: float = field(default_factory=time.time)
++
++    def as_dict(self) -> Dict[str, Any]:
++        return {
++            "fixture_id": self.fixture_id,
++            "state": self.state,
++            "probabilities": self.probabilities,
++            "probabilities_pct": self.probabilities_pct,
++            "intensities": self.intensities,
++            "features": self.features,
++            "solver": self.solver_meta,
++            "ts": self.ts,
++        }
++
++
++class InplayQuantEngine:
++    """QuantEngine: rolling Markov tick over live fixtures."""
++
++    def __init__(
++        self,
++        *,
++        config: Optional[InplayEngineConfig] = None,
++        event_stack: Optional[EventStack] = None,
++    ):
++        self.config = config or inplay_engine_config_from_env()
++        self.stack = event_stack or EventStack()
++        self._cache: Dict[str, ProbabilitySnapshot] = {}
++
++    def tick_fixture(self, row: Dict[str, Any]) -> Optional[ProbabilitySnapshot]:
++        if not row.get("is_live"):
++            return None
++        fid = str(row.get("id") or "")
++        if not fid:
++            return None
++        tick = parse_live_fixture_tick(row, match_minutes=self.config.match_minutes)
++        self.stack.push_tick(fid, tick)
++
++        state = match_state_from_fixture(row, match_minutes=self.config.match_minutes)
++        prior = prematch_prior_from_fixture(row)
++        hist = self._history_with_age(fid, state.minute)
++        features = extract_live_features(row, state, history=hist)
++        lam_h, lam_a, intensity_dbg = compute_intensities(state, prior, features)
++
++        if self.config.solver == "mc":
++            probs, solver_meta = simulate_terminal_1x2_mc(
++                state, lam_h, lam_a, n_paths=self.config.mc_paths
++            )
++        else:
++            probs, solver_meta = solve_terminal_1x2_ctmc(state, lam_h, lam_a)
++
++        snap = ProbabilitySnapshot(
++            fixture_id=fid,
++            state=state.as_dict(),
++            probabilities={k: round(v, 6) for k, v in probs.items()},
++            probabilities_pct={k: round(v * 100.0, 2) for k, v in probs.items()},
++            intensities=intensity_dbg,
++            features=features.as_dict(),
++            solver_meta=solver_meta,
++        )
++        self._cache[fid] = snap
++        return snap
++
++    def evaluate_execution(
++        self,
++        row: Dict[str, Any],
++        snapshot: Optional[ProbabilitySnapshot] = None,
++    ) -> RiskDecision:
++        snap = snapshot or self._cache.get(str(row.get("id") or ""))
++        if not snap:
++            snap = self.tick_fixture(row)
++        if not snap:
++            return RiskDecision(fixture_id=str(row.get("id") or ""), suspended=True, suspend_reason="not_live")
++        odds = _market_odds_from_row(row)
++        return evaluate_risk(
++            snap.fixture_id,
++            snap.probabilities,
++            odds,
++            row=row,
++        )
++
++    def attach_to_fixture(self, row: Dict[str, Any]) -> bool:
++        """Compute live 1X2 and attach `inplay_prediction` to dashboard row."""
++        if not inplay_enabled():
++            return False
++        snap = self.tick_fixture(row)
++        if not snap:
++            return False
++        row["inplay_prediction"] = snap.as_dict()
++        risk = self.evaluate_execution(row, snap)
++        row["inplay_risk"] = {
++            "suspended": risk.suspended,
++            "suspend_reason": risk.suspend_reason,
++            "signals": [
++                {
++                    "outcome": s.outcome,
++                    "edge": s.edge,
++                    "approved": s.approved,
++                    "kelly": s.kelly,
++                    "decimal_odds": s.decimal_odds,
++                }
++                for s in risk.signals
++            ],
++        }
++        return True
++
++    def tick_many(self, fixtures: List[Dict[str, Any]]) -> Dict[str, ProbabilitySnapshot]:
++        out: Dict[str, ProbabilitySnapshot] = {}
++        for row in fixtures:
++            snap = self.tick_fixture(row)
++            if snap:
++                out[snap.fixture_id] = snap
++        return out
++
++    def get_cached(self, fixture_id: str) -> Optional[ProbabilitySnapshot]:
++        return self._cache.get(str(fixture_id))
++
++    def _history_with_age(self, fixture_id: str, current_minute: float) -> List[Dict[str, Any]]:
++        hist = self.stack.history(fixture_id, limit=40)
++        out: List[Dict[str, Any]] = []
++        for item in reversed(hist):
++            try:
++                minute = float(item.get("minute", 0))
++            except (TypeError, ValueError):
++                minute = 0.0
++            row = dict(item)
++            row["age_minutes"] = max(0.0, current_minute - minute)
++            out.append(row)
++        return out
++
++
++def inplay_engine_config_from_env() -> InplayEngineConfig:
++    solver = (os.getenv("HIBS_INPLAY_SOLVER") or "ctmc").strip().lower()
++    return InplayEngineConfig(
++        tick_sec=_env_float("HIBS_INPLAY_TICK_SEC", 15.0),
++        match_minutes=_env_float("HIBS_INPLAY_MATCH_MINUTES", 95.0),
++        solver="mc" if solver == "mc" else "ctmc",
++        mc_paths=_env_int("HIBS_INPLAY_MC_PATHS", 10000),
++    )
++
++
++def inplay_engine_from_env() -> InplayQuantEngine:
++    return InplayQuantEngine(config=inplay_engine_config_from_env())
++
++
++def _market_odds_from_row(row: Dict[str, Any]) -> Dict[str, float]:
++    out: Dict[str, float] = {}
++    best = row.get("best_odds_1x2") if isinstance(row.get("best_odds_1x2"), dict) else {}
++    mapping = {"home": "home", "draw": "draw", "away": "away"}
++    for side, key in mapping.items():
++        raw = best.get(side)
++        if raw is None:
++            raw = row.get(f"odds_{side}")
++        try:
++            val = float(raw)
++        except (TypeError, ValueError):
++            continue
++        if val > 1.0:
++            out[side] = val
++    return out
+diff --git a/src/hibs_predictor/inplay/event_stack.py b/src/hibs_predictor/inplay/event_stack.py
+new file mode 100644
+index 0000000..98fd839
+--- /dev/null
++++ b/src/hibs_predictor/inplay/event_stack.py
+@@ -0,0 +1,86 @@
++"""Redis-backed event stack with in-memory fallback for live tick history."""
++
++from __future__ import annotations
++
++import json
++import os
++import time
++from collections import deque
++from dataclasses import dataclass, field
++from typing import Any, Deque, Dict, List, Optional
++
++
++@dataclass
++class EventStackConfig:
++    redis_url: str = ""
++    max_ticks_per_fixture: int = 120
++    ttl_sec: int = 7200
++
++
++class EventStack:
++    """
++    Append-only tick ring per fixture_id.
++    Production: Redis LIST/ZSET; dev: in-process deque.
++    """
++
++    def __init__(self, config: Optional[EventStackConfig] = None):
++        cfg = config or EventStackConfig(
++            redis_url=(os.getenv("HIBS_INPLAY_REDIS_URL") or "").strip(),
++        )
++        self._cfg = cfg
++        self._memory: Dict[str, Deque[Dict[str, Any]]] = {}
++        self._redis = None
++        if cfg.redis_url:
++            try:
++                import redis  # type: ignore
++
++                self._redis = redis.from_url(cfg.redis_url, decode_responses=True)
++            except Exception:
++                self._redis = None
++
++    def push_tick(self, fixture_id: str, payload: Dict[str, Any]) -> None:
++        fid = str(fixture_id)
++        row = dict(payload)
++        row["ts"] = time.time()
++        if self._redis is not None:
++            key = f"hibs:inplay:ticks:{fid}"
++            self._redis.lpush(key, json.dumps(row, default=str))
++            self._redis.ltrim(key, 0, self._cfg.max_ticks_per_fixture - 1)
++            self._redis.expire(key, self._cfg.ttl_sec)
++            return
++        ring = self._memory.setdefault(fid, deque(maxlen=self._cfg.max_ticks_per_fixture))
++        ring.appendleft(row)
++
++    def history(self, fixture_id: str, *, limit: int = 40) -> List[Dict[str, Any]]:
++        fid = str(fixture_id)
++        if self._redis is not None:
++            key = f"hibs:inplay:ticks:{fid}"
++            raw = self._redis.lrange(key, 0, max(0, limit - 1))
++            out: List[Dict[str, Any]] = []
++            for item in raw:
++                try:
++                    out.append(json.loads(item))
++                except json.JSONDecodeError:
++                    continue
++            return out
++        ring = self._memory.get(fid)
++        if not ring:
++            return []
++        return list(ring)[:limit]
++
++    def latest(self, fixture_id: str) -> Optional[Dict[str, Any]]:
++        hist = self.history(fixture_id, limit=1)
++        return hist[0] if hist else None
++
++    def push_event(self, fixture_id: str, event: Dict[str, Any]) -> None:
++        """Structured match event (goal, card, sub) onto the stack."""
++        self.push_tick(
++            fixture_id,
++            {"type": "event", "event": event, "minute": event.get("minute")},
++        )
++
++    def stats(self) -> Dict[str, Any]:
++        return {
++            "backend": "redis" if self._redis is not None else "memory",
++            "fixtures_tracked": len(self._memory) if self._redis is None else None,
++        }
+diff --git a/src/hibs_predictor/inplay/execution.py b/src/hibs_predictor/inplay/execution.py
+new file mode 100644
+index 0000000..efe1a5a
+--- /dev/null
++++ b/src/hibs_predictor/inplay/execution.py
+@@ -0,0 +1,118 @@
++"""Low-latency execution engine — Kelly gate + paper/live mode."""
++
++from __future__ import annotations
++
++import json
++import os
++import time
++from dataclasses import dataclass, field
++from pathlib import Path
++from typing import Any, Dict, List, Optional
++
++from hibs_predictor.inplay.engine import InplayQuantEngine, ProbabilitySnapshot
++from hibs_predictor.inplay.risk import RiskDecision, TradeSignal
++from hibs_predictor.inplay.router import SmartOrderRouter
++
++
++@dataclass
++class ExecutionResult:
++    fixture_id: str
++    executed: bool
++    mode: str
++    orders: List[Dict[str, Any]] = field(default_factory=list)
++    reason: str = ""
++    ts: float = field(default_factory=time.time)
++
++    def as_dict(self) -> Dict[str, Any]:
++        return {
++            "fixture_id": self.fixture_id,
++            "executed": self.executed,
++            "mode": self.mode,
++            "orders": self.orders,
++            "reason": self.reason,
++            "ts": self.ts,
++        }
++
++
++class InplayExecutionEngine:
++    """Kelly-checked execution — paper by default."""
++
++    def __init__(
++        self,
++        *,
++        quant: Optional[InplayQuantEngine] = None,
++        router: Optional[SmartOrderRouter] = None,
++    ):
++        self.quant = quant or InplayQuantEngine()
++        self.router = router or SmartOrderRouter()
++        self._log_path = Path(os.getenv("HIBS_INPLAY_EXEC_LOG", "logs/inplay_execution.jsonl"))
++
++    def execute_if_edge(
++        self,
++        row: Dict[str, Any],
++        *,
++        bankroll: float = 1000.0,
++    ) -> ExecutionResult:
++        fid = str(row.get("id") or "")
++        snap = self.quant.tick_fixture(row)
++        if not snap:
++            return ExecutionResult(fixture_id=fid, executed=False, mode=self.router.mode, reason="not_live")
++        risk = self.quant.evaluate_execution(row, snap)
++        if risk.suspended:
++            return ExecutionResult(
++                fixture_id=fid,
++                executed=False,
++                mode=self.router.mode,
++                reason=risk.suspend_reason or "suspended",
++            )
++        approved = [s for s in risk.signals if s.approved]
++        if not approved:
++            return ExecutionResult(fixture_id=fid, executed=False, mode=self.router.mode, reason="no_edge")
++        orders = []
++        for signal in approved:
++            stake = self._stake_from_signal(signal, bankroll)
++            if stake <= 0:
++                continue
++            order = self.router.route_order(
++                fixture_id=fid,
++                outcome=signal.outcome,
++                decimal_odds=signal.decimal_odds,
++                stake=stake,
++                meta={"edge": signal.edge, "model_prob": signal.model_prob},
++            )
++            orders.append(order)
++        executed = bool(orders) and self.router.mode != "dry"
++        result = ExecutionResult(
++            fixture_id=fid,
++            executed=executed,
++            mode=self.router.mode,
++            orders=orders,
++            reason="edge_ok" if orders else "stake_zero",
++        )
++        self._audit(result, snap, risk)
++        return result
++
++    def _stake_from_signal(self, signal: TradeSignal, bankroll: float) -> float:
++        pct = float(signal.kelly.get("suggested_percent") or 0.0)
++        return round(bankroll * (pct / 100.0), 2)
++
++    def _audit(
++        self,
++        result: ExecutionResult,
++        snap: ProbabilitySnapshot,
++        risk: RiskDecision,
++    ) -> None:
++        try:
++            self._log_path.parent.mkdir(parents=True, exist_ok=True)
++            row = {
++                "result": result.as_dict(),
++                "probabilities": snap.probabilities,
++                "signals": [
++                    {"outcome": s.outcome, "edge": s.edge, "approved": s.approved}
++                    for s in risk.signals
++                ],
++            }
++            with self._log_path.open("a", encoding="utf-8") as fh:
++                fh.write(json.dumps(row, default=str) + "\n")
++        except OSError:
++            pass
+diff --git a/src/hibs_predictor/inplay/features.py b/src/hibs_predictor/inplay/features.py
+new file mode 100644
+index 0000000..dfc1177
+--- /dev/null
++++ b/src/hibs_predictor/inplay/features.py
+@@ -0,0 +1,235 @@
++"""Live feature engineering for rolling Poisson intensities."""
++
++from __future__ import annotations
++
++import math
++from dataclasses import dataclass, field
++from typing import Any, Dict, List, Optional
++
++from hibs_predictor.inplay.state import MatchState, PitchZone
++
++
++@dataclass
++class LiveFeatureVector:
++    """f_i(t) inputs to log-linear intensity model."""
++
++    xg_momentum_home: float = 0.0
++    xg_momentum_away: float = 0.0
++    xg_divergence: float = 0.0
++    possession_tilt: float = 0.0
++    corner_pressure_home: float = 0.0
++    corner_pressure_away: float = 0.0
++    shots_on_momentum_home: float = 0.0
++    shots_on_momentum_away: float = 0.0
++    score_state_pressure: float = 0.0
++    red_card_home_penalty: float = 0.0
++    red_card_away_penalty: float = 0.0
++    meta: Dict[str, Any] = field(default_factory=dict)
++
++    def as_list(self) -> List[float]:
++        return [
++            self.xg_momentum_home,
++            self.xg_momentum_away,
++            self.xg_divergence,
++            self.possession_tilt,
++            self.corner_pressure_home,
++            self.corner_pressure_away,
++            self.shots_on_momentum_home,
++            self.shots_on_momentum_away,
++            self.score_state_pressure,
++            self.red_card_home_penalty,
++            self.red_card_away_penalty,
++        ]
++
++    def as_dict(self) -> Dict[str, Any]:
++        keys = (
++            "xg_momentum_home",
++            "xg_momentum_away",
++            "xg_divergence",
++            "possession_tilt",
++            "corner_pressure_home",
++            "corner_pressure_away",
++            "shots_on_momentum_home",
++            "shots_on_momentum_away",
++            "score_state_pressure",
++            "red_card_home_penalty",
++            "red_card_away_penalty",
++        )
++        out = {k: round(getattr(self, k), 4) for k in keys}
++        if self.meta:
++            out["meta"] = self.meta
++        return out
++
++
++def default_feature_weights() -> List[float]:
++    """ML-ready weights w_i (hand-tuned v1; swap via env/JSON in production)."""
++    return [
++        0.35,  # xg_momentum_home
++        0.35,  # xg_momentum_away
++        0.22,  # xg_divergence
++        0.18,  # possession_tilt
++        0.12,  # corner_pressure_home
++        0.12,  # corner_pressure_away
++        0.10,  # shots_on_momentum_home
++        0.10,  # shots_on_momentum_away
++        0.08,  # score_state_pressure
++        -0.55,  # red_card_home_penalty (reduces home scoring)
++        -0.55,  # red_card_away_penalty
++    ]
++
++
++def extract_live_features(
++    row: Dict[str, Any],
++    state: MatchState,
++    *,
++    history: Optional[List[Dict[str, Any]]] = None,
++    window_minutes: float = 5.0,
++) -> LiveFeatureVector:
++    """Compute rolling live metrics from fixture row + optional tick history."""
++    xg_h = _float_or_none(row.get("live_xg_home"))
++    xg_a = _float_or_none(row.get("live_xg_away"))
++    stats = _stats_map(row)
++    poss_h = stats.get("possession")
++    poss_a = stats.get("possession_away")
++    corners_h = stats.get("corners")
++    corners_a = stats.get("corners_away")
++    shots_h = stats.get("shots_on")
++    shots_a = stats.get("shots_on_away")
++
++    hist = history or []
++    xg_m_h, xg_m_a = _rolling_xg_momentum(hist, xg_h, xg_a, window_minutes=window_minutes)
++    s_m_h, s_m_a = _rolling_stat_momentum(hist, "shots_on", shots_h, shots_a, window_minutes)
++
++    minute = max(1.0, float(state.minute or 1.0))
++    xg_div = 0.0
++    if xg_h is not None and xg_a is not None:
++        xg_div = (xg_h - xg_a) / minute
++
++    poss_tilt = 0.0
++    if poss_h is not None and poss_a is not None:
++        poss_tilt = (poss_h - poss_a) / 100.0
++
++    corner_h = (corners_h or 0.0) / minute
++    corner_a = (corners_a or 0.0) / minute
++
++    score_diff = state.goals_home - state.goals_away
++    score_pressure = math.tanh(score_diff / 1.5)
++
++    red_h_pen = -1.0 if state.red_home else 0.0
++    red_a_pen = -1.0 if state.red_away else 0.0
++
++    zone_boost = 0.0
++    if state.possession == PitchZone.HOME:
++        zone_boost = 0.05
++    elif state.possession == PitchZone.AWAY:
++        zone_boost = -0.05
++
++    return LiveFeatureVector(
++        xg_momentum_home=xg_m_h,
++        xg_momentum_away=xg_m_a,
++        xg_divergence=xg_div + zone_boost,
++        possession_tilt=poss_tilt,
++        corner_pressure_home=corner_h,
++        corner_pressure_away=corner_a,
++        shots_on_momentum_home=s_m_h,
++        shots_on_momentum_away=s_m_a,
++        score_state_pressure=score_pressure,
++        red_card_home_penalty=red_h_pen,
++        red_card_away_penalty=red_a_pen,
++        meta={
++            "minute": state.minute,
++            "window_minutes": window_minutes,
++            "live_xg_home": xg_h,
++            "live_xg_away": xg_a,
++        },
++    )
++
++
++def _stats_map(row: Dict[str, Any]) -> Dict[str, float]:
++    stats = row.get("live_stats") if isinstance(row.get("live_stats"), dict) else {}
++    rows = stats.get("rows") if isinstance(stats.get("rows"), list) else []
++    out: Dict[str, float] = {}
++    for item in rows:
++        if not isinstance(item, dict):
++            continue
++        label = str(item.get("label") or "").lower()
++        home = _parse_stat(item.get("home"))
++        away = _parse_stat(item.get("away"))
++        if "possession" in label:
++            out["possession"] = home
++            out["possession_away"] = away
++        elif "corner" in label:
++            out["corners"] = home
++            out["corners_away"] = away
++        elif "shots on" in label:
++            out["shots_on"] = home
++            out["shots_on_away"] = away
++    return out
++
++
++def _parse_stat(value: Any) -> Optional[float]:
++    if value is None:
++        return None
++    text = str(value).strip().rstrip("%")
++    if not text or text == "-":
++        return None
++    try:
++        return float(text)
++    except ValueError:
++        return None
++
++
++def _float_or_none(value: Any) -> Optional[float]:
++    try:
++        return float(value) if value is not None else None
++    except (TypeError, ValueError):
++        return None
++
++
++def _rolling_xg_momentum(
++    history: List[Dict[str, Any]],
++    xg_h: Optional[float],
++    xg_a: Optional[float],
++    *,
++    window_minutes: float,
++) -> tuple[float, float]:
++    if xg_h is None or xg_a is None or len(history) < 2:
++        return 0.0, 0.0
++    recent = [h for h in history if _within_window(h, window_minutes)]
++    if len(recent) < 2:
++        return 0.0, 0.0
++    first = recent[0]
++    last = recent[-1]
++    dt = max(0.5, float(last.get("minute", 0)) - float(first.get("minute", 0)))
++    dh = float(last.get("live_xg_home", xg_h)) - float(first.get("live_xg_home", xg_h))
++    da = float(last.get("live_xg_away", xg_a)) - float(first.get("live_xg_away", xg_a))
++    return dh / dt, da / dt
++
++
++def _rolling_stat_momentum(
++    history: List[Dict[str, Any]],
++    key: str,
++    current_h: Optional[float],
++    current_a: Optional[float],
++    window_minutes: float,
++) -> tuple[float, float]:
++    if current_h is None or current_a is None or len(history) < 2:
++        return 0.0, 0.0
++    recent = [h for h in history if _within_window(h, window_minutes)]
++    if len(recent) < 2:
++        return 0.0, 0.0
++    first, last = recent[0], recent[-1]
++    dt = max(0.5, float(last.get("minute", 0)) - float(first.get("minute", 0)))
++    fh = float(first.get(key + "_home", current_h))
++    fa = float(first.get(key + "_away", current_a))
++    lh = float(last.get(key + "_home", current_h))
++    la = float(last.get(key + "_away", current_a))
++    return (lh - fh) / dt, (la - fa) / dt
++
++
++def _within_window(snapshot: Dict[str, Any], window_minutes: float) -> bool:
++    try:
++        age = float(snapshot.get("age_minutes", 0))
++    except (TypeError, ValueError):
++        age = 0.0
++    return age <= window_minutes
+diff --git a/src/hibs_predictor/inplay/feeds.py b/src/hibs_predictor/inplay/feeds.py
+new file mode 100644
+index 0000000..c25af19
+--- /dev/null
++++ b/src/hibs_predictor/inplay/feeds.py
+@@ -0,0 +1,55 @@
++"""FIX/JSON feed normalisation into event-stack payloads."""
++
++from __future__ import annotations
++
++from typing import Any, Dict, List, Optional
++
++from hibs_predictor.inplay.state import MatchState, match_state_from_fixture
++
++
++def parse_live_fixture_tick(row: Dict[str, Any], *, match_minutes: float = 95.0) -> Dict[str, Any]:
++    """Normalise dashboard/API row into a quant-engine tick payload."""
++    state = match_state_from_fixture(row, match_minutes=match_minutes)
++    stats = row.get("live_stats") if isinstance(row.get("live_stats"), dict) else {}
++    stat_rows = stats.get("rows") if isinstance(stats.get("rows"), list) else []
++    corners_h = corners_a = shots_h = shots_a = None
++    for item in stat_rows:
++        if not isinstance(item, dict):
++            continue
++        label = str(item.get("label") or "").lower()
++        if "corner" in label:
++            corners_h, corners_a = item.get("home"), item.get("away")
++        if "shots on" in label:
++            shots_h, shots_a = item.get("home"), item.get("away")
++    return {
++        "fixture_id": str(row.get("id") or ""),
++        "minute": state.minute,
++        "live_xg_home": row.get("live_xg_home"),
++        "live_xg_away": row.get("live_xg_away"),
++        "live_score_home": state.goals_home,
++        "live_score_away": state.goals_away,
++        "shots_on_home": shots_h,
++        "shots_on_away": shots_a,
++        "corners_home": corners_h,
++        "corners_away": corners_a,
++        "live_status": row.get("live_status"),
++        "state": state.as_dict(),
++    }
++
++
++def parse_api_football_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
++    """Map API-Football fixture/events rows to stack events."""
++    out: List[Dict[str, Any]] = []
++    for ev in events or []:
++        if not isinstance(ev, dict):
++            continue
++        out.append(
++            {
++                "type": ev.get("type"),
++                "detail": ev.get("detail"),
++                "minute": (ev.get("time") or {}).get("elapsed"),
++                "team": (ev.get("team") or {}).get("name"),
++                "player": (ev.get("player") or {}).get("name"),
++            }
++        )
++    return out
+diff --git a/src/hibs_predictor/inplay/integration.py b/src/hibs_predictor/inplay/integration.py
+new file mode 100644
+index 0000000..32f83ac
+--- /dev/null
++++ b/src/hibs_predictor/inplay/integration.py
+@@ -0,0 +1,64 @@
++"""Dashboard and API wiring for the in-play quant stack."""
++
++from __future__ import annotations
++
++from typing import Any, Dict, List, Optional
++
++from hibs_predictor.inplay.engine import InplayQuantEngine, inplay_enabled, inplay_engine_from_env
++
++
++def attach_inplay_predictions(
++    fixtures: List[Dict[str, Any]],
++    *,
++    engine: Optional[InplayQuantEngine] = None,
++) -> int:
++    """Run quant tick on live rows; returns count updated."""
++    if not inplay_enabled():
++        return 0
++    quant = engine or inplay_engine_from_env()
++    updated = 0
++    for row in fixtures or []:
++        if not row.get("is_live"):
++            continue
++        if quant.attach_to_fixture(row):
++            updated += 1
++    return updated
++
++
++def inplay_payload_for_rows(
++    fixtures: List[Dict[str, Any]],
++    *,
++    engine: Optional[InplayQuantEngine] = None,
++) -> Dict[str, Any]:
++    """API payload keyed by fixture id."""
++    if not inplay_enabled():
++        return {"enabled": False, "fixtures": {}}
++    quant = engine or inplay_engine_from_env()
++    out: Dict[str, Any] = {}
++    for row in fixtures or []:
++        if not row.get("is_live"):
++            continue
++        fid = str(row.get("id") or "")
++        if not fid:
++            continue
++        snap = quant.tick_fixture(row)
++        if not snap:
++            continue
++        risk = quant.evaluate_execution(row, snap)
++        out[fid] = {
++            "prediction": snap.as_dict(),
++            "risk": {
++                "suspended": risk.suspended,
++                "suspend_reason": risk.suspend_reason,
++                "signals": [
++                    {
++                        "outcome": s.outcome,
++                        "edge": s.edge,
++                        "approved": s.approved,
++                        "kelly": s.kelly,
++                    }
++                    for s in risk.signals
++                ],
++            },
++        }
++    return {"enabled": True, "fixtures": out, "count": len(out)}
+diff --git a/src/hibs_predictor/inplay/intensity.py b/src/hibs_predictor/inplay/intensity.py
+new file mode 100644
+index 0000000..0b8fb71
+--- /dev/null
++++ b/src/hibs_predictor/inplay/intensity.py
+@@ -0,0 +1,116 @@
++"""Non-homogeneous Poisson hazard rates λ_H(t), λ_A(t)."""
++
++from __future__ import annotations
++
++import math
++import os
++from typing import List, Optional, Tuple
++
++from hibs_predictor.calibrated_lambdas import league_home_away_multipliers
++from hibs_predictor.inplay.features import LiveFeatureVector, default_feature_weights
++from hibs_predictor.inplay.state import MatchState, PrematchPrior
++
++
++def _env_float(name: str, default: float) -> float:
++    try:
++        return float(os.getenv(name, str(default)))
++    except ValueError:
++        return default
++
++
++def time_decay_factor(minute: float, *, match_minutes: float = 95.0) -> float:
++    """
++    δ(t): historical scoring escalation — elevated around 44' and 89'.
++    """
++    t = max(0.0, min(float(minute), match_minutes)) / max(match_minutes, 1.0)
++    base = 0.82 + 0.28 * t
++    spike44 = 0.22 * math.exp(-((minute - 44.0) ** 2) / (2.0 * 6.0**2))
++    spike89 = 0.32 * math.exp(-((minute - 89.0) ** 2) / (2.0 * 5.0**2))
++    ht_dip = -0.08 * math.exp(-((minute - 45.0) ** 2) / (2.0 * 4.0**2))
++    return max(0.35, base + spike44 + spike89 + ht_dip)
++
++
++def red_card_multiplier(red_home: int, red_away: int) -> Tuple[float, float]:
++    """Scale intensities when a team is down to ten (or fewer) men."""
++    home_pen = 0.72 ** max(0, red_home)
++    away_pen = 0.72 ** max(0, red_away)
++    # Opponent boost when other side has red
++    if red_away:
++        home_pen *= 1.12
++    if red_home:
++        away_pen *= 1.12
++    return home_pen, away_pen
++
++
++def score_state_intensity_nudge(state: MatchState) -> Tuple[float, float]:
++    """
++    Trailing team presses; leading team sits — mild intensity nudge.
++    """
++    diff = state.goals_home - state.goals_away
++    if diff == 0:
++        return 1.0, 1.0
++    if diff > 0:
++        return 0.94, 1.08
++    return 1.08, 0.94
++
++
++def compute_intensities(
++    state: MatchState,
++    prior: PrematchPrior,
++    features: LiveFeatureVector,
++    *,
++    weights: Optional[List[float]] = None,
++) -> Tuple[float, float, dict]:
++    """
++    λ_H(t) = α_H · β_A · γ_home · δ(t) · exp(Σ w_i f_i) · adjustments
++    Returns (λ_home_per_match, λ_away_per_match, debug).
++    """
++    w = weights or default_feature_weights()
++    feats = features.as_list()
++    log_term = 0.0
++    for wi, fi in zip(w, feats):
++        log_term += wi * fi
++    log_term = max(-2.5, min(2.5, log_term))
++
++    gamma_h, gamma_a = league_home_away_multipliers(prior.league_code)
++    if prior.gamma_home:
++        gamma_h = prior.gamma_home
++    if prior.gamma_away:
++        gamma_a = prior.gamma_away
++
++    alpha_h = max(0.12, float(prior.lambda_home))
++    beta_a = max(0.12, float(prior.lambda_away))
++    delta = time_decay_factor(state.minute, match_minutes=state.match_minutes)
++
++    red_h, red_a = red_card_multiplier(state.red_home, state.red_away)
++    score_h, score_a = score_state_intensity_nudge(state)
++
++    lam_h = alpha_h * gamma_h * delta * math.exp(log_term) * red_h * score_h
++    lam_a = beta_a * gamma_a * delta * math.exp(-log_term * 0.85) * red_a * score_a
++
++    floor = _env_float("HIBS_INPLAY_LAMBDA_FLOOR", 0.05)
++    cap = _env_float("HIBS_INPLAY_LAMBDA_CAP", 4.5)
++    lam_h = max(floor, min(cap, lam_h))
++    lam_a = max(floor, min(cap, lam_a))
++
++    remaining = state.minutes_remaining
++    scale = remaining / max(state.match_minutes, 1.0)
++    lam_h_rem = lam_h * scale
++    lam_a_rem = lam_a * scale
++
++    debug = {
++        "alpha_home": round(alpha_h, 4),
++        "beta_away": round(beta_a, 4),
++        "gamma_home": round(gamma_h, 4),
++        "gamma_away": round(gamma_a, 4),
++        "delta_t": round(delta, 4),
++        "log_feature_term": round(log_term, 4),
++        "red_multiplier_home": round(red_h, 4),
++        "red_multiplier_away": round(red_a, 4),
++        "lambda_home_full_match": round(lam_h, 4),
++        "lambda_away_full_match": round(lam_a, 4),
++        "lambda_home_remaining": round(lam_h_rem, 4),
++        "lambda_away_remaining": round(lam_a_rem, 4),
++        "minutes_remaining": round(remaining, 2),
++    }
++    return lam_h_rem, lam_a_rem, debug
+diff --git a/src/hibs_predictor/inplay/monte_carlo.py b/src/hibs_predictor/inplay/monte_carlo.py
+new file mode 100644
+index 0000000..29719d1
+--- /dev/null
++++ b/src/hibs_predictor/inplay/monte_carlo.py
+@@ -0,0 +1,60 @@
++"""Monte Carlo parallel paths for terminal 1X2 (GPU-ready batch interface)."""
++
++from __future__ import annotations
++
++import os
++from typing import Dict, Tuple
++
++import numpy as np
++
++from hibs_predictor.inplay.state import MatchState
++
++
++def _env_int(name: str, default: int) -> int:
++    try:
++        return int(os.getenv(name, str(default)))
++    except ValueError:
++        return default
++
++
++def simulate_terminal_1x2_mc(
++    state: MatchState,
++    lam_h_remaining: float,
++    lam_a_remaining: float,
++    *,
++    n_paths: int | None = None,
++    seed: int | None = None,
++) -> Tuple[Dict[str, float], Dict[str, float]]:
++    """
++    Simulate remaining goals as coupled Poisson processes (100k paths default in prod).
++    """
++    paths = n_paths if n_paths is not None else _env_int("HIBS_INPLAY_MC_PATHS", 10000)
++    remaining = max(0.0, state.minutes_remaining)
++    if remaining <= 0.0:
++        from hibs_predictor.inplay.ctmc import _terminal_from_current_score
++
++        return _terminal_from_current_score(state), {"method": "mc_terminal_score", "paths": 0}
++
++    rng = np.random.default_rng(seed)
++    lam_h = max(0.0, lam_h_remaining)
++    lam_a = max(0.0, lam_a_remaining)
++    add_h = rng.poisson(lam_h, size=paths)
++    add_a = rng.poisson(lam_a, size=paths)
++    final_h = state.goals_home + add_h
++    final_a = state.goals_away + add_a
++    wins_h = np.sum(final_h > final_a)
++    draws = np.sum(final_h == final_a)
++    wins_a = np.sum(final_h < final_a)
++    total = float(paths)
++    probs = {
++        "home": wins_h / total,
++        "draw": draws / total,
++        "away": wins_a / total,
++    }
++    meta = {
++        "method": "monte_carlo_poisson",
++        "paths": paths,
++        "lambda_home_remaining": round(lam_h, 4),
++        "lambda_away_remaining": round(lam_a, 4),
++    }
++    return probs, meta
+diff --git a/src/hibs_predictor/inplay/risk.py b/src/hibs_predictor/inplay/risk.py
+new file mode 100644
+index 0000000..d5f8fac
+--- /dev/null
++++ b/src/hibs_predictor/inplay/risk.py
+@@ -0,0 +1,134 @@
++"""Fractional Kelly, suspension gates, and information-asymmetry filters."""
++
++from __future__ import annotations
++
++import os
++from dataclasses import dataclass, field
++from typing import Any, Dict, List, Optional
++
++from hibs_predictor.betting_engine import OddsAnalyzer
++
++
++@dataclass
++class RiskConfig:
++    kelly_fraction: float = 0.25
++    min_edge: float = 0.025
++    max_stake_pct: float = 10.0
++    min_liquidity: float = 500.0
++    max_spread_pct: float = 4.0
++    fee_pct: float = 0.02
++    suspend_on_var: bool = True
++    suspend_on_penalty: bool = True
++
++
++@dataclass
++class TradeSignal:
++    outcome: str
++    model_prob: float
++    market_prob: float
++    edge: float
++    decimal_odds: float
++    kelly: Dict[str, Any]
++    approved: bool
++    reason: str = ""
++
++
++@dataclass
++class RiskDecision:
++    fixture_id: str
++    suspended: bool
++    suspend_reason: str = ""
++    signals: List[TradeSignal] = field(default_factory=list)
++    meta: Dict[str, Any] = field(default_factory=dict)
++
++
++def risk_config_from_env() -> RiskConfig:
++    def _f(name: str, default: float) -> float:
++        try:
++            return float(os.getenv(name, str(default)))
++        except ValueError:
++            return default
++
++    return RiskConfig(
++        kelly_fraction=_f("HIBS_INPLAY_KELLY_FRACTION", 0.25),
++        min_edge=_f("HIBS_INPLAY_MIN_EDGE", 0.025),
++        max_stake_pct=_f("HIBS_INPLAY_MAX_STAKE_PCT", 10.0),
++        min_liquidity=_f("HIBS_INPLAY_MIN_LIQUIDITY", 500.0),
++        max_spread_pct=_f("HIBS_INPLAY_MAX_SPREAD_PCT", 4.0),
++        fee_pct=_f("HIBS_INPLAY_FEE_PCT", 0.02),
++        suspend_on_var=os.getenv("HIBS_INPLAY_SUSPEND_VAR", "1").strip().lower() not in ("0", "false", "no"),
++        suspend_on_penalty=os.getenv("HIBS_INPLAY_SUSPEND_PENALTY", "1").strip().lower() not in ("0", "false", "no"),
++    )
++
++
++def high_danger_state(row: Dict[str, Any]) -> Optional[str]:
++    """Information asymmetry filter — freeze during VAR / penalties."""
++    status = str(row.get("live_status") or row.get("live_status_long") or "").upper()
++    if "VAR" in status:
++        return "var_review"
++    ev = row.get("live_last_event") if isinstance(row.get("live_last_event"), dict) else {}
++    detail = str(ev.get("detail") or ev.get("type") or "").lower()
++    if "penalty" in detail:
++        return "penalty_sequence"
++    if "var" in detail:
++        return "var_review"
++    return None
++
++
++def evaluate_risk(
++    fixture_id: str,
++    model_probs: Dict[str, float],
++    market_odds: Dict[str, float],
++    *,
++    row: Optional[Dict[str, Any]] = None,
++    liquidity: Optional[float] = None,
++    spread_pct: Optional[float] = None,
++    config: Optional[RiskConfig] = None,
++) -> RiskDecision:
++    cfg = config or risk_config_from_env()
++    row = row or {}
++    danger = high_danger_state(row)
++    if danger and (
++        (danger == "var_review" and cfg.suspend_on_var)
++        or (danger == "penalty_sequence" and cfg.suspend_on_penalty)
++    ):
++        return RiskDecision(fixture_id=fixture_id, suspended=True, suspend_reason=danger)
++
++    if liquidity is not None and liquidity < cfg.min_liquidity:
++        return RiskDecision(
++            fixture_id=fixture_id,
++            suspended=True,
++            suspend_reason="low_liquidity",
++            meta={"liquidity": liquidity},
++        )
++    if spread_pct is not None and spread_pct > cfg.max_spread_pct:
++        return RiskDecision(
++            fixture_id=fixture_id,
++            suspended=True,
++            suspend_reason="spread_too_wide",
++            meta={"spread_pct": spread_pct},
++        )
++
++    signals: List[TradeSignal] = []
++    for outcome, model_p in model_probs.items():
++        odds = market_odds.get(outcome)
++        if odds is None or odds <= 1.0:
++            continue
++        market_p = 1.0 / odds
++        edge = model_p - market_p - cfg.fee_pct
++        kelly = OddsAnalyzer.kelly_criterion(model_p, odds, fraction=cfg.kelly_fraction)
++        approved = edge >= cfg.min_edge and kelly.get("suggested_percent", 0) > 0
++        reason = "edge_ok" if approved else "edge_below_threshold"
++        signals.append(
++            TradeSignal(
++                outcome=outcome,
++                model_prob=round(model_p, 4),
++                market_prob=round(market_p, 4),
++                edge=round(edge, 4),
++                decimal_odds=odds,
++                kelly=kelly,
++                approved=approved,
++                reason=reason,
++            )
++        )
++    return RiskDecision(fixture_id=fixture_id, suspended=False, signals=signals)
+diff --git a/src/hibs_predictor/inplay/router.py b/src/hibs_predictor/inplay/router.py
+new file mode 100644
+index 0000000..f93a6ca
+--- /dev/null
++++ b/src/hibs_predictor/inplay/router.py
+@@ -0,0 +1,102 @@
++"""Smart order router — REST hooks; FIX stub for institutional venues."""
++
++from __future__ import annotations
++
++import os
++import time
++import uuid
++from typing import Any, Dict, List, Optional
++
++
++class SmartOrderRouter:
++    """
++    Route orders across venues with volume splitting.
++    Default: paper log only. Set HIBS_INPLAY_EXECUTE=paper|live (live requires explicit confirm).
++    """
++
++    def __init__(self) -> None:
++        self.mode = self._resolve_mode()
++        self.venues = self._parse_venues()
++
++    def _resolve_mode(self) -> str:
++        execute = (os.getenv("HIBS_INPLAY_EXECUTE") or "dry").strip().lower()
++        if execute == "live":
++            confirm = (os.getenv("HIBS_INPLAY_CONFIRM_LIVE") or "").strip().upper()
++            if confirm != "YES":
++                return "dry"
++            return "live"
++        if execute in ("paper", "shadow"):
++            return "paper"
++        return "dry"
++
++    def _parse_venues(self) -> List[str]:
++        raw = (os.getenv("HIBS_INPLAY_VENUES") or "betfair,matchbook").strip()
++        return [v.strip() for v in raw.split(",") if v.strip()]
++
++    def route_order(
++        self,
++        *,
++        fixture_id: str,
++        outcome: str,
++        decimal_odds: float,
++        stake: float,
++        meta: Optional[Dict[str, Any]] = None,
++    ) -> Dict[str, Any]:
++        """Split stake across venues (equal slices v1)."""
++        if stake <= 0 or decimal_odds <= 1.0:
++            return {"status": "rejected", "reason": "invalid_stake_or_odds"}
++        n = max(1, len(self.venues))
++        slice_stake = round(stake / n, 2)
++        legs = []
++        for venue in self.venues:
++            legs.append(self._submit_leg(venue, fixture_id, outcome, decimal_odds, slice_stake, meta))
++        return {
++            "status": "routed",
++            "mode": self.mode,
++            "order_id": str(uuid.uuid4()),
++            "total_stake": stake,
++            "legs": legs,
++            "ts": time.time(),
++        }
++
++    def _submit_leg(
++        self,
++        venue: str,
++        fixture_id: str,
++        outcome: str,
++        decimal_odds: float,
++        stake: float,
++        meta: Optional[Dict[str, Any]],
++    ) -> Dict[str, Any]:
++        if self.mode == "live":
++            return self._live_submit(venue, fixture_id, outcome, decimal_odds, stake, meta)
++        return {
++            "venue": venue,
++            "status": "paper" if self.mode == "paper" else "dry",
++            "fixture_id": fixture_id,
++            "outcome": outcome,
++            "decimal_odds": decimal_odds,
++            "stake": stake,
++            "meta": meta or {},
++        }
++
++    def _live_submit(
++        self,
++        venue: str,
++        fixture_id: str,
++        outcome: str,
++        decimal_odds: float,
++        stake: float,
++        meta: Optional[Dict[str, Any]],
++    ) -> Dict[str, Any]:
++        # Institutional FIX/REST adapters plug in here (Betfair, Matchbook, Pinnacle).
++        return {
++            "venue": venue,
++            "status": "live_stub",
++            "message": "Wire venue adapter before live submit",
++            "fixture_id": fixture_id,
++            "outcome": outcome,
++            "decimal_odds": decimal_odds,
++            "stake": stake,
++            "meta": meta or {},
++        }
+diff --git a/src/hibs_predictor/inplay/state.py b/src/hibs_predictor/inplay/state.py
+new file mode 100644
+index 0000000..a6aee96
+--- /dev/null
++++ b/src/hibs_predictor/inplay/state.py
+@@ -0,0 +1,175 @@
++"""Match state vector X(t) for the in-play CTMC."""
++
++from __future__ import annotations
++
++from dataclasses import dataclass, field
++from enum import Enum
++from typing import Any, Dict, Optional
++
++
++class PitchZone(str, Enum):
++    HOME = "H"
++    AWAY = "A"
++    NEUTRAL = "N"
++
++
++@dataclass(frozen=True)
++class MatchState:
++    """X(t) = (G_H, G_A, P, R_H, R_A) at elapsed minute t."""
++
++    goals_home: int = 0
++    goals_away: int = 0
++    possession: PitchZone = PitchZone.NEUTRAL
++    red_home: int = 0
++    red_away: int = 0
++    minute: float = 0.0
++    match_minutes: float = 95.0
++
++    @property
++    def minutes_remaining(self) -> float:
++        return max(0.0, float(self.match_minutes) - float(self.minute))
++
++    def as_dict(self) -> Dict[str, Any]:
++        return {
++            "goals_home": self.goals_home,
++            "goals_away": self.goals_away,
++            "possession": self.possession.value,
++            "red_home": self.red_home,
++            "red_away": self.red_away,
++            "minute": round(float(self.minute), 2),
++            "minutes_remaining": round(self.minutes_remaining, 2),
++        }
++
++
++@dataclass
++class PrematchPrior:
++    """Pre-match λ inputs (α, β, γ) from the offline engine."""
++
++    lambda_home: float
++    lambda_away: float
++    league_code: str = ""
++    home_team: str = ""
++    away_team: str = ""
++    gamma_home: float = 1.06
++    gamma_away: float = 0.96
++    fixture_id: str = ""
++    meta: Dict[str, Any] = field(default_factory=dict)
++
++
++def match_state_from_fixture(row: Dict[str, Any], *, match_minutes: float = 95.0) -> MatchState:
++    """Build MatchState from a dashboard fixture row with live_* fields."""
++    gh = row.get("live_score_home")
++    ga = row.get("live_score_away")
++    if gh is None or ga is None:
++        score = str(row.get("live_score") or "")
++        if "-" in score:
++            parts = score.split("-", 1)
++            try:
++                gh = int(parts[0].strip())
++                ga = int(parts[1].strip())
++            except ValueError:
++                gh = ga = 0
++        else:
++            gh = ga = 0
++    minute_raw = row.get("live_minute")
++    try:
++        minute = float(minute_raw) if minute_raw is not None else 0.0
++    except (TypeError, ValueError):
++        minute = 0.0
++    reds = _red_cards_from_row(row)
++    possession = _possession_zone_from_stats(row)
++    return MatchState(
++        goals_home=max(0, int(gh or 0)),
++        goals_away=max(0, int(ga or 0)),
++        possession=possession,
++        red_home=reds[0],
++        red_away=reds[1],
++        minute=minute,
++        match_minutes=match_minutes,
++    )
++
++
++def prematch_prior_from_fixture(row: Dict[str, Any]) -> PrematchPrior:
++    """Extract baseline intensities from pre-match prediction payload."""
++    pred = row.get("prediction") if isinstance(row.get("prediction"), dict) else {}
++    lam_h = pred.get("expected_goals_home")
++    lam_a = pred.get("expected_goals_away")
++    if lam_h is None:
++        lam_h = row.get("xg_home")
++    if lam_a is None:
++        lam_a = row.get("xg_away")
++    try:
++        lam_h_f = max(0.12, float(lam_h or 1.35))
++        lam_a_f = max(0.12, float(lam_a or 1.15))
++    except (TypeError, ValueError):
++        lam_h_f, lam_a_f = 1.35, 1.15
++    return PrematchPrior(
++        lambda_home=lam_h_f,
++        lambda_away=lam_a_f,
++        league_code=str(row.get("league_code") or row.get("league") or ""),
++        home_team=str(row.get("home") or ""),
++        away_team=str(row.get("away") or ""),
++        fixture_id=str(row.get("id") or ""),
++        meta={"source": "fixture_prediction"},
++    )
++
++
++def _red_cards_from_row(row: Dict[str, Any]) -> tuple[int, int]:
++    stats = row.get("live_stats") if isinstance(row.get("live_stats"), dict) else {}
++    rows = stats.get("rows") if isinstance(stats.get("rows"), list) else []
++    rh = ra = 0
++    for item in rows:
++        if not isinstance(item, dict):
++            continue
++        label = str(item.get("label") or "").lower()
++        if "red" not in label:
++            continue
++        try:
++            rh = int(item.get("home") or 0)
++            ra = int(item.get("away") or 0)
++        except (TypeError, ValueError):
++            continue
++        break
++    ev = row.get("live_last_event") if isinstance(row.get("live_last_event"), dict) else {}
++    detail = str(ev.get("detail") or ev.get("type") or "").lower()
++    if "red card" in detail:
++        team = str(ev.get("team") or "").lower()
++        home = str(row.get("home") or "").lower()
++        if team and home and team in home:
++            rh = max(rh, 1)
++        else:
++            ra = max(ra, 1)
++    return rh, ra
++
++
++def _possession_zone_from_stats(row: Dict[str, Any]) -> PitchZone:
++    stats = row.get("live_stats") if isinstance(row.get("live_stats"), dict) else {}
++    rows = stats.get("rows") if isinstance(stats.get("rows"), list) else []
++    poss_h = poss_a = None
++    for item in rows:
++        if not isinstance(item, dict):
++            continue
++        if str(item.get("label") or "").lower() != "possession":
++            continue
++        poss_h = _parse_pct(item.get("home"))
++        poss_a = _parse_pct(item.get("away"))
++        break
++    if poss_h is None or poss_a is None:
++        return PitchZone.NEUTRAL
++    if poss_h - poss_a >= 8.0:
++        return PitchZone.HOME
++    if poss_a - poss_h >= 8.0:
++        return PitchZone.AWAY
++    return PitchZone.NEUTRAL
++
++
++def _parse_pct(value: Any) -> Optional[float]:
++    if value is None:
++        return None
++    text = str(value).strip().rstrip("%")
++    if not text or text == "-":
++        return None
++    try:
++        return float(text)
++    except ValueError:
++        return None
+diff --git a/src/hibs_predictor/web.py b/src/hibs_predictor/web.py
+index 489f8fc..98976c3 100644
+--- a/src/hibs_predictor/web.py
++++ b/src/hibs_predictor/web.py
+@@ -992,6 +992,14 @@ def _refresh_live_on_bundle(bundle: Dict[str, Any]) -> None:
+         attach_live_to_fixtures(all_f, aggregator, include_events=True, include_stats=True)
+     except Exception as exc:
+         print(f"[Live scores] refresh failed: {exc!r}")
++    try:
++        from hibs_predictor.inplay.integration import attach_inplay_predictions
++
++        n = attach_inplay_predictions(all_f)
++        if n:
++            print(f"[Inplay CTMC] updated {n} live fixture(s)")
++    except Exception as exc:
++        print(f"[Inplay CTMC] refresh failed: {exc!r}")
+ 
+ 
+ def _live_snapshot_on_load_enabled() -> bool:
+@@ -3838,6 +3846,24 @@ def api_fixtures_live():
+     )
+ 
+ 
++@app.route("/api/inplay/probabilities")
++@login_required
++def api_inplay_probabilities():
++    """Live CTMC 1X2 probabilities + Kelly risk signals for in-play fixtures."""
++    from hibs_predictor.inplay.integration import inplay_payload_for_rows
++
++    raw_ids = (request.args.get("ids") or "").strip()
++    include_domestic = request.args.get("domestic") == "1"
++    data = _load_fixtures_for_http(include_domestic=include_domestic)
++    all_rows = data.get("all") or []
++    if raw_ids:
++        want = {part.strip() for part in raw_ids.split(",") if part.strip()}
++        rows = [f for f in all_rows if str(f.get("id")) in want and f.get("is_live")]
++    else:
++        rows = [f for f in all_rows if f.get("is_live")]
++    return jsonify(inplay_payload_for_rows(rows))
++
++
+ @app.route("/api/fixtures")
+ @login_required
+ def api_fixtures():
+diff --git a/templates/_fixture_expand_panel.html b/templates/_fixture_expand_panel.html
+index 97c3329..73fb6a2 100644
+--- a/templates/_fixture_expand_panel.html
++++ b/templates/_fixture_expand_panel.html
+@@ -84,6 +84,23 @@
+                 <p class="in-play-stats-empty" data-live-stats-empty style="margin:8px 0 0;font-size:0.72em;color:var(--muted);{% if fixture.live_stats and fixture.live_stats.rows %}display:none;{% endif %}">Live match statistics not available yet — API often publishes after kick-off.</p>
+             </div>
+             <p class="in-play-deferred" style="margin:8px 0 0;font-size:0.68em;color:var(--muted);">Player ratings deferred (no SofaScore scrape). Live xG when API statistics include Expected Goals.</p>
++            {% set ip = fixture.inplay_prediction if fixture.inplay_prediction is defined else none %}
++            {% if ip and ip.probabilities_pct %}
++            <div class="in-play-panel" style="margin-top:10px;border-color:rgba(0,122,51,0.35);">
++                <div class="section-title" style="margin-bottom:8px;">Live win probability (CTMC)</div>
++                <div class="market-pills">
++                    <span class="mpill">H <strong>{{ ip.probabilities_pct.home }}%</strong></span>
++                    <span class="mpill">D <strong>{{ ip.probabilities_pct.draw }}%</strong></span>
++                    <span class="mpill">A <strong>{{ ip.probabilities_pct.away }}%</strong></span>
++                </div>
++                {% if ip.intensities %}
++                <p style="margin:8px 0 0;font-size:0.68em;color:var(--muted);">
++                    λ rem {{ ip.intensities.lambda_home_remaining }} / {{ ip.intensities.lambda_away_remaining }}
++                    · {{ ip.intensities.minutes_remaining }}′ left · {{ ip.solver.method if ip.solver else 'ctmc' }}
++                </p>
++                {% endif %}
++            </div>
++            {% endif %}
+         </div>
+         {% endif %}
+         {% set show_pred = p and not (p.prediction_unavailable | default(false)) %}
+diff --git a/tests/test_inplay_engine.py b/tests/test_inplay_engine.py
+new file mode 100644
+index 0000000..30709e2
+--- /dev/null
++++ b/tests/test_inplay_engine.py
+@@ -0,0 +1,134 @@
++"""Tests for live in-play CTMC probability engine."""
++
++from __future__ import annotations
++
++import numpy as np
++
++from hibs_predictor.inplay.ctmc import aggregate_1x2, build_score_generator, solve_terminal_1x2_ctmc
++from hibs_predictor.inplay.engine import InplayQuantEngine, InplayEngineConfig
++from hibs_predictor.inplay.features import extract_live_features
++from hibs_predictor.inplay.intensity import compute_intensities, time_decay_factor
++from hibs_predictor.inplay.monte_carlo import simulate_terminal_1x2_mc
++from hibs_predictor.inplay.risk import evaluate_risk, high_danger_state
++from hibs_predictor.inplay.state import MatchState, PitchZone, match_state_from_fixture, prematch_prior_from_fixture
++
++
++def _live_fixture(**overrides):
++    base = {
++        "id": "99001",
++        "is_live": True,
++        "live_minute": 67,
++        "live_score_home": 1,
++        "live_score_away": 0,
++        "live_status": "2H",
++        "live_xg_home": 1.45,
++        "live_xg_away": 0.82,
++        "home": "Hibs",
++        "away": "Hearts",
++        "league_code": "SCOTLAND",
++        "prediction": {"expected_goals_home": 1.55, "expected_goals_away": 1.05},
++        "best_odds_1x2": {"home": 1.72, "draw": 3.8, "away": 5.2},
++        "live_stats": {
++            "rows": [
++                {"label": "Possession", "home": "58%", "away": "42%"},
++                {"label": "Corner kicks", "home": 6, "away": 3},
++                {"label": "Shots on goal", "home": 5, "away": 2},
++            ]
++        },
++    }
++    base.update(overrides)
++    return base
++
++
++def test_match_state_from_fixture():
++    state = match_state_from_fixture(_live_fixture())
++    assert state.goals_home == 1
++    assert state.goals_away == 0
++    assert state.minute == 67
++    assert state.possession == PitchZone.HOME
++
++
++def test_time_decay_has_late_match_spike():
++    d89 = time_decay_factor(89.0)
++    d20 = time_decay_factor(20.0)
++    assert d89 > d20
++
++
++def test_intensities_respond_to_red_card():
++    state = MatchState(goals_home=0, goals_away=0, red_home=1, minute=30.0)
++    prior = prematch_prior_from_fixture(_live_fixture())
++    feats = extract_live_features(_live_fixture(), state)
++    lam_h, lam_a, _ = compute_intensities(state, prior, feats)
++    state_ok = MatchState(goals_home=0, goals_away=0, minute=30.0)
++    lam_h_ok, lam_a_ok, _ = compute_intensities(state_ok, prior, feats)
++    assert lam_h < lam_h_ok
++    assert lam_a > lam_a_ok
++
++
++def test_ctmc_probs_sum_to_one():
++    state = MatchState(goals_home=1, goals_away=1, minute=70.0, match_minutes=95.0)
++    probs, meta = solve_terminal_1x2_ctmc(state, lam_h_remaining=0.9, lam_a_remaining=0.8)
++    assert meta["method"] == "ctmc_matrix_exp"
++    assert abs(sum(probs.values()) - 1.0) < 1e-6
++    assert all(v >= 0 for v in probs.values())
++
++
++def test_ctmc_leading_team_has_higher_win_prob():
++    state = MatchState(goals_home=2, goals_away=0, minute=80.0, match_minutes=95.0)
++    probs, _ = solve_terminal_1x2_ctmc(state, lam_h_remaining=0.25, lam_a_remaining=0.55)
++    assert probs["home"] > probs["away"]
++
++
++def test_monte_carlo_probs_sum_to_one():
++    state = MatchState(goals_home=0, goals_away=0, minute=10.0, match_minutes=95.0)
++    probs, meta = simulate_terminal_1x2_mc(state, 1.4, 1.1, n_paths=5000, seed=42)
++    assert meta["paths"] == 5000
++    assert abs(sum(probs.values()) - 1.0) < 0.02
++
++
++def test_generator_rows_sum_zero():
++    q = build_score_generator(5, 0.03, 0.025)
++    assert np.allclose(q.sum(axis=1), 0.0, atol=1e-12)
++
++
++def test_aggregate_1x2_distribution():
++    n = 4
++    dist = np.zeros(n * n)
++    dist[1 * n + 0] = 0.5  # 1-0 home win
++    dist[0 * n + 1] = 0.5  # 0-1 away win
++    probs = aggregate_1x2(dist, n)
++    assert abs(probs["home"] - 0.5) < 1e-9
++    assert abs(probs["away"] - 0.5) < 1e-9
++
++
++def test_quant_engine_attaches_prediction(monkeypatch):
++    monkeypatch.setenv("HIBS_INPLAY_ENABLED", "1")
++    row = _live_fixture()
++    engine = InplayQuantEngine(config=InplayEngineConfig(solver="ctmc", mc_paths=1000))
++    assert engine.attach_to_fixture(row) is True
++    pred = row.get("inplay_prediction") or {}
++    assert pred.get("probabilities_pct", {}).get("home", 0) > 50
++
++
++def test_risk_var_suspension():
++    row = _live_fixture(live_status="VAR", live_last_event={"detail": "VAR check"})
++    assert high_danger_state(row) == "var_review"
++    decision = evaluate_risk(
++        "99001",
++        {"home": 0.5, "draw": 0.25, "away": 0.25},
++        {"home": 2.0, "draw": 3.5, "away": 4.0},
++        row=row,
++    )
++    assert decision.suspended is True
++
++
++def test_risk_detects_positive_edge():
++    row = _live_fixture()
++    decision = evaluate_risk(
++        "99001",
++        {"home": 0.72, "draw": 0.16, "away": 0.12},
++        {"home": 1.72, "draw": 3.8, "away": 5.2},
++        row=row,
++    )
++    assert decision.suspended is False
++    assert any(s.approved for s in decision.signals)
+-- 
+2.43.0
+

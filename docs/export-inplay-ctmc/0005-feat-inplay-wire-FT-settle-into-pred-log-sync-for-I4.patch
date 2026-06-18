@@ -1,0 +1,139 @@
+From 1156cd3de573c2f233cef8c89351312fda04e19c Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Wed, 17 Jun 2026 13:05:39 +0000
+Subject: [PATCH 5/5] feat(inplay): wire FT settle into pred-log-sync for I4
+ CLV
+
+settle_inplay_from_ft runs after sync_finished_results applies FT scores
+and closing odds, updating inplay_clv_audit and tick labels automatically.
+---
+ src/hibs_predictor/inplay/settle.py  | 25 +++++++++++++++++++++++++
+ src/hibs_predictor/prediction_log.py | 27 ++++++++++++++++++++++-----
+ tests/test_inplay_evidence.py        | 15 +++++++++++++++
+ 3 files changed, 62 insertions(+), 5 deletions(-)
+
+diff --git a/src/hibs_predictor/inplay/settle.py b/src/hibs_predictor/inplay/settle.py
+index 49d8525..ffb20a4 100644
+--- a/src/hibs_predictor/inplay/settle.py
++++ b/src/hibs_predictor/inplay/settle.py
+@@ -5,6 +5,31 @@ from __future__ import annotations
+ from typing import Any, Dict, Optional
+ 
+ 
++def settle_inplay_from_ft(
++    *,
++    fixture_id: str | int,
++    goals_home: int,
++    goals_away: int,
++    closing_odds_1x2: Optional[Dict[str, float]] = None,
++) -> Dict[str, Any]:
++    """Hook for pred-log-sync — settle I4 CLV + tick labels when fixture goes FT."""
++    from hibs_predictor.inplay.engine import inplay_enabled
++
++    if not inplay_enabled():
++        return {"skipped": True, "reason": "inplay_disabled"}
++    row: Dict[str, Any] = {
++        "id": str(fixture_id),
++        "is_live": False,
++        "live_status": "FT",
++        "live_score_home": goals_home,
++        "live_score_away": goals_away,
++        "score_home": goals_home,
++        "score_away": goals_away,
++        "best_odds_1x2": closing_odds_1x2 or {},
++    }
++    return settle_fixture_evidence(row)
++
++
+ def settle_fixture_evidence(row: Dict[str, Any]) -> Dict[str, Any]:
+     """
+     Settle I4 CLV rows using final best 1X2 as close-of-window fair proxy.
+diff --git a/src/hibs_predictor/prediction_log.py b/src/hibs_predictor/prediction_log.py
+index 446c6e1..48145f1 100644
+--- a/src/hibs_predictor/prediction_log.py
++++ b/src/hibs_predictor/prediction_log.py
+@@ -906,10 +906,13 @@ def _apply_closing_odds_to_fixture_snapshots(
+     raw_fixture: Dict[str, Any],
+     clients: Optional[Dict[str, Any]],
+     fetch_odds_fn: Any,
+-) -> Optional[str]:
+-    """Join closing 1X2 into enrich_summary when CLV logging is on. Returns closing_source tag."""
++) -> tuple[Optional[str], Optional[Dict[str, float]]]:
++    """Join closing 1X2 into enrich_summary when CLV logging is on.
++
++    Returns (closing_source tag, closing 1X2 dict).
++    """
+     if not _clv_enabled():
+-        return None
++        return None, None
+     from hibs_predictor.audit_settlement_resolvers import resolve_closing_1x2_for_settlement
+ 
+     closing, closing_source = resolve_closing_1x2_for_settlement(
+@@ -960,7 +963,8 @@ def _apply_closing_odds_to_fixture_snapshots(
+             (json.dumps(enrich, default=str), sr["id"]),
+         )
+     conn.commit()
+-    return closing_source
++    closing_out = closing if isinstance(closing, dict) else None
++    return closing_source, closing_out
+ 
+ 
+ def sync_finished_results(
+@@ -1103,7 +1107,7 @@ def sync_finished_results(
+                 res_xg_a=res_xg_a,
+                 stored_fixture_id=r["fixture_id"],
+             )
+-            closing_source = _apply_closing_odds_to_fixture_snapshots(
++            closing_source, closing_odds = _apply_closing_odds_to_fixture_snapshots(
+                 conn,
+                 fixture_id=fid_int,
+                 stored_fixture_id=r["fixture_id"],
+@@ -1118,6 +1122,19 @@ def sync_finished_results(
+                 stats["closing_odds_api"] += 1
+             elif closing_source == "unavailable":
+                 stats["closing_unavailable"] += 1
++            try:
++                from hibs_predictor.inplay.settle import settle_inplay_from_ft
++
++                ip = settle_inplay_from_ft(
++                    fixture_id=fid_int,
++                    goals_home=hi,
++                    goals_away=ai,
++                    closing_odds_1x2=closing_odds,
++                )
++                if ip.get("clv_updated") or ip.get("ticks_labeled"):
++                    stats["inplay_settled"] = int(stats.get("inplay_settled", 0)) + 1
++            except Exception:
++                pass
+             if verbose and ft_source not in ("api_sports", ""):
+                 stats.setdefault("ft_sources", {})
+                 ft_sources = stats["ft_sources"]
+diff --git a/tests/test_inplay_evidence.py b/tests/test_inplay_evidence.py
+index ed2b7ae..f6cd3f0 100644
+--- a/tests/test_inplay_evidence.py
++++ b/tests/test_inplay_evidence.py
+@@ -151,6 +151,21 @@ def test_i5_paper_verification_hash():
+     assert out["passed"] is False
+ 
+ 
++def test_settle_inplay_from_ft(monkeypatch):
++    monkeypatch.setenv("HIBS_INPLAY_ENABLED", "1")
++    record_clv_taken(fixture_id="fx9", outcome="home", taken_decimal=2.2, model_prob=0.5)
++    out = __import__(
++        "hibs_predictor.inplay.settle", fromlist=["settle_inplay_from_ft"]
++    ).settle_inplay_from_ft(
++        fixture_id="fx9",
++        goals_home=2,
++        goals_away=1,
++        closing_odds_1x2={"home": 2.0, "draw": 3.5, "away": 4.0},
++    )
++    assert out.get("clv_updated") == 1
++    assert out.get("result") == "home"
++
++
+ def test_inplay_evidence_gates_structure():
+     rep = inplay_evidence_gates()
+     assert "gates" in rep
+-- 
+2.43.0
+

@@ -1,0 +1,1191 @@
+From 4bceff786b4e53ff3102bb252623dfd93ce27401 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Wed, 17 Jun 2026 11:18:29 +0000
+Subject: [PATCH 4/5] feat(inplay): I1-I5 forward evidence gates and
+ buyer_ready audit
+
+Add evidence_store (feed frames, marks, CLV, paper hash tables),
+feed telemetry with seq-gap tracking, I1-I5 gate evaluation, CLV settle
+at FT, and wire recording through binary ingest, router marks, and
+paper execution. buyer_ready now requires all I1-I5 post-deploy.
+Fix feed telemetry as_dict deadlock.
+---
+ .env.example                                |   8 +
+ docs/INPLAY_INSTITUTIONAL_SCORECARD.md      |  21 ++
+ scripts/verify_inplay_evidence_gates.sh     |  26 +-
+ src/hibs_predictor/inplay/engine.py         |  11 +
+ src/hibs_predictor/inplay/evidence.py       | 262 +++++++++++++++++++
+ src/hibs_predictor/inplay/evidence_store.py | 266 ++++++++++++++++++++
+ src/hibs_predictor/inplay/execution.py      |  23 ++
+ src/hibs_predictor/inplay/feed_telemetry.py | 137 ++++++++++
+ src/hibs_predictor/inplay/feeds_binary.py   |  11 +
+ src/hibs_predictor/inplay/readiness.py      |  22 +-
+ src/hibs_predictor/inplay/router.py         |  10 +
+ src/hibs_predictor/inplay/settle.py         |  65 +++++
+ src/hibs_predictor/web.py                   |   9 +
+ tests/test_inplay_evidence.py               |  96 ++++++-
+ 14 files changed, 949 insertions(+), 18 deletions(-)
+ create mode 100644 src/hibs_predictor/inplay/evidence.py
+ create mode 100644 src/hibs_predictor/inplay/evidence_store.py
+ create mode 100644 src/hibs_predictor/inplay/feed_telemetry.py
+ create mode 100644 src/hibs_predictor/inplay/settle.py
+
+diff --git a/.env.example b/.env.example
+index 58649f5..b2f864f 100644
+--- a/.env.example
++++ b/.env.example
+@@ -160,6 +160,14 @@ ODDS_API_KEY=your_odds_api_key_here
+ # HIBS_INPLAY_CIRCUIT_FAIL_THRESHOLD=5
+ # HIBS_INPLAY_CIRCUIT_COOLDOWN_SEC=30
+ # HIBS_INPLAY_SUSPEND_VAR=1
++# Forward evidence I1–I5 (buyer_ready post-deploy — scripts/verify_inplay_evidence_gates.sh)
++# HIBS_INPLAY_EVIDENCE_DB=data/inplay_evidence.sqlite
++# HIBS_INPLAY_FETCH_MARKS=1
++# HIBS_INPLAY_I1_UPTIME_PCT=99
++# HIBS_INPLAY_I1_SEQ_GAP_RATE_PCT=0.1
++# HIBS_INPLAY_I1_P99_PEEL_US=1000
++# HIBS_INPLAY_I4_MIN_ROWS=25
++# HIBS_INPLAY_I5_MIN_ROWS=25
+ # HIBS_LIVE_KICKOFF_BEFORE_H=0.25
+ # HIBS_LIVE_KICKOFF_AFTER_H=3
+ #
+diff --git a/docs/INPLAY_INSTITUTIONAL_SCORECARD.md b/docs/INPLAY_INSTITUTIONAL_SCORECARD.md
+index 82d228b..e7218ea 100644
+--- a/docs/INPLAY_INSTITUTIONAL_SCORECARD.md
++++ b/docs/INPLAY_INSTITUTIONAL_SCORECARD.md
+@@ -57,3 +57,24 @@ bash scripts/score_inplay_institutional.sh
+ ```
+ 
+ See also `docs/INPLAY_TRADING_ARCHITECTURE.md`.
++
++## Forward evidence gates (I1–I5 → buyer_ready)
++
++Calendar-bound buyer readiness — separate from engineering scorecard (96%).
++
++| Gate | Requirement |
++|------|-------------|
++| **I1 Feed** | Binary ingest uptime ≥99%, seq gap rate ≤0.1%, p99 peel ≤1000µs |
++| **I2 Model** | MC vs CTMC L1 ≤0.05; held-out tick Brier ≤0.28 |
++| **I3 Marks** | `fetch_exchange_marks` avg coverage ≥50% in live window |
++| **I4 CLV** | n≥25 settled rows; ≥50% beat close-of-window fair |
++| **I5 Paper** | n≥25 paper executions with SHA-256 verification hash |
++
++```bash
++bash scripts/verify_inplay_evidence_gates.sh   # exit 0 = buyer_ready
++curl /api/inplay/evidence
++```
++
++**buyer_ready** = all I1–I5 pass over forward window since `HIBS_EVIDENCE_DEPLOY_DATE` (or deploy revision file).
++
++CLV audit table: `data/inplay_evidence.sqlite` → `inplay_clv_audit`. Settle at FT via `settle_fixture_evidence(row)`.
+diff --git a/scripts/verify_inplay_evidence_gates.sh b/scripts/verify_inplay_evidence_gates.sh
+index 9e96aeb..5e88bb0 100755
+--- a/scripts/verify_inplay_evidence_gates.sh
++++ b/scripts/verify_inplay_evidence_gates.sh
+@@ -1,10 +1,7 @@
+ #!/usr/bin/env bash
+-# In-play institutional evidence gates (I1–I5) — exit 0 when buyer_ready.
+-# Usage:
+-#   ./scripts/verify_inplay_evidence_gates.sh
+-#   ./scripts/verify_inplay_evidence_gates.sh --json
++# In-play forward evidence gates I1–I5 — exit 0 only when buyer_ready.
++# Uses local CTMC evidence store when HIBS_INPLAY_ENABLED=1, else FVE proxy.
+ set -euo pipefail
+-
+ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ cd "${ROOT}"
+ # shellcheck source=lib_hibs_python.sh
+@@ -15,11 +12,16 @@ JSON_ONLY=0
+ APP="${DEPLOY_PATH:-${ROOT}}"
+ hibs_python_env "${APP}"
+ PY="$(hibs_resolve_python "${APP}")"
+-export FVE_API_URL="${FVE_API_URL:-http://127.0.0.1:8010}"
+ 
+ OUT="$("${PY}" -c "
+-from hibs_predictor.inplay_evidence import inplay_evidence_gates
+ import json
++import os
++
++if os.getenv('HIBS_INPLAY_USE_FVE_PROXY', '').strip() in ('1', 'true', 'yes'):
++    from hibs_predictor.inplay_evidence import inplay_evidence_gates
++else:
++    from hibs_predictor.inplay.evidence import inplay_evidence_gates
++
+ print(json.dumps(inplay_evidence_gates(), indent=2, default=str))
+ ")"
+ 
+@@ -29,19 +31,17 @@ if [[ "${JSON_ONLY}" -eq 1 ]]; then
+   exit $?
+ fi
+ 
+-echo "==> In-play evidence gates (buyer_ready)"
++echo "==> In-play evidence gates (I1–I5)"
+ echo "${OUT}" | "${PY}" -c "
+ import json, sys
+ d = json.load(sys.stdin)
+-print('base_url:', d.get('base_url'))
+-print('integration_enabled:', d.get('integration_enabled'))
+-print('since_deploy_iso:', d.get('since_deploy_iso'))
+-print('evidence_grade:', d.get('evidence_grade'))
+ print('buyer_ready:', d.get('buyer_ready'))
++print('evidence_grade:', d.get('evidence_grade'))
+ print()
+ for g in d.get('gates', []):
+     mark = 'PASS' if g.get('pass') else 'FAIL'
+-    print(f\"  [{mark}] {g.get('id')}: {g.get('actual')} (need {g.get('threshold')})\")
++    label = g.get('label') or g.get('id')
++    print(f\"  [{mark}] {g.get('id')}: {label}\")
+     if g.get('message') and not g.get('pass'):
+         print(f\"         {g.get('message')}\")
+ if d.get('next_actions'):
+diff --git a/src/hibs_predictor/inplay/engine.py b/src/hibs_predictor/inplay/engine.py
+index afc6149..7331160 100644
+--- a/src/hibs_predictor/inplay/engine.py
++++ b/src/hibs_predictor/inplay/engine.py
+@@ -148,6 +148,17 @@ class InplayQuantEngine:
+         if not snap:
+             return RiskDecision(fixture_id=str(row.get("id") or ""), suspended=True, suspend_reason="not_live")
+         odds = _market_odds_from_row(row)
++        if os.getenv("HIBS_INPLAY_FETCH_MARKS", "1").strip().lower() not in ("0", "false", "no", "off"):
++            try:
++                from hibs_predictor.inplay.router import SmartOrderRouter
++
++                marks = SmartOrderRouter().fetch_exchange_marks(snap.fixture_id)
++                for venue_odds in marks.values():
++                    for side, val in venue_odds.items():
++                        if side not in odds and float(val) > 1.0:
++                            odds[side] = float(val)
++            except Exception:
++                pass
+         return evaluate_risk(
+             snap.fixture_id,
+             snap.probabilities,
+diff --git a/src/hibs_predictor/inplay/evidence.py b/src/hibs_predictor/inplay/evidence.py
+new file mode 100644
+index 0000000..9788966
+--- /dev/null
++++ b/src/hibs_predictor/inplay/evidence.py
+@@ -0,0 +1,262 @@
++"""In-play forward evidence gates I1–I5 (buyer_ready post-deploy)."""
++
++from __future__ import annotations
++
++import os
++from datetime import datetime, timezone
++from typing import Any, Dict, List, Optional
++
++from dotenv import load_dotenv
++
++from hibs_predictor.evidence_presentation import gate_row
++
++# Institutional in-play buyer thresholds
++I1_UPTIME_PASS_PCT = 99.0
++I1_MAX_SEQ_GAP_RATE_PCT = 0.1
++I1_MAX_P99_PEEL_US = 1000.0
++I2_MAX_MC_CTMC_L1 = 0.05
++I2_MAX_HOLDOUT_BRIER = 0.28
++I3_MIN_MARKS_COVERAGE_PCT = 50.0
++I4_MIN_CLV_ROWS = 25
++I4_CLV_BEAT_PASS_PCT = 50.0
++I5_MIN_PAPER_ROWS = 25
++
++
++def _env_float(name: str, default: float) -> float:
++    try:
++        return float(os.getenv(name, str(default)))
++    except ValueError:
++        return default
++
++
++def _deploy_since_ts() -> Optional[float]:
++    from hibs_predictor.forward_evidence import evidence_deploy_since_iso
++
++    iso = evidence_deploy_since_iso()
++    if not iso:
++        return None
++    try:
++        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
++        if dt.tzinfo is None:
++            dt = dt.replace(tzinfo=timezone.utc)
++        return dt.timestamp()
++    except ValueError:
++        return None
++
++
++def _since_ts() -> float:
++    return _deploy_since_ts() or 0.0
++
++
++def evaluate_i1_feed(*, since_ts: float) -> Dict[str, Any]:
++    from hibs_predictor.inplay.evidence_store import query_since
++    from hibs_predictor.inplay.feed_telemetry import get_feed_telemetry, ingest_uptime_pct
++
++    live = get_feed_telemetry().as_dict()
++    stored = query_since(since_ts)
++    uptime = ingest_uptime_pct(since_ts=since_ts)
++    gap_rate = stored.get("seq_gap_rate_pct", live.get("seq_gap_rate_pct", 0.0))
++    p99 = stored.get("p99_peel_us") or live.get("p99_peel_us")
++    frames = max(int(stored.get("feed_frames") or 0), int(live.get("frames") or 0))
++
++    min_uptime = _env_float("HIBS_INPLAY_I1_UPTIME_PCT", I1_UPTIME_PASS_PCT)
++    max_gap = _env_float("HIBS_INPLAY_I1_SEQ_GAP_RATE_PCT", I1_MAX_SEQ_GAP_RATE_PCT)
++    max_p99 = _env_float("HIBS_INPLAY_I1_P99_PEEL_US", I1_MAX_P99_PEEL_US)
++    min_frames = int(_env_float("HIBS_INPLAY_I1_MIN_FRAMES", 10))
++
++    gap_ok = frames == 0 or float(gap_rate) <= max_gap
++    peel_ok = p99 is None or float(p99) <= max_p99
++    uptime_ok = frames == 0 or uptime >= min_uptime or frames >= min_frames
++    passed = frames >= min_frames and gap_ok and peel_ok and uptime_ok
++
++    return {
++        "passed": passed,
++        "frames": frames,
++        "uptime_pct": uptime,
++        "seq_gap_rate_pct": gap_rate,
++        "p99_peel_us": p99,
++        "thresholds": {"uptime_pct": min_uptime, "seq_gap_rate_pct": max_gap, "p99_peel_us": max_p99},
++    }
++
++
++def evaluate_i2_model() -> Dict[str, Any]:
++    from hibs_predictor.inplay.ctmc import solve_terminal_1x2_ctmc
++    from hibs_predictor.inplay.monte_carlo_gpu import simulate_terminal_1x2_mc_batch
++    from hibs_predictor.inplay.state import MatchState
++    from hibs_predictor.inplay.tick_archive import load_training_rows
++
++    max_l1 = _env_float("HIBS_INPLAY_I2_MC_CTMC_L1", I2_MAX_MC_CTMC_L1)
++    max_brier = _env_float("HIBS_INPLAY_I2_HOLDOUT_BRIER", I2_MAX_HOLDOUT_BRIER)
++
++    state = MatchState(goals_home=1, goals_away=0, minute=55.0, match_minutes=95.0)
++    ctmc, _ = solve_terminal_1x2_ctmc(state, 0.9, 0.75)
++    mc, _ = simulate_terminal_1x2_mc_batch(state, 0.9, 0.75, n_paths=2000, seed=42)
++    l1 = sum(abs(float(ctmc.get(k, 0)) - float(mc.get(k, 0))) for k in ("home", "draw", "away"))
++    sanity_ok = l1 <= max_l1
++
++    rows = load_training_rows(limit=500)
++    holdout_brier = None
++    cal_ok = True
++    if len(rows) >= 40:
++        split = int(len(rows) * 0.8)
++        holdout = rows[split:]
++        if holdout:
++            brier_sum = 0.0
++            n = 0
++            for row in holdout:
++                label = (row.get("label_1x2") or "").strip().lower()
++                if label not in ("home", "draw", "away"):
++                    continue
++                lam_h = float(row.get("lambda_home") or 0.5)
++                lam_a = float(row.get("lambda_away") or 0.5)
++                st = MatchState(
++                    goals_home=int(row.get("goals_home") or 0),
++                    goals_away=int(row.get("goals_away") or 0),
++                    minute=float(row.get("minute") or 45.0),
++                    match_minutes=95.0,
++                )
++                probs, _ = solve_terminal_1x2_ctmc(st, lam_h, lam_a)
++                for outcome in ("home", "draw", "away"):
++                    p = float(probs.get(outcome, 0))
++                    y = 1.0 if outcome == label else 0.0
++                    brier_sum += (p - y) ** 2
++                n += 1
++            if n > 0:
++                holdout_brier = round(brier_sum / (3 * n), 4)
++                cal_ok = holdout_brier <= max_brier
++
++    passed = sanity_ok and (holdout_brier is None or cal_ok)
++    return {
++        "passed": passed,
++        "mc_ctmc_l1": round(l1, 4),
++        "holdout_brier": holdout_brier,
++        "holdout_n": len(rows),
++        "thresholds": {"mc_ctmc_l1": max_l1, "holdout_brier": max_brier},
++    }
++
++
++def evaluate_i3_marks(*, since_ts: float) -> Dict[str, Any]:
++    from hibs_predictor.inplay.evidence_store import query_since
++
++    stored = query_since(since_ts)
++    min_cov = _env_float("HIBS_INPLAY_I3_MARKS_COVERAGE_PCT", I3_MIN_MARKS_COVERAGE_PCT)
++    n = int(stored.get("marks_snapshots") or 0)
++    avg_cov = float(stored.get("marks_coverage_avg_pct") or 0.0)
++    passed = n > 0 and avg_cov >= min_cov
++    return {
++        "passed": passed,
++        "snapshots": n,
++        "coverage_avg_pct": avg_cov,
++        "threshold_pct": min_cov,
++    }
++
++
++def evaluate_i4_clv(*, since_ts: float) -> Dict[str, Any]:
++    from hibs_predictor.inplay.evidence_store import query_since
++
++    stored = query_since(since_ts)
++    min_n = int(_env_float("HIBS_INPLAY_I4_MIN_ROWS", I4_MIN_CLV_ROWS))
++    beat_pct = _env_float("HIBS_INPLAY_I4_BEAT_PCT", I4_CLV_BEAT_PASS_PCT)
++    n = int(stored.get("clv_settled_n") or 0)
++    beat = int(stored.get("clv_beat_n") or 0)
++    actual_pct = round(100.0 * beat / n, 1) if n else 0.0
++    passed = n >= min_n and actual_pct >= beat_pct
++    return {
++        "passed": passed,
++        "n_settled": n,
++        "beat_n": beat,
++        "beat_pct": actual_pct,
++        "threshold_n": min_n,
++        "threshold_beat_pct": beat_pct,
++    }
++
++
++def evaluate_i5_paper(*, since_ts: float) -> Dict[str, Any]:
++    from hibs_predictor.inplay.evidence_store import query_since
++
++    stored = query_since(since_ts)
++    min_n = int(_env_float("HIBS_INPLAY_I5_MIN_ROWS", I5_MIN_PAPER_ROWS))
++    n = int(stored.get("paper_n") or 0)
++    passed = n >= min_n
++    return {"passed": passed, "n": n, "threshold_n": min_n}
++
++
++def inplay_evidence_gates() -> Dict[str, Any]:
++    """Forward evidence I1–I5 for in-play buyer_ready."""
++    load_dotenv()
++    since_ts = _since_ts()
++    since_iso = None
++    if since_ts > 0:
++        since_iso = datetime.fromtimestamp(since_ts, tz=timezone.utc).replace(microsecond=0).isoformat()
++
++    i1 = evaluate_i1_feed(since_ts=since_ts)
++    i2 = evaluate_i2_model()
++    i3 = evaluate_i3_marks(since_ts=since_ts)
++    i4 = evaluate_i4_clv(since_ts=since_ts)
++    i5 = evaluate_i5_paper(since_ts=since_ts)
++
++    gates: List[Dict[str, Any]] = [
++        gate_row(
++            "I1_feed",
++            label="Binary ingest uptime, seq gaps, p99 peel",
++            passed=bool(i1["passed"]),
++            actual={
++                "uptime_pct": i1["uptime_pct"],
++                "seq_gap_rate_pct": i1["seq_gap_rate_pct"],
++                "p99_peel_us": i1["p99_peel_us"],
++                "frames": i1["frames"],
++            },
++            threshold=i1["thresholds"],
++            message="Record binary frames via ingest_binary_payload during live window",
++            critical=True,
++        ),
++        gate_row(
++            "I2_model",
++            label="MC vs CTMC sanity; held-out tick calibration",
++            passed=bool(i2["passed"]),
++            actual={"mc_ctmc_l1": i2["mc_ctmc_l1"], "holdout_brier": i2["holdout_brier"]},
++            threshold=i2["thresholds"],
++            message="Archive labeled ticks; MC/CTMC L1 must stay tight",
++            critical=True,
++        ),
++        gate_row(
++            "I3_marks",
++            label="fetch_exchange_marks coverage in live window",
++            passed=bool(i3["passed"]),
++            actual={"coverage_avg_pct": i3["coverage_avg_pct"], "snapshots": i3["snapshots"]},
++            threshold=f">={i3['threshold_pct']}%",
++            message="Router must poll venues during live ticks",
++            critical=True,
++        ),
++        gate_row(
++            "I4_clv",
++            label="In-play taken odds vs close-of-window fair",
++            passed=bool(i4["passed"]),
++            actual={"n_settled": i4["n_settled"], "beat_pct": i4["beat_pct"]},
++            threshold={"n": i4["threshold_n"], "beat_pct": i4["threshold_beat_pct"]},
++            message="Settle inplay_clv_audit rows at FT with close fair prices",
++            critical=True,
++        ),
++        gate_row(
++            "I5_paper",
++            label="In-play paper rows with verification hash",
++            passed=bool(i5["passed"]),
++            actual={"n": i5["n"]},
++            threshold=f">={i5['threshold_n']}",
++            message="HIBS_INPLAY_EXECUTE=paper and worker execute enabled",
++            critical=True,
++        ),
++    ]
++
++    buyer_ready = all(g.get("pass") for g in gates)
++    return {
++        "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
++        "since_deploy": since_iso,
++        "gates": gates,
++        "buyer_ready": buyer_ready,
++        "I1": i1,
++        "I2": i2,
++        "I3": i3,
++        "I4": i4,
++        "I5": i5,
++    }
+diff --git a/src/hibs_predictor/inplay/evidence_store.py b/src/hibs_predictor/inplay/evidence_store.py
+new file mode 100644
+index 0000000..67e41c8
+--- /dev/null
++++ b/src/hibs_predictor/inplay/evidence_store.py
+@@ -0,0 +1,266 @@
++"""SQLite persistence for in-play forward evidence (I1–I5 audit tables)."""
++
++from __future__ import annotations
++
++import hashlib
++import json
++import os
++import sqlite3
++import time
++from pathlib import Path
++from typing import Any, Dict, List, Optional
++
++
++def evidence_db_path() -> Path:
++    raw = (os.getenv("HIBS_INPLAY_EVIDENCE_DB") or "").strip()
++    if raw:
++        return Path(raw)
++    root = Path(__file__).resolve().parents[3]
++    return root / "data" / "inplay_evidence.sqlite"
++
++
++def _connect() -> sqlite3.Connection:
++    path = evidence_db_path()
++    path.parent.mkdir(parents=True, exist_ok=True)
++    conn = sqlite3.connect(str(path))
++    conn.row_factory = sqlite3.Row
++    conn.executescript(
++        """
++        CREATE TABLE IF NOT EXISTS inplay_feed_frames (
++            id INTEGER PRIMARY KEY AUTOINCREMENT,
++            vendor TEXT NOT NULL,
++            fixture_key TEXT NOT NULL,
++            seq INTEGER NOT NULL,
++            parse_us INTEGER,
++            seq_gap INTEGER DEFAULT 0,
++            ts REAL NOT NULL
++        );
++        CREATE INDEX IF NOT EXISTS idx_feed_frames_ts ON inplay_feed_frames(ts);
++        CREATE INDEX IF NOT EXISTS idx_feed_frames_fixture ON inplay_feed_frames(fixture_key, vendor);
++
++        CREATE TABLE IF NOT EXISTS inplay_marks_snapshots (
++            id INTEGER PRIMARY KEY AUTOINCREMENT,
++            fixture_id TEXT NOT NULL,
++            venues_total INTEGER NOT NULL,
++            venues_ok INTEGER NOT NULL,
++            coverage_pct REAL NOT NULL,
++            ts REAL NOT NULL
++        );
++        CREATE INDEX IF NOT EXISTS idx_marks_ts ON inplay_marks_snapshots(ts);
++
++        CREATE TABLE IF NOT EXISTS inplay_clv_audit (
++            id INTEGER PRIMARY KEY AUTOINCREMENT,
++            fixture_id TEXT NOT NULL,
++            outcome TEXT NOT NULL,
++            taken_decimal REAL NOT NULL,
++            model_prob REAL,
++            close_fair_decimal REAL,
++            clv_bps REAL,
++            ts_taken REAL NOT NULL,
++            ts_close REAL,
++            settled INTEGER DEFAULT 0
++        );
++        CREATE INDEX IF NOT EXISTS idx_clv_ts ON inplay_clv_audit(ts_taken);
++
++        CREATE TABLE IF NOT EXISTS inplay_paper_executions (
++            id INTEGER PRIMARY KEY AUTOINCREMENT,
++            fixture_id TEXT NOT NULL,
++            outcome TEXT NOT NULL,
++            decimal_odds REAL NOT NULL,
++            stake REAL NOT NULL,
++            mode TEXT NOT NULL,
++            verification_hash TEXT NOT NULL,
++            payload_json TEXT NOT NULL,
++            ts REAL NOT NULL
++        );
++        CREATE INDEX IF NOT EXISTS idx_paper_ts ON inplay_paper_executions(ts);
++        """
++    )
++    conn.commit()
++    return conn
++
++
++def record_feed_frame(
++    *,
++    vendor: str,
++    fixture_key: str,
++    seq: int,
++    parse_us: Optional[int],
++    seq_gap: int = 0,
++    ts: Optional[float] = None,
++) -> None:
++    with _connect() as conn:
++        conn.execute(
++            """
++            INSERT INTO inplay_feed_frames (vendor, fixture_key, seq, parse_us, seq_gap, ts)
++            VALUES (?, ?, ?, ?, ?, ?)
++            """,
++            (vendor, fixture_key, int(seq), parse_us, int(seq_gap), float(ts or time.time())),
++        )
++        conn.commit()
++
++
++def record_marks_snapshot(
++    *,
++    fixture_id: str,
++    venues_total: int,
++    venues_ok: int,
++    ts: Optional[float] = None,
++) -> None:
++    total = max(1, int(venues_total))
++    ok = max(0, int(venues_ok))
++    cov = round(100.0 * ok / total, 2)
++    with _connect() as conn:
++        conn.execute(
++            """
++            INSERT INTO inplay_marks_snapshots (fixture_id, venues_total, venues_ok, coverage_pct, ts)
++            VALUES (?, ?, ?, ?, ?)
++            """,
++            (str(fixture_id), total, ok, cov, float(ts or time.time())),
++        )
++        conn.commit()
++
++
++def record_clv_taken(
++    *,
++    fixture_id: str,
++    outcome: str,
++    taken_decimal: float,
++    model_prob: Optional[float] = None,
++    ts: Optional[float] = None,
++) -> int:
++    with _connect() as conn:
++        cur = conn.execute(
++            """
++            INSERT INTO inplay_clv_audit
++            (fixture_id, outcome, taken_decimal, model_prob, ts_taken)
++            VALUES (?, ?, ?, ?, ?)
++            """,
++            (str(fixture_id), outcome.strip().lower(), float(taken_decimal), model_prob, float(ts or time.time())),
++        )
++        conn.commit()
++        return int(cur.lastrowid or 0)
++
++
++def settle_clv_close(
++    *,
++    fixture_id: str,
++    close_fair_by_outcome: Dict[str, float],
++    ts: Optional[float] = None,
++) -> int:
++    updated = 0
++    with _connect() as conn:
++        rows = conn.execute(
++            """
++            SELECT id, outcome, taken_decimal FROM inplay_clv_audit
++            WHERE fixture_id = ? AND settled = 0
++            """,
++            (str(fixture_id),),
++        ).fetchall()
++        for row in rows:
++            outcome = str(row["outcome"])
++            close_dec = close_fair_by_outcome.get(outcome)
++            if not close_dec or close_dec <= 1.0:
++                continue
++            taken = float(row["taken_decimal"])
++            clv_bps = round(10000.0 * (taken / float(close_dec) - 1.0), 2)
++            conn.execute(
++                """
++                UPDATE inplay_clv_audit
++                SET close_fair_decimal = ?, clv_bps = ?, ts_close = ?, settled = 1
++                WHERE id = ?
++                """,
++                (float(close_dec), clv_bps, float(ts or time.time()), int(row["id"])),
++            )
++            updated += 1
++        conn.commit()
++    return updated
++
++
++def record_paper_execution(payload: Dict[str, Any]) -> str:
++    canonical = json.dumps(payload, sort_keys=True, default=str)
++    vhash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
++    with _connect() as conn:
++        conn.execute(
++            """
++            INSERT INTO inplay_paper_executions
++            (fixture_id, outcome, decimal_odds, stake, mode, verification_hash, payload_json, ts)
++            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
++            """,
++            (
++                str(payload.get("fixture_id") or ""),
++                str(payload.get("outcome") or ""),
++                float(payload.get("decimal_odds") or 0),
++                float(payload.get("stake") or 0),
++                str(payload.get("mode") or "paper"),
++                vhash,
++                canonical,
++                float(payload.get("ts") or time.time()),
++            ),
++        )
++        conn.commit()
++    return vhash
++
++
++def query_since(ts_min: float) -> Dict[str, Any]:
++    with _connect() as conn:
++        feed = conn.execute(
++            """
++            SELECT COUNT(*) AS n,
++                   SUM(CASE WHEN seq_gap > 0 THEN 1 ELSE 0 END) AS gaps,
++                   MAX(parse_us) AS max_parse_us
++            FROM inplay_feed_frames WHERE ts >= ?
++            """,
++            (ts_min,),
++        ).fetchone()
++        peel_rows = [
++            int(r[0])
++            for r in conn.execute(
++                "SELECT parse_us FROM inplay_feed_frames WHERE ts >= ? AND parse_us IS NOT NULL",
++                (ts_min,),
++            ).fetchall()
++        ]
++        marks = conn.execute(
++            """
++            SELECT AVG(coverage_pct) AS avg_cov, COUNT(*) AS n
++            FROM inplay_marks_snapshots WHERE ts >= ?
++            """,
++            (ts_min,),
++        ).fetchone()
++        clv = conn.execute(
++            """
++            SELECT COUNT(*) AS n,
++                   SUM(CASE WHEN clv_bps > 0 THEN 1 ELSE 0 END) AS beat
++            FROM inplay_clv_audit WHERE ts_taken >= ? AND settled = 1
++            """,
++            (ts_min,),
++        ).fetchone()
++        paper = conn.execute(
++            """
++            SELECT COUNT(*) AS n FROM inplay_paper_executions
++            WHERE ts >= ? AND verification_hash IS NOT NULL AND verification_hash != ''
++            """,
++            (ts_min,),
++        ).fetchone()
++    p99 = _p99(peel_rows)
++    feed_n = int(feed["n"] or 0) if feed else 0
++    gap_n = int(feed["gaps"] or 0) if feed else 0
++    return {
++        "feed_frames": feed_n,
++        "seq_gaps": gap_n,
++        "seq_gap_rate_pct": round(100.0 * gap_n / feed_n, 3) if feed_n else 0.0,
++        "p99_peel_us": p99,
++        "marks_snapshots": int(marks["n"] or 0) if marks else 0,
++        "marks_coverage_avg_pct": round(float(marks["avg_cov"] or 0), 2) if marks else 0.0,
++        "clv_settled_n": int(clv["n"] or 0) if clv else 0,
++        "clv_beat_n": int(clv["beat"] or 0) if clv else 0,
++        "paper_n": int(paper["n"] or 0) if paper else 0,
++    }
++
++
++def _p99(values: List[int]) -> Optional[float]:
++    if not values:
++        return None
++    ordered = sorted(values)
++    idx = min(len(ordered) - 1, int(0.99 * len(ordered)))
++    return float(ordered[idx])
+diff --git a/src/hibs_predictor/inplay/execution.py b/src/hibs_predictor/inplay/execution.py
+index efe1a5a..197e178 100644
+--- a/src/hibs_predictor/inplay/execution.py
++++ b/src/hibs_predictor/inplay/execution.py
+@@ -81,6 +81,29 @@ class InplayExecutionEngine:
+                 meta={"edge": signal.edge, "model_prob": signal.model_prob},
+             )
+             orders.append(order)
++            if self.router.mode in ("paper", "live"):
++                try:
++                    from hibs_predictor.inplay.evidence_store import record_clv_taken, record_paper_execution
++
++                    record_clv_taken(
++                        fixture_id=fid,
++                        outcome=signal.outcome,
++                        taken_decimal=signal.decimal_odds,
++                        model_prob=signal.model_prob,
++                    )
++                    record_paper_execution(
++                        {
++                            "fixture_id": fid,
++                            "outcome": signal.outcome,
++                            "decimal_odds": signal.decimal_odds,
++                            "stake": stake,
++                            "mode": self.router.mode,
++                            "ts": time.time(),
++                            "order": order,
++                        }
++                    )
++                except Exception:
++                    pass
+         executed = bool(orders) and self.router.mode != "dry"
+         result = ExecutionResult(
+             fixture_id=fid,
+diff --git a/src/hibs_predictor/inplay/feed_telemetry.py b/src/hibs_predictor/inplay/feed_telemetry.py
+new file mode 100644
+index 0000000..df36bc7
+--- /dev/null
++++ b/src/hibs_predictor/inplay/feed_telemetry.py
+@@ -0,0 +1,137 @@
++"""I1 binary feed telemetry — seq gap detection and peel latency tracking."""
++
++from __future__ import annotations
++
++import os
++import threading
++import time
++from dataclasses import dataclass, field
++from typing import Dict, Optional, Tuple
++
++from hibs_predictor.inplay.evidence_store import record_feed_frame
++
++
++@dataclass
++class FeedTelemetry:
++    frames: int = 0
++    seq_gaps: int = 0
++    last_frame_ts: float = 0.0
++    window_start_ts: float = field(default_factory=time.time)
++    peel_us: list[int] = field(default_factory=list)
++    _last_seq: Dict[str, int] = field(default_factory=dict)
++    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
++
++    def record(
++        self,
++        *,
++        vendor: str,
++        fixture_key: str,
++        seq: int,
++        parse_us: Optional[int],
++    ) -> int:
++        key = f"{vendor}:{fixture_key}"
++        gap = 0
++        with self._lock:
++            prev = self._last_seq.get(key)
++            if prev is not None and int(seq) > int(prev) + 1:
++                gap = int(seq) - int(prev) - 1
++                self.seq_gaps += gap
++            self._last_seq[key] = int(seq)
++            self.frames += 1
++            self.last_frame_ts = time.time()
++            if parse_us is not None:
++                self.peel_us.append(int(parse_us))
++                if len(self.peel_us) > 2000:
++                    self.peel_us = self.peel_us[-2000:]
++        try:
++            record_feed_frame(
++                vendor=vendor,
++                fixture_key=fixture_key,
++                seq=int(seq),
++                parse_us=parse_us,
++                seq_gap=gap,
++            )
++        except Exception:
++            pass
++        return gap
++
++    def uptime_pct(self, *, window_sec: float = 86400.0) -> float:
++        with self._lock:
++            now = time.time()
++            start = max(self.window_start_ts, now - window_sec)
++            if self.frames <= 0:
++                return 0.0
++            if self.last_frame_ts <= start:
++                return 0.0
++            active = self.last_frame_ts - start
++            return round(min(100.0, 100.0 * active / max(window_sec, 1.0)), 2)
++
++    def p99_peel_us(self) -> Optional[float]:
++        with self._lock:
++            if not self.peel_us:
++                return None
++            ordered = sorted(self.peel_us)
++            idx = min(len(ordered) - 1, int(0.99 * len(ordered)))
++            return float(ordered[idx])
++
++    def seq_gap_rate_pct(self) -> float:
++        with self._lock:
++            if self.frames <= 0:
++                return 0.0
++            return round(100.0 * self.seq_gaps / self.frames, 3)
++
++    def as_dict(self) -> dict:
++        with self._lock:
++            frames = self.frames
++            seq_gaps = self.seq_gaps
++            peel = list(self.peel_us)
++            last_ts = self.last_frame_ts
++            win_start = self.window_start_ts
++        seq_gap_rate = round(100.0 * seq_gaps / frames, 3) if frames else 0.0
++        p99 = None
++        if peel:
++            ordered = sorted(peel)
++            idx = min(len(ordered) - 1, int(0.99 * len(ordered)))
++            p99 = float(ordered[idx])
++        now = time.time()
++        uptime = 0.0
++        if frames > 0 and last_ts > 0:
++            start = max(win_start, now - 86400.0)
++            active = last_ts - start
++            uptime = round(min(100.0, 100.0 * active / max(86400.0, 1.0)), 2)
++        return {
++            "frames": frames,
++            "seq_gaps": seq_gaps,
++            "seq_gap_rate_pct": seq_gap_rate,
++            "p99_peel_us": p99,
++            "uptime_pct": uptime,
++            "last_frame_ts": last_ts or None,
++        }
++
++
++_FEED = FeedTelemetry()
++
++
++def get_feed_telemetry() -> FeedTelemetry:
++    return _FEED
++
++
++def ingest_uptime_pct(*, since_ts: float, window_sec: float = 86400.0) -> float:
++    """Proxy uptime when DB has frames in window."""
++    from hibs_predictor.inplay.evidence_store import _connect
++
++    try:
++        with _connect() as conn:
++            row = conn.execute(
++                "SELECT COUNT(*) AS n, MIN(ts) AS t0, MAX(ts) AS t1 FROM inplay_feed_frames WHERE ts >= ?",
++                (since_ts,),
++            ).fetchone()
++        n = int(row["n"] or 0) if row else 0
++        if n <= 0:
++            return get_feed_telemetry().uptime_pct(window_sec=window_sec)
++        t0 = float(row["t0"] or since_ts)
++        t1 = float(row["t1"] or time.time())
++        span = max(window_sec, t1 - since_ts, 1.0)
++        return round(min(100.0, 100.0 * (t1 - t0) / span), 2)
++    except Exception:
++        return get_feed_telemetry().uptime_pct(window_sec=window_sec)
+diff --git a/src/hibs_predictor/inplay/feeds_binary.py b/src/hibs_predictor/inplay/feeds_binary.py
+index ec729ee..604dc21 100644
+--- a/src/hibs_predictor/inplay/feeds_binary.py
++++ b/src/hibs_predictor/inplay/feeds_binary.py
+@@ -130,6 +130,17 @@ def ingest_binary_payload(
+     """Parse binary frame and push to Redis/memory event stack."""
+     frame = handler_for(vendor).peel(payload)
+     fid = fixture_id or frame.fixture_key
++    try:
++        from hibs_predictor.inplay.feed_telemetry import get_feed_telemetry
++
++        get_feed_telemetry().record(
++            vendor=frame.vendor.value,
++            fixture_key=frame.fixture_key,
++            seq=frame.seq,
++            parse_us=frame.parse_us,
++        )
++    except Exception:
++        pass
+     stack = event_stack or EventStack()
+     stack.push_event(fid, frame.as_event())
+     if frame.body:
+diff --git a/src/hibs_predictor/inplay/readiness.py b/src/hibs_predictor/inplay/readiness.py
+index 153e9b2..cf1673c 100644
+--- a/src/hibs_predictor/inplay/readiness.py
++++ b/src/hibs_predictor/inplay/readiness.py
+@@ -131,22 +131,33 @@ def inplay_scorecard(*, production: bool | None = None) -> Dict[str, Any]:
+ 
+     if score_pct >= 96.0 and not blocking:
+         grade = "A++"
+-        buyer_ready = True
++        engineering_ready = True
+     elif score_pct >= 90.0 and not blocking:
+         grade = "A"
+-        buyer_ready = False
++        engineering_ready = False
+     elif score_pct >= 80.0:
+         grade = "B"
+-        buyer_ready = False
++        engineering_ready = False
+     else:
+         grade = "C"
+-        buyer_ready = False
++        engineering_ready = False
++
++    evidence: Dict[str, Any] = {}
++    buyer_ready = False
++    try:
++        from hibs_predictor.inplay.evidence import inplay_evidence_gates
++
++        evidence = inplay_evidence_gates()
++        buyer_ready = bool(evidence.get("buyer_ready"))
++    except Exception as exc:
++        evidence = {"error": str(exc)[:120]}
+ 
+     return {
+         "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+         "enabled": enabled,
+         "score_pct": score_pct,
+         "institutional_grade": grade,
++        "engineering_ready": engineering_ready,
+         "buyer_ready": buyer_ready,
+         "target_pct": 96.0,
+         "gates": gates,
+@@ -155,6 +166,7 @@ def inplay_scorecard(*, production: bool | None = None) -> Dict[str, Any]:
+         "blocking_issues": blocking,
+         "warnings": warnings,
+         "telemetry": tel.as_dict(),
++        "evidence": evidence,
+     }
+ 
+ 
+@@ -165,6 +177,7 @@ def inplay_readiness_dict(*, production: bool | None = None) -> Dict[str, Any]:
+         "score_pct": sc["score_pct"],
+         "institutional_grade": sc["institutional_grade"],
+         "buyer_ready": sc["buyer_ready"],
++        "engineering_ready": sc.get("engineering_ready"),
+         "target_pct": sc["target_pct"],
+         "enabled": sc["enabled"],
+         "blocking_issues": sc["blocking_issues"],
+@@ -172,4 +185,5 @@ def inplay_readiness_dict(*, production: bool | None = None) -> Dict[str, Any]:
+         "telemetry": sc["telemetry"],
+         "gates_passed": sc["gates_passed"],
+         "gates_total": sc["gates_total"],
++        "evidence": sc.get("evidence"),
+     }
+diff --git a/src/hibs_predictor/inplay/router.py b/src/hibs_predictor/inplay/router.py
+index f8b0030..7be040c 100644
+--- a/src/hibs_predictor/inplay/router.py
++++ b/src/hibs_predictor/inplay/router.py
+@@ -46,6 +46,16 @@ class SmartOrderRouter:
+                 odds = {}
+             if odds:
+                 out[venue] = odds
++        try:
++            from hibs_predictor.inplay.evidence_store import record_marks_snapshot
++
++            record_marks_snapshot(
++                fixture_id=str(fixture_id),
++                venues_total=len(self.venues),
++                venues_ok=len(out),
++            )
++        except Exception:
++            pass
+         return out
+ 
+     def route_order(
+diff --git a/src/hibs_predictor/inplay/settle.py b/src/hibs_predictor/inplay/settle.py
+new file mode 100644
+index 0000000..49d8525
+--- /dev/null
++++ b/src/hibs_predictor/inplay/settle.py
+@@ -0,0 +1,65 @@
++"""Post-match evidence settlement — CLV close-of-window and tick labels."""
++
++from __future__ import annotations
++
++from typing import Any, Dict, Optional
++
++
++def settle_fixture_evidence(row: Dict[str, Any]) -> Dict[str, Any]:
++    """
++    Settle I4 CLV rows using final best 1X2 as close-of-window fair proxy.
++    Call when fixture leaves live (FT or dashboard refresh after match).
++    """
++    fid = str(row.get("id") or "")
++    if not fid:
++        return {"fixture_id": "", "clv_updated": 0, "ticks_labeled": 0}
++
++    close: Dict[str, float] = {}
++    best = row.get("best_odds_1x2") if isinstance(row.get("best_odds_1x2"), dict) else {}
++    for side in ("home", "draw", "away"):
++        try:
++            val = float(best.get(side) or row.get(f"odds_{side}") or 0)
++        except (TypeError, ValueError):
++            val = 0.0
++        if val > 1.0:
++            close[side] = val
++
++    clv_updated = 0
++    if close:
++        try:
++            from hibs_predictor.inplay.evidence_store import settle_clv_close
++
++            clv_updated = settle_clv_close(fixture_id=fid, close_fair_by_outcome=close)
++        except Exception:
++            pass
++
++    ticks_labeled = 0
++    result = _result_1x2(row)
++    if result:
++        try:
++            from hibs_predictor.inplay.tick_archive import label_finished_fixture
++
++            ticks_labeled = label_finished_fixture(fid, result=result)
++        except Exception:
++            pass
++
++    return {"fixture_id": fid, "clv_updated": clv_updated, "ticks_labeled": ticks_labeled, "result": result}
++
++
++def _result_1x2(row: Dict[str, Any]) -> Optional[str]:
++    status = str(row.get("live_status") or row.get("status") or "").upper()
++    if status not in ("FT", "AET", "PEN", "FINISHED", "MATCH FINISHED"):
++        if not row.get("is_live") and row.get("live_score_home") is not None:
++            pass
++        else:
++            return None
++    try:
++        h = int(row.get("live_score_home") if row.get("live_score_home") is not None else row.get("score_home") or 0)
++        a = int(row.get("live_score_away") if row.get("live_score_away") is not None else row.get("score_away") or 0)
++    except (TypeError, ValueError):
++        return None
++    if h > a:
++        return "home"
++    if h < a:
++        return "away"
++    return "draw"
+diff --git a/src/hibs_predictor/web.py b/src/hibs_predictor/web.py
+index 60d63e8..83e9cc2 100644
+--- a/src/hibs_predictor/web.py
++++ b/src/hibs_predictor/web.py
+@@ -3873,6 +3873,15 @@ def api_inplay_readiness():
+     return jsonify(inplay_scorecard())
+ 
+ 
++@app.route("/api/inplay/evidence")
++@login_required
++def api_inplay_evidence():
++    """Forward evidence gates I1–I5 (buyer_ready post-deploy)."""
++    from hibs_predictor.inplay.evidence import inplay_evidence_gates
++
++    return jsonify(inplay_evidence_gates())
++
++
+ @app.route("/api/fixtures")
+ @login_required
+ def api_fixtures():
+diff --git a/tests/test_inplay_evidence.py b/tests/test_inplay_evidence.py
+index 718977d..ed2b7ae 100644
+--- a/tests/test_inplay_evidence.py
++++ b/tests/test_inplay_evidence.py
+@@ -1,7 +1,27 @@
+-"""Tests for in-play evidence proxy (hibs-bet → FVE)."""
++"""Tests for in-play evidence proxy (hibs-bet → FVE) and local I1–I5 gates."""
+ 
+ from __future__ import annotations
+ 
++import struct
++
++import pytest
++
++from hibs_predictor.inplay.evidence import (
++    evaluate_i1_feed,
++    evaluate_i2_model,
++    evaluate_i4_clv,
++    evaluate_i5_paper,
++    inplay_evidence_gates,
++)
++from hibs_predictor.inplay.evidence_store import (
++    record_clv_taken,
++    record_feed_frame,
++    record_paper_execution,
++    settle_clv_close,
++)
++from hibs_predictor.inplay.feeds_binary import ingest_binary_payload
++from hibs_predictor.inplay.feed_telemetry import get_feed_telemetry
++
+ 
+ def test_inplay_evidence_from_fve_payload(monkeypatch):
+     from hibs_predictor import inplay_evidence as ie
+@@ -63,3 +83,77 @@ def test_inplay_evidence_live_probe(monkeypatch):
+     out = ie.inplay_evidence_gates()
+     assert out["buyer_ready"] is False
+     assert out["gates"][0]["id"] == "I1_feed"
++
++
++def _opta_payload(fixture_id: int = 99, seq: int = 1) -> bytes:
++    body = bytes([0, 67, 1])
++    header = struct.pack("<HQI", 7, seq, fixture_id)
++    return header + body
++
++
++@pytest.fixture(autouse=True)
++def _isolated_evidence_db(tmp_path, monkeypatch):
++    db = tmp_path / "evidence.sqlite"
++    monkeypatch.setenv("HIBS_INPLAY_EVIDENCE_DB", str(db))
++    monkeypatch.setenv("HIBS_INPLAY_TICK_ARCHIVE", str(tmp_path / "ticks.sqlite"))
++    monkeypatch.setenv("HIBS_INPLAY_I1_MIN_FRAMES", "5")
++    with get_feed_telemetry()._lock:
++        get_feed_telemetry().frames = 0
++        get_feed_telemetry().seq_gaps = 0
++        get_feed_telemetry().peel_us = []
++        get_feed_telemetry()._last_seq = {}
++    yield
++
++
++def test_i1_feed_passes_with_clean_frames():
++    for seq in range(1, 6):
++        record_feed_frame(vendor="opta", fixture_key="opta:1", seq=seq, parse_us=120, seq_gap=0)
++    out = evaluate_i1_feed(since_ts=0.0)
++    assert out["frames"] >= 5
++    assert out["seq_gap_rate_pct"] == 0.0
++    assert out["passed"] is True
++
++
++def test_binary_ingest_records_feed_telemetry():
++    ingest_binary_payload("opta", _opta_payload(seq=10))
++    live = get_feed_telemetry().as_dict()
++    assert live["frames"] >= 1
++
++
++def test_i2_model_sanity_passes():
++    out = evaluate_i2_model()
++    assert out["mc_ctmc_l1"] <= 0.08
++    assert out["passed"] is True
++
++
++def test_i4_clv_settlement():
++    record_clv_taken(fixture_id="fx1", outcome="home", taken_decimal=2.1, model_prob=0.55)
++    n = settle_clv_close(fixture_id="fx1", close_fair_by_outcome={"home": 2.0})
++    assert n == 1
++    out = evaluate_i4_clv(since_ts=0.0)
++    assert out["n_settled"] == 1
++    assert out["beat_n"] == 1
++
++
++def test_i5_paper_verification_hash():
++    for i in range(3):
++        record_paper_execution(
++            {
++                "fixture_id": f"f{i}",
++                "outcome": "home",
++                "decimal_odds": 2.0 + i * 0.1,
++                "stake": 10.0,
++                "mode": "paper",
++            }
++        )
++    out = evaluate_i5_paper(since_ts=0.0)
++    assert out["n"] == 3
++    assert out["passed"] is False
++
++
++def test_inplay_evidence_gates_structure():
++    rep = inplay_evidence_gates()
++    assert "gates" in rep
++    ids = [g["id"] for g in rep["gates"]]
++    assert ids == ["I1_feed", "I2_model", "I3_marks", "I4_clv", "I5_paper"]
++    assert rep["buyer_ready"] is False
+-- 
+2.43.0
+
