@@ -67,7 +67,7 @@ All three are **thin product layers** on existing `inst_spine/` — no core file
 | # | Product | Difficulty | Spine reuse | New work | Sales velocity | Status |
 |---|---------|------------|-------------|----------|----------------|--------|
 | **5** | **Webhook Idempotency Mesh** | **Easy** | ~75% | Delivery FSM, provider sigs | **High** | **P0 scaffolded** |
-| **6** | **Ad-Tech Budget Guardrail** | **Easy–Medium** | ~85% | Spend metric extraction | Medium | Planned |
+| **6** | **Ad-Tech Budget Guardrail** | **Easy–Medium** | ~85% | Spend metric extraction | Medium | **P0 scaffolded** |
 | **7** | **Health Telemetry Recorder** | **Medium (tech) / Hard (GTM)** | ~90% | HIPAA/DTAC packaging | Slow, high ticket | Planned |
 
 **Difficulty key:** Easy = fork `proxy_risk` + config; Medium = new domain logic + compliance docs; Hard = regulatory sales cycle, not Python.
@@ -129,7 +129,23 @@ All three are **thin product layers** on existing `inst_spine/` — no core file
 
 ## Product 6: Ad-Tech Budget Guardrail Kernel
 
-**One job:** Air-gapped **outbound** proxy on marketing API calls — kill when spend velocity is statistically anomalous.
+**One job:** Air-gapped **outbound** proxy on marketing API calls — kill when spend velocity is statistically anomalous, with genesis-anchored audit export.
+
+**Institutional positioning:** See `docs/AD_GUARD_INSTITUTIONAL_STACK.md` for enterprise landscape (DoubleVerify, IAS, NeMo, Bedrock) and where Inst++ fits in the nested firewall.
+
+### Where Inst++ sits in the enterprise stack
+
+Inst++ Ad Guard is **not** a pre-bid verifier (DoubleVerify / IAS) and **not** an LLM safety firewall (NeMo / Llama Guard / Bedrock). It is the **Compliance & Spend Control** layer between approved creative assets and marketing API calls:
+
+```
+GenAI Safety (NeMo/Bedrock) → Inst++ Ad Guard (spend) → DSP + DV/IAS pre-bid → placement
+```
+
+| Layer | Incumbent | Inst++ role |
+|-------|-----------|-------------|
+| Pre-bid placement | DV, IAS, Moat | **Complement** — audit API-layer spend they don't see |
+| GenAI creative | NeMo, Llama Guard, Guardrails AI | **Downstream** — guard spend after creative approved |
+| Outbound API spend | Fragmented scripts | **Own** — Z-score kill + cryptographic trail |
 
 ### Why this is almost free after Proxy-Risk
 
@@ -154,13 +170,15 @@ Product 6 **is** Proxy-Risk with different config:
 
 ### Effort estimate
 
-| Component | Invasiveness | Notes |
-|-----------|--------------|-------|
-| `ad_guard/proxy.py` | New ~250 LOC | **Subclass or config flag on ProxyRiskGateway** |
-| `ZScoreConfig` per campaign | Exists | `rates.py` already has `ZScoreConfig` |
-| Spend metric parser | New ~150 LOC | JSON path extract for bid/campaign |
+| Component | Status | Notes |
+|-----------|--------|-------|
+| `ad_guard/spend.py` | **P0 done** | Google / Meta / generic JSON path parsers |
+| `ad_guard/proxy.py` | **P0 done** | Per-campaign bucket + Z-score spend drift |
+| `ad_guard/cli.py` | **P0 done** | `ad-guard evaluate` |
+| HTTP serve endpoint | P1 | Fork `proxy_risk/serve` |
+| `export_ad_audit.sh` | P1 | Wrapper on `export.py` |
+| Creative approval header gate | P2 | NeMo/Bedrock integration hook |
 | **True RTB exchange (<5ms)** | **Not in scope** | Would need Go/Rust — say no |
-| **Core changes** | **Zero** | |
 
 **Verdict: Easy–Medium** — trivial if positioned as **marketing API proxy** (Meta/Google). Medium only if buyer expects sub-5ms RTB exchange insertion.
 
@@ -273,8 +291,9 @@ src/
 │   ├── fsm.py           # delivery FSM + DLQ
 │   ├── hmac_verify.py
 │   └── cli.py
-├── ad_guard/            # P6 — outbound spend guard (fork proxy_risk)
-│   ├── proxy.py
+├── ad_guard/            # P6 — outbound spend guard (P0)
+│   ├── spend.py         # Google/Meta/generic parsers
+│   ├── proxy.py         # per-campaign gate chain
 │   └── cli.py
 └── health_telemetry/    # P7 — batch ingest + export wrapper
     ├── ingest.py
@@ -360,6 +379,7 @@ python3 -m inst_spine.export_cli data/ledger.sqlite --repro-check
 
 ## Related docs
 
+- `docs/AD_GUARD_INSTITUTIONAL_STACK.md` — enterprise ad guardrail landscape + Inst++ slot
 - `docs/NEW_PRODUCT_INST_PLUS_ROADMAPS.md` — technical roadmaps v3
 - `docs/PORTFOLIO_DEEP_DIVE.md` — racing gate lanes
 - `src/inst_spine/export.py` — P2 bundle implementation
