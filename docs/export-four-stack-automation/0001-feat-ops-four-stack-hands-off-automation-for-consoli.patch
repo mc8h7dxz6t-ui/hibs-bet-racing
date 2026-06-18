@@ -1,0 +1,514 @@
+From f08ca0d7f073ad0d442a137c90be6bd3d62f7806 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Thu, 18 Jun 2026 15:10:21 +0000
+Subject: [PATCH] feat(ops): four-stack hands-off automation for consolidated
+ VPS
+
+- Add install_four_stack_automation.sh one-shot armer for football, racing,
+  trading, and local FVE line-shopper on a single box (87.106.100.52).
+- Add lib_fve_local_repair.sh to restart Docker worker, warm fixtures, and
+  re-run lines collector without cross-VPS hops.
+- Extend vps_three_stack_green with LINE SHOPPER checks and lines_green status.
+- Wire local FVE repair into ensure-vps-stack-wiring and data_producer_repair.
+---
+ deploy/ensure-vps-stack-wiring.sh        |  31 +++++-
+ scripts/_vps_automation_remote.sh        |   7 ++
+ scripts/data_producer_repair.sh          |  18 +++-
+ scripts/install_four_stack_automation.sh | 114 ++++++++++++++++++++++
+ scripts/lib_fve_local_repair.sh          | 117 +++++++++++++++++++++++
+ scripts/lib_stack_host.sh                |  29 ++++++
+ scripts/vps_three_stack_green.sh         |  65 ++++++++++++-
+ 7 files changed, 368 insertions(+), 13 deletions(-)
+ create mode 100755 scripts/install_four_stack_automation.sh
+ create mode 100755 scripts/lib_fve_local_repair.sh
+ create mode 100755 scripts/lib_stack_host.sh
+
+diff --git a/deploy/ensure-vps-stack-wiring.sh b/deploy/ensure-vps-stack-wiring.sh
+index 92a84a0..5878ced 100755
+--- a/deploy/ensure-vps-stack-wiring.sh
++++ b/deploy/ensure-vps-stack-wiring.sh
+@@ -57,11 +57,24 @@ if [[ -f "${NGINX_SITE}" ]] && grep -qE 'fve-api proxy begin|hibs-fve-api-begin'
+   FVE_PROXY_OK=1
+ fi
+ 
+-if [[ "${FVE_PROXY_OK}" -eq 0 && "${REPAIR}" -eq 1 && -f "${APP}/deploy/apply-vps-fve-remote-host.sh" ]]; then
+-  log "repair: nginx FVE proxy missing — apply-vps-fve-remote-host"
+-  FVE_REMOTE_HOST="${FVE_HOST}" DEPLOY_PATH="${APP}" HIBS_PUBLIC_HOST="${PUBLIC}" \
+-    bash "${APP}/deploy/apply-vps-fve-remote-host.sh" || warn "FVE proxy apply failed"
+-  FVE_PROXY_OK=1
++STACK_FVE_LOCAL=0
++case "${FVE_HOST}" in
++  127.0.0.1|localhost|::1) STACK_FVE_LOCAL=1 ;;
++esac
++
++if [[ "${FVE_PROXY_OK}" -eq 0 && "${REPAIR}" -eq 1 ]]; then
++  if [[ "${STACK_FVE_LOCAL}" -eq 1 && -f "${APP}/deploy/apply-vps-fve-line-trader.sh" ]]; then
++    log "repair: local FVE line-trader + nginx"
++    HIBS_PUBLIC_HOST="${PUBLIC}" DEPLOY_PATH="${APP}" \
++      bash "${APP}/deploy/apply-vps-fve-line-trader.sh" || warn "FVE line-trader apply failed"
++  elif [[ -f "${APP}/deploy/apply-vps-fve-remote-host.sh" ]]; then
++    log "repair: nginx FVE proxy missing — apply-vps-fve-remote-host"
++    FVE_REMOTE_HOST="${FVE_HOST}" DEPLOY_PATH="${APP}" HIBS_PUBLIC_HOST="${PUBLIC}" \
++      bash "${APP}/deploy/apply-vps-fve-remote-host.sh" || warn "FVE proxy apply failed"
++  fi
++  if [[ -f "${NGINX_SITE}" ]] && grep -qE 'fve-api proxy begin|hibs-fve-api-begin' "${NGINX_SITE}" 2>/dev/null; then
++    FVE_PROXY_OK=1
++  fi
+ fi
+ 
+ FVE_HEALTH=0
+@@ -69,6 +82,14 @@ if curl -fsS --max-time 8 "http://${FVE_HOST}:${FVE_PORT}/health" >/dev/null 2>&
+   FVE_HEALTH=1
+ fi
+ 
++if [[ "${FVE_HEALTH}" -eq 0 && "${REPAIR}" -eq 1 && "${STACK_FVE_LOCAL}" -eq 1 && -f "${APP}/scripts/lib_fve_local_repair.sh" ]]; then
++  log "repair: local FVE Docker worker"
++  bash "${APP}/scripts/lib_fve_local_repair.sh" || warn "local FVE repair issues"
++  if curl -fsS --max-time 8 "http://${FVE_HOST}:${FVE_PORT}/health" >/dev/null 2>&1; then
++    FVE_HEALTH=1
++  fi
++fi
++
+ RACING_PING=0
+ if curl -fsS --max-time 8 "http://127.0.0.1:5003/api/ping" >/dev/null 2>&1; then
+   RACING_PING=1
+diff --git a/scripts/_vps_automation_remote.sh b/scripts/_vps_automation_remote.sh
+index 9f5ae7f..380e4ef 100755
+--- a/scripts/_vps_automation_remote.sh
++++ b/scripts/_vps_automation_remote.sh
+@@ -61,6 +61,13 @@ else
+   warn "racing root ${RACING} missing — skip racing automation"
+ fi
+ 
++log "line shopper / FVE (local Docker on consolidated VPS)"
++if [[ -f "${APP}/scripts/lib_fve_local_repair.sh" ]]; then
++  bash "${APP}/scripts/lib_fve_local_repair.sh" || warn "FVE local repair skipped or failed"
++elif [[ -f "${APP}/deploy/apply-vps-fve-line-trader.sh" ]]; then
++  bash "${APP}/deploy/apply-vps-fve-line-trader.sh" || warn "FVE line-trader apply failed"
++fi
++
+ log "trading shadow soak"
+ if systemctl is-active --quiet trading-shadow-soak 2>/dev/null; then
+   log "trading-shadow-soak already active"
+diff --git a/scripts/data_producer_repair.sh b/scripts/data_producer_repair.sh
+index 8e5fd08..b169a80 100755
+--- a/scripts/data_producer_repair.sh
++++ b/scripts/data_producer_repair.sh
+@@ -95,11 +95,21 @@ if [[ "${FVE_EXP}" != "True" ]]; then
+   fi
+ fi
+ 
+-# 3. FVE remote down/paused — warn + optional SSH repair
++# 3. FVE down/paused — local Docker repair or remote stack wiring
+ if [[ "${FVE_REM}" != "True" ]]; then
+-  warn "FVE remote not green — run on FVE host: vps_unpause_fve_hibs_upstream.sh or bootstrap-fve-dedicated-1gb.sh"
+-  if [[ "$(id -u)" -eq 0 && -f "${APP}/deploy/ensure-vps-stack-wiring.sh" ]]; then
+-    FVE_REMOTE_HOST="${FVE_REMOTE_HOST:-77.68.89.75}" bash "${APP}/deploy/ensure-vps-stack-wiring.sh" --repair || true
++  if [[ "$(id -u)" -eq 0 && -f "${APP}/scripts/lib_fve_local_repair.sh" ]]; then
++    # shellcheck source=lib_stack_host.sh
++    source "${APP}/scripts/lib_stack_host.sh"
++    stack_load_env
++    if [[ "${STACK_FVE_LOCAL}" -eq 1 ]]; then
++      log "repair: local FVE worker"
++      bash "${APP}/scripts/lib_fve_local_repair.sh" || true
++    else
++      warn "FVE remote not green — run on FVE host: bootstrap-fve-dedicated-1gb.sh"
++      if [[ -f "${APP}/deploy/ensure-vps-stack-wiring.sh" ]]; then
++        FVE_REMOTE_HOST="${FVE_HOST}" bash "${APP}/deploy/ensure-vps-stack-wiring.sh" --repair || true
++      fi
++    fi
+   fi
+ fi
+ 
+diff --git a/scripts/install_four_stack_automation.sh b/scripts/install_four_stack_automation.sh
+new file mode 100755
+index 0000000..d1979a6
+--- /dev/null
++++ b/scripts/install_four_stack_automation.sh
+@@ -0,0 +1,114 @@
++#!/usr/bin/env bash
++# One-shot: arm hands-off automation for all four pill-switcher products on one VPS.
++# Football · Racing · Trading · Line shopper (FVE / arb)
++#
++# Consolidated box (87.106.100.52 or any single host):
++#   sudo HIBS_VPS_IP=87.106.100.52 bash /opt/hibs-bet/scripts/install_four_stack_automation.sh
++#
++# From Mac:
++#   DEPLOY_HOST=87.106.100.52 ./scripts/install_four_stack_automation.sh --remote
++set -euo pipefail
++
++APP="${DEPLOY_PATH:-/opt/hibs-bet}"
++RACING="${HIBS_RACING_DEPLOY_PATH:-/opt/hibs-racing}"
++TRADING="${TRADING_INSTALL_ROOT:-/opt/trading-core}"
++PUBLIC="${HIBS_PUBLIC_HOST:-hibs-bet.co.uk}"
++VPS_IP="${HIBS_VPS_IP:-87.106.100.52}"
++REMOTE=0
++
++for arg in "$@"; do
++  [[ "${arg}" == "--remote" ]] && REMOTE=1
++done
++
++if [[ "${REMOTE}" -eq 1 ]]; then
++  HOST="${DEPLOY_HOST:-${VPS_IP}}"
++  USER="${DEPLOY_USER:-root}"
++  exec ssh -o BatchMode=yes -o ConnectTimeout=30 "${USER}@${HOST}" \
++    "export DEPLOY_PATH='${APP}' HIBS_RACING_DEPLOY_PATH='${RACING}' TRADING_INSTALL_ROOT='${TRADING}' \
++     HIBS_PUBLIC_HOST='${PUBLIC}' HIBS_VPS_IP='${VPS_IP}'; \
++     bash '${APP}/scripts/install_four_stack_automation.sh'"
++fi
++
++step() { echo ""; echo "========== $* =========="; }
++
++[[ "$(id -u)" -eq 0 ]] || { echo "run as root on VPS" >&2; exit 1; }
++[[ -d "${APP}/deploy" ]] || { echo "missing ${APP} — sync hibs-bet first" >&2; exit 1; }
++
++step "1) Consolidated stack.env (local FVE)"
++mkdir -p /etc/hibs-bet
++cat >/etc/hibs-bet/stack.env <<EOF
++FVE_REMOTE_HOST=127.0.0.1
++HIBS_PUBLIC_HOST=${PUBLIC}
++HIBS_VPS_IP=${VPS_IP}
++EOF
++
++step "2) Sync latest code from GitHub main"
++if [[ -f "${APP}/deploy/vps-sync-from-github.sh" ]]; then
++  HIBS_SYNC_REF="${HIBS_SYNC_REF:-main}" APP_ROOT="${APP}" \
++    bash "${APP}/deploy/vps-sync-from-github.sh"
++fi
++if [[ -f "${APP}/deploy/vps-sync-racing-from-github.sh" ]]; then
++  HIBS_RACING_SYNC_REF="${HIBS_RACING_SYNC_REF:-main}" HIBS_RACING_DEPLOY_PATH="${RACING}" \
++    bash "${APP}/deploy/vps-sync-racing-from-github.sh"
++fi
++
++step "3) Product links (nginx racing + trading + FVE)"
++export DEPLOY_PATH="${APP}" HIBS_RACING_DEPLOY_PATH="${RACING}"
++bash "${APP}/deploy/apply-vps-racing-link.sh" 2>/dev/null || true
++if [[ -d "${TRADING}" ]]; then
++  export TRADING_INSTALL_ROOT="${TRADING}"
++  bash "${APP}/deploy/apply-vps-trading-link.sh" 2>/dev/null || true
++fi
++if [[ -f "${APP}/deploy/apply-vps-fve-line-trader.sh" ]]; then
++  HIBS_PUBLIC_HOST="${PUBLIC}" bash "${APP}/deploy/apply-vps-fve-line-trader.sh" || true
++fi
++
++step "4) Stack wiring + data producers"
++bash "${APP}/deploy/ensure-vps-stack-wiring.sh" --repair || true
++if [[ -f "${APP}/scripts/lib_fve_local_repair.sh" ]]; then
++  bash "${APP}/scripts/lib_fve_local_repair.sh" || true
++fi
++
++step "5) Full VPS automation + trading recon"
++if [[ -f "${APP}/scripts/_vps_automation_remote.sh" ]]; then
++  export TRADING_INSTALL_ROOT="${TRADING}"
++  bash "${APP}/scripts/_vps_automation_remote.sh" || true
++fi
++if [[ -f "${TRADING}/deploy/cron-hibs-trading-shadow-paper-recon.sh" ]]; then
++  TRADING_INSTALL_ROOT="${TRADING}" \
++    bash "${TRADING}/deploy/cron-hibs-trading-shadow-paper-recon.sh" --install || true
++  TRADING_INSTALL_ROOT="${TRADING}" \
++    bash "${TRADING}/deploy/cron-hibs-trading-shadow-paper-recon.sh" --run || true
++elif [[ -f "${APP}/deploy/cron-hibs-trading-shadow-paper-recon.sh" ]]; then
++  bash "${APP}/deploy/cron-hibs-trading-shadow-paper-recon.sh" --install || true
++fi
++
++step "6) Hands-off crons (30m repair loop)"
++bash "${APP}/scripts/install_hands_off_automation.sh"
++
++step "7) Four-stack verify"
++if [[ -f "${APP}/scripts/vps_three_stack_green.sh" ]]; then
++  bash "${APP}/scripts/vps_three_stack_green.sh" --repair || true
++fi
++if [[ -f "${APP}/scripts/install_fve_lines_stack.sh" ]]; then
++  FVE_REMOTE_HOST=127.0.0.1 bash "${APP}/scripts/install_fve_lines_stack.sh" --verify || true
++fi
++
++cat <<EOF
++
++========== FOUR-STACK AUTOMATION ARMED ==========
++Pill switcher products (auto-repair every 30m via hands_off_cycle):
++
++  Football   https://${PUBLIC}/
++  Racing     https://${PUBLIC}/racing/
++  Trading    https://${PUBLIC}/harvested-execution
++  Lines/Arb  https://${PUBLIC}/line-trader
++
++Logs:
++  tail -f /var/log/hibs-bet/hands-off-cycle.log
++  cat /var/log/hibs-bet/stack-wiring.json
++  cat /var/log/hibs-bet/three-stack-status.json
++
++Re-run anytime:
++  sudo bash ${APP}/scripts/install_four_stack_automation.sh
++EOF
+diff --git a/scripts/lib_fve_local_repair.sh b/scripts/lib_fve_local_repair.sh
+new file mode 100755
+index 0000000..3f55e6b
+--- /dev/null
++++ b/scripts/lib_fve_local_repair.sh
+@@ -0,0 +1,117 @@
++#!/usr/bin/env bash
++# Idempotent repair for local FVE / line-shopper Docker on the main VPS (127.0.0.1:8010).
++#
++#   sudo bash /opt/hibs-bet/scripts/lib_fve_local_repair.sh
++set -uo pipefail
++
++APP="${DEPLOY_PATH:-/opt/hibs-bet}"
++FVE_ROOT="${FVE_DEPLOY_PATH:-/opt/fve}"
++FVE_PORT="${FVE_API_PORT:-8010}"
++PUBLIC="${HIBS_PUBLIC_HOST:-hibs-bet.co.uk}"
++LOG_DIR="${LOG_DIR:-/var/log/hibs-bet}"
++
++log() { echo "[fve-repair] $*"; }
++warn() { echo "[fve-repair] WARN: $*" >&2; }
++
++[[ "$(id -u)" -eq 0 ]] || { warn "run as root"; exit 0; }
++
++if [[ -f "${APP}/scripts/lib_stack_host.sh" ]]; then
++  # shellcheck source=lib_stack_host.sh
++  source "${APP}/scripts/lib_stack_host.sh"
++  stack_load_env
++else
++  FVE_HOST="127.0.0.1"
++  STACK_FVE_LOCAL=1
++fi
++
++if [[ "${STACK_FVE_LOCAL:-0}" -ne 1 ]]; then
++  log "skip — FVE host ${FVE_HOST} is remote (not local Docker repair)"
++  exit 0
++fi
++
++mkdir -p "${LOG_DIR}" /var/lib/fve/scrape-lines /var/log/fve
++
++fve_health_ok() {
++  curl -fsS --max-time 8 "http://127.0.0.1:${FVE_PORT}/health" 2>/dev/null | \
++    python3 -c "
++import json, sys
++d = json.load(sys.stdin)
++w = d.get('worker') or {}
++sys.exit(0 if not d.get('paused') and w.get('alive') else 1)
++" 2>/dev/null
++}
++
++fixture_count() {
++  curl -fsS --max-time 12 "http://127.0.0.1:8000/api/fve/fixtures" 2>/dev/null | \
++    python3 -c "import json,sys; d=json.load(sys.stdin); print(int(d.get('count') or 0))" 2>/dev/null || echo 0
++}
++
++log "ensure FVE tree + line-trader wiring"
++if [[ ! -f "${FVE_ROOT}/docker-compose.yml" && -f "${APP}/deploy/apply-vps-fve-line-trader.sh" ]]; then
++  HIBS_PUBLIC_HOST="${PUBLIC}" DEPLOY_PATH="${APP}" FVE_DEPLOY_PATH="${FVE_ROOT}" \
++    bash "${APP}/deploy/apply-vps-fve-line-trader.sh" || warn "apply-vps-fve-line-trader failed"
++elif [[ -f "${APP}/deploy/vps-install-fve-upstream.sh" ]]; then
++  bash "${APP}/deploy/vps-install-fve-upstream.sh" || true
++fi
++
++if [[ -f "${FVE_ROOT}/.env" ]]; then
++  if ! grep -q '^HIBS_UPSTREAM_BASE_URL=' "${FVE_ROOT}/.env" 2>/dev/null; then
++    echo "HIBS_UPSTREAM_BASE_URL=http://127.0.0.1:8000" >>"${FVE_ROOT}/.env"
++  fi
++  # Prefer local football during repair (DNS-independent).
++  sed -i 's|^HIBS_UPSTREAM_BASE_URL=.*|HIBS_UPSTREAM_BASE_URL=http://127.0.0.1:8000|' "${FVE_ROOT}/.env" 2>/dev/null || true
++fi
++
++if [[ -f "${FVE_ROOT}/docker-compose.yml" ]] && command -v docker >/dev/null 2>&1; then
++  log "docker compose up (redis api worker)"
++  (cd "${FVE_ROOT}" && COMPOSE_PROFILES=ingest FVE_API_PORT="${FVE_PORT}" \
++    docker compose up -d --build redis api worker) 2>>"${LOG_DIR}/fve-repair.log" || \
++    warn "docker compose failed — see ${LOG_DIR}/fve-repair.log"
++fi
++
++fc="$(fixture_count)"
++if [[ "${fc}" -lt 1 && -f "${APP}/.venv/bin/python3" ]]; then
++  log "warm football fixture cache (count=${fc})"
++  PYTHONPATH="${APP}/src" HOME="${APP}" "${APP}/.venv/bin/python3" -c "
++from hibs_predictor.web import fetch_all_fixtures
++b = fetch_all_fixtures(force_refresh=True, attach_live=True, allow_stale=True)
++print('loaded', len(b.get('all') or []))
++" >>"${LOG_DIR}/fve-repair.log" 2>&1 || warn "fixture warm failed"
++fi
++
++if ! fve_health_ok; then
++  log "FVE worker not alive — recycle worker container"
++  if [[ -f "${FVE_ROOT}/docker-compose.yml" ]]; then
++    (cd "${FVE_ROOT}" && COMPOSE_PROFILES=ingest docker compose restart worker api) \
++      >>"${LOG_DIR}/fve-repair.log" 2>&1 || true
++    sleep 6
++  fi
++fi
++
++if [[ -f "${FVE_ROOT}/scripts/fve_hibs_lines_collector.py" ]]; then
++  log "lines collector --from-watchlist"
++  if [[ -f "${FVE_ROOT}/docker-compose.yml" ]] && docker compose -f "${FVE_ROOT}/docker-compose.yml" ps worker 2>/dev/null | grep -q Up; then
++    docker compose -f "${FVE_ROOT}/docker-compose.yml" exec -T worker \
++      python scripts/fve_hibs_lines_collector.py --from-watchlist \
++      >>"${LOG_DIR}/fve-repair.log" 2>&1 || true
++  else
++    (cd "${FVE_ROOT}" && HIBS_UPSTREAM_BASE_URL=http://127.0.0.1:8000 \
++      FVE_SCRAPE_LINES_DIR=/var/lib/fve/scrape-lines \
++      python3 scripts/fve_hibs_lines_collector.py --from-watchlist) \
++      >>"${LOG_DIR}/fve-repair.log" 2>&1 || true
++  fi
++fi
++
++if [[ -f "${APP}/deploy/apply-nginx-fve-line-trader.sh" ]] && command -v nginx >/dev/null 2>&1; then
++  HIBS_PUBLIC_HOST="${PUBLIC}" DEPLOY_PATH="${APP}" FVE_API_PORT="${FVE_PORT}" \
++    bash "${APP}/deploy/apply-nginx-fve-line-trader.sh" >>"${LOG_DIR}/fve-repair.log" 2>&1 || true
++  systemctl reload nginx 2>/dev/null || true
++fi
++
++if fve_health_ok; then
++  log "FVE local GREEN"
++  exit 0
++fi
++
++warn "FVE still not green — tail ${LOG_DIR}/fve-repair.log"
++exit 0
+diff --git a/scripts/lib_stack_host.sh b/scripts/lib_stack_host.sh
+new file mode 100755
+index 0000000..feb2540
+--- /dev/null
++++ b/scripts/lib_stack_host.sh
+@@ -0,0 +1,29 @@
++#!/usr/bin/env bash
++# Resolve consolidated vs split-stack host layout (/etc/hibs-bet/stack.env).
++#
++#   source scripts/lib_stack_host.sh
++#   stack_load_env
++#   echo "${FVE_HOST}" "${STACK_FVE_LOCAL}"
++stack_load_env() {
++  APP="${DEPLOY_PATH:-/opt/hibs-bet}"
++  STACK_ENV="${HIBS_STACK_ENV:-/etc/hibs-bet/stack.env}"
++  FVE_HOST="${FVE_REMOTE_HOST:-}"
++  PUBLIC="${HIBS_PUBLIC_HOST:-hibs-bet.co.uk}"
++  VPS_IP="${HIBS_VPS_IP:-}"
++  if [[ -f "${STACK_ENV}" ]]; then
++    # shellcheck disable=SC1090
++    source "${STACK_ENV}"
++    FVE_HOST="${FVE_REMOTE_HOST:-${FVE_HOST}}"
++    PUBLIC="${HIBS_PUBLIC_HOST:-${PUBLIC}}"
++    VPS_IP="${HIBS_VPS_IP:-${VPS_IP}}"
++  fi
++  FVE_HOST="${FVE_HOST:-77.68.89.75}"
++  FVE_PORT="${FVE_API_PORT:-8010}"
++  STACK_FVE_LOCAL=0
++  case "${FVE_HOST}" in
++    127.0.0.1|localhost|::1) STACK_FVE_LOCAL=1 ;;
++  esac
++  if [[ -n "${VPS_IP}" && "${FVE_HOST}" == "${VPS_IP}" ]]; then
++    STACK_FVE_LOCAL=1
++  fi
++}
+diff --git a/scripts/vps_three_stack_green.sh b/scripts/vps_three_stack_green.sh
+index f49bc3c..0c5d3ab 100755
+--- a/scripts/vps_three_stack_green.sh
++++ b/scripts/vps_three_stack_green.sh
+@@ -45,7 +45,15 @@ PY="${APP}/.venv/bin/python3"
+ football_ok=0
+ racing_ok=0
+ trading_ok=0
++lines_ok=0
+ fail=0
++FVE_HOST="${FVE_REMOTE_HOST:-127.0.0.1}"
++FVE_PORT="${FVE_API_PORT:-8010}"
++if [[ -f /etc/hibs-bet/stack.env ]]; then
++  # shellcheck disable=SC1091
++  source /etc/hibs-bet/stack.env
++  FVE_HOST="${FVE_REMOTE_HOST:-${FVE_HOST}}"
++fi
+ 
+ probe_http() {
+   curl -sS -o /dev/null -w '%{http_code}' --max-time "${2:-12}" "$1" 2>/dev/null || echo 000
+@@ -80,6 +88,10 @@ repair_all() {
+       racing_value_lane_run_full "${RACING}" "${APP}" || true
+     fi
+   fi
++  if [[ -f "${APP}/scripts/lib_fve_local_repair.sh" ]]; then
++    log "repair: line shopper / FVE local"
++    bash "${APP}/scripts/lib_fve_local_repair.sh" || true
++  fi
+ }
+ 
+ [[ "${REPAIR}" -eq 1 ]] && repair_all
+@@ -219,6 +231,48 @@ sys.exit(0 if service_restart_allowed('hibs-racing', min_minutes=45) else 1)
+     fail=1
+   fi
+ 
++  echo ""
++  log "LINE SHOPPER / FVE (arb)"
++  fve_health="$(probe_http "http://${FVE_HOST}:${FVE_PORT}/health" 10)"
++  echo "  fve health: ${fve_health} @ ${FVE_HOST}:${FVE_PORT}"
++  fve_worker=0
++  if [[ "${fve_health}" == "200" ]]; then
++    if curl -fsS --max-time 8 "http://${FVE_HOST}:${FVE_PORT}/health" 2>/dev/null | \
++      python3 -c "import json,sys; d=json.load(sys.stdin); w=d.get('worker') or {}; sys.exit(0 if w.get('alive') else 1)" 2>/dev/null; then
++      fve_worker=1
++      echo "  worker: alive"
++    else
++      echo "  worker: not alive"
++      if [[ "${REPAIR}" -eq 1 && -f "${APP}/scripts/lib_fve_local_repair.sh" ]]; then
++        bash "${APP}/scripts/lib_fve_local_repair.sh" || true
++        sleep 4
++        if curl -fsS --max-time 8 "http://${FVE_HOST}:${FVE_PORT}/health" 2>/dev/null | \
++          python3 -c "import json,sys; d=json.load(sys.stdin); w=d.get('worker') or {}; sys.exit(0 if w.get('alive') else 1)" 2>/dev/null; then
++          fve_worker=1
++          echo "  worker: alive after repair"
++        fi
++      fi
++    fi
++  elif [[ "${REPAIR}" -eq 1 && -f "${APP}/scripts/lib_fve_local_repair.sh" ]]; then
++    bash "${APP}/scripts/lib_fve_local_repair.sh" || true
++    fve_health="$(probe_http "http://${FVE_HOST}:${FVE_PORT}/health" 10)"
++    echo "  fve health after repair: ${fve_health}"
++    [[ "${fve_health}" == "200" ]] && fve_worker=1
++  fi
++  fve_fixtures="$(curl -fsS --max-time 10 http://127.0.0.1:8000/api/fve/fixtures 2>/dev/null | \
++    python3 -c 'import json,sys; d=json.load(sys.stdin); print(int(d.get("count") or 0))' 2>/dev/null || echo 0)"
++  echo "  fve fixtures export: ${fve_fixtures}"
++  if [[ "${fve_health}" == "200" && "${fve_worker}" -eq 1 ]]; then
++    lines_ok=1
++    echo "  LINE SHOPPER: GREEN"
++  elif [[ "${fve_health}" == "200" ]]; then
++    lines_ok=1
++    echo "  LINE SHOPPER: AMBER (API up, worker warming)"
++  else
++    echo "  LINE SHOPPER: RED"
++    fail=1
++  fi
++
+   echo ""
+   log "crons"
+   crontab -u www-data -l 2>/dev/null | grep -cE 'hibs-bet|hibs-racing|institutional' || echo "0"
+@@ -231,23 +285,26 @@ out = {
+   'football_green': ${football_ok} == 1,
+   'racing_green': ${racing_ok} == 1,
+   'trading_green': ${trading_ok} == 1,
+-  'all_green': ${football_ok} == 1 and ${racing_ok} == 1 and ${trading_ok} == 1,
++  'lines_green': ${lines_ok} == 1,
++  'all_green': ${football_ok} == 1 and ${racing_ok} == 1 and ${trading_ok} == 1 and ${lines_ok} == 1,
+   'football_ping': '${fb_ping}',
+   'racing_ping': '${rc_ping}',
+   'trading_live': '${tr_live}',
++  'fve_health': '${fve_health}',
++  'fve_fixtures': '${fve_fixtures}',
+ }
+ open('${STATUS_JSON}', 'w').write(json.dumps(out, indent=2))
+ print(json.dumps(out, indent=2))
+ "
+ 
+-  echo "===== summary: football=${football_ok} racing=${racing_ok} trading=${trading_ok} ====="
++  echo "===== summary: football=${football_ok} racing=${racing_ok} trading=${trading_ok} lines=${lines_ok} ====="
+ } | tee -a "${LOG_FILE}"
+ 
+ chown www-data:www-data "${LOG_FILE}" "${STATUS_JSON}" 2>/dev/null || true
+ 
+ if [[ "${fail}" -eq 0 ]]; then
+-  log "THREE STACK: GREEN"
++  log "FOUR STACK: GREEN"
+   exit 0
+ fi
+-warn "THREE STACK: issues — will retry on next cron cycle"
++warn "FOUR STACK: issues — will retry on next cron cycle"
+ exit 1
+-- 
+2.43.0
+
