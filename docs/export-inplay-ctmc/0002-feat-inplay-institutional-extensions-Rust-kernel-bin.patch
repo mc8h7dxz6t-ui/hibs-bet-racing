@@ -1,7 +1,7 @@
 From 1c512245a16483356aaa6109179f78043c39a1bd Mon Sep 17 00:00:00 2001
 From: Cursor Agent <cursoragent@cursor.com>
 Date: Wed, 17 Jun 2026 09:09:07 +0000
-Subject: [PATCH 2/5] =?UTF-8?q?feat(inplay):=20institutional=20extensions?=
+Subject: [PATCH 2/6] =?UTF-8?q?feat(inplay):=20institutional=20extensions?=
  =?UTF-8?q?=20=E2=80=94=20Rust=20kernel,=20binary=20feeds,=20venues,=20ML?=
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

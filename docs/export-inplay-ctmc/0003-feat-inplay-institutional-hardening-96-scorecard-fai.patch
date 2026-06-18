@@ -1,7 +1,7 @@
 From 1807fcf24c42312c683922a8831dab595a59c1a2 Mon Sep 17 00:00:00 2001
 From: Cursor Agent <cursoragent@cursor.com>
 Date: Wed, 17 Jun 2026 09:54:30 +0000
-Subject: [PATCH 3/5] =?UTF-8?q?feat(inplay):=20institutional++=20hardening?=
+Subject: [PATCH 3/6] =?UTF-8?q?feat(inplay):=20institutional++=20hardening?=
  =?UTF-8?q?=20=E2=80=94=2096%=20scorecard,=20failsafe,=20telemetry=20fix?=
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

@@ -1,7 +1,7 @@
 From 4bceff786b4e53ff3102bb252623dfd93ce27401 Mon Sep 17 00:00:00 2001
 From: Cursor Agent <cursoragent@cursor.com>
 Date: Wed, 17 Jun 2026 11:18:29 +0000
-Subject: [PATCH 4/5] feat(inplay): I1-I5 forward evidence gates and
+Subject: [PATCH 4/6] feat(inplay): I1-I5 forward evidence gates and
  buyer_ready audit
 
 Add evidence_store (feed frames, marks, CLV, paper hash tables),
