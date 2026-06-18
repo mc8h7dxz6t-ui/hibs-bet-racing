@@ -52,6 +52,8 @@ class HealthStatus:
     paper: dict | None = None
     cron: dict | None = None
     reliability: dict | None = None
+    latest_card_date: str | None = None
+    card_fresh: bool | None = None
 
     def to_dict(self) -> dict:
         out = {
@@ -93,6 +95,10 @@ class HealthStatus:
             out["cron"] = self.cron
         if self.reliability is not None:
             out["reliability"] = self.reliability
+        if self.latest_card_date is not None:
+            out["latest_card_date"] = self.latest_card_date
+        if self.card_fresh is not None:
+            out["card_fresh"] = self.card_fresh
         return out
 
 
@@ -211,6 +217,17 @@ def health_status() -> HealthStatus:
     tel = telemetry_balance if isinstance(telemetry_balance, dict) else {}
     if cov.get("coverage_pct") is not None and "coverage_pct" not in tel:
         tel = {**tel, "coverage_pct": float(cov.get("coverage_pct"))}
+    latest_card_date = None
+    card_fresh = None
+    if runners is not None and len(runners) > 0 and "card_date" in runners.columns:
+        try:
+            latest_card_date = str(runners["card_date"].astype(str).max())
+            card_fresh = latest_card_date >= today
+        except Exception:
+            latest_card_date = None
+    elif manifest is not None:
+        latest_card_date = manifest.card_date
+        card_fresh = str(latest_card_date) >= today if latest_card_date else False
     return HealthStatus(
         db_ok=db.exists(),
         runners_loaded=len(runners),
@@ -235,6 +252,8 @@ def health_status() -> HealthStatus:
         paper=paper_summary,
         cron=cron_summary,
         reliability=reliability_summary,
+        latest_card_date=latest_card_date,
+        card_fresh=card_fresh,
     )
 
 
