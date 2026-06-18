@@ -83,3 +83,6 @@ def test_health_payload_includes_paper_and_cron():
     assert "paper" in body
     assert "n_rows" in body["paper"]
     assert "cron" in body
+    assert "card_fresh" in body or body.get("latest_card_date") is not None
+    assert "execution" in body
+    assert body["execution"].get("disabled") is True

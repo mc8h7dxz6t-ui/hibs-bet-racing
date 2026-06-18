@@ -97,8 +97,13 @@ class HealthStatus:
             out["reliability"] = self.reliability
         if self.latest_card_date is not None:
             out["latest_card_date"] = self.latest_card_date
-        if self.card_fresh is not None:
-            out["card_fresh"] = self.card_fresh
+        out["card_fresh"] = self.card_fresh if self.card_fresh is not None else False
+        try:
+            from hibs_racing.live.execution_config import execution_summary
+
+            out["execution"] = execution_summary()
+        except Exception:
+            pass
         return out
 
 

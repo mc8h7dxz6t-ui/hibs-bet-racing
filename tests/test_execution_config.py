@@ -14,6 +14,7 @@ def test_analytics_mode_execution_disabled():
     assert summary["mode"] == "analytics"
     assert summary["dry_run"] is True
     assert summary["preferred_venues"] == []
+    assert summary.get("message")
 
 
 def test_betfair_configured_requires_all_creds(monkeypatch):
