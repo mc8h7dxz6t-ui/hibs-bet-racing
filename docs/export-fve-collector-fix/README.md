@@ -1,33 +1,26 @@
-# FVE lines collector fix (scrapers ModuleNotFoundError)
+# FVE collector fix
 
-Apply on hibs-bet when `--from-watchlist` fails inside FVE Docker:
+**Cause:** `scrapers` exists in `/opt/fve/scrapers` (inside the Docker image). Python adds `/app/scripts` to `sys.path` when you run `python scripts/fve_hibs_lines_collector.py`, so `import scrapers` fails unless `PYTHONPATH=/app`.
 
-```bash
-cd /opt/hibs-bet
-git fetch origin
-git checkout cursor/fix-fve-collector-fixtures-7e4d   # after merge
-# or:
-git am /path/to/0001-fix-fve-use-hibs-fixtures-API-for-lines-collector-in.patch
-```
-
-Immediate VPS workaround (no git):
+**Quickest fix on VPS** (paste as root):
 
 ```bash
-# 1. Replace broken cron (host python + --from-watchlist)
-( crontab -l 2>/dev/null | grep -vE 'fve_hibs_lines_collector|from-watchlist' || true ) | crontab -
-
-# 2. Run collector via docker with hibs fixture keys (skips if count=0)
-FIX=$(curl -sS http://127.0.0.1:8000/api/fve/fixtures | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-print(','.join(x['fixture_key'] for x in (d.get('fixtures') or [])[:20] if x.get('fixture_key')))
-")
+cd /opt/fve
+FIX=$(curl -sS http://127.0.0.1:8000/api/fve/fixtures | python3 -c "import json,sys; d=json.load(sys.stdin); print(','.join(x['fixture_key'] for x in (d.get('fixtures') or [])[:30] if x.get('fixture_key')))")
 if [[ -n "$FIX" ]]; then
-  cd /opt/fve
-  docker compose exec -T worker python scripts/fve_hibs_lines_collector.py --fixtures "$FIX"
+  docker compose exec -T -w /app worker env PYTHONPATH=/app python scripts/fve_hibs_lines_collector.py --fixtures "$FIX"
 else
-  echo "fixtures count=0 — copy .cache from old VPS or wait for API quota reset"
+  docker compose exec -T -w /app worker env PYTHONPATH=/app python scripts/fve_hibs_lines_collector.py --from-watchlist
 fi
+curl -sS http://127.0.0.1:8010/health | python3 -m json.tool | head -20
 ```
 
-Root blocker when `count=0`: warm football fixture disk cache (see four-stack migration notes).
+Replace broken cron:
+
+```bash
+( crontab -l 2>/dev/null | grep -vE 'fve_hibs_lines_collector|from-watchlist' || true
+  echo '*/5 * * * * HIBS_UPSTREAM_BASE_URL=http://127.0.0.1:8000 bash /opt/hibs-bet/scripts/run_fve_lines_collector.sh >> /var/log/fve/lines-collector.log 2>&1'
+) | crontab -
+```
+
+Copy `scripts/run_fve_lines_collector.sh` from hibs-bet if missing on VPS.

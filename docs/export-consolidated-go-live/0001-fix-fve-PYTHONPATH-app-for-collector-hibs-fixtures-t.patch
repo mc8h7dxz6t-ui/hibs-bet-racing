@@ -1,0 +1,117 @@
+From 9537851ba17e8ce503d88e61a7b040193e1fde3a Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Thu, 18 Jun 2026 21:21:32 +0000
+Subject: [PATCH] fix(fve): PYTHONPATH=/app for collector; hibs fixtures then
+ watchlist fallback
+
+---
+ scripts/run_fve_lines_collector.sh | 79 ++++++++++--------------------
+ 1 file changed, 27 insertions(+), 52 deletions(-)
+
+diff --git a/scripts/run_fve_lines_collector.sh b/scripts/run_fve_lines_collector.sh
+index fd56ab3..1458091 100755
+--- a/scripts/run_fve_lines_collector.sh
++++ b/scripts/run_fve_lines_collector.sh
+@@ -1,72 +1,47 @@
+ #!/usr/bin/env bash
+-# Pull FVE scrape-lines from hibs-bet /api/fve/lines using fixture keys from /api/fve/fixtures.
++# FVE lines collector — run inside Docker worker (fixes PYTHONPATH + uses hibs fixtures).
+ #
+-# Avoids --from-watchlist (needs scrapers.fotmob_client inside the FVE image). Run via cron or repair:
+-#
+-#   HIBS_UPSTREAM_BASE_URL=http://127.0.0.1:8000 bash /opt/hibs-bet/scripts/run_fve_lines_collector.sh
++#   bash /opt/hibs-bet/scripts/run_fve_lines_collector.sh
+ set -euo pipefail
+ 
+-APP="${DEPLOY_PATH:-/opt/hibs-bet}"
+ FVE_ROOT="${FVE_DEPLOY_PATH:-/opt/fve}"
+ HIBS_URL="${HIBS_UPSTREAM_BASE_URL:-http://127.0.0.1:8000}"
+-SCRAPE_DIR="${FVE_SCRAPE_LINES_DIR:-/var/lib/fve/scrape-lines}"
+-MAX_FIX="${FVE_COLLECTOR_MAX_FIXTURES:-20}"
++MAX_FIX="${FVE_COLLECTOR_MAX_FIXTURES:-30}"
+ 
+ log() { echo "[fve-collector] $*"; }
+ 
+-if [[ ! -f "${FVE_ROOT}/scripts/fve_hibs_lines_collector.py" ]]; then
+-  log "skip — no collector at ${FVE_ROOT}/scripts/fve_hibs_lines_collector.py"
+-  exit 0
+-fi
++[[ -f "${FVE_ROOT}/docker-compose.yml" ]] || { log "no ${FVE_ROOT}/docker-compose.yml"; exit 1; }
++command -v docker >/dev/null 2>&1 || { log "docker missing"; exit 1; }
+ 
+-export FVE_COLLECTOR_MAX_FIXTURES="${MAX_FIX}"
+ fixture_csv="$(
+   curl -fsS --max-time 15 "${HIBS_URL%/}/api/fve/fixtures" 2>/dev/null | \
+-    python3 -c "
++    MAX="${MAX_FIX}" python3 -c "
+ import json, os, sys
+-max_n = int(os.environ.get('FVE_COLLECTOR_MAX_FIXTURES', '20'))
+-try:
+-    d = json.load(sys.stdin)
+-except Exception:
+-    sys.exit(1)
+-keys = [
+-    x['fixture_key']
+-    for x in (d.get('fixtures') or [])
+-    if isinstance(x, dict) and x.get('fixture_key')
+-]
++max_n = int(os.environ.get('MAX', '30'))
++d = json.load(sys.stdin)
++keys = [x['fixture_key'] for x in (d.get('fixtures') or []) if isinstance(x, dict) and x.get('fixture_key')]
+ print(','.join(keys[:max_n]))
+ " 2>/dev/null || true
+ )"
+ 
+-if [[ -z "${fixture_csv}" ]]; then
+-  log "no fixtures from ${HIBS_URL}/api/fve/fixtures — skip (warm hibs .cache or wait for API quota reset)"
+-  exit 0
+-fi
+-
+-fixture_n="$(awk -F, '{print NF}' <<<"${fixture_csv}")"
+-mkdir -p "${SCRAPE_DIR}"
+-export HIBS_UPSTREAM_BASE_URL="${HIBS_URL}"
+-export FVE_SCRAPE_LINES_DIR="${SCRAPE_DIR}"
+-
+-run_via_docker() {
+-  docker compose -f "${FVE_ROOT}/docker-compose.yml" exec -T worker \
+-    python scripts/fve_hibs_lines_collector.py --fixtures "${fixture_csv}"
+-}
+-
+-run_via_host() {
+-  (
+-    cd "${FVE_ROOT}"
+-    python3 scripts/fve_hibs_lines_collector.py --fixtures "${fixture_csv}"
+-  )
++run_collector() {
++  local mode="$1"   # fixtures | watchlist
++  local extra=()
++  if [[ "${mode}" == "fixtures" ]]; then
++    extra=(--fixtures "${fixture_csv}")
++  else
++    extra=(--from-watchlist)
++  fi
++  docker compose -f "${FVE_ROOT}/docker-compose.yml" exec -T -w /app worker \
++    env PYTHONPATH=/app HIBS_UPSTREAM_BASE_URL="${HIBS_URL}" \
++    python scripts/fve_hibs_lines_collector.py "${extra[@]}"
+ }
+ 
+-if [[ -f "${FVE_ROOT}/docker-compose.yml" ]] && command -v docker >/dev/null 2>&1; then
+-  if docker compose -f "${FVE_ROOT}/docker-compose.yml" ps worker 2>/dev/null | grep -qE 'Up|running'; then
+-    log "docker worker — ${fixture_n} fixture(s)"
+-    run_via_docker
+-    exit $?
+-  fi
++if [[ -n "${fixture_csv}" ]]; then
++  n="$(awk -F, '{print NF}' <<<"${fixture_csv}")"
++  log "${n} fixture(s) from hibs — collecting lines"
++  run_collector fixtures
++else
++  log "hibs fixtures empty — FotMob watchlist (PYTHONPATH=/app)"
++  run_collector watchlist
+ fi
+-
+-log "host python3 — ${fixture_n} fixture(s)"
+-run_via_host
+-- 
+2.43.0
+
