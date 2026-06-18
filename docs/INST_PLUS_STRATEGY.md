@@ -51,6 +51,8 @@ You have **two distinct portfolios** — do not conflate them in pitch or pricin
 
 Built on `src/inst_spine/` — **zero sports imports**. Sell **individually**, not as one bundle.
 
+**Enterprise stack map:** `docs/INSTITUTIONAL_ENTERPRISE_STACK.md` — how Inst++ fits inside DV/IAS + NeMo/Bedrock nested firewalls.
+
 ### Core four (in build order)
 
 | # | Product | One job | Code status | Next to 95% |
@@ -71,6 +73,20 @@ All three are **thin product layers** on existing `inst_spine/` — no core file
 | **7** | **Health Telemetry Recorder** | **Medium (tech) / Hard (GTM)** | ~90% | HIPAA/DTAC packaging | Slow, high ticket | Planned |
 
 **Difficulty key:** Easy = fork `proxy_risk` + config; Medium = new domain logic + compliance docs; Hard = regulatory sales cycle, not Python.
+
+---
+
+### Institutional enterprise stack (sales reference)
+
+| Enterprise layer | Incumbents | Inst++ product |
+|------------------|------------|----------------|
+| LLM safety firewall | NeMo, Llama Guard, Guardrails AI, Bedrock | **None** — partner downstream |
+| Compliance & legal audit | CSV tools, GRC platforms | **#1 Compliance Logger** |
+| Outbound spend control | Finance alerts, scripts | **#6 Ad Guard** |
+| Pre-bid placement | DoubleVerify, IAS, Oracle Moat | **None** — complement only |
+| Inbound webhook reliability | Custom middleware | **#5 Webhook Mesh** |
+
+Full narrative: `docs/INSTITUTIONAL_ENTERPRISE_STACK.md`
 
 ---
 
@@ -131,7 +147,11 @@ All three are **thin product layers** on existing `inst_spine/` — no core file
 
 **One job:** Air-gapped **outbound** proxy on marketing API calls — kill when spend velocity is statistically anomalous, with genesis-anchored audit export.
 
-**Institutional positioning:** See `docs/AD_GUARD_INSTITUTIONAL_STACK.md` for enterprise landscape (DoubleVerify, IAS, NeMo, Bedrock) and where Inst++ fits in the nested firewall.
+### Institutional positioning (sales copy)
+
+> DV/IAS guard **placement**. NeMo/Bedrock guard **creative**. Inst++ Ad Guard guards **spend leaving the account** — with a genesis-anchored audit trail legal can replay without calling us.
+
+See `docs/INSTITUTIONAL_ENTERPRISE_STACK.md` and `docs/AD_GUARD_INSTITUTIONAL_STACK.md`.
 
 ### Where Inst++ sits in the enterprise stack
 
@@ -379,7 +399,8 @@ python3 -m inst_spine.export_cli data/ledger.sqlite --repro-check
 
 ## Related docs
 
-- `docs/AD_GUARD_INSTITUTIONAL_STACK.md` — enterprise ad guardrail landscape + Inst++ slot
+- `docs/INSTITUTIONAL_ENTERPRISE_STACK.md` — DV/IAS/NeMo/Bedrock map + nested firewall
+- `docs/AD_GUARD_INSTITUTIONAL_STACK.md` — Product #6 deep dive
 - `docs/INST_PLUS_TEST_AND_DEMO.md` — test, demo, and advertise playbook
 - `docs/NEW_PRODUCT_INST_PLUS_ROADMAPS.md` — technical roadmaps v3
 - `docs/PORTFOLIO_DEEP_DIVE.md` — racing gate lanes

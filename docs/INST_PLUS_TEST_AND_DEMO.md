@@ -30,6 +30,20 @@ chmod +x scripts/instpp_smoke_test.sh scripts/export_*.sh
 
 ---
 
+### Institutional stack (enterprise buyers)
+
+| Layer | Incumbent | Inst++ |
+|-------|-----------|--------|
+| Pre-bid (DV/IAS) | Placement + fraud | **Complement** — don't compete |
+| GenAI (NeMo/Bedrock) | Creative safety | **Downstream** — spend after approval |
+| Compliance audit | CSV / GRC | **#1 Compliance Logger** |
+| Marketing API spend | Scripts / alerts | **#6 Ad Guard** |
+| Webhook billing | Custom code | **#5 Webhook Mesh** |
+
+Full map: `docs/INSTITUTIONAL_ENTERPRISE_STACK.md`
+
+---
+
 ## Product 5 — Webhook Idempotency Mesh
 
 ### Start server

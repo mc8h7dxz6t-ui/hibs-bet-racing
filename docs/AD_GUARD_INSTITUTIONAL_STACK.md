@@ -3,6 +3,8 @@
 **Product #6:** Outbound marketing API spend guard + cryptographic audit trail.  
 **One job:** Kill statistically anomalous spend velocity before dollars leave the agency account — with tamper-evident evidence.
 
+> **Full enterprise map:** `docs/INSTITUTIONAL_ENTERPRISE_STACK.md` — two pillars (pre-bid + GenAI), nested firewall, all Inst++ products mapped.
+
 ---
 
 ## Where Inst++ fits (and where it does not)
@@ -25,24 +27,24 @@ Enterprise ad guardrails split into **two pillars**. Inst++ Ad Guard occupies a 
 [ GenAI Marketing Input ]
               │
               ▼
- ┌─────────────────────────┐
- │   LLM SAFETY FIREWALL   │  NeMo / Llama Guard / Bedrock Guardrails
- │   (NOT Inst++ Ad Guard) │  Blocks prompt injection & brand violations
- └────────────┬────────────┘
-              │ (Approved Copy/Asset)
-              ▼
- ┌─────────────────────────┐
- │   COMPLIANCE & SPEND    │  ◄── Inst++ Ad Guard (#6)
- │   CONTROL LAYER         │      Z-score spend drift, per-campaign bucket
- └────────────┬────────────┘      WAL + genesis audit export
-              │ (Locked Assets)
-              ▼
- ┌─────────────────────────┐
- │     ENTERPRISE DSP      │  Integrates DoubleVerify / IAS pre-bid
- └────────────┬────────────┘
-              │ (Sub-millisecond placement auction)
-              ▼
-     [ Verified Safe Ad ]
+┌─────────────────────────┐
+│   LLM SAFETY FIREWALL   │  NeMo / Llama Guard / Guardrails AI / Bedrock
+│   (NOT Inst++)          │  ► Blocks prompt injection & brand violations
+└────────────┬────────────┘
+             │ (Approved Copy/Asset)
+             ▼
+┌─────────────────────────┐
+│   COMPLIANCE & LEGAL    │  Inst++ Compliance Logger (#1) — decision audit
+│   + SPEND CONTROL       │  Inst++ Ad Guard (#6) — spend velocity kill  ◄── YOU ARE HERE
+└────────────┬────────────┘
+             │ (Locked Assets)
+             ▼
+┌─────────────────────────┐
+│     ENTERPRISE DSP      │  Integrates DoubleVerify / IAS pre-bid
+└────────────┬────────────┘
+             │ (Sub-millisecond placement auction)
+             ▼
+    [ Verified Safe Ad ]
 ```
 
 **Deployment pattern:** Air-gapped proxy between marketing automation scripts and Google Ads / Meta Marketing API. All outbound mutations pass through `ad_guard` before reaching the network.
@@ -51,14 +53,29 @@ Enterprise ad guardrails split into **two pillars**. Inst++ Ad Guard occupies a 
 
 ## Institutional-grade capability matrix
 
-| Capability | Mid-market tools | DV / IAS (pre-bid) | NeMo / Bedrock (GenAI) | **Inst++ Ad Guard** |
-|------------|------------------|--------------------|-------------------------|---------------------|
-| **Latency** | Async / minutes | Sub-ms pre-bid | ~10–100ms inference | **<10ms** API proxy (memory gates) |
-| **SLA posture** | 99% web hosting | 99.999% + penalties | Cloud-managed | **VPC / on-prem** — buyer-operated |
-| **Data privacy** | Shared cloud | Enterprise contracts | Vendor cloud | **Zero-retention proxy** — WAL local only |
-| **Compliance proof** | CSV dashboards | SOC 2 + contractual metrics | Model cards | **Genesis chain + deterministic export** |
-| **Customisation** | Keyword blocklists | Custom brand suitability NLP | Programmable rails | **Per-campaign Z-score + token bucket** |
-| **Spend velocity kill** | Finance alerts (lagging) | Pre-bid placement block | N/A | **Real-time circuit KILL** |
+Industry framing — what procurement compares:
+
+| Capability | Mid-market tools | Institutional-grade (DV / IAS / NeMo) | **Inst++ Ad Guard** |
+|------------|------------------|----------------------------------------|---------------------|
+| **Latency** | Async / minutes after event | Sub-ms pre-bid or real-time LLM | **<10ms** API proxy |
+| **SLA & uptime** | 99% web hosting | 99.999% + breach penalties | VPC/on-prem — buyer SLA |
+| **Data privacy** | Shared cloud / scraping | Zero-retention enterprise contracts | Local WAL — no vendor cloud |
+| **Compliance proof** | CSV downloads | SOC 2, ISO 27001, contract metrics | Genesis chain + repro-check export |
+| **Customisation** | Keyword blocklists | Custom NLP / legal playbooks | Per-campaign Z-score + bucket |
+| **Spend velocity kill** | Finance alerts (lagging) | Pre-bid block (placement) | Real-time circuit KILL (API spend) |
+
+Expanded comparison across all Inst++ products: `docs/INSTITUTIONAL_ENTERPRISE_STACK.md`.
+
+### Layer-specific matrix (ad stack only)
+
+| Capability | DV / IAS (pre-bid) | NeMo / Bedrock (GenAI) | **Inst++ Ad Guard** |
+|------------|--------------------|-------------------------|---------------------|
+| **Latency** | Sub-ms pre-bid | ~10–100ms inference | **<10ms** API proxy (memory gates) |
+| **SLA posture** | 99.999% + penalties | Cloud-managed | **VPC / on-prem** — buyer-operated |
+| **Data privacy** | Enterprise contracts | Vendor cloud | **Zero-retention proxy** — WAL local only |
+| **Compliance proof** | SOC 2 + contractual metrics | Model cards | **Genesis chain + deterministic export** |
+| **Customisation** | Custom brand suitability NLP | Programmable rails | **Per-campaign Z-score + token bucket** |
+| **Spend velocity kill** | Pre-bid placement block | N/A | **Real-time circuit KILL** |
 
 ---
 
@@ -167,6 +184,8 @@ Same spine as Proxy-Risk — forked config:
 
 ## Related
 
+- `docs/INSTITUTIONAL_ENTERPRISE_STACK.md` — full two-pillar map + sales narrative
 - `docs/INST_PLUS_STRATEGY.md` — portfolio strategy
+- `docs/INST_PLUS_TEST_AND_DEMO.md` — demo commands
 - `src/proxy_risk/` — fork base
 - `src/inst_spine/rates.py` — token bucket + Z-score math
