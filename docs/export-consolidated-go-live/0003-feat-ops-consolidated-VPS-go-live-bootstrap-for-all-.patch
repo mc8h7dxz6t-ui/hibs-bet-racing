@@ -1,0 +1,326 @@
+From 7dc095a4f7bd22af54d895e4e301d284dcc86aa9 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Thu, 18 Jun 2026 21:37:19 +0000
+Subject: [PATCH 3/3] feat(ops): consolidated VPS go-live bootstrap for all
+ four stacks
+
+Add bootstrap_consolidated_vps_go_live.sh to install/sync football, racing,
+trading shadow soak, and local FVE Docker on one box. Add install_fve_lines_stack.sh,
+default FVE upstream to localhost when stack.env says 127.0.0.1, and detect local
+/opt/fve when stack.env is missing.
+---
+ deploy/apply-vps-fve-line-trader.sh           |  10 +-
+ scripts/bootstrap_consolidated_vps_go_live.sh | 190 ++++++++++++++++++
+ scripts/install_four_stack_automation.sh      |   5 +-
+ scripts/install_fve_lines_stack.sh            |  44 ++++
+ scripts/lib_stack_host.sh                     |   8 +-
+ 5 files changed, 254 insertions(+), 3 deletions(-)
+ create mode 100755 scripts/bootstrap_consolidated_vps_go_live.sh
+ create mode 100755 scripts/install_fve_lines_stack.sh
+
+diff --git a/deploy/apply-vps-fve-line-trader.sh b/deploy/apply-vps-fve-line-trader.sh
+index b00b018..1981f16 100755
+--- a/deploy/apply-vps-fve-line-trader.sh
++++ b/deploy/apply-vps-fve-line-trader.sh
+@@ -8,8 +8,16 @@ set -euo pipefail
+ 
+ APP="${DEPLOY_PATH:-/opt/hibs-bet}"
+ FVE_ROOT="${FVE_DEPLOY_PATH:-/opt/fve}"
+-HIBS_URL="${HIBS_UPSTREAM_BASE_URL:-https://hibs-bet.co.uk}"
+ PUBLIC_HOST="${HIBS_PUBLIC_HOST:-hibs-bet.co.uk}"
++HIBS_URL="${HIBS_UPSTREAM_BASE_URL:-}"
++if [[ -z "${HIBS_URL}" && -f /etc/hibs-bet/stack.env ]]; then
++  # shellcheck disable=SC1091
++  source /etc/hibs-bet/stack.env
++  if [[ "${FVE_REMOTE_HOST:-}" == "127.0.0.1" || "${FVE_REMOTE_HOST:-}" == "${HIBS_VPS_IP:-}" ]]; then
++    HIBS_URL="http://127.0.0.1:8000"
++  fi
++fi
++[[ -n "${HIBS_URL}" ]] || HIBS_URL="https://${PUBLIC_HOST}"
+ SCRAPE_DIR="${FVE_SCRAPE_LINES_DIR:-/var/lib/fve/scrape-lines}"
+ FVE_PORT="${FVE_API_PORT:-8010}"
+ BRANCH="${HIBS_FVE_RAW_BRANCH:-main}"
+diff --git a/scripts/bootstrap_consolidated_vps_go_live.sh b/scripts/bootstrap_consolidated_vps_go_live.sh
+new file mode 100755
+index 0000000..33a7f3b
+--- /dev/null
++++ b/scripts/bootstrap_consolidated_vps_go_live.sh
+@@ -0,0 +1,190 @@
++#!/usr/bin/env bash
++# One-shot go-live for all four pill-switcher stacks on a single VPS.
++#
++# Football · Racing · Trading · Lines (FVE Docker @ 127.0.0.1:8010)
++#
++# Run on the new box as root (after DNS points here and .env secrets exist):
++#   sudo HIBS_VPS_IP=87.106.100.52 HIBS_PUBLIC_HOST=hibs-bet.co.uk \
++#     bash /opt/hibs-bet/scripts/bootstrap_consolidated_vps_go_live.sh
++#
++# From Mac (SSH):
++#   DEPLOY_HOST=87.106.100.52 ./scripts/bootstrap_consolidated_vps_go_live.sh --remote
++set -euo pipefail
++
++APP="${DEPLOY_PATH:-/opt/hibs-bet}"
++RACING="${HIBS_RACING_DEPLOY_PATH:-/opt/hibs-racing}"
++TRADING="${TRADING_INSTALL_ROOT:-/opt/trading-core}"
++FVE="${FVE_DEPLOY_PATH:-/opt/fve}"
++PUBLIC="${HIBS_PUBLIC_HOST:-hibs-bet.co.uk}"
++VPS_IP="${HIBS_VPS_IP:-87.106.100.52}"
++REMOTE=0
++
++for arg in "$@"; do
++  [[ "${arg}" == "--remote" ]] && REMOTE=1
++done
++
++if [[ "${REMOTE}" -eq 1 ]]; then
++  HOST="${DEPLOY_HOST:-${VPS_IP}}"
++  USER="${DEPLOY_USER:-root}"
++  exec ssh -o BatchMode=yes -o ConnectTimeout=30 "${USER}@${HOST}" \
++    "export DEPLOY_PATH='${APP}' HIBS_RACING_DEPLOY_PATH='${RACING}' TRADING_INSTALL_ROOT='${TRADING}' \
++     FVE_DEPLOY_PATH='${FVE}' HIBS_PUBLIC_HOST='${PUBLIC}' HIBS_VPS_IP='${VPS_IP}'; \
++     bash '${APP}/scripts/bootstrap_consolidated_vps_go_live.sh'"
++fi
++
++step() { echo ""; echo "========== $* =========="; }
++warn() { echo "[go-live] WARN: $*" >&2; }
++log() { echo "[go-live] $*"; }
++
++[[ "$(id -u)" -eq 0 ]] || { echo "run as root on VPS" >&2; exit 1; }
++[[ -d "${APP}/deploy" ]] || { echo "missing ${APP} — clone/sync hibs-bet first" >&2; exit 1; }
++
++step "0) OS packages (docker, nginx, python venv)"
++export DEBIAN_FRONTEND=noninteractive
++apt-get update -qq
++apt-get install -y -qq curl rsync git nginx python3 python3-venv python3-pip ca-certificates \
++  docker.io 2>/dev/null || apt-get install -y -qq curl rsync git nginx python3 python3-venv docker.io
++if ! docker compose version >/dev/null 2>&1; then
++  apt-get install -y -qq docker-compose-plugin 2>/dev/null || true
++fi
++systemctl enable --now docker nginx 2>/dev/null || true
++
++step "1) Consolidated stack.env (local FVE)"
++mkdir -p /etc/hibs-bet /var/log/hibs-bet /var/log/fve /var/lib/fve/scrape-lines
++cat >/etc/hibs-bet/stack.env <<EOF
++FVE_REMOTE_HOST=127.0.0.1
++HIBS_PUBLIC_HOST=${PUBLIC}
++HIBS_VPS_IP=${VPS_IP}
++EOF
++
++step "2) Sync latest code"
++if [[ -f "${APP}/deploy/vps-sync-from-github.sh" ]]; then
++  HIBS_SYNC_REF="${HIBS_SYNC_REF:-main}" APP_ROOT="${APP}" \
++    bash "${APP}/deploy/vps-sync-from-github.sh"
++fi
++if [[ -f "${APP}/deploy/vps-sync-racing-from-github.sh" ]]; then
++  HIBS_RACING_SYNC_REF="${HIBS_RACING_SYNC_REF:-main}" HIBS_RACING_DEPLOY_PATH="${RACING}" \
++    bash "${APP}/deploy/vps-sync-racing-from-github.sh" || warn "racing sync failed — set racing_github_token or deploy from Mac"
++fi
++
++step "3) Football (hibs-bet)"
++mkdir -p "${APP}/logs" "${APP}/.cache"
++if [[ ! -f "${APP}/.env" && -f "${APP}/.env.example" ]]; then
++  cp "${APP}/.env.example" "${APP}/.env"
++  warn "created ${APP}/.env from example — verify API keys"
++fi
++[[ -f "${APP}/deploy/dedupe-env.sh" ]] && bash "${APP}/deploy/dedupe-env.sh" || true
++if [[ ! -x "${APP}/.venv/bin/python3" ]]; then
++  python3 -m venv "${APP}/.venv"
++  "${APP}/.venv/bin/pip" install -q --upgrade pip setuptools wheel
++  "${APP}/.venv/bin/pip" install -q -r "${APP}/requirements.txt"
++fi
++chown -R www-data:www-data "${APP}/logs" "${APP}/.cache" "${APP}/.env" 2>/dev/null || true
++chmod 640 "${APP}/.env" 2>/dev/null || true
++cp "${APP}/deploy/hibs-bet.service" /etc/systemd/system/hibs-bet.service
++systemctl daemon-reload
++systemctl enable hibs-bet
++systemctl restart hibs-bet
++sleep 3
++
++step "4) Racing (hibs-racing)"
++if [[ -d "${RACING}/src" || -d "${RACING}/hibs_racing" ]]; then
++  if [[ ! -x "${RACING}/.venv/bin/python3" ]]; then
++    python3 -m venv "${RACING}/.venv"
++    "${RACING}/.venv/bin/pip" install -q -r "${RACING}/requirements.txt"
++    [[ -f "${RACING}/pyproject.toml" || -f "${RACING}/setup.py" ]] && \
++      "${RACING}/.venv/bin/pip" install -q -e "${RACING}" || true
++  fi
++  mkdir -p "${RACING}/data" /var/log/hibs-racing
++  touch "${RACING}/.env"
++  grep -q '^HIBS_URL_PREFIX=' "${RACING}/.env" 2>/dev/null || echo 'HIBS_URL_PREFIX=/racing' >>"${RACING}/.env"
++  chown -R www-data:www-data "${RACING}" 2>/dev/null || true
++  cp "${APP}/deploy/hibs-racing.service" /etc/systemd/system/hibs-racing.service
++  systemctl daemon-reload
++  systemctl enable hibs-racing
++  systemctl restart hibs-racing
++  sleep 4
++else
++  warn "racing tree missing at ${RACING} — pill /racing/ will 502 until synced"
++fi
++
++step "5) Trading (shadow soak :9108)"
++mkdir -p "${TRADING}"
++if [[ ! -f "${TRADING}/deploy/install-harvested-execution-shadow.sh" ]]; then
++  log "seed trading-core from hibs-bet"
++  rsync -a \
++    --exclude '.git/' --exclude '.venv/' --exclude '.cache/' --exclude 'data/' --exclude '.env' \
++    "${APP}/" "${TRADING}/"
++fi
++if [[ ! -x "${TRADING}/.venv/bin/python3" ]]; then
++  python3 -m venv "${TRADING}/.venv"
++  "${TRADING}/.venv/bin/pip" install -q --upgrade pip setuptools wheel
++  "${TRADING}/.venv/bin/pip" install -q -r "${TRADING}/requirements.txt" 2>/dev/null || \
++    "${TRADING}/.venv/bin/pip" install -q -e "${TRADING}" 2>/dev/null || true
++fi
++if [[ ! -f /etc/trading_secrets && -f "${APP}/deploy/trading_secrets.template" ]]; then
++  cp "${APP}/deploy/trading_secrets.template" /etc/trading_secrets
++  chmod 600 /etc/trading_secrets
++  warn "created /etc/trading_secrets from template — add Alpaca paper keys then re-run step 5"
++fi
++if [[ -f /etc/trading_secrets ]] && grep -qE '^ALPACA_API_KEY=' /etc/trading_secrets 2>/dev/null; then
++  systemctl stop trading-paper 2>/dev/null || true
++  TRADING_INSTALL_ROOT="${TRADING}" bash "${TRADING}/deploy/install-harvested-execution-shadow.sh" \
++    --install-root "${TRADING}" || warn "trading shadow install failed — check /etc/trading_secrets"
++else
++  warn "trading skipped — fill /etc/trading_secrets (Alpaca paper keys) and re-run"
++fi
++
++step "6) FVE / line shopper (Docker :8010)"
++HIBS_UPSTREAM_BASE_URL=http://127.0.0.1:8000 HIBS_PUBLIC_HOST="${PUBLIC}" \
++  DEPLOY_PATH="${APP}" FVE_DEPLOY_PATH="${FVE}" \
++  bash "${APP}/deploy/apply-vps-fve-line-trader.sh" || warn "FVE apply failed"
++if [[ -f "${APP}/scripts/run_fve_lines_collector.sh" ]]; then
++  HIBS_UPSTREAM_BASE_URL=http://127.0.0.1:8000 FVE_DEPLOY_PATH="${FVE}" \
++    bash "${APP}/scripts/run_fve_lines_collector.sh" || true
++fi
++
++step "7) nginx + product links"
++export DEPLOY_PATH="${APP}" HIBS_RACING_DEPLOY_PATH="${RACING}" TRADING_INSTALL_ROOT="${TRADING}"
++bash "${APP}/deploy/apply-vps-racing-link.sh" 2>/dev/null || true
++[[ -d "${TRADING}" ]] && bash "${APP}/deploy/apply-vps-trading-link.sh" 2>/dev/null || true
++if [[ -f "${APP}/deploy/hibs-bet.nginx.conf" && ! -f /etc/nginx/sites-enabled/hibs-bet ]]; then
++  cp "${APP}/deploy/hibs-bet.nginx.conf" /etc/nginx/sites-available/hibs-bet
++  ln -sf /etc/nginx/sites-available/hibs-bet /etc/nginx/sites-enabled/hibs-bet
++  rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
++fi
++nginx -t 2>/dev/null && systemctl reload nginx || warn "nginx config needs certbot/TLS review"
++
++step "8) Hands-off automation (30m repair loop)"
++if [[ -f "${APP}/scripts/install_four_stack_automation.sh" ]]; then
++  HIBS_VPS_IP="${VPS_IP}" HIBS_PUBLIC_HOST="${PUBLIC}" \
++    bash "${APP}/scripts/install_four_stack_automation.sh"
++else
++  bash "${APP}/scripts/install_hands_off_automation.sh" 2>/dev/null || true
++fi
++
++step "9) Four-stack verify + repair"
++bash "${APP}/scripts/vps_three_stack_green.sh" --repair || true
++
++cat <<EOF
++
++========== CONSOLIDATED VPS GO-LIVE COMPLETE ==========
++
++  Football   https://${PUBLIC}/
++  Racing     https://${PUBLIC}/racing/
++  Trading    https://${PUBLIC}/harvested-execution
++  Lines/Arb  https://${PUBLIC}/line-trader
++
++Local probes:
++  curl -sS http://127.0.0.1:8000/api/ping
++  curl -sS http://127.0.0.1:5003/api/ping
++  curl -sS http://127.0.0.1:9108/live
++  curl -sS http://127.0.0.1:8010/health | python3 -m json.tool | head -16
++
++Status JSON:
++  cat /var/log/hibs-bet/three-stack-status.json
++  cat /var/log/hibs-bet/stack-wiring.json
++
++Re-arm anytime:
++  sudo bash ${APP}/scripts/bootstrap_consolidated_vps_go_live.sh
++EOF
+diff --git a/scripts/install_four_stack_automation.sh b/scripts/install_four_stack_automation.sh
+index d1979a6..06d60f4 100755
+--- a/scripts/install_four_stack_automation.sh
++++ b/scripts/install_four_stack_automation.sh
+@@ -2,7 +2,10 @@
+ # One-shot: arm hands-off automation for all four pill-switcher products on one VPS.
+ # Football · Racing · Trading · Line shopper (FVE / arb)
+ #
+-# Consolidated box (87.106.100.52 or any single host):
++# First-time go-live on a new consolidated box — use bootstrap instead:
++#   sudo bash /opt/hibs-bet/scripts/bootstrap_consolidated_vps_go_live.sh
++#
++# Re-arm automation only (services already installed):
+ #   sudo HIBS_VPS_IP=87.106.100.52 bash /opt/hibs-bet/scripts/install_four_stack_automation.sh
+ #
+ # From Mac:
+diff --git a/scripts/install_fve_lines_stack.sh b/scripts/install_fve_lines_stack.sh
+new file mode 100755
+index 0000000..8556b69
+--- /dev/null
++++ b/scripts/install_fve_lines_stack.sh
+@@ -0,0 +1,44 @@
++#!/usr/bin/env bash
++# Install or verify local FVE line-shopper stack (consolidated VPS @ 127.0.0.1).
++#
++#   sudo bash /opt/hibs-bet/scripts/install_fve_lines_stack.sh
++#   sudo bash /opt/hibs-bet/scripts/install_fve_lines_stack.sh --verify
++set -euo pipefail
++
++APP="${DEPLOY_PATH:-/opt/hibs-bet}"
++FVE="${FVE_DEPLOY_PATH:-/opt/fve}"
++VERIFY=0
++
++for arg in "$@"; do
++  [[ "${arg}" == "--verify" ]] && VERIFY=1
++done
++
++[[ "$(id -u)" -eq 0 ]] || { echo "run as root" >&2; exit 1; }
++
++mkdir -p /etc/hibs-bet
++if [[ ! -f /etc/hibs-bet/stack.env ]]; then
++  cat >/etc/hibs-bet/stack.env <<EOF
++FVE_REMOTE_HOST=127.0.0.1
++HIBS_PUBLIC_HOST=${HIBS_PUBLIC_HOST:-hibs-bet.co.uk}
++HIBS_VPS_IP=${HIBS_VPS_IP:-127.0.0.1}
++EOF
++fi
++
++HIBS_UPSTREAM_BASE_URL=http://127.0.0.1:8000 DEPLOY_PATH="${APP}" FVE_DEPLOY_PATH="${FVE}" \
++  bash "${APP}/deploy/apply-vps-fve-line-trader.sh"
++
++if [[ -f "${APP}/scripts/run_fve_lines_collector.sh" ]]; then
++  HIBS_UPSTREAM_BASE_URL=http://127.0.0.1:8000 FVE_DEPLOY_PATH="${FVE}" \
++    bash "${APP}/scripts/run_fve_lines_collector.sh" || true
++fi
++
++if [[ -f "${APP}/scripts/lib_fve_local_repair.sh" ]]; then
++  bash "${APP}/scripts/lib_fve_local_repair.sh" || true
++fi
++
++if [[ "${VERIFY}" -eq 1 ]]; then
++  echo "==> FVE health"
++  curl -fsS --max-time 10 "http://127.0.0.1:8010/health" | python3 -m json.tool | head -24 || true
++  echo "==> hibs fixtures export"
++  curl -fsS --max-time 10 "http://127.0.0.1:8000/api/fve/fixtures" | python3 -m json.tool | head -16 || true
++fi
+diff --git a/scripts/lib_stack_host.sh b/scripts/lib_stack_host.sh
+index feb2540..a33a306 100755
+--- a/scripts/lib_stack_host.sh
++++ b/scripts/lib_stack_host.sh
+@@ -17,7 +17,13 @@ stack_load_env() {
+     PUBLIC="${HIBS_PUBLIC_HOST:-${PUBLIC}}"
+     VPS_IP="${HIBS_VPS_IP:-${VPS_IP}}"
+   fi
+-  FVE_HOST="${FVE_HOST:-77.68.89.75}"
++  if [[ -z "${FVE_HOST}" ]]; then
++    if [[ -f "${FVE_DEPLOY_PATH:-/opt/fve}/docker-compose.yml" ]]; then
++      FVE_HOST="127.0.0.1"
++    else
++      FVE_HOST="77.68.89.75"
++    fi
++  fi
+   FVE_PORT="${FVE_API_PORT:-8010}"
+   STACK_FVE_LOCAL=0
+   case "${FVE_HOST}" in
+-- 
+2.43.0
+
