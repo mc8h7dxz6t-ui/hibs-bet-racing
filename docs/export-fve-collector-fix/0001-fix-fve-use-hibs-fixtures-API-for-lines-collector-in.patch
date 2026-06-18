@@ -1,0 +1,200 @@
+From 4830f824348e07f252dc8d22a195c6f51b2ca180 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Thu, 18 Jun 2026 21:18:06 +0000
+Subject: [PATCH] fix(fve): use hibs fixtures API for lines collector instead
+ of watchlist
+
+--from-watchlist imports scrapers.fotmob_client which is not available in
+the FVE Docker worker image, causing ModuleNotFoundError on every repair
+and cron tick.
+
+Add run_fve_lines_collector.sh to pull fixture keys from /api/fve/fixtures
+and run the collector with --fixtures via docker compose exec.
+---
+ deploy/apply-vps-fve-line-trader.sh   | 11 ++--
+ deploy/bootstrap-fve-dedicated-1gb.sh | 24 ++++++---
+ scripts/lib_fve_local_repair.sh       | 17 ++-----
+ scripts/run_fve_lines_collector.sh    | 72 +++++++++++++++++++++++++++
+ 4 files changed, 101 insertions(+), 23 deletions(-)
+ create mode 100755 scripts/run_fve_lines_collector.sh
+
+diff --git a/deploy/apply-vps-fve-line-trader.sh b/deploy/apply-vps-fve-line-trader.sh
+index a390bd3..b00b018 100755
+--- a/deploy/apply-vps-fve-line-trader.sh
++++ b/deploy/apply-vps-fve-line-trader.sh
+@@ -83,8 +83,8 @@ TOKEN_ENV=""
+ if [[ -n "${LINES_TOKEN}" ]]; then
+   TOKEN_ENV="HIBS_UPSTREAM_TOKEN=${LINES_TOKEN}"
+ fi
+-CRON_LINE="*/5 * * * * cd ${FVE_ROOT} && HIBS_UPSTREAM_BASE_URL=${HIBS_URL} FVE_SCRAPE_LINES_DIR=${SCRAPE_DIR} ${TOKEN_ENV} /usr/bin/python3 scripts/fve_hibs_lines_collector.py --from-watchlist >> /var/log/fve/lines-collector.log 2>&1"
+-( crontab -l 2>/dev/null | grep -v 'fve_hibs_lines_collector' || true; echo "${CRON_LINE}" ) | crontab -
++CRON_LINE="*/5 * * * * DEPLOY_PATH=${APP} FVE_DEPLOY_PATH=${FVE_ROOT} HIBS_UPSTREAM_BASE_URL=${HIBS_URL} FVE_SCRAPE_LINES_DIR=${SCRAPE_DIR} ${TOKEN_ENV} bash ${APP}/scripts/run_fve_lines_collector.sh >> /var/log/fve/lines-collector.log 2>&1"
++( crontab -l 2>/dev/null | grep -vE 'fve_hibs_lines_collector|run_fve_lines_collector' || true; echo "${CRON_LINE}" ) | crontab -
+ 
+ log "5/6 — start FVE API + ingest worker (docker profile ingest)"
+ if [[ -f "${FVE_ROOT}/docker-compose.yml" ]]; then
+@@ -95,9 +95,10 @@ else
+   echo "  curl -fsSL ${RAW}/scripts/vps_unpause_fve_scrape_stack.sh | sudo bash"
+ fi
+ 
+-if [[ -f "${FVE_ROOT}/scripts/fve_hibs_lines_collector.py" ]]; then
+-  (cd "${FVE_ROOT}" && HIBS_UPSTREAM_BASE_URL="${HIBS_URL}" FVE_SCRAPE_LINES_DIR="${SCRAPE_DIR}" ${TOKEN_ENV} \
+-    python3 scripts/fve_hibs_lines_collector.py --from-watchlist) || true
++if [[ -f "${APP}/scripts/run_fve_lines_collector.sh" ]]; then
++  DEPLOY_PATH="${APP}" FVE_DEPLOY_PATH="${FVE_ROOT}" HIBS_UPSTREAM_BASE_URL="${HIBS_URL}" \
++    FVE_SCRAPE_LINES_DIR="${SCRAPE_DIR}" ${TOKEN_ENV} \
++    bash "${APP}/scripts/run_fve_lines_collector.sh" || true
+ fi
+ 
+ log "6/6 — nginx /fve-api proxy (when nginx present)"
+diff --git a/deploy/bootstrap-fve-dedicated-1gb.sh b/deploy/bootstrap-fve-dedicated-1gb.sh
+index 32a37d7..ad5e3a0 100755
+--- a/deploy/bootstrap-fve-dedicated-1gb.sh
++++ b/deploy/bootstrap-fve-dedicated-1gb.sh
+@@ -14,6 +14,7 @@
+ set -euo pipefail
+ 
+ FVE_ROOT="${FVE_DEPLOY_PATH:-/opt/fve}"
++APP="${DEPLOY_PATH:-/opt/hibs-bet}"
+ FVE_PORT="${FVE_API_PORT:-8010}"
+ HIBS_URL="${HIBS_UPSTREAM_BASE_URL:-https://hibs-bet.co.uk}"
+ HIBS_MAIN_IP="${HIBS_MAIN_IP:-}"
+@@ -174,12 +175,23 @@ TOKEN_ENV=""
+ if [[ -n "${HIBS_UPSTREAM_TOKEN:-}" ]]; then
+   TOKEN_ENV="HIBS_UPSTREAM_TOKEN=${HIBS_UPSTREAM_TOKEN}"
+ fi
+-CRON_LINE="*/5 * * * * cd ${FVE_ROOT} && HIBS_UPSTREAM_BASE_URL=${HIBS_URL} FVE_SCRAPE_LINES_DIR=${SCRAPE_DIR} ${TOKEN_ENV} /usr/bin/python3 scripts/fve_hibs_lines_collector.py --from-watchlist >> /var/log/fve/lines-collector.log 2>&1"
+-( crontab -l 2>/dev/null | grep -v 'fve_hibs_lines_collector' || true; echo "${CRON_LINE}" ) | crontab -
+-
+-if [[ -f "${FVE_ROOT}/scripts/fve_hibs_lines_collector.py" ]]; then
+-  (cd "${FVE_ROOT}" && HIBS_UPSTREAM_BASE_URL="${HIBS_URL}" FVE_SCRAPE_LINES_DIR="${SCRAPE_DIR}" ${TOKEN_ENV} \
+-    python3 scripts/fve_hibs_lines_collector.py --from-watchlist) || true
++if [[ -f "${APP}/scripts/run_fve_lines_collector.sh" ]]; then
++  CRON_LINE="*/5 * * * * DEPLOY_PATH=${APP} FVE_DEPLOY_PATH=${FVE_ROOT} HIBS_UPSTREAM_BASE_URL=${HIBS_URL} FVE_SCRAPE_LINES_DIR=${SCRAPE_DIR} ${TOKEN_ENV} bash ${APP}/scripts/run_fve_lines_collector.sh >> /var/log/fve/lines-collector.log 2>&1"
++else
++  CRON_LINE="*/5 * * * * cd ${FVE_ROOT} && FIX=\$(curl -fsS --max-time 15 ${HIBS_URL}/api/fve/fixtures | python3 -c \"import json,sys; d=json.load(sys.stdin); print(','.join(x['fixture_key'] for x in (d.get('fixtures') or [])[:20] if x.get('fixture_key')))\") && [ -n \"\${FIX}\" ] && docker compose exec -T worker python scripts/fve_hibs_lines_collector.py --fixtures \"\${FIX}\" >> /var/log/fve/lines-collector.log 2>&1"
++fi
++( crontab -l 2>/dev/null | grep -vE 'fve_hibs_lines_collector|run_fve_lines_collector' || true; echo "${CRON_LINE}" ) | crontab -
++
++if [[ -f "${APP}/scripts/run_fve_lines_collector.sh" ]]; then
++  DEPLOY_PATH="${APP}" FVE_DEPLOY_PATH="${FVE_ROOT}" HIBS_UPSTREAM_BASE_URL="${HIBS_URL}" \
++    FVE_SCRAPE_LINES_DIR="${SCRAPE_DIR}" ${TOKEN_ENV} \
++    bash "${APP}/scripts/run_fve_lines_collector.sh" || true
++elif [[ -f "${FVE_ROOT}/scripts/fve_hibs_lines_collector.py" ]]; then
++  FIX="$(curl -fsS --max-time 15 "${HIBS_URL}/api/fve/fixtures" | python3 -c "import json,sys; d=json.load(sys.stdin); print(','.join(x['fixture_key'] for x in (d.get('fixtures') or [])[:20] if x.get('fixture_key')))" 2>/dev/null || true)"
++  if [[ -n "${FIX}" ]]; then
++    (cd "${FVE_ROOT}" && docker compose exec -T worker \
++      python scripts/fve_hibs_lines_collector.py --fixtures "${FIX}") || true
++  fi
+ fi
+ 
+ sleep 5
+diff --git a/scripts/lib_fve_local_repair.sh b/scripts/lib_fve_local_repair.sh
+index 3f55e6b..1c8eac5 100755
+--- a/scripts/lib_fve_local_repair.sh
++++ b/scripts/lib_fve_local_repair.sh
+@@ -88,18 +88,11 @@ if ! fve_health_ok; then
+   fi
+ fi
+ 
+-if [[ -f "${FVE_ROOT}/scripts/fve_hibs_lines_collector.py" ]]; then
+-  log "lines collector --from-watchlist"
+-  if [[ -f "${FVE_ROOT}/docker-compose.yml" ]] && docker compose -f "${FVE_ROOT}/docker-compose.yml" ps worker 2>/dev/null | grep -q Up; then
+-    docker compose -f "${FVE_ROOT}/docker-compose.yml" exec -T worker \
+-      python scripts/fve_hibs_lines_collector.py --from-watchlist \
+-      >>"${LOG_DIR}/fve-repair.log" 2>&1 || true
+-  else
+-    (cd "${FVE_ROOT}" && HIBS_UPSTREAM_BASE_URL=http://127.0.0.1:8000 \
+-      FVE_SCRAPE_LINES_DIR=/var/lib/fve/scrape-lines \
+-      python3 scripts/fve_hibs_lines_collector.py --from-watchlist) \
+-      >>"${LOG_DIR}/fve-repair.log" 2>&1 || true
+-  fi
++if [[ -f "${APP}/scripts/run_fve_lines_collector.sh" ]]; then
++  log "lines collector from hibs /api/fve/fixtures"
++  DEPLOY_PATH="${APP}" FVE_DEPLOY_PATH="${FVE_ROOT}" HIBS_UPSTREAM_BASE_URL=http://127.0.0.1:8000 \
++    FVE_SCRAPE_LINES_DIR=/var/lib/fve/scrape-lines \
++    bash "${APP}/scripts/run_fve_lines_collector.sh" >>"${LOG_DIR}/fve-repair.log" 2>&1 || true
+ fi
+ 
+ if [[ -f "${APP}/deploy/apply-nginx-fve-line-trader.sh" ]] && command -v nginx >/dev/null 2>&1; then
+diff --git a/scripts/run_fve_lines_collector.sh b/scripts/run_fve_lines_collector.sh
+new file mode 100755
+index 0000000..fd56ab3
+--- /dev/null
++++ b/scripts/run_fve_lines_collector.sh
+@@ -0,0 +1,72 @@
++#!/usr/bin/env bash
++# Pull FVE scrape-lines from hibs-bet /api/fve/lines using fixture keys from /api/fve/fixtures.
++#
++# Avoids --from-watchlist (needs scrapers.fotmob_client inside the FVE image). Run via cron or repair:
++#
++#   HIBS_UPSTREAM_BASE_URL=http://127.0.0.1:8000 bash /opt/hibs-bet/scripts/run_fve_lines_collector.sh
++set -euo pipefail
++
++APP="${DEPLOY_PATH:-/opt/hibs-bet}"
++FVE_ROOT="${FVE_DEPLOY_PATH:-/opt/fve}"
++HIBS_URL="${HIBS_UPSTREAM_BASE_URL:-http://127.0.0.1:8000}"
++SCRAPE_DIR="${FVE_SCRAPE_LINES_DIR:-/var/lib/fve/scrape-lines}"
++MAX_FIX="${FVE_COLLECTOR_MAX_FIXTURES:-20}"
++
++log() { echo "[fve-collector] $*"; }
++
++if [[ ! -f "${FVE_ROOT}/scripts/fve_hibs_lines_collector.py" ]]; then
++  log "skip — no collector at ${FVE_ROOT}/scripts/fve_hibs_lines_collector.py"
++  exit 0
++fi
++
++export FVE_COLLECTOR_MAX_FIXTURES="${MAX_FIX}"
++fixture_csv="$(
++  curl -fsS --max-time 15 "${HIBS_URL%/}/api/fve/fixtures" 2>/dev/null | \
++    python3 -c "
++import json, os, sys
++max_n = int(os.environ.get('FVE_COLLECTOR_MAX_FIXTURES', '20'))
++try:
++    d = json.load(sys.stdin)
++except Exception:
++    sys.exit(1)
++keys = [
++    x['fixture_key']
++    for x in (d.get('fixtures') or [])
++    if isinstance(x, dict) and x.get('fixture_key')
++]
++print(','.join(keys[:max_n]))
++" 2>/dev/null || true
++)"
++
++if [[ -z "${fixture_csv}" ]]; then
++  log "no fixtures from ${HIBS_URL}/api/fve/fixtures — skip (warm hibs .cache or wait for API quota reset)"
++  exit 0
++fi
++
++fixture_n="$(awk -F, '{print NF}' <<<"${fixture_csv}")"
++mkdir -p "${SCRAPE_DIR}"
++export HIBS_UPSTREAM_BASE_URL="${HIBS_URL}"
++export FVE_SCRAPE_LINES_DIR="${SCRAPE_DIR}"
++
++run_via_docker() {
++  docker compose -f "${FVE_ROOT}/docker-compose.yml" exec -T worker \
++    python scripts/fve_hibs_lines_collector.py --fixtures "${fixture_csv}"
++}
++
++run_via_host() {
++  (
++    cd "${FVE_ROOT}"
++    python3 scripts/fve_hibs_lines_collector.py --fixtures "${fixture_csv}"
++  )
++}
++
++if [[ -f "${FVE_ROOT}/docker-compose.yml" ]] && command -v docker >/dev/null 2>&1; then
++  if docker compose -f "${FVE_ROOT}/docker-compose.yml" ps worker 2>/dev/null | grep -qE 'Up|running'; then
++    log "docker worker — ${fixture_n} fixture(s)"
++    run_via_docker
++    exit $?
++  fi
++fi
++
++log "host python3 — ${fixture_n} fixture(s)"
++run_via_host
+-- 
+2.43.0
+
