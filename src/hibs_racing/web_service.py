@@ -102,6 +102,9 @@ class HealthStatus:
             from hibs_racing.live.execution_config import execution_summary
 
             out["execution"] = execution_summary()
+            out["execution"]["institutional_note"] = (
+                "Sub-100ms exchange execution not in analytics license."
+            )
         except Exception:
             pass
         if not _health_light_mode():
