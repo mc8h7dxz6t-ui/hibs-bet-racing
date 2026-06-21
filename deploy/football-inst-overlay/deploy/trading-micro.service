@@ -1,0 +1,54 @@
+# Harvested Execution — MICRO phase (small real-capital submits, metrics :9110).
+#
+# Install:
+#   sudo bash deploy/install-harvested-execution-micro.sh --install-root /opt/trading-core
+#
+# Prereq: shadow→micro promotion scorecard GO (30 clean shadow days).
+# Stop paper (:9109) before enabling micro if both would hold Alpaca WSS.
+
+[Unit]
+Description=Harvested Execution trading core (micro-capital phase)
+Documentation=file:/opt/trading-core/docs/TRADING_PROMOTION_SCORECARD.md
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=trading_executor
+Group=trading_ops
+WorkingDirectory=/opt/trading-core
+
+Environment=PYTHONPATH=/opt/trading-core/src
+EnvironmentFile=-/etc/trading_secrets
+Environment=TRADING_DEPLOYMENT_PHASE=micro
+Environment=TRADING_MICRO_DB=/opt/trading-core/data/trading_micro.db
+Environment=TRADING_MICRO_STRATEGY_AUDIT=/opt/trading-core/data/strategy_scan_micro.jsonl
+Environment=TRADING_MICRO_SPREAD_AUDIT=/opt/trading-core/data/spread_slippage_micro.jsonl
+Environment=TRADING_METRICS_URL=http://127.0.0.1:9110
+Environment=METRICS_PORT=9110
+
+ExecStartPre=/opt/trading-core/scripts/verify_paper_preflight_vps.sh
+ExecStart=/opt/trading-core/scripts/run_micro_orchestrator_vps.sh
+
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=600
+TimeoutStopSec=120
+KillMode=mixed
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=trading-micro
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/trading-core/data
+
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

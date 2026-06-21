@@ -1,0 +1,541 @@
+{% extends "base.html" %}
+{% block title %}hibs-bet — Acca Builder{% endblock %}
+
+{% block extra_css %}
+<style>
+.acca-layout{display:grid;grid-template-columns:320px 1fr;gap:12px;align-items:start;}
+@media(max-width:860px){.acca-layout{grid-template-columns:1fr;}}
+
+/* SLIP */
+.slip{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;position:sticky;top:10px;}
+.slip-title{font-family:'Orbitron',monospace;font-size:0.95em;color:var(--green);font-weight:700;letter-spacing:0.08em;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;}
+.slip-brand{display:inline-flex;align-items:center;gap:8px;}
+.slip-brand img{width:26px;height:26px;border-radius:8px;object-fit:contain;box-shadow:0 0 0 1px rgba(124,252,0,0.2);}
+.slip-count{background:var(--green);color:#000;font-size:0.68em;font-weight:800;padding:2px 8px;border-radius:999px;min-width:22px;text-align:center;}
+.slip-empty{text-align:center;padding:20px 10px;color:var(--muted);font-size:0.78em;border:1px dashed rgba(124,252,0,0.12);border-radius:8px;margin-bottom:10px;}
+.slip-sel{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:9px 10px;margin-bottom:7px;position:relative;}
+.slip-sel-league{font-size:0.62em;color:var(--muted);margin-bottom:2px;}
+.slip-sel-match{font-size:0.78em;font-weight:700;color:var(--text);margin-bottom:5px;padding-right:20px;}
+.slip-sel-row{display:flex;justify-content:space-between;align-items:center;}
+.outcome-pill{font-size:0.68em;font-weight:700;padding:2px 9px;border-radius:999px;text-transform:uppercase;}
+.op-home{background:rgba(124,252,0,0.12);color:var(--green);border:1px solid rgba(124,252,0,0.22);}
+.op-draw{background:rgba(255,165,0,0.12);color:#FFA500;border:1px solid rgba(255,165,0,0.22);}
+.op-away{background:rgba(0,122,51,0.12);color:var(--accent);border:1px solid rgba(0,122,51,0.25);}
+.slip-odds{font-size:0.95em;font-weight:800;color:var(--gold);}
+.slip-rm{position:absolute;top:7px;right:7px;background:rgba(255,68,68,0.1);border:none;color:var(--red);width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:0.7em;font-weight:800;display:flex;align-items:center;justify-content:center;}
+.slip-rm:hover{background:rgba(255,68,68,0.22);}
+
+/* TOTALS */
+.slip-totals{background:rgba(124,252,0,0.04);border:1px solid var(--border);border-radius:8px;padding:10px;margin:10px 0;}
+.tot-row{display:flex;justify-content:space-between;font-size:0.78em;margin-bottom:5px;}
+.tot-row:last-child{margin-bottom:0;}
+.tot-lbl{color:var(--muted);}
+.tot-val{font-weight:700;color:var(--text);}
+.tot-val.big{font-size:1.15em;color:var(--green);}
+.tot-val.gold{color:var(--gold);font-size:1.05em;}
+
+/* STAKE */
+.stake-lbl{font-size:0.68em;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;}
+.stake-input{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.92em;font-family:'Inter',sans-serif;font-weight:700;outline:none;margin-bottom:6px;}
+.stake-input:focus{border-color:var(--green);}
+.presets{display:flex;gap:5px;margin-bottom:10px;}
+.preset{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:var(--muted);border-radius:6px;padding:5px 8px;cursor:pointer;font-size:0.72em;font-weight:700;font-family:'Inter',sans-serif;transition:all 0.2s;flex:1;}
+.preset:hover{background:rgba(124,252,0,0.08);color:var(--green);border-color:var(--border);}
+
+/* BUTTONS */
+.btn-clear{width:100%;padding:7px;border:1px solid rgba(255,68,68,0.18);border-radius:8px;background:rgba(255,68,68,0.05);color:var(--red);font-size:0.72em;font-weight:700;font-family:'Inter',sans-serif;cursor:pointer;margin-bottom:10px;}
+.btn-clear:hover{background:rgba(255,68,68,0.1);}
+
+/* SLIP ACTIONS */
+.btn-copy-slip{width:100%;padding:11px;border:none;border-radius:8px;background:linear-gradient(135deg,#1f4a34,#0f2a1c);color:var(--accent);font-size:0.84em;font-weight:800;font-family:'Inter',sans-serif;cursor:pointer;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:7px;transition:opacity 0.2s;}
+.btn-copy-slip:hover{opacity:0.9;}
+.btn-copy-slip:disabled{opacity:0.3;cursor:not-allowed;}
+.btn-affiliate-slip{width:100%;padding:11px;border:none;border-radius:8px;background:linear-gradient(135deg,#1e3a5f,#0f172a);color:var(--gold);font-size:0.82em;font-weight:800;font-family:'Inter',sans-serif;cursor:pointer;margin-bottom:7px;border:1px solid rgba(255,215,0,0.22);}
+.btn-wa-slip{width:100%;padding:11px;border:none;border-radius:8px;background:linear-gradient(135deg,#128c7e,#075e54);color:#ecfdf5;font-size:0.82em;font-weight:800;font-family:'Inter',sans-serif;cursor:pointer;margin-bottom:7px;}
+.acca-slip-note{font-size:0.68em;color:var(--accent);line-height:1.45;margin:0 0 10px;padding:8px 10px;border-radius:8px;border:1px solid rgba(0,122,51,0.22);background:rgba(0,122,51,0.08);}
+.disclaimer{font-size:0.62em;color:var(--muted);text-align:center;line-height:1.5;margin-top:4px;}
+.disclaimer a{color:var(--muted);}
+
+/* FIXTURE LIST */
+.filter-bar{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
+.fbtn{padding:5px 11px;border:1px solid rgba(255,255,255,0.07);background:rgba(255,255,255,0.03);color:var(--muted);border-radius:6px;cursor:pointer;font-size:0.7em;font-weight:600;font-family:'Inter',sans-serif;transition:all 0.2s;}
+.fbtn:hover{color:var(--text);}
+.fbtn.active{background:rgba(124,252,0,0.08);color:var(--green);border-color:var(--border);}
+.fbtn.fgold.active{background:var(--gold-dim);color:var(--gold);border-color:rgba(255,215,0,0.22);}
+
+.fix-list{display:flex;flex-direction:column;gap:8px;}
+.afix{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color 0.2s;}
+.afix.in-slip{border-color:rgba(124,252,0,0.35);background:rgba(124,252,0,0.02);}
+.afix-top{display:flex;justify-content:space-between;margin-bottom:7px;}
+.afix-league{font-size:0.62em;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;}
+.afix-time{font-size:0.62em;color:var(--muted);}
+.afix-teams{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;gap:6px;}
+.afix-home{font-weight:700;font-size:0.86em;flex:1;}
+.afix-away{font-weight:700;font-size:0.86em;flex:1;text-align:right;}
+.afix-vs{font-size:0.65em;color:var(--muted);flex-shrink:0;}
+.odds-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;}
+.odd-btn{padding:7px 4px;border-radius:7px;border:1px solid rgba(255,255,255,0.07);background:rgba(255,255,255,0.03);cursor:pointer;font-family:'Inter',sans-serif;text-align:center;transition:all 0.2s;position:relative;}
+.odd-btn:hover{border-color:rgba(124,252,0,0.28);background:rgba(124,252,0,0.05);}
+.odd-btn.sel{border-color:var(--green);background:rgba(124,252,0,0.1);}
+.odd-btn.sel .odd-price{color:var(--green);}
+.odd-btn.vbet{border-color:rgba(255,215,0,0.35);}
+.odd-lbl{font-size:0.58em;color:var(--muted);text-transform:uppercase;font-weight:700;}
+.odd-price{font-size:0.9em;font-weight:800;color:var(--text);}
+.odd-pct{font-size:0.56em;color:var(--muted);}
+.vpip{position:absolute;top:-4px;right:-4px;background:var(--gold);color:#000;font-size:0.48em;font-weight:800;padding:1px 4px;border-radius:999px;}
+.afix-meta{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;}
+.mpill{font-size:0.6em;color:var(--muted);background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);border-radius:5px;padding:2px 6px;}
+.mpill strong{color:var(--text);}
+.mpill.vp{color:var(--gold);border-color:rgba(255,215,0,0.18);}
+
+.acca-review-panel{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:10px;background:rgba(2,6,23,0.55);}
+.acca-review-hd{font-size:0.72em;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;}
+.btn-review-acca{width:100%;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#1a3d2e,#0b2418);color:var(--accent);font-size:0.78em;font-weight:800;cursor:pointer;font-family:'Inter',sans-serif;margin-bottom:8px;}
+.btn-review-acca:hover{opacity:0.92;}
+.btn-review-acca:disabled{opacity:0.35;cursor:not-allowed;}
+.acca-review-out{font-size:0.74em;line-height:1.45;color:var(--accent);max-height:280px;overflow-y:auto;}
+.acca-review-leg-item{margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(148,163,184,0.12);}
+.acca-review-leg-item:last-child{border-bottom:none;margin-bottom:0;}
+.acca-review-warn{color:#fde68a;font-weight:700;font-size:0.72em;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ref-page" style="margin-bottom:12px;">
+    <h1 style="font-size:1.2rem;font-family:'Orbitron',monospace;color:var(--neon-value);margin:0 0 4px;">Acca Builder</h1>
+    <p style="font-size:0.78em;color:var(--muted);margin:0;">Click any odds on the dashboard to add legs — use the product bar above to switch platforms.</p>
+</div>
+
+{% include '_betting_guide.html' %}
+
+<div class="acca-layout">
+
+    <!-- BET SLIP -->
+    <div class="slip">
+        <div class="slip-title">
+            <span class="slip-brand">{% from '_hibs_brand.html' import inline_crest %}{{ inline_crest(size=22, css_class='slip-crest') }} Bet Slip</span>
+            <span class="slip-count" id="sc">0</span>
+        </div>
+
+        <div id="slip-body">
+            <div class="slip-empty" id="slip-empty">⚽ Click any odds button to add a selection</div>
+        </div>
+
+        <p class="acca-slip-note"><strong>Total odds</strong> multiply each leg (2.00 × 1.50 = 3.00). We assume legs are <strong>independent</strong> — picks on the same match or linked markets can overlap in real life.</p>
+
+        <div class="slip-totals">
+            <div class="tot-row"><span class="tot-lbl">Selections</span><span class="tot-val" id="t-count">0</span></div>
+            <div class="tot-row"><span class="tot-lbl">Total Odds</span><span class="tot-val big" id="t-odds">—</span></div>
+            <div class="tot-row"><span class="tot-lbl">Potential Return</span><span class="tot-val gold" id="t-return">£—</span></div>
+            <div class="tot-row"><span class="tot-lbl">Profit</span><span class="tot-val" id="t-profit">—</span></div>
+        </div>
+
+        <div class="stake-lbl">Stake (£)</div>
+        <input type="number" class="stake-input" id="stake" value="10" min="0.01" step="0.5" oninput="recalc()">
+        <div class="presets">
+            <button class="preset" onclick="setStake(5)">£5</button>
+            <button class="preset" onclick="setStake(10)">£10</button>
+            <button class="preset" onclick="setStake(25)">£25</button>
+            <button class="preset" onclick="setStake(50)">£50</button>
+            <button class="preset" onclick="setStake(100)">£100</button>
+        </div>
+
+        <button class="btn-copy-slip" id="btn-copy-slip" onclick="copySlipSummary()" disabled>📋 Copy slip summary</button>
+        {% if affiliate_enabled %}
+        <button type="button" class="btn-affiliate-slip" id="btn-place-affiliate" onclick="placeSlipAffiliate()" disabled>↗ Place via tracked {{ affiliate_default_bookmaker | default('bet365') | replace('_', ' ') | title }}</button>
+        <button type="button" class="btn-wa-slip" id="btn-wa-slip" onclick="shareSlipWhatsApp()" disabled>💬 WhatsApp slip + tracked link</button>
+        {% endif %}
+        <button type="button" class="btn-review-acca" id="btn-review-acca" onclick="reviewAccaSlip()" disabled>🧠 Review acca with AI</button>
+        <button class="btn-clear" onclick="clearSlip()">✕ Clear Slip</button>
+
+        <div class="acca-review-panel" id="acca-review-panel" hidden>
+            <div class="acca-review-hd">AI acca review</div>
+            <div class="acca-review-out" id="acca-review-out"></div>
+        </div>
+
+        <div class="disclaimer">⚠️ Analysis + affiliate routing via tracked redirects (18+). Gamble responsibly.<br>
+            {% if affiliate_enabled and affiliate_revenue_share_enabled %}
+            Structure B: {{ affiliate_master_revenue_share_pct }}% revenue-share routing enforced in code — buyer updates tracking IDs in <code>config/affiliate_config.json</code>.<br>
+            {% endif %}
+            <a href="https://www.begambleaware.org" target="_blank" rel="noopener noreferrer">BeGambleAware.org</a></div>
+    </div>
+
+    <!-- FIXTURES -->
+    <div>
+        <div class="filter-bar">
+            <button class="fbtn fgold active" onclick="doFilter('value',this)">⚡ Value Bets</button>
+            <button class="fbtn" onclick="doFilter('all',this)">All Fixtures</button>
+            <button class="fbtn" onclick="doFilter('scotland',this)">🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scotland</button>
+            <button class="fbtn" onclick="doFilter('england',this)">🏴󠁧󠁢󠁥󠁮󠁧󠁿 England</button>
+            <button class="fbtn" onclick="doFilter('european',this)">🏆 European</button>
+            <button class="fbtn" onclick="doFilter('international',this)">🌍 Intl</button>
+        </div>
+
+        <div class="fix-list" id="fix-list">
+        {% for fixture in fixtures %}
+        {% set p = fixture.prediction %}
+        {% set show_pred = p and not (p.prediction_unavailable | default(false)) %}
+        {% set vb = p.value_bets if p else {} %}
+        {% set fid = fixture.id | string %}
+        {% set region = 'scotland' if 'SCOTLAND' in fixture.league else 'england' if fixture.league in ['EPL','CHAMPIONSHIP','LEAGUE_ONE','LEAGUE_TWO','FA_CUP'] else 'european' if fixture.league in ['UCL','EUROPA_LEAGUE','UECL','LA_LIGA','SERIE_A','BUNDESLIGA','LIGUE_1','EREDIVISIE','PRIMEIRA','BELGIUM_FIRST','DENMARK_SL','GREECE_SL','AUSTRIA_BL'] else 'international' %}
+        <div class="afix"
+             id="afix-{{ fid }}"
+             data-region="{{ region }}"
+             data-value="{{ 'true' if fixture.has_value_bet else 'false' }}">
+
+            <div class="afix-top">
+                <span class="afix-league">{{ fixture.league_flag }} {{ fixture.league_name }}</span>
+                <span class="afix-time">{{ fixture.date[8:10] }}/{{ fixture.date[5:7] }} {{ fixture.date[11:16] if fixture.date and 'T' in fixture.date else '' }}</span>
+            </div>
+
+            <div class="afix-teams">
+                <span class="afix-home">{{ fixture.home }}</span>
+                <span class="afix-vs">vs</span>
+                <span class="afix-away">{{ fixture.away }}</span>
+            </div>
+
+            {% if show_pred %}
+            {% if p.odds_source_bookmaker and p.bookmaker_odds.home is not none %}
+            <div class="odds-row">
+                <button class="odd-btn {% if vb and 'home' in vb %}vbet{% endif %}"
+                        id="ob-{{ fid }}-home"
+                        onclick="toggle('{{ fid }}','{{ fixture.home|e }}','{{ fixture.away|e }}','{{ fixture.league_name|e }}','home',{{ p.bookmaker_odds.home }})">
+                    {% if vb and 'home' in vb %}<span class="vpip">⚡</span>{% endif %}
+                    <div class="odd-lbl">1 Home</div>
+                    <div class="odd-price" data-odds-dec="{{ p.bookmaker_odds.home }}">{{ "%.2f"|format(p.bookmaker_odds.home) }}</div>
+                    <div class="odd-pct">{{ p.probabilities_pct.home }}%</div>
+                </button>
+                <button class="odd-btn {% if vb and 'draw' in vb %}vbet{% endif %}"
+                        id="ob-{{ fid }}-draw"
+                        onclick="toggle('{{ fid }}','{{ fixture.home|e }}','{{ fixture.away|e }}','{{ fixture.league_name|e }}','draw',{{ p.bookmaker_odds.draw }})">
+                    {% if vb and 'draw' in vb %}<span class="vpip">⚡</span>{% endif %}
+                    <div class="odd-lbl">X Draw</div>
+                    <div class="odd-price" data-odds-dec="{{ p.bookmaker_odds.draw }}">{{ "%.2f"|format(p.bookmaker_odds.draw) }}</div>
+                    <div class="odd-pct">{{ p.probabilities_pct.draw }}%</div>
+                </button>
+                <button class="odd-btn {% if vb and 'away' in vb %}vbet{% endif %}"
+                        id="ob-{{ fid }}-away"
+                        onclick="toggle('{{ fid }}','{{ fixture.home|e }}','{{ fixture.away|e }}','{{ fixture.league_name|e }}','away',{{ p.bookmaker_odds.away }})">
+                    {% if vb and 'away' in vb %}<span class="vpip">⚡</span>{% endif %}
+                    <div class="odd-lbl">2 Away</div>
+                    <div class="odd-price" data-odds-dec="{{ p.bookmaker_odds.away }}">{{ "%.2f"|format(p.bookmaker_odds.away) }}</div>
+                    <div class="odd-pct">{{ p.probabilities_pct.away }}%</div>
+                </button>
+            </div>
+            {% else %}
+            <div class="odds-row" style="font-size:0.72em;color:var(--muted);padding:6px 0;">No synced 1X2 book prices for this fixture — predictions still shown.</div>
+            {% endif %}
+            <div class="afix-meta">
+                <span class="mpill">BTTS <strong>{{ p.btts_probability_pct }}%</strong></span>
+                <span class="mpill">O2.5 <strong>{{ p.over25_probability_pct }}%</strong></span>
+                <span class="mpill">xG <strong>{{ p.expected_goals_home }}/{{ p.expected_goals_away }}</strong></span>
+                <span class="mpill">Conf <strong>{{ p.confidence_pct }}%</strong></span>
+                {% if fixture.has_value_bet %}<span class="mpill vp">⚡ +{{ p.best_bet_roi }}% ROI</span>{% endif %}
+            </div>
+            {% elif p and (p.prediction_unavailable | default(false)) %}
+            <div class="odds-row" style="font-size:0.72em;color:var(--muted);padding:6px 0;">{% if p.prediction_quality_hint is defined and p.prediction_quality_hint and p.prediction_quality_hint.summary %}{{ p.prediction_quality_hint.summary }}{% else %}Prediction unavailable for this fixture.{% endif %}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const slip = {};
+if (window.HibsBetslip && typeof HibsBetslip.loadSlip === 'function') {
+    Object.assign(slip, HibsBetslip.loadSlip());
+}
+
+function persistSlip() {
+    if (window.HibsBetslip && typeof HibsBetslip.saveSlip === 'function') {
+        HibsBetslip.saveSlip(slip);
+    }
+}
+
+function fmtOdds(odds) {
+    if (window.HibsOdds && typeof HibsOdds.formatOdds === 'function') {
+        return HibsOdds.formatOdds(odds);
+    }
+    return Number(odds).toFixed(2);
+}
+
+function toggle(fid, home, away, league, outcome, odds) {
+    if (slip[fid] && slip[fid].outcome === outcome) {
+        delete slip[fid];
+        ['home','draw','away'].forEach(o => {
+            const b = document.getElementById('ob-'+fid+'-'+o);
+            if(b) b.classList.remove('sel');
+        });
+        document.getElementById('afix-'+fid).classList.remove('in-slip');
+    } else {
+        slip[fid] = {home, away, league, outcome, odds};
+        ['home','draw','away'].forEach(o => {
+            const b = document.getElementById('ob-'+fid+'-'+o);
+            if(b) b.classList.toggle('sel', o===outcome);
+        });
+        document.getElementById('afix-'+fid).classList.add('in-slip');
+    }
+    renderSlip();
+}
+
+function slipLegsPayload() {
+    const outcomeLabels = { home: 'Home Win', draw: 'Draw', away: 'Away Win' };
+    return Object.keys(slip).map(fid => {
+        const s = slip[fid];
+        return {
+            fixture_id: fid,
+            home: s.home,
+            away: s.away,
+            market_key: s.outcome,
+            market_label: outcomeLabels[s.outcome] || s.outcome,
+            odds: s.odds,
+        };
+    });
+}
+
+function syncAccaLegsGlobal() {
+    window.HIBS_ACCA_LEGS = slipLegsPayload();
+}
+
+function reviewAccaSlip() {
+    const legs = slipLegsPayload();
+    if (!legs.length) return;
+    const btn = document.getElementById('btn-review-acca');
+    const panel = document.getElementById('acca-review-panel');
+    const out = document.getElementById('acca-review-out');
+    btn.disabled = true;
+    btn.textContent = 'Reviewing…';
+    fetch('/api/assistant/acca-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ legs }),
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                out.innerHTML = '<p style="color:#fecaca;">' + data.error + '</p>';
+            } else {
+                out.innerHTML = renderAccaReview(data);
+            }
+            panel.hidden = false;
+            syncAccaLegsGlobal();
+        })
+        .catch(() => {
+            out.innerHTML = '<p style="color:#fecaca;">Could not reach acca review API.</p>';
+            panel.hidden = false;
+        })
+        .finally(() => {
+            btn.disabled = !Object.keys(slip).length;
+            btn.textContent = '🧠 Review acca with AI';
+        });
+}
+
+function dqClass(pct) {
+    if (pct == null) return '';
+    if (pct >= 90) return 'ok';
+    if (pct >= 78) return 'mid';
+    return 'low';
+}
+
+function renderAccaReview(data) {
+    let html = '';
+    if (data.summary) {
+        html += '<p style="margin:0 0 10px;color:var(--muted);">' + data.summary + '</p>';
+    }
+    (data.legs || []).forEach((leg, i) => {
+        const badge = leg.data_quality_pct != null
+            ? '<span class="fr-dq fr-dq-compact ' + dqClass(leg.data_quality_pct) + '">' + leg.data_quality_pct + '%</span> '
+            : '';
+        html += '<div class="acca-review-leg-item">';
+        html += '<p style="margin:0 0 4px;"><strong>Leg ' + (i + 1) + ':</strong> ' + badge + (leg.match || '') + ' — ' + (leg.market_label || '') + '</p>';
+        if (leg.model_pct != null) {
+            html += '<p style="margin:0 0 4px;color:var(--muted);">Model ' + leg.model_pct + '%';
+            if (leg.implied_pct != null) html += ' vs implied ' + leg.implied_pct + '%';
+            if (leg.edge_pct != null) html += ' · edge ' + (leg.edge_pct >= 0 ? '+' : '') + leg.edge_pct + '%';
+            html += '</p>';
+        }
+        html += '<p style="margin:0;">' + (leg.paragraph || '') + '</p>';
+        if (leg.thin_data) {
+            html += '<p class="acca-review-warn" style="margin:6px 0 0;">Thin data — caution</p>';
+        }
+        html += '</div>';
+    });
+    if (data.disclaimer) {
+        html += '<p style="margin:10px 0 0;font-size:0.68em;color:var(--muted);">' + data.disclaimer + '</p>';
+    }
+    return html;
+}
+
+function renderSlip() {
+    const body = document.getElementById('slip-body');
+    const empty = document.getElementById('slip-empty');
+    body.querySelectorAll('.slip-sel').forEach(e=>e.remove());
+    const keys = Object.keys(slip);
+    empty.style.display = keys.length ? 'none' : 'block';
+    const reviewBtn = document.getElementById('btn-review-acca');
+    if (reviewBtn) reviewBtn.disabled = !keys.length;
+    keys.forEach(fid => {
+        const s = slip[fid];
+        const ol = s.outcome==='home' ? s.home : s.outcome==='away' ? s.away : 'Draw';
+        const oc = 'op-'+s.outcome;
+        const d = document.createElement('div');
+        d.className = 'slip-sel';
+        d.innerHTML = `
+            <button class="slip-rm" onclick="removeSel('${fid}')">✕</button>
+            <div class="slip-sel-league">${s.league}</div>
+            <div class="slip-sel-match">${s.home} vs ${s.away}</div>
+            <div class="slip-sel-row">
+                <span class="outcome-pill ${oc}">${ol}</span>
+                <span class="slip-odds" data-odds-dec="${s.odds}">${fmtOdds(s.odds)}</span>
+            </div>`;
+        body.appendChild(d);
+    });
+    recalc();
+    persistSlip();
+    syncAccaLegsGlobal();
+}
+
+function removeSel(fid) {
+    if(slip[fid]) {
+        ['home','draw','away'].forEach(o=>{
+            const b=document.getElementById('ob-'+fid+'-'+o);
+            if(b) b.classList.remove('sel');
+        });
+        const c=document.getElementById('afix-'+fid);
+        if(c) c.classList.remove('in-slip');
+    }
+    delete slip[fid];
+    renderSlip();
+    persistSlip();
+}
+
+function clearSlip() {
+    Object.keys(slip).forEach(k=>removeSel(k));
+}
+
+function recalc() {
+    const keys = Object.keys(slip);
+    const stake = parseFloat(document.getElementById('stake').value)||0;
+    document.getElementById('sc').textContent = keys.length;
+    document.getElementById('t-count').textContent = keys.length;
+    if(!keys.length){
+        document.getElementById('t-odds').textContent='—';
+        document.getElementById('t-return').textContent='£—';
+        document.getElementById('t-profit').textContent='—';
+        document.getElementById('btn-copy-slip').disabled = true;
+        const placeAff = document.getElementById('btn-place-affiliate');
+        const waAff = document.getElementById('btn-wa-slip');
+        if (placeAff) placeAff.disabled = true;
+        if (waAff) waAff.disabled = true;
+        return;
+    }
+    const totalOdds = keys.reduce((a,k)=>a*slip[k].odds,1);
+    const ret = stake*totalOdds;
+    const profit = ret-stake;
+    document.getElementById('t-odds').textContent=fmtOdds(totalOdds);
+    document.getElementById('t-return').textContent='£'+ret.toFixed(2);
+    const pp = document.getElementById('t-profit');
+    pp.textContent=(profit>=0?'+£':'-£')+Math.abs(profit).toFixed(2);
+    pp.style.color=profit>=0?'var(--green)':'var(--red)';
+    document.getElementById('btn-copy-slip').disabled = false;
+    const placeAff = document.getElementById('btn-place-affiliate');
+    const waAff = document.getElementById('btn-wa-slip');
+    if (placeAff) placeAff.disabled = false;
+    if (waAff) waAff.disabled = false;
+}
+
+function setStake(v){
+    document.getElementById('stake').value=v;
+    recalc();
+}
+
+function buildSummary() {
+    const keys = Object.keys(slip);
+    const stake = parseFloat(document.getElementById('stake').value) || 0;
+    const totalOdds = keys.reduce((a, k) => a * slip[k].odds, 1);
+    const ret = (stake * totalOdds).toFixed(2);
+    const lines = keys.map(k => {
+        const s = slip[k];
+        const ol = s.outcome === 'home' ? s.home : s.outcome === 'away' ? s.away : 'Draw';
+        return `${s.home} vs ${s.away} \u2014 ${ol} @ ${s.odds.toFixed(2)}`;
+    });
+    return { keys, stake, totalOdds, ret, lines };
+}
+
+function buildSummaryText() {
+    const { keys, stake, totalOdds, ret, lines } = buildSummary();
+    if (!keys.length) return '';
+    const betType = keys.length > 1 ? keys.length + '-fold acca' : 'Single';
+    const profit = (parseFloat(ret) - stake).toFixed(2);
+    return [
+        'hibs-bet — slip summary (analysis only)',
+        betType,
+        '',
+        ...lines,
+        '',
+        'Selections: ' + keys.length,
+        'Total odds: ' + totalOdds.toFixed(2),
+        'Stake: £' + stake.toFixed(2),
+        'Potential return: £' + ret,
+        'Profit if all win: £' + profit,
+    ].join('\n');
+}
+
+function copySlipSummary() {
+    const text = buildSummaryText();
+    if (!text) return;
+    const done = () => alert('Slip summary copied. Paste into your notes or bookmaker app.');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else {
+        fallbackCopy(text, done);
+    }
+}
+
+function placeSlipAffiliate() {
+    if (!Object.keys(slip).length || !window.HibsAffiliate) return;
+    HibsAffiliate.openTracked({ kind: 'betslip', source: 'acca_builder', legs: Object.keys(slip).length });
+}
+
+function shareSlipWhatsApp() {
+    const text = buildSummaryText();
+    if (!text || !window.HibsAffiliate) return;
+    HibsAffiliate.shareSlipViaWhatsApp(text);
+}
+
+function fallbackCopy(text, onDone) {
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (onDone) onDone();
+    } catch (e) {
+        prompt('Copy this slip summary:', text);
+    }
+}
+
+function doFilter(f, btn){
+    document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.afix').forEach(card=>{
+        const r=card.dataset.region;
+        const v=card.dataset.value==='true';
+        card.style.display=(f==='all'||( f==='value'&&v)||(f===r))?'block':'none';
+    });
+}
+
+renderSlip();
+document.addEventListener('hibs-odds-format-change', renderSlip);
+document.addEventListener('hibs-betslip-change', syncAccaLegsGlobal);
+// Default: show value bets
+doFilter('value', document.querySelector('.fbtn.fgold'));
+</script>
+{% endblock %}

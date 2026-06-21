@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}hibs-bet - Betting Guide{% endblock %}
+{% block container_class %} dash-outer{% endblock %}
+{% block extra_css %}
+<style>
+.guide-page{max-width:980px;margin:0 auto;}
+.guide-hero{border:1px solid var(--border);border-radius:16px;padding:18px;background:linear-gradient(145deg,rgba(15,23,42,0.96),rgba(2,6,23,0.9));margin-bottom:14px;}
+.guide-title{font-family:'Orbitron',monospace;font-size:1.35em;color:var(--hibs-neon);letter-spacing:0.06em;margin:0 0 6px;}
+.guide-sub{font-size:0.82em;color:var(--muted);line-height:1.5;max-width:760px;}
+.guide-page .betting-guide{display:block;}
+.guide-page .betting-guide[open] .betting-guide-body{display:block;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="guide-page">
+    <header class="site-top">
+        <div class="site-top-left">
+            {% include '_football_site_nav.html' %}
+        </div>
+    </header>
+
+    <section class="guide-hero">
+        <h1 class="guide-title">Betting Guide</h1>
+        <p class="guide-sub">Plain-English labels for value, edge, ROI and Kelly — plus links to acca tools. Educational only; stake within your own limits.</p>
+    </section>
+
+    {% include '_betting_guide.html' %}
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var guide = document.getElementById('betting-guide');
+        if (guide) guide.open = true;
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}hibs-bet - Settings{% endblock %}
+{% block container_class %} dash-outer{% endblock %}
+{% block content %}
+<div class="settings-page">
+    <header class="site-top">
+        <div class="site-top-left">
+            {% include '_football_site_nav.html' %}
+        </div>
+        <div class="site-top-right">
+            {% include '_site_ops_chips.html' %}
+            <span class="pill-soft" data-hibs-settings-summary>Balanced profile</span>
+            <div class="odds-toggle" role="group" aria-label="Odds format">
+                <button type="button" class="ot ot-active" data-odds="dec" aria-pressed="true">Dec</button>
+                <button type="button" class="ot" data-odds="frac" aria-pressed="false">Frac</button>
+            </div>
+        </div>
+    </header>
+
+    <section class="settings-hero">
+        <h1 class="settings-title">Settings</h1>
+        <p class="settings-sub">Everything here saves in this browser only — nothing changes how predictions are calculated on the server. Use the notes under each option if you are new to the app.</p>
+    </section>
+
+    <div class="settings-grid">
+        <section class="settings-card">
+            <h2>Betting View</h2>
+            <div class="setting-row">
+                <label for="setting-profile">Bet engine profile</label>
+                <select id="setting-profile" data-hibs-setting="profile">
+                    <option value="balanced">Balanced - probabilities and value together</option>
+                    <option value="conservative">Conservative - probability-first</option>
+                    <option value="value">Value-aware - edge-seeking</option>
+                </select>
+                <p><strong>Balanced</strong> — mix of probability and value labels. <strong>Conservative</strong> — emphasises model confidence. <strong>Value-aware</strong> — highlights edge and ROI. Does not change server maths.</p>
+            </div>
+            <div class="setting-row">
+                <label>Odds format</label>
+                <div class="odds-toggle" role="group" aria-label="Odds format">
+                    <button type="button" class="ot ot-active" data-odds="dec" aria-pressed="true">Decimal</button>
+                    <button type="button" class="ot" data-odds="frac" aria-pressed="false">Fractional</button>
+                </div>
+                <p><strong>Decimal</strong> (e.g. 2.50) or <strong>fractional</strong> (e.g. 6/4) — applies on dashboard, insights and acca pages.</p>
+            </div>
+        </section>
+
+        <section class="settings-card">
+            <h2>Display</h2>
+            <div class="setting-row">
+                <label for="setting-theme">Theme</label>
+                <select id="setting-theme" data-hibs-setting="theme">
+                    <option value="default">Forest green</option>
+                    <option value="bright-pitch">Bright pitch</option>
+                    <option value="deep-forest">Deep forest</option>
+                    <option value="pastel">Soft mint</option>
+                    <option value="low-glow">Muted green</option>
+                </select>
+                <p><strong>Forest green</strong> — default Hibs green on dark. <strong>Bright pitch</strong> — higher contrast neons. <strong>Deep forest</strong> — darker, calmer. <strong>Soft mint</strong> / <strong>Muted green</strong> — easier on the eyes for long sessions.</p>
+            </div>
+            <div class="setting-row">
+                <label for="setting-density">Display density</label>
+                <select id="setting-density" data-hibs-setting="density">
+                    <option value="comfortable">Comfortable</option>
+                    <option value="compact">Compact</option>
+                    <option value="spacious">Spacious</option>
+                </select>
+                <p><strong>Comfortable</strong> — default spacing. <strong>Compact</strong> — more rows on screen. <strong>Spacious</strong> — extra padding for readability.</p>
+            </div>
+            <div class="setting-row">
+                <label for="setting-ui-mode">UI layout mode</label>
+                <select id="setting-ui-mode" data-hibs-setting="uiMode">
+                    <option value="home">Hibs Home UI</option>
+                    <option value="away">Hibs Away UI</option>
+                </select>
+                <p><strong>Hibs Home UI</strong> keeps the current layout. <strong>Hibs Away UI</strong> adds a brighter green glass style with subtler transparent fixture cards and a more fluent futuristic feel. Visual-only — no changes to features, data, DQ, or badges.</p>
+            </div>
+            <div class="setting-row">
+                <label for="setting-font">Text style</label>
+                <select id="setting-font" data-hibs-setting="font">
+                    <option value="standard">Inter</option>
+                    <option value="system">System font</option>
+                    <option value="large">Larger text</option>
+                </select>
+                <p>Inter matches the app branding; system font uses your OS default; larger text bumps base size for accessibility.</p>
+            </div>
+        </section>
+
+        <section class="settings-card">
+            <h2>Fixtures</h2>
+            <div class="setting-row">
+                <label for="setting-fetch-days">Fixture window</label>
+                <select id="setting-fetch-days" data-hibs-setting="fetchDays" data-hibs-fetch-days-select>
+                    <option value="5">5 days — default</option>
+                    <option value="7">7 days — European finals week</option>
+                </select>
+                <p>How many days of fixtures to load on the dashboard. Pick <strong>7 days</strong> during European finals week so late kick-offs appear. Saved in this browser and synced via <code>?days=</code> on refresh. Server default if unset: {{ fetch_days }} days.</p>
+            </div>
+        </section>
+
+        <section class="settings-card">
+            <h2>Data Quality</h2>
+            <div class="setting-row">
+                <label class="setting-check">
+                    <input type="checkbox" data-hibs-setting-check="fullDataDefault">
+                    Start dashboard with Full data filter on
+                </label>
+                <p>When on, the dashboard opens with <strong>Full data</strong> already ticked — hides thin-coverage matches until you turn the filter off.</p>
+            </div>
+            <div class="setting-row">
+                <label for="setting-data-quality">Full data threshold</label>
+                <select id="setting-data-quality" data-hibs-setting="dataQualityMin">
+                    <option value="">App default ({{ data_quality_ui_min }}%)</option>
+                    <option value="70">70% - broader list</option>
+                    <option value="85">85% - standard</option>
+                    <option value="90">90% - stricter</option>
+                </select>
+                <p>Minimum <strong>data %</strong> for the “Full data” filter (form, xG, odds, etc.). Higher = fewer fixtures, richer stats. Does not change how data is fetched.</p>
+            </div>
+        </section>
+
+        <section class="settings-card">
+            <h2>Reset</h2>
+            <p class="settings-save-note">Display preferences are stored in localStorage. The fixture window is also sent as <code>?days=</code> on dashboard refresh so the server fetches the matching range.</p>
+            <div class="settings-actions">
+                <button type="button" class="status-btn" data-hibs-settings-reset>Reset preferences</button>
+                <a href="/" class="nav-btn" style="text-decoration:none;display:inline-flex;align-items:center;">Back to dashboard</a>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}

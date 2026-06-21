@@ -1,0 +1,64 @@
+# Production split-stack manifest (hibs-bet.co.uk + dedicated FVE)
+# Secrets live in VPS .env files — never commit API keys here.
+
+tenant_id: production
+display_name: "HIBS Production (split)"
+tier: managed_saas
+stack_layout: split  # football+racing+trading on main; FVE on dedicated 1GB box
+
+managed: true
+
+vps:
+  host: "77.68.89.73"
+  user: root
+
+fve_vps:
+  host: "77.68.89.75"
+  user: root
+  api_port: 8010
+
+domain: hibs-bet.co.uk
+
+paths:
+  football: /opt/hibs-bet
+  racing: /opt/hibs-racing
+  trading: /opt/trading-core
+  fve_docker: /opt/fve-stack
+
+volumes:
+  racing_sqlite: /mnt/hibs-racing-data
+  fve_docker: /mnt/fve-data
+
+products:
+  football: true
+  racing: true
+  trading: true
+  fve: true
+
+env_pointers:
+  FVE_API_URL: "http://77.68.89.75:8010"
+  FVE_UPSTREAM_HOST: "77.68.89.75"
+  HIBS_RACING_BASE_URL: "https://hibs-bet.co.uk/racing"
+  HIBS_RACING_SQLITE_BEEFY: "1"
+
+whitelabel:
+  tagline: "Harvested Intelligent Betting & Trading System"
+  tagline_short: "HIBS — Betting & Trading"
+  partner: ""
+  logo: hibs_harvested_logo.png
+
+provision:
+  hands_off: true
+  install_racing_cron: true
+  link_racing: true
+  link_trading: true
+  bootstrap_fve_remote: true
+  mount_racing_volume: true
+  skip_data_seed: true
+
+notes: |
+  Split layout:
+    - Main VPS: nginx, football :8000, racing :5003, trading :9108, line-trader shell
+    - FVE VPS: Docker FVE on :8010, firewall from main VPS IP only
+  Block storage: +20GB each — racing SQLite on main, FVE Docker on 1GB box.
+  Deploy: HIBS_SYNC_REF + apply-vps-fve-remote-host.sh (see deploy/README.md).

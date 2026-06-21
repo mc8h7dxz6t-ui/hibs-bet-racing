@@ -110,8 +110,19 @@ def _row_best_price(row: pd.Series, book_cols: list[str]) -> tuple[float | None,
 def search_race_url(query: str, *, session=None, base_url: str = "https://www.oddschecker.com") -> str | None:
     session = session or _get_session()
     url = f"{base_url.rstrip('/')}/search/process?from=1&limit=10&query={quote_plus(query)}"
-    resp = session.get(url, timeout=30)
-    resp.raise_for_status()
+
+    def _fetch():
+        resp = session.get(url, timeout=30)
+        resp.raise_for_status()
+        return resp
+
+    try:
+        from hibs_racing.scrapers.scrape_resilience import resilient_call
+
+        resp = resilient_call("oddschecker", _fetch, operation="search", max_retries=3)
+    except Exception:
+        resp = session.get(url, timeout=30)
+        resp.raise_for_status()
     payload = resp.json()
     results = payload.get("search_results", {}).get("search_results") or []
     if not results:
@@ -132,11 +143,24 @@ def fetch_race_odds_page(
 ) -> pd.DataFrame:
     """Parse an Oddschecker race winner market into horse × bookmaker prices."""
     session = session or _get_session()
-    resp = session.get(url, timeout=45)
-    resp.raise_for_status()
-    table = _parse_html_table(resp.text)
+
+    def _fetch_html():
+        resp = session.get(url, timeout=45)
+        resp.raise_for_status()
+        return resp.text
+
+    try:
+        from hibs_racing.scrapers.scrape_resilience import resilient_call
+
+        html = resilient_call("oddschecker", _fetch_html, operation="race_page", max_retries=3)
+    except Exception:
+        resp = session.get(url, timeout=45)
+        resp.raise_for_status()
+        html = resp.text
+
+    table = _parse_html_table(html)
     if table is None:
-        raise ValueError(f"No odds table found at {url}")
+        raise ValueError(f"No odds table found at {url} (layout_broken)")
 
     name_col = None
     for candidate in ("winner", "selection", "name", "horse"):

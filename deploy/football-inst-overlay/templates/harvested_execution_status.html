@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% block title %}Harvested Execution — HIBS{% endblock %}
+{% block portfolio_bar %}{% endblock %}
+{% block extra_css %}
+<style>
+.hx-wrap{max-width:1100px;margin:0 auto;}
+.hx-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;}
+.hx-head h1{margin:0;font-size:1.2rem;}
+.hx-sub{color:var(--muted);font-size:0.82rem;margin:4px 0 0;}
+.hx-badges{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.hx-badge{padding:5px 12px;border-radius:999px;font-size:0.78em;font-weight:700;}
+.hx-badge.ok{background:rgba(16,185,129,0.2);color:#10b981;}
+.hx-badge.bad{background:rgba(239,68,68,0.2);color:#ef4444;}
+.hx-badge.wait{background:rgba(245,158,11,0.2);color:#f59e0b;}
+.hx-badge.tier{background:rgba(59,130,246,0.2);color:#60a5fa;}
+.hx-rev{background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(15,28,46,0.95));border:1px solid rgba(16,185,129,0.35);border-radius:14px;padding:16px 18px;margin-bottom:14px;}
+.hx-rev h2,.hx-promo h2{margin:0 0 10px;font-size:0.95rem;font-weight:700;}
+.hx-rev-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;}
+.hx-rev .big{font-size:1.65rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;}
+.hx-rev .lbl{font-size:0.68em;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);}
+.hx-rev .pos{color:#10b981;}
+.hx-rev .neg{color:#ef4444;}
+.hx-rev .hint,.hx-promo .hint{font-size:0.8rem;color:var(--muted);margin-top:10px;line-height:1.45;}
+.hx-promo{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px;}
+.hx-bar{height:8px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;margin:8px 0 4px;}
+.hx-bar>span{display:block;height:100%;background:linear-gradient(90deg,#3b82f6,#10b981);border-radius:999px;transition:width 0.4s;}
+.hx-checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-top:10px;}
+.hx-check{font-size:0.8rem;padding:8px 10px;border-radius:8px;border:1px solid var(--border);line-height:1.35;}
+.hx-check.pass{border-color:rgba(16,185,129,0.4);background:rgba(16,185,129,0.06);}
+.hx-check.fail{border-color:rgba(239,68,68,0.4);background:rgba(239,68,68,0.06);}
+.hx-perf{background:linear-gradient(135deg,rgba(30,58,138,0.45),rgba(15,28,46,0.95));border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:14px;}
+.hx-perf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;}
+.hx-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:720px){.hx-cols{grid-template-columns:1fr;}}
+.hx-lane{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;}
+.hx-lane h3{margin:0 0 8px;font-size:0.88rem;display:flex;align-items:center;gap:8px;}
+.hx-lane ul{margin:0;padding-left:18px;font-size:0.85rem;color:var(--muted);}
+.hx-lane li{margin:4px 0;}
+.hx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:14px;}
+.hx-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.hx-card label{display:block;font-size:0.68em;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);}
+.hx-card .val{font-size:1.25em;font-weight:700;font-variant-numeric:tabular-nums;margin-top:4px;}
+.hx-card .tip{font-size:0.72rem;color:var(--muted);margin-top:6px;line-height:1.35;}
+.hx-insights{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.hx-insight{padding:10px 12px;border-radius:10px;border:1px solid var(--border);font-size:0.86rem;line-height:1.45;}
+.hx-insight.ok{background:rgba(16,185,129,0.08);border-color:rgba(16,185,129,0.35);}
+.hx-insight.warn{background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.35);}
+.hx-insight.bad{background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.35);}
+.hx-insight strong{display:block;margin-bottom:4px;font-size:0.9em;}
+.hx-err{color:#ef4444;font-size:0.88rem;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="hx-wrap">
+    <div class="hx-head">
+        <div>
+            <h1>Harvested Execution</h1>
+            <p class="hx-sub">Algorithmic lane · <span id="phase-label">—</span> · <span id="metrics-url">{{ metrics_url }}</span></p>
+        </div>
+        <div class="hx-badges">
+            <span id="tier-badge" class="hx-badge tier">—</span>
+            <span id="status-badge" class="hx-badge wait">Checking…</span>
+        </div>
+    </div>
+
+    <section class="hx-rev" id="revenue-panel">
+        <h2>Revenue surface</h2>
+        <div class="hx-rev-grid">
+            <div><div class="lbl">Equity</div><div class="big" id="r-equity">—</div></div>
+            <div><div class="lbl">Day P&amp;L</div><div class="big" id="r-daypnl">—</div></div>
+            <div><div class="lbl">Unrealized</div><div class="big" id="r-unreal">—</div></div>
+            <div><div class="lbl">Positions</div><div class="big" id="r-posn">—</div></div>
+            <div><div class="lbl">Cap / order</div><div class="big" id="r-cap-order">—</div></div>
+            <div><div class="lbl">Cap gross</div><div class="big" id="r-cap-gross">—</div></div>
+        </div>
+        <p class="hint" id="revenue-hint">Conservative OFI microstructure — not colo HFT. Revenue = audited PnL after promotion gates, not license fees.</p>
+    </section>
+
+    <section class="hx-promo" id="promo-panel">
+        <h2>Promotion · <span id="promo-score">—</span>/100</h2>
+        <div class="lbl">Shadow evidence progress</div>
+        <div class="hx-bar"><span id="shadow-bar" style="width:0%"></span></div>
+        <div class="hx-sub" id="shadow-days-text">—</div>
+        <p class="hint" id="next-action">—</p>
+        <div class="hx-checks" id="promo-checks"></div>
+    </section>
+
+    <div class="hx-insights" id="insights"></div>
+
+    <section class="hx-lane" id="safety-layers" style="margin-bottom:14px;" hidden>
+        <h3>Safety layers <span class="hx-sub" id="trading-maturity-label"></span></h3>
+        <div class="hx-cols" style="margin-top:8px;">
+            <div>
+                <strong style="font-size:0.82em;color:var(--muted);">Invariants (hard)</strong>
+                <ul id="inv-list"></ul>
+            </div>
+            <div>
+                <strong style="font-size:0.82em;color:var(--muted);">Observability (soft)</strong>
+                <ul id="obs-list"></ul>
+            </div>
+        </div>
+    </section>
+
+    <div class="hx-cols">
+        <div class="hx-lane">
+            <h3>Equities <span class="hx-sub" id="eq-syms"></span></h3>
+            <ul id="eq-pos"><li>No open stock positions</li></ul>
+        </div>
+        <div class="hx-lane">
+            <h3>Crypto <span class="hx-sub" id="cr-syms"></span></h3>
+            <ul id="cr-pos"><li id="cr-off">Crypto lane off</li></ul>
+        </div>
+    </div>
+
+    <div class="hx-grid" id="metrics-grid"></div>
+    <p class="hx-err" id="error" hidden></p>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function(){
+    const METRIC_HELP = {
+        trading_node_ready: ['Node ready', '1 = armed after boot barrier + reconciliation.'],
+        trading_stale_feed_ms: ['Stale feed (ms)', 'Age since last tick.'],
+        trading_reconciliation_drifts_total: ['Recon drifts', 'Must stay 0.'],
+        trading_strategy_routed_total: ['Orders routed', 'Submits through risk + execution.'],
+        trading_strategy_scan_cycles_total: ['Strategy scans', 'OFI gate evaluations.'],
+        trading_strategy_no_signal_total: ['No signal', 'Scans below OFI threshold.'],
+        trading_stream_errors_total: ['Stream errors', 'WSS issues.'],
+        trading_healthy_cycles_total: ['Healthy recon', 'Clean ledger cycles.'],
+    };
+    const badge = document.getElementById('status-badge');
+    const tierBadge = document.getElementById('tier-badge');
+    const errEl = document.getElementById('error');
+    const grid = document.getElementById('metrics-grid');
+    const insightsEl = document.getElementById('insights');
+
+    function fmtMoney(v){
+        if (v == null || v === '') return '—';
+        const n = parseFloat(v);
+        if (isNaN(n)) return String(v);
+        const sign = n >= 0 ? '+' : '';
+        return sign + n.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+    function fmtPnl(v, pct){
+        if (v == null) return '—';
+        const n = parseFloat(v);
+        const sign = n >= 0 ? '+' : '';
+        const p = pct != null ? ' (' + sign + parseFloat(pct).toFixed(2) + '%)' : '';
+        return sign + n.toFixed(2) + p;
+    }
+    function pnlClass(v){
+        if (v == null) return '';
+        return parseFloat(v) >= 0 ? 'pos' : 'neg';
+    }
+
+    function renderPositions(list, el, empty){
+        el.innerHTML = '';
+        if (!list || !list.length){ el.innerHTML = '<li>' + empty + '</li>'; return; }
+        list.forEach(p => {
+            const li = document.createElement('li');
+            li.textContent = p.symbol + ' · qty ' + p.qty + ' · uP/L ' + (p.unrealized_pl || '0');
+            el.appendChild(li);
+        });
+    }
+    function card(key, val){
+        const h = METRIC_HELP[key] || [key, ''];
+        const d = document.createElement('div');
+        d.className = 'hx-card';
+        d.innerHTML = '<label>' + h[0] + '</label><div class="val">' + (val ?? '—') + '</div><div class="tip">' + h[1] + '</div>';
+        return d;
+    }
+    function renderPromoChecks(card){
+        const el = document.getElementById('promo-checks');
+        el.innerHTML = '';
+        if (!card || !card.checks) return;
+        const show = card.checks.filter(c => c.severity === 'critical').slice(0, 8);
+        show.forEach(c => {
+            const d = document.createElement('div');
+            d.className = 'hx-check ' + (c.passed ? 'pass' : 'fail');
+            d.textContent = (c.passed ? '✓ ' : '✗ ') + c.id + ': ' + c.actual;
+            el.appendChild(d);
+        });
+    }
+
+    async function refresh(){
+        try {
+            const r = await fetch('/api/trading/status', {cache:'no-store'});
+            const j = await r.json();
+            errEl.hidden = true;
+            const cfg = j.config || {};
+            const rev = j.revenue || {};
+            const promo = j.promotion || {};
+            document.getElementById('phase-label').textContent = rev.phase_label || cfg.phase || 'paper';
+            document.getElementById('profile') && (document.getElementById('profile').textContent = cfg.profile || 'conservative');
+            document.getElementById('eq-syms').textContent = (cfg.equity || []).join(', ') || '—';
+            document.getElementById('cr-syms').textContent = cfg.crypto_enabled ? (cfg.crypto || []).join(', ') : '(disabled)';
+
+            tierBadge.textContent = promo.tier_label || 'Pilot R&D';
+            document.getElementById('promo-score').textContent = promo.score != null ? promo.score : '—';
+            document.getElementById('next-action').textContent = promo.next_action || '';
+
+            const clean = promo.clean_shadow_days || 0;
+            const need = promo.clean_shadow_days_required || 30;
+            const pct = Math.min(100, Math.round((clean / need) * 100));
+            document.getElementById('shadow-bar').style.width = pct + '%';
+            document.getElementById('shadow-days-text').textContent = clean + ' / ' + need + ' clean shadow days';
+
+            const lim = rev.limits || {};
+            document.getElementById('r-equity').textContent = rev.equity ? '$' + rev.equity : '—';
+            const dayEl = document.getElementById('r-daypnl');
+            dayEl.textContent = fmtPnl(rev.day_pnl, rev.day_pnl_pct);
+            dayEl.className = 'big ' + pnlClass(rev.day_pnl);
+            const unEl = document.getElementById('r-unreal');
+            unEl.textContent = fmtMoney(rev.unrealized_pl_total);
+            unEl.className = 'big ' + pnlClass(rev.unrealized_pl_total);
+            document.getElementById('r-posn').textContent = rev.position_count != null ? rev.position_count : '—';
+            document.getElementById('r-cap-order').textContent = lim.max_order_usd != null ? '$' + lim.max_order_usd : '—';
+            document.getElementById('r-cap-gross').textContent = lim.max_gross_usd != null ? '$' + lim.max_gross_usd : '—';
+            document.getElementById('revenue-hint').textContent =
+                (rev.broker_lane || 'broker') + ' · phase ' + (rev.phase || 'paper') +
+                (lim.broker_submit ? ' · submits enabled' : ' · observe-only');
+
+            const activeCard = promo.active_transition === 'micro_to_live' ? promo.micro_to_live : promo.shadow_to_micro;
+            renderPromoChecks(activeCard);
+
+            if (j.error && !j.online) {
+                badge.className = 'hx-badge bad';
+                badge.textContent = 'Offline';
+                errEl.textContent = j.error;
+                errEl.hidden = false;
+            } else if (j.online) {
+                badge.className = 'hx-badge ok';
+                badge.textContent = 'NODE_READY';
+            } else {
+                badge.className = 'hx-badge bad';
+                const rt = (j.ready_text || '').replace(/^NODE_UNREADY:\\s*/i, '');
+                badge.textContent = rt ? ('Not ready: ' + rt.slice(0, 40)) : 'Not ready';
+            }
+
+            const port = j.portfolio || {};
+            renderPositions(port.equity_positions, document.getElementById('eq-pos'), 'No open stock positions');
+            if (cfg.crypto_enabled) {
+                const crOff = document.getElementById('cr-off');
+                if (crOff) crOff.remove();
+                renderPositions(port.crypto_positions, document.getElementById('cr-pos'), 'No open crypto positions');
+            }
+
+            insightsEl.innerHTML = '';
+            (j.insights || []).forEach(ins => {
+                const d = document.createElement('div');
+                d.className = 'hx-insight ' + (ins.tone || 'ok');
+                d.innerHTML = '<strong>' + ins.title + '</strong>' + ins.body;
+                insightsEl.appendChild(d);
+            });
+
+            grid.innerHTML = '';
+            const m = j.metrics || {};
+            Object.keys(METRIC_HELP).forEach(k => {
+                if (m[k] !== undefined) grid.appendChild(card(k, m[k]));
+            });
+
+            const safety = j.safety_layers || {};
+            const safetyEl = document.getElementById('safety-layers');
+            if (safetyEl && safety.invariants) {
+                safetyEl.hidden = false;
+                const mat = safety.maturity || {};
+                document.getElementById('trading-maturity-label').textContent = mat.label || '';
+                const inv = document.getElementById('inv-list');
+                inv.innerHTML = '';
+                (safety.invariants || []).forEach(i => {
+                    const li = document.createElement('li');
+                    li.textContent = (i.pass ? '✓ ' : '✗ ') + i.label + ': ' + (i.actual != null ? i.actual : '—');
+                    inv.appendChild(li);
+                });
+                const obs = document.getElementById('obs-list');
+                obs.innerHTML = '';
+                (safety.observability || []).forEach(o => {
+                    const li = document.createElement('li');
+                    li.textContent = (o.ok ? '✓ ' : '⚠ ') + o.label + ': ' + (o.value != null ? o.value : '—');
+                    obs.appendChild(li);
+                });
+            }
+        } catch (e) {
+            badge.className = 'hx-badge bad';
+            badge.textContent = 'Error';
+            errEl.textContent = String(e);
+            errEl.hidden = false;
+        }
+    }
+    refresh();
+    setInterval(refresh, 5000);
+})();
+</script>
+{% endblock %}

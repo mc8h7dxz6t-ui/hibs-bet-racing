@@ -103,6 +103,9 @@ def refresh_cards(
     parallel_workers: int | None = None,
     poll_milestone: str | None = None,
 ) -> dict:
+    from hibs_racing.scrapers.racing_scrape_api import resolve_cards_source
+
+    source = resolve_cards_source(source)
     workers = parallel_workers if parallel_workers is not None else _parallel_workers()
     timings: dict[str, float] = {}
 

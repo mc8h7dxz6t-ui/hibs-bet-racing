@@ -416,6 +416,33 @@ def create_app() -> Flask:
 
         return jsonify(scraper_catalog_payload())
 
+    @app.route("/api/scrape/status")
+    def api_scrape_status():
+        from hibs_racing.scrapers.racing_scrape_api import scrape_status_payload
+
+        return jsonify(scrape_status_payload())
+
+    @app.route("/api/scrape/cards")
+    def api_scrape_cards():
+        from hibs_racing.scrapers.racing_scrape_api import list_cards_payload
+
+        enrich = request.args.get("enrich", "0") == "1"
+        rescue = request.args.get("rescue", "0") == "1"
+        return jsonify(list_cards_payload(slim=not enrich, rescue=rescue))
+
+    @app.route("/api/scrape/resilience")
+    def api_scrape_resilience():
+        from hibs_racing.scrapers.robust_scrape_cycle import read_robust_scrape_status
+        from hibs_racing.scrapers.scrape_resilience import scrape_resilience_status
+
+        return jsonify(
+            {
+                "ok": True,
+                "resilience": scrape_resilience_status(),
+                "last_cycle": read_robust_scrape_status(),
+            }
+        )
+
     @app.route("/api/runner/<runner_id>")
     def api_runner_fields(runner_id: str):
         from hibs_racing.cards.runner_field_api import resolve_runner_fields
@@ -462,7 +489,9 @@ def create_app() -> Flask:
 
     @app.route("/api/refresh", methods=["POST", "GET"])
     def api_refresh():
-        source = request.args.get("source", "racing_api")
+        from hibs_racing.scrapers.racing_scrape_api import resolve_cards_source
+
+        source = resolve_cards_source(request.args.get("source", "auto"))
         region = request.args.get("region", "gb")
         day = int(request.args.get("day", "1"))
         odds_source = os.environ.get("HIBS_ODDS_SOURCE") or request.args.get("odds_source", "auto")
