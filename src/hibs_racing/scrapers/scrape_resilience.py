@@ -122,12 +122,13 @@ def resilient_call(
 def ledger_summary(*, max_lines: int = 100) -> dict[str, Any]:
     path = _ledger_path()
     if not path.is_file():
-        return {"ok": True, "entries": 0, "sources": {}}
+        return {"ok": True, "entries": 0, "sources": {}, "recent_errors": []}
     try:
         lines = path.read_text(encoding="utf-8").splitlines()[-max_lines:]
     except OSError:
-        return {"ok": False, "entries": 0, "sources": {}}
+        return {"ok": False, "entries": 0, "sources": {}, "recent_errors": []}
     sources: dict[str, dict[str, int]] = {}
+    recent_errors: list[dict[str, Any]] = []
     for raw in lines:
         if not raw.strip():
             continue
@@ -141,10 +142,48 @@ def ledger_summary(*, max_lines: int = 100) -> dict[str, Any]:
             bucket["ok"] += 1
         else:
             bucket["fail"] += 1
+            if len(recent_errors) < 8:
+                recent_errors.append(
+                    {
+                        "at": row.get("at"),
+                        "source_id": sid,
+                        "error": row.get("error"),
+                    }
+                )
     total = sum(b["ok"] + b["fail"] for b in sources.values())
     fail_n = sum(b["fail"] for b in sources.values())
     return {
         "ok": fail_n == 0 or (total > 0 and fail_n / total < 0.5),
         "entries": total,
         "sources": sources,
+        "recent_errors": recent_errors,
+        "ledger_path": str(path),
+    }
+
+
+def circuit_status() -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    with _lock:
+        items = list(_circuits.items())
+    for sid, circ in items:
+        ts = time.time()
+        with circ._lock:
+            st = "open" if circ.open_until > ts else "closed"
+            allows = circ.open_until <= ts
+            remain = max(0.0, circ.open_until - ts) if circ.open_until > ts else 0.0
+        out[sid] = {
+            "state": st,
+            "allows_traffic": allows,
+            "consecutive_failures": circ.consecutive_failures,
+            "open_remain_sec": round(remain, 1),
+            "last_error": circ.last_error or None,
+        }
+    return out
+
+
+def scrape_resilience_status() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "circuits": circuit_status(),
+        "ledger": ledger_summary(),
     }
