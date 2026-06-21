@@ -20,7 +20,7 @@ load_env
 
 for arg in "$@"; do
   if [[ "${arg}" == "--dry-run-quotes" ]]; then
-    echo "hibs-racing dry-run quotes (Matchbook → exchange_quotes)"
+    echo "Matchbook dry-run-quotes -> exchange_quotes"
     run_logged "dry-run-quotes" hibs-racing dry-run-quotes
     exit $?
   fi
