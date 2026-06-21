@@ -104,6 +104,23 @@ class HealthStatus:
             out["execution"] = execution_summary()
         except Exception:
             pass
+        if not _health_light_mode():
+            try:
+                from pathlib import Path
+
+                from hibs_racing.config import db_path
+                from inst_spine.check import run_institutional_check
+
+                spine_db = Path(str(db_path())).parent / "inst_spine.sqlite"
+                if spine_db.is_file():
+                    rep = run_institutional_check(database=spine_db)
+                    out["inst_spine"] = {
+                        "passed": rep.passed,
+                        "message": rep.message,
+                        "n_checks": len(rep.checks),
+                    }
+            except Exception:
+                pass
         return out
 
 
