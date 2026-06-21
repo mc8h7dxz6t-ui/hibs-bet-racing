@@ -346,7 +346,13 @@ class FootballDataOrgClient(BaseApiClient):
         if not isinstance(data, dict):
             return []
         if data.get("errorCode") or data.get("message"):
-            if int(data.get("errorCode") or 0) not in (403,):
+            err_code = data.get("errorCode")
+            try:
+                err_int = int(err_code) if err_code is not None else 0
+            except (TypeError, ValueError):
+                err_int = 0
+            msg = str(data.get("message") or "")
+            if err_int not in (403, 429) and "403" not in msg and "forbidden" not in msg.lower():
                 print(f"[Football-Data.org] {competition_code}: {data.get('message', data)}")
             return []
         return data.get("matches", []) or []
