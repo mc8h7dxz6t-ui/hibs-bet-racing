@@ -1,6 +1,6 @@
-built_at=2026-06-21T22:09:38Z
+built_at=2026-06-21T22:36:06Z
 source=/workspace/hibs-bet
 base_ref=main
-head=531c590
+head=f0544c6
 branch=cursor/robust-scrape-inst-7e4d
-file_count=164
+file_count=165

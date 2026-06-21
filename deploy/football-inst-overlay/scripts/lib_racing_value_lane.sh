@@ -90,18 +90,22 @@ racing_value_lane_matchbook_poll() {
   if [[ -x "${bet}/scripts/test_matchbook_credentials.sh" ]]; then
     bash "${bet}/scripts/test_matchbook_credentials.sh" "${env_file}" || return 1
   fi
-  [[ -x "${cli}" ]] || return 0
-  local try poll_cmds
+  [[ -x "${cli}" ]] || { echo "WARN: ${cli} missing — skip poll" >&2; return 0; }
+  local try poll_cmds subcmd
   poll_cmds=""
   if [[ -f "${app}/scripts/daily_refresh.sh" ]]; then
-    poll_cmds="$(grep -oE 'hibs-racing [^|;&]+' "${app}/scripts/daily_refresh.sh" 2>/dev/null \
-      | grep -iE 'poll|matchbook|exchange|quote' | sort -u || true)"
+    # Only real CLI invocations — never echo "hibs-racing dry-run quotes (...)" help text.
+    poll_cmds="$(grep -E 'run_logged|^\s*hibs-racing ' "${app}/scripts/daily_refresh.sh" 2>/dev/null \
+      | grep -vE '^\s*echo ' \
+      | grep -oE 'hibs-racing [a-z0-9_-]+' | sort -u || true)"
   fi
   if [[ -n "${poll_cmds}" ]]; then
     while IFS= read -r cmd; do
       [[ -n "${cmd}" ]] || continue
-      echo "==> ${cmd}"
-      racing_value_lane_www_data_exec "${app}" "HIBS_POLL_MILESTONE=baseline ${cmd}" || true
+      subcmd="${cmd#hibs-racing }"
+      [[ -n "${subcmd}" ]] || continue
+      echo "==> ${cli} ${subcmd}"
+      racing_value_lane_www_data_exec "${app}" "HIBS_POLL_MILESTONE=baseline '${cli}' ${subcmd}" || true
     done <<<"${poll_cmds}"
     return 0
   fi
