@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% block title %}Performance · hibs-bet{% endblock %}
+{% block content %}
+{% macro perf_tally(bp, label='Model 1X2 pick') %}
+<p class="perf-tally"><span class="tally-label">{{ label }}:</span> Wins <strong class="tally-w">{{ bp.wins or 0 }}</strong> · Losses <strong class="tally-l">{{ bp.losses or 0 }}</strong> · Pending <strong class="tally-p">{{ bp.pending or 0 }}</strong></p>
+{% endmacro %}
+{% macro value_tally(vp) %}
+<p class="perf-tally perf-tally-value"><span class="tally-label">Value bet (top edge at log):</span> Wins <strong class="tally-w">{{ vp.wins or 0 }}</strong> · Losses <strong class="tally-l">{{ vp.losses or 0 }}</strong> · Pending <strong class="tally-p">{{ vp.pending or 0 }}</strong>{% if vp.hit_rate_pct is not none %} · Hit <strong class="tally-w">{{ vp.hit_rate_pct }}%</strong> <span class="tally-hint">(settled)</span>{% endif %}</p>
+{% endmacro %}
+{% macro perf_row(row) %}
+<tr class="{% if row.value_result == 'W' %}perf-win{% elif row.value_result == 'L' %}perf-loss{% elif row.result == 'W' %}perf-win{% elif row.result == 'L' %}perf-loss{% endif %}">
+    <td>{{ row.match }}</td>
+    <td>{{ row.league or '—' }}</td>
+    <td>{{ row.value_market or '—' }}</td>
+    <td>{% if row.value_model_pct is not none %}{{ row.value_model_pct }}%{% else %}—{% endif %}</td>
+    <td>{% if row.model_pct is not none %}{{ row.model_pct }}%{% else %}—{% endif %}</td>
+    <td>{{ row.value_odds or '—' }}</td>
+    <td>{% if row.value_edge_pct is not none %}{{ row.value_edge_pct }}%{% else %}—{% endif %}</td>
+    <td>{% if row.value_result %}<strong>{{ row.value_result }}</strong>{% else %}—{% endif %}</td>
+    <td>{{ row.score or '—' }}</td>
+    <td>{{ row.pick or '—' }}</td>
+    <td>{% if row.result %}<strong>{{ row.result }}</strong>{% else %}pending{% endif %}</td>
+    <td>{% if row.clv_pp is not none %}{{ row.clv_pp }}{% else %}—{% endif %}</td>
+</tr>
+{% endmacro %}
+<style>
+.perf-page{max-width:1100px;margin:0 auto;position:relative;z-index:1;}
+.perf-hero{margin-bottom:18px;padding:16px 18px;border:1px solid rgba(0,122,51,0.28);border-radius:var(--radius-lg);background:linear-gradient(118deg,rgba(0,122,51,0.2) 0%,rgba(10,32,22,0.92) 45%,rgba(6,14,24,0.95) 100%);box-shadow:var(--shadow-sm);}
+.perf-hero h1{font-family:'Orbitron',sans-serif;font-size:1.35em;letter-spacing:0.04em;margin-bottom:8px;color:var(--hibs-neon);}
+.perf-hero .perf-crest{width:44px;height:44px;object-fit:contain;float:right;margin:0 0 8px 12px;opacity:0.9;filter:drop-shadow(0 0 14px rgba(0,122,51,0.25));}
+.perf-intro{font-size:0.9em;color:var(--muted);line-height:1.5;margin-bottom:14px;}
+.perf-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:16px;box-shadow:var(--shadow-sm);}
+.perf-card h2{font-size:1.05em;margin-bottom:8px;}
+.perf-card h3{font-size:0.92em;margin:14px 0 6px;color:var(--accent);}
+.perf-card h4{font-size:0.85em;margin:10px 0 4px;font-weight:600;color:var(--muted);}
+.perf-hint{font-size:0.78em;color:var(--muted);line-height:1.45;margin:0 0 10px;padding:8px 10px;border-radius:8px;border:1px solid rgba(167,243,208,0.2);background:rgba(0,122,51,0.06);}
+.perf-tally{font-size:0.82em;margin:4px 0;}
+.perf-tally-value{border-left:2px solid rgba(255,215,0,0.35);padding-left:8px;}
+.perf-win td{background:rgba(0,122,51,0.12)!important;}
+.perf-loss td{background:rgba(220,38,38,0.1)!important;}
+.perf-scorecard{width:100%;font-size:0.8em;border-collapse:collapse;margin-top:8px;}
+.perf-scorecard th,.perf-scorecard td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;}
+.perf-scorecard th{color:var(--muted);font-weight:600;}
+.perf-detail-table{width:100%;font-size:0.76em;margin-top:8px;}
+.perf-nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+.perf-nav a{text-decoration:none;}
+.empty-mini{font-size:0.82em;color:var(--muted);padding:8px 0;}
+.ir-pill{display:inline-block;font-size:0.72em;padding:2px 8px;border-radius:999px;margin:2px 4px 2px 0;border:1px solid var(--border);}
+.ir-gold{border-color:rgba(246,216,137,0.4);color:var(--gold);}
+.perf-table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px 8px;}
+@media(max-width:767px){
+    .perf-page{padding:0 2px;}
+    .perf-hero h1{font-size:1.1em;}
+    .perf-nav{gap:6px;}
+    .perf-nav .nav-btn{flex:1 1 auto;min-height:40px;text-align:center;}
+    .perf-card{padding:12px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .perf-scorecard,.perf-detail-table{min-width:520px;}
+    .perf-detail-table th,.perf-detail-table td{padding:6px 5px;font-size:0.72em;}
+}
+</style>
+<div class="perf-page">
+    <header class="site-top" style="margin-bottom:14px;">
+        <div class="site-top-left">
+            {% include '_football_site_nav.html' %}
+        </div>
+        <div class="site-top-right">
+            {% include '_site_ops_chips.html' %}
+        </div>
+    </header>
+    <div class="perf-hero">
+        {% from '_hibs_brand.html' import inline_crest %}{{ inline_crest(size=44, css_class='perf-crest') }}
+        <h1>Performance &amp; track record</h1>
+        <p class="perf-intro">
+            <strong>Engine monitor</strong> logs picks when you load the dashboard before kick-off
+            (<code>HIBS_PREDICTION_LOG_ENABLED=1</code> — on in your launcher).
+            This page does not change predictions or data quality — it only reads the audit database.
+            {{ perf.primary_view_hint|safe }}
+        </p>
+        {% if perf.enabled %}
+        <p class="perf-hint" style="margin-top:0;">
+            <strong>0/9 yesterday?</strong> Check <em>Results recorded</em> (when FT was synced), not <em>Kickoff yesterday</em>
+            (matches that started that calendar day — often empty in summer).
+            Your <strong>9/10 high-confidence</strong> check is under yesterday → <em>High-confidence model leans (≥55%)</em>
+            after you run sync below.
+        </p>
+        <div class="perf-monitor-actions" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;">
+            <span class="ir-pill ir-good">Engine monitor on</span>
+            <button type="button" class="nav-btn" id="perf-sync-results-btn">Sync finished results (today)</button>
+            <span id="perf-sync-status" class="ir-meta" aria-live="polite"></span>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if not perf.enabled %}
+    <section class="perf-card">
+        <h2>Logging off</h2>
+        <p class="empty-mini">Set <code>HIBS_PREDICTION_LOG_ENABLED=1</code> on the server and load the dashboard before matches to build history.</p>
+    </section>
+    {% else %}
+
+    {% if perf.pred_log_sync_cron and perf.pred_log_sync_cron.needs_reminder %}
+    <section class="perf-card" style="border-color:rgba(251,191,36,0.35);">
+        <p class="perf-hint" style="color:var(--gold);">{{ perf.pred_log_sync_cron.message }}</p>
+    </section>
+    {% endif %}
+
+    <section class="perf-card">
+        <h2>Daily scorecard ({{ perf.history_days }} days)</h2>
+        <p class="perf-hint"><strong>Results recorded</strong> = when FT was synced (your 9/10 check). <strong>Kickoff</strong> = matches that started that calendar day (often 0/0 if nothing kicked off yesterday).</p>
+        <table class="perf-scorecard data-table">
+            <thead>
+                <tr>
+                    <th>Day</th>
+                    <th>FT synced</th>
+                    <th>Model (scored)</th>
+                    <th>Value (scored)</th>
+                    <th>Kickoff count</th>
+                    <th>Model (kickoff)</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for day in perf.daily_history %}
+                <tr>
+                    <td>{{ day.label }}<br><span style="color:var(--muted);font-size:0.9em;">{{ day.date_local }}</span></td>
+                    <td>{{ day.scored.n }}</td>
+                    <td>{{ day.scored.model_record }}</td>
+                    <td>{{ day.scored.value_record }}</td>
+                    <td>{{ day.kickoff.n }}</td>
+                    <td>{{ day.kickoff.model_record }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    {% set m = perf.rolling %}
+    <section class="perf-card">
+        <h2>Rolling window ({{ m.window_days or 28 }} days)</h2>
+        {% if m.ok and m.n_scored %}
+        <p class="perf-tally">{{ m.n_logged }} snapshots · {{ m.n_scored }} with FT results</p>
+        <span class="ir-pill">Brier {{ m.brier_score_1x2 }}</span>
+        <span class="ir-pill">Model 1X2 {{ m.best_pick_accuracy_pct }}% ({{ m.best_pick_correct or 0 }}/{{ m.best_pick_n or 0 }})</span>
+        {% if m.beat_close_pct is not none %}<span class="ir-pill ir-gold">Beat close {{ m.beat_close_pct }}%</span>{% endif %}
+        {% if perf.audit.value_hit_rate is not none %}
+        <span class="ir-pill ir-gold">Value hit {{ perf.audit.value_hit_rate }}% (all-time audit)</span>
+        {% endif %}
+        {% else %}
+        <p class="empty-mini">{{ m.message or 'No scored rows yet — run pred-log-sync after matches finish.' }}</p>
+        {% endif %}
+    </section>
+
+    <section class="perf-card">
+        <h2>Yesterday — results recorded ({{ perf.display_tz_label }})</h2>
+        {% set ys = perf.yesterday_scored %}
+        {% if ys.rows %}
+        {{ perf_tally(ys.best_pick) }}
+        {{ value_tally(ys.value_pick) }}
+        <h3>All settled yesterday</h3>
+        <table class="data-table perf-detail-table">
+            <thead><tr><th>Match</th><th>Lg</th><th>Value</th><th>Val%</th><th>Mod%</th><th>Odds</th><th>Edge</th><th>V</th><th>Score</th><th>1X2</th><th>M</th><th>CLV</th></tr></thead>
+            <tbody>{% for row in ys.rows %}{{ perf_row(row) }}{% endfor %}</tbody>
+        </table>
+        {% if ys.high_confidence %}
+        <h3>High-confidence model leans (≥55%)</h3>
+        <table class="data-table perf-detail-table">
+            <thead><tr><th>Match</th><th>Lg</th><th>Mod%</th><th>1X2</th><th>M</th><th>Score</th><th>Value</th><th>V</th></tr></thead>
+            <tbody>
+            {% for row in ys.high_confidence %}
+            <tr class="{% if row.result == 'W' %}perf-win{% elif row.result == 'L' %}perf-loss{% endif %}">
+                <td>{{ row.match }}</td><td>{{ row.league }}</td><td>{{ row.model_pct }}%</td><td>{{ row.pick }}</td>
+                <td><strong>{{ row.result or 'pending' }}</strong></td><td>{{ row.score or '—' }}</td>
+                <td>{{ row.value_market or '—' }}</td><td>{{ row.value_result or '—' }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        {% else %}
+        <p class="empty-mini">{{ ys.message or perf.yesterday.scored.message or 'No FT results recorded yesterday.' }}</p>
+        {% endif %}
+
+        <h4>Kickoff yesterday (separate calendar day)</h4>
+        {% set yk = perf.yesterday_kickoff %}
+        {% if yk.rows %}
+        {{ perf_tally(yk.best_pick) }}
+        {{ value_tally(yk.value_pick) }}
+        <table class="data-table perf-detail-table">
+            <thead><tr><th>Match</th><th>Lg</th><th>Value</th><th>Mod%</th><th>V</th><th>Score</th><th>M</th></tr></thead>
+            <tbody>{% for row in yk.rows %}{{ perf_row(row) }}{% endfor %}</tbody>
+        </table>
+        {% else %}
+        <p class="empty-mini">{{ yk.message or 'No fixtures kicked off yesterday — normal in summer / between matchdays.' }}</p>
+        {% endif %}
+    </section>
+
+    <section class="perf-card">
+        <h2>Today — results recorded &amp; kickoff</h2>
+        {% set ts = perf.today_scored %}
+        {% set tk = perf.today_kickoff %}
+        <h3>Results recorded today</h3>
+        {% if ts.rows %}
+        {{ perf_tally(ts.best_pick) }}
+        {{ value_tally(ts.value_pick) }}
+        <table class="data-table perf-detail-table">
+            <thead><tr><th>Match</th><th>Lg</th><th>Value</th><th>Mod%</th><th>V</th><th>Score</th><th>M</th></tr></thead>
+            <tbody>{% for row in ts.rows %}{{ perf_row(row) }}{% endfor %}</tbody>
+        </table>
+        {% else %}
+        <p class="empty-mini">{{ ts.message or 'No FT results synced today yet.' }}</p>
+        {% endif %}
+        <h3>Kickoff today</h3>
+        {% if tk.rows %}
+        {{ perf_tally(tk.best_pick) }}
+        {{ value_tally(tk.value_pick) }}
+        <table class="data-table perf-detail-table">
+            <thead><tr><th>Match</th><th>Lg</th><th>Value</th><th>Mod%</th><th>V</th><th>M</th></tr></thead>
+            <tbody>{% for row in tk.rows %}{{ perf_row(row) }}{% endfor %}</tbody>
+        </table>
+        {% else %}
+        <p class="empty-mini">{{ tk.message or 'No kickoffs today in the log.' }}</p>
+        {% endif %}
+    </section>
+
+    {% if m.by_league %}
+    <section class="perf-card">
+        <h2>By league ({{ m.window_days }}d)</h2>
+        <table class="data-table perf-detail-table">
+            <thead><tr><th>League</th><th>Scored</th><th>Brier</th><th>Model 1X2 %</th><th>CLV beat</th></tr></thead>
+            <tbody>
+            {% for row in m.by_league %}
+            <tr>
+                <td>{{ row.league }}</td>
+                <td>{{ row.n_scored }}</td>
+                <td>{{ row.brier if row.brier is not none else '—' }}</td>
+                <td>{{ row.best_pick_accuracy_pct if row.best_pick_accuracy_pct is not none else '—' }}</td>
+                <td>{% if row.beat_close_pct is not none %}{{ row.beat_close_pct }}%{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    <section class="perf-card">
+        <h2>Calibration (all scored rows)</h2>
+        {% set a = perf.audit %}
+        {% if a.ok and a.n_used_metrics %}
+        <span class="ir-pill">Brier {{ a.brier_score_1x2 }}</span>
+        <span class="ir-pill">Log loss {{ a.log_loss_1x2 }}</span>
+        {% if a.value_hit_rate is not none %}
+        <span class="ir-pill ir-gold">Value {{ a.value_best_outcome_hits or 0 }}/{{ a.value_settled or 0 }} settled ({{ a.value_hit_rate }}%)</span>
+        {% endif %}
+        {% else %}
+        <p class="empty-mini">{{ a.message or 'No audit rows yet.' }}</p>
+        {% endif %}
+        <p class="perf-hint" style="margin-top:12px;">API: <code>/api/performance</code> · <code>/api/monitor/summary</code></p>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+    var btn = document.getElementById('perf-sync-results-btn');
+    var status = document.getElementById('perf-sync-status');
+    if (!btn || !status) return;
+    btn.addEventListener('click', function () {
+        btn.disabled = true;
+        status.textContent = 'Syncing FT results from API-Football…';
+        fetch('/api/monitor/sync-results', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ force: true }),
+            credentials: 'same-origin'
+        })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (res) {
+                status.textContent = (res.j && res.j.message) ? res.j.message : (res.ok ? 'Done.' : 'Sync failed.');
+                if (res.ok && res.j && res.j.updated > 0) {
+                    setTimeout(function () { window.location.reload(); }, 800);
+                }
+            })
+            .catch(function () {
+                status.textContent = 'Sync failed — check you are logged in and the server is running.';
+            })
+            .finally(function () { btn.disabled = false; });
+    });
+})();
+</script>
+{% endblock %}

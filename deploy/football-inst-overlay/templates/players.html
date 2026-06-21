@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}hibs-bet — Players{% endblock %}
+{% block container_class %} dash-outer{% endblock %}
+{% block content %}
+<div class="ref-page">
+    <header class="site-top">
+        <div class="site-top-left">
+            {% include '_football_site_nav.html' %}
+        </div>
+        <div class="site-top-right">
+            {% include '_site_ops_chips.html' %}
+        </div>
+    </header>
+
+    <div class="hero-strip" style="margin-bottom:14px;">
+        <h1 class="hero-title"><span class="hero-brand">hibs-bet</span> Players</h1>
+        <p class="hero-meta">Upcoming fixtures across <strong>{{ fetch_days }} days</strong> · player availability and form context only from loaded data (no synthetic stats).</p>
+    </div>
+    {% if cold_start %}
+    <div class="api-missing-banner" role="status" style="margin-bottom:12px;">
+        <strong>Loading players data…</strong> First load can take a minute while fixtures warm in cache. This page will auto-refresh shortly.
+    </div>
+    {% endif %}
+
+    {% if not player_row_groups %}
+    <div class="empty-state">
+        <p>No player data available yet. Refresh dashboard fixtures first.</p>
+    </div>
+    {% else %}
+    <section class="players-page" aria-label="Players by league">
+        {% for group in player_row_groups %}
+        <div class="players-league-block" data-league-section="{{ group.league }}">
+            <h2 class="players-league-hd">{{ group.section_title|upper }}</h2>
+            <div class="players-grid">
+        {% for row in group.rows %}
+        <article class="players-card">
+            <div class="players-card-top">
+                <span class="players-ko">{{ row.kickoff_day_local }} {{ row.kickoff_time }}</span>
+                <span class="players-league">{{ row.league_name }}</span>
+            </div>
+            <h3 class="players-match">{{ row.home }} <span class="fr-vs">v</span> {{ row.away }}</h3>
+            {% if row.id is not none %}
+            <p class="players-open-row">
+                <a href="/?days={{ fetch_days }}{% if include_domestic %}&domestic=1{% endif %}#fix-{{ row.id }}">Open fixture row →</a>
+            </p>
+            {% endif %}
+            <div class="players-chips">
+                <span class="players-chip{% if row.lineup_confirmed %} ok{% endif %}">
+                    {% if row.lineup_confirmed %}Lineups confirmed{% else %}Lineups pending{% endif %}
+                </span>
+                <span class="players-chip">Injuries {{ row.injury_count }}</span>
+                <span class="players-chip">Form H{{ row.home_recent_n }}/A{{ row.away_recent_n }}</span>
+            </div>
+            <div class="players-lists">
+                <div>
+                    <h4>{{ row.home }} top scorers</h4>
+                    <ul>
+                        {% for pl in (row.home_top_scorers or [])[:4] %}
+                        <li>{{ pl.name or 'Unknown' }}{% if pl.goals is defined and pl.goals is not none %} · {{ pl.goals }}g{% endif %}</li>
+                        {% else %}
+                        <li class="muted">No scorer feed</li>
+                        {% endfor %}
+                    </ul>
+                    {% if row.home_scorers_out_of_xi %}
+                    <p class="players-alert">Out of XI: {{ row.home_scorers_out_of_xi|map(attribute='name')|join(', ') }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <h4>{{ row.away }} top scorers</h4>
+                    <ul>
+                        {% for pl in (row.away_top_scorers or [])[:4] %}
+                        <li>{{ pl.name or 'Unknown' }}{% if pl.goals is defined and pl.goals is not none %} · {{ pl.goals }}g{% endif %}</li>
+                        {% else %}
+                        <li class="muted">No scorer feed</li>
+                        {% endfor %}
+                    </ul>
+                    {% if row.away_scorers_out_of_xi %}
+                    <p class="players-alert">Out of XI: {{ row.away_scorers_out_of_xi|map(attribute='name')|join(', ') }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </section>
+    {% endif %}
+</div>
+{% endblock %}
+{% block extra_js %}
+{% if cold_start %}
+<script>
+(function () {
+    var KEY = 'hibs_players_cold_reloads';
+    var MAX_RELOADS = 4;
+    var n = 0;
+    try { n = parseInt(sessionStorage.getItem(KEY) || '0', 10) || 0; } catch (e) {}
+    if (n < MAX_RELOADS) {
+        try { sessionStorage.setItem(KEY, String(n + 1)); } catch (e) {}
+        setTimeout(function () { window.location.reload(); }, 12000);
+    }
+})();
+</script>
+{% else %}
+<script>
+try { sessionStorage.removeItem('hibs_players_cold_reloads'); } catch (e) {}
+</script>
+{% endif %}
+{% endblock %}
+{% block extra_css %}
+<style>
+.players-league-block{margin-bottom:18px;}
+.players-league-hd{margin:0 0 10px;font-size:0.82em;letter-spacing:0.08em;color:var(--accent);}
+.players-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+.players-card{border:1px solid var(--border);border-radius:12px;background:rgba(10,22,40,0.72);padding:12px;}
+.players-card-top{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:0.72em;}
+.players-league{text-transform:uppercase;letter-spacing:0.06em;}
+.players-match{margin:8px 0 10px;font-size:0.98em;}
+.players-open-row{margin:0 0 8px;}
+.players-open-row a{font-size:0.72em;color:var(--blue);text-decoration:none;font-weight:700;}
+.players-open-row a:hover{text-decoration:underline;}
+.players-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.players-chip{font-size:0.64em;border:1px solid var(--border);border-radius:999px;padding:3px 7px;color:var(--muted);}
+.players-chip.ok{border-color:rgba(57,255,20,0.35);color:var(--neon-value);}
+.players-lists{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.players-lists h4{margin:0 0 6px;font-size:0.74em;color:var(--accent);}
+.players-lists ul{margin:0;padding-left:16px;}
+.players-lists li{font-size:0.78em;line-height:1.35;margin-bottom:2px;}
+.players-alert{margin-top:6px;font-size:0.68em;color:#fde68a;}
+@media(max-width:980px){.players-grid{grid-template-columns:1fr;}.players-lists{grid-template-columns:1fr;}}
+</style>
+{% endblock %}

@@ -1,0 +1,513 @@
+{% extends "base.html" %}
+{% block title %}hibs-bet — API &amp; data status{% endblock %}
+{% block content %}
+<div class="ref-page">
+    <header class="site-top">
+        <div class="site-top-left">
+            {% include '_football_site_nav.html' %}
+        </div>
+        <div class="site-top-right">
+            {% include '_site_ops_chips.html' %}
+            <button type="button" class="btn-refresh" id="btn-status-refresh">Refresh checks</button>
+        </div>
+    </header>
+
+    <div class="status-page">
+        <div class="status-hero">
+            <h1>Feeds &amp; scrapers</h1>
+            <p>Live probes against the same endpoints the dashboard uses. Green: OK and responsive; amber: reachable but slow; red: down, misconfigured, or layout drift.</p>
+            <div class="status-actions">
+                <button type="button" class="status-btn" id="btn-status-refresh-2">Run checks again</button>
+                <button type="button" class="status-btn" id="btn-clear-cache">Clear disk cache</button>
+                <a href="/" class="nav-btn" style="text-decoration:none;display:inline-flex;align-items:center;">← Back to dashboard</a>
+            </div>
+        </div>
+
+        <div class="status-section" id="presentation-layers">
+            <h2>Three-layer ops truth</h2>
+            <p class="status-note" style="margin-bottom:12px;">telemetry → evidence → statistical interpretation → commercial tier</p>
+            <div class="pres-layer-grid">
+                <article class="audit-evidence-card">
+                    <h3 class="audit-evidence-title">System status (engineering)</h3>
+                    <p id="status-system-headline" class="status-impact-headline">—</p>
+                    <ul id="status-cron-health" class="status-impact-list"></ul>
+                    <ul id="status-recent-failures" class="status-impact-list" style="margin-top:8px;"></ul>
+                </article>
+                <article class="audit-evidence-card">
+                    <h3 class="audit-evidence-title">Evidence status (statistical)</h3>
+                    <p id="status-evidence-headline" class="status-impact-headline">—</p>
+                    <div id="status-evidence-gates" class="status-impact-list"></div>
+                </article>
+                <article class="audit-evidence-card">
+                    <h3 class="audit-evidence-title">Commercial readiness (market)</h3>
+                    <p id="status-commercial-headline" class="status-impact-headline">—</p>
+                    <p id="status-commercial-note" class="status-note"></p>
+                </article>
+            </div>
+        </div>
+
+        <div class="status-section" id="playbook-30d">
+            <h2>30-day ops playbook</h2>
+            <p id="status-playbook-headline" class="status-impact-headline">—</p>
+            <ul id="status-playbook-priorities" class="status-impact-list"></ul>
+            <ul id="status-playbook-actions" class="status-impact-list" style="margin-top:8px;"></ul>
+        </div>
+
+        <div class="status-section" id="inst-grade">
+            <h2>Institutional++ grades</h2>
+            <p id="status-inst-headline" class="status-impact-headline">—</p>
+            <ul id="status-inst-warnings" class="status-impact-list"></ul>
+            <div id="status-nine-ten-pillars" class="health-grid" style="margin-top:10px;"></div>
+            <p class="status-note" style="margin-top:10px;">Engineering = controls, tests, cron. Evidence = forward B2B gates with n/window. Commercial = pilot-deployable tier — not sellable-as-proven-edge. Nine-ten = full stack pillars — <a href="/status#audit-evidence">audit evidence</a> · <code>./scripts/score_hibs_nine_ten.sh</code></p>
+        </div>
+        <div class="status-section">
+            <h2>How feeds affect predictions</h2>
+            <p id="status-quality-headline" class="status-impact-headline">—</p>
+            <ul id="status-quality-bullets" class="status-impact-list"></ul>
+            <p id="status-scrapers-policy" class="status-note" style="margin-top:10px;"></p>
+        </div>
+        <div class="status-section">
+            <h2>Feature flags (live)</h2>
+            <div id="status-features" class="health-grid"></div>
+        </div>
+        <div class="status-section" id="model-monitor">
+            <h2>Model monitor</h2>
+            <p id="status-monitor-yesterday-headline" class="status-impact-headline" style="font-size:0.95em;">—</p>
+            <table class="data-table status-xg-table" id="status-monitor-yesterday-kickoff-rows" style="margin-top:8px;font-size:0.78em;width:100%;"></table>
+            <p id="status-monitor-yesterday-scored-headline" class="status-impact-headline" style="font-size:0.88em;margin-top:10px;">—</p>
+            <table class="data-table status-xg-table" id="status-monitor-yesterday-scored-rows" style="margin-top:6px;font-size:0.78em;width:100%;"></table>
+            <p id="status-monitor-today-headline" class="status-impact-headline" style="font-size:0.95em;margin-top:14px;">—</p>
+            <table class="data-table status-xg-table" id="status-monitor-today-kickoff-rows" style="margin-top:8px;font-size:0.78em;width:100%;"></table>
+            <p id="status-monitor-today-scored-headline" class="status-impact-headline" style="font-size:0.88em;margin-top:10px;">—</p>
+            <table class="data-table status-xg-table" id="status-monitor-today-scored-rows" style="margin-top:6px;font-size:0.78em;width:100%;"></table>
+            <p id="status-monitor-headline" class="status-impact-headline" style="margin-top:14px;">—</p>
+            <table class="data-table status-xg-table" id="status-monitor-leagues" style="margin-top:10px;font-size:0.78em;width:100%;"></table>
+            <p id="status-monitor-cron" class="status-note" style="margin-top:10px;"></p>
+        </div>
+        <div class="status-section is-hidden" id="audit-evidence" hidden aria-hidden="true">
+            <h2>Audit evidence (forward B2B)</h2>
+            <p id="status-audit-evidence-note" class="status-note is-hidden" hidden></p>
+            <article class="audit-evidence-card is-hidden" id="status-forward-evidence-card" hidden aria-hidden="true" style="margin-bottom:12px;">
+                <h3 class="audit-evidence-title">Nine-ten forward gates</h3>
+                <p id="status-forward-evidence-headline" class="status-impact-headline">—</p>
+                <ul id="status-forward-evidence-gaps" class="status-impact-list" style="margin-top:8px;"></ul>
+            </article>
+            <div class="audit-evidence-grid">
+                <article class="audit-evidence-card is-hidden" id="status-odds-capture-card" hidden aria-hidden="true">
+                    <h3 class="audit-evidence-title">Opening 1X2 capture</h3>
+                    <p id="status-odds-capture-headline" class="status-impact-headline">—</p>
+                    <p id="status-odds-capture-message" class="status-note is-hidden" hidden></p>
+                </article>
+                <article class="audit-evidence-card is-hidden" id="status-clv-28d-card" hidden aria-hidden="true">
+                    <h3 class="audit-evidence-title">CLV beat-close</h3>
+                    <p id="status-clv-28d-headline" class="status-impact-headline">—</p>
+                    <p id="status-clv-28d-message" class="status-note is-hidden" hidden></p>
+                </article>
+                <article class="audit-evidence-card is-hidden" id="status-calibration-drift-card" hidden aria-hidden="true">
+                    <h3 class="audit-evidence-title">Calibration drift</h3>
+                    <p id="status-calibration-drift-headline" class="status-impact-headline">—</p>
+                    <ul id="status-calibration-drift-alerts" class="status-impact-list" style="margin-top:8px;"></ul>
+                </article>
+            </div>
+        </div>
+        <div class="status-section">
+            <h2>Audit &amp; calibration</h2>
+            <p id="status-audit-headline" class="status-impact-headline">—</p>
+            <ul id="status-audit-clv" class="status-impact-list"></ul>
+            <ul id="status-audit-cal" class="status-impact-list" style="margin-top:8px;"></ul>
+        </div>
+        <div class="status-section">
+            <h2>xG priority chain</h2>
+            <p id="status-xg-headline" class="status-impact-headline">—</p>
+            <ul id="status-xg-ops" class="status-impact-list"></ul>
+            <table class="data-table status-xg-table" id="status-xg-steps" style="margin-top:10px;font-size:0.78em;width:100%;"></table>
+            <ul id="status-xg-leagues" class="status-impact-list" style="margin-top:10px;"></ul>
+        </div>
+        <div class="status-section">
+            <h2>Per-league API gaps</h2>
+            <p id="status-api-gaps-headline" class="status-impact-headline">—</p>
+            <table class="data-table status-xg-table" id="status-api-gaps" style="margin-top:8px;font-size:0.78em;width:100%;"></table>
+        </div>
+        <div class="status-section">
+            <h2>HTTP APIs</h2>
+            <div id="status-apis" class="health-grid"></div>
+        </div>
+        <div class="status-section">
+            <h2>Scrapers &amp; open data</h2>
+            <div id="status-scrapers" class="health-grid"></div>
+        </div>
+        <p class="status-note">Results are cached for about 90 seconds server-side. Set keys in <code>.env</code> (<code>API_SPORTS_FOOTBALL_KEY</code>, <code>FOOTBALL_DATA_ORG_KEY</code>, <code>ODDS_API_KEY</code>) to enable paid APIs. Threshold for “fast” response: <span id="latency-threshold">—</span> ms.</p>
+    </div>
+</div>
+{% endblock %}
+{% block extra_css %}
+<style>
+.status-impact-headline{font-size:1.05em;font-weight:700;color:var(--text);margin:0 0 10px;line-height:1.35;}
+.status-impact-list{margin:0;padding-left:1.2em;color:var(--muted);font-size:0.88em;line-height:1.5;}
+.status-impact-list li{margin-bottom:6px;}
+.status-effect{font-size:0.78em;color:var(--muted);margin-top:4px;line-height:1.45;}
+.status-xg-table td,.status-xg-table th{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top;}
+.status-xg-table th{color:var(--muted);font-weight:600;text-align:left;}
+.is-hidden{display:none!important;}
+.audit-evidence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px;}
+.audit-evidence-card{border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:rgba(10,22,40,0.55);}
+.audit-evidence-title{margin:0 0 8px;font-size:0.82em;letter-spacing:0.06em;text-transform:uppercase;color:var(--accent);}
+.audit-ops-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;font-size:0.72em;font-weight:600;text-decoration:none;color:var(--text);background:rgba(10,22,40,0.65);white-space:nowrap;}
+.audit-ops-chip:hover{border-color:rgba(96,165,250,0.45);color:var(--blue);}
+.audit-ops-chip-label{color:var(--muted);letter-spacing:0.04em;text-transform:uppercase;font-size:0.92em;}
+.audit-ops-metric{color:var(--neon-value);}
+.audit-ops-metric.audit-ops-warn{color:#fde68a;}
+.audit-ops-metric.audit-ops-good{color:var(--neon-value);}
+.pres-layer-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px;}
+.pres-tier-green{color:var(--neon-value);}
+.pres-tier-green-plus{color:#86efac;}
+.pres-tier-amber{color:#fde68a;}
+.pres-tier-red{color:#fca5a5;}
+@media(max-width:960px){.pres-layer-grid{grid-template-columns:1fr;}}
+@media(max-width:720px){.audit-evidence-grid{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function rowHtml(item, okMs, showEffect) {
+        var dotClass = 'dot ';
+        if (item.ok && item.ms != null && item.ms < okMs) dotClass += 'dot-pulse';
+        else if (item.ok) dotClass += 'dot-warn';
+        else if (item.error_code === 'BLOCKED' || item.error_code === 'NOT_CONFIGURED' || item.error_code === 'DEFERRED') dotClass += 'dot-warn';
+        else dotClass += 'dot-bad';
+        var ms = item.ms != null ? '<span class="health-ms">' + item.ms + 'ms</span>' : '<span class="health-ms">—</span>';
+        var err = item.error || item.error_code || '';
+        var errHtml = err ? '<div class="status-err">' + esc(err) + '</div>' : '';
+        var eff = (showEffect && item.prediction_effect) ? '<div class="status-effect">' + esc(item.prediction_effect) + '</div>' : '';
+        var lab = esc(item.label || item.id);
+        return '<div class="health-row" style="flex-wrap:wrap;"><div style="flex:1;min-width:0;"><span class="health-name">' + lab + '</span>' + errHtml + eff + '</div><div class="health-meta"><span class="' + dotClass + '"></span>' + ms + '</div></div>';
+    }
+
+    function featureRowHtml(item) {
+        var dotClass = 'dot ' + (item.ok ? 'dot-pulse' : 'dot-warn');
+        var lab = esc(item.label || item.id);
+        var eff = item.prediction_effect ? '<div class="status-effect">' + esc(item.prediction_effect) + '</div>' : '';
+        return '<div class="health-row" style="flex-wrap:wrap;"><div style="flex:1;min-width:0;"><span class="health-name">' + lab + '</span>' + eff + '</div><div class="health-meta"><span class="' + dotClass + '"></span></div></div>';
+    }
+
+    async function load() {
+        var aRoot = document.getElementById('status-apis');
+        var sRoot = document.getElementById('status-scrapers');
+        var fRoot = document.getElementById('status-features');
+        var thr = document.getElementById('latency-threshold');
+        try {
+            var res = await fetch('/api/health');
+            var d = await res.json();
+            var okMs = d.latency_ok_ms || 200;
+            if (thr) thr.textContent = String(okMs);
+            var pq = d.prediction_quality || {};
+            var hq = document.getElementById('status-quality-headline');
+            if (hq) hq.textContent = pq.headline || '—';
+            var ul = document.getElementById('status-quality-bullets');
+            if (ul) {
+                ul.innerHTML = '';
+                (pq.bullets || []).forEach(function (b) {
+                    var li = document.createElement('li');
+                    li.textContent = b;
+                    ul.appendChild(li);
+                });
+            }
+            var pol = document.getElementById('status-scrapers-policy');
+            var sp = d.scrapers_policy || {};
+            if (pol) {
+                pol.innerHTML = 'Scraper policy: heavy scrapers default <strong>' + esc(sp.heavy_scrapers_default || '') + '</strong>; '
+                    + 'auto-skip heavy when APIs already strong: <strong>' + (sp.skip_heavy_when_api_strong ? 'yes' : 'no') + '</strong>.';
+            }
+            var xg = d.xg_priority_chain || {};
+            var xgH = document.getElementById('status-xg-headline');
+            if (xgH) xgH.textContent = xg.headline || '—';
+            var xgOps = document.getElementById('status-xg-ops');
+            if (xgOps) {
+                xgOps.innerHTML = '';
+                (xg.ops_notes || []).forEach(function (n) {
+                    var li = document.createElement('li');
+                    li.textContent = n;
+                    xgOps.appendChild(li);
+                });
+            }
+            var xgTbl = document.getElementById('status-xg-steps');
+            if (xgTbl) {
+                var th = '<tr><th>#</th><th>Source tag</th><th>When used</th><th>Leagues</th></tr>';
+                var body = (xg.steps || []).map(function (s) {
+                    return '<tr><td>' + esc(s.rank) + '</td><td><code>' + esc(s.source) + '</code></td><td>' + esc(s.when) + '</td><td>' + esc(s.leagues) + '</td></tr>';
+                }).join('');
+                xgTbl.innerHTML = th + body;
+            }
+            var xgLg = document.getElementById('status-xg-leagues');
+            if (xgLg) {
+                xgLg.innerHTML = '';
+                (xg.per_league_notes || []).forEach(function (row) {
+                    var li = document.createElement('li');
+                    li.innerHTML = '<strong>' + esc(row.code) + '</strong> — ' + esc(row.note);
+                    xgLg.appendChild(li);
+                });
+            }
+            var ao = d.audit_ops || {};
+            if (window.HibsAuditOps && window.HibsAuditOps.apply) window.HibsAuditOps.apply(d);
+            var mon = ao.monitor || {};
+            var yd = mon.yesterday || {};
+            var td = mon.today || {};
+            function monitorSliceHeadline(slice, label) {
+                if (slice.enabled === false || mon.enabled === false) {
+                    return label + ': model monitor off — set HIBS_PREDICTION_LOG_ENABLED=1.';
+                }
+                if (parseInt(slice.n_logged, 10) > 0) {
+                    var bp = slice.best_pick || {};
+                    var parts = [label + ': ' + slice.n_logged + ' fixtures', '1X2 W ' + (bp.wins || 0)
+                        + ' L ' + (bp.losses || 0) + ' P ' + (bp.pending || 0)];
+                    var vp = slice.value_pick || {};
+                    if (parseInt(vp.attempts, 10) > 0) {
+                        var vline = 'Value W ' + (vp.wins || 0) + ' L ' + (vp.losses || 0) + ' P ' + (vp.pending || 0);
+                        if (vp.hit_rate_pct != null) vline += ' · hit ' + vp.hit_rate_pct + '%';
+                        parts.push(vline);
+                    }
+                    return parts.join(' · ');
+                }
+                return slice.message || (label + ': none.');
+            }
+            function monitorDayHeadline(daySlice, prefix) {
+                if (daySlice.enabled === false || mon.enabled === false) {
+                    return prefix + ': model monitor off — set HIBS_PREDICTION_LOG_ENABLED=1.';
+                }
+                var ko = daySlice.kickoff || daySlice;
+                var sc = daySlice.scored || {};
+                var dateLbl = daySlice.date_local || ko.date_local || '';
+                var tzLbl = daySlice.display_tz_label || ko.display_tz_label || 'local';
+                return prefix + ' (' + dateLbl + ' · ' + tzLbl + ')';
+            }
+            function monitorResultBadge(res) {
+                if (res === 'W') return '<span class="result-badge result-badge-w">W</span>';
+                if (res === 'L') return '<span class="result-badge result-badge-l">L</span>';
+                return '<span class="result-badge result-badge-pending">pending</span>';
+            }
+            function monitorRowClass(res) {
+                if (res === 'W') return 'monitor-win';
+                if (res === 'L') return 'monitor-loss';
+                return '';
+            }
+            function monitorSortRows(rows) {
+                var order = { W: 0, pending: 1, L: 2 };
+                return (rows || []).slice().sort(function (a, b) {
+                    var ra = a.result === 'W' ? 'W' : (a.result === 'L' ? 'L' : 'pending');
+                    var rb = b.result === 'W' ? 'W' : (b.result === 'L' ? 'L' : 'pending');
+                    var oa = order[ra] != null ? order[ra] : 1;
+                    var ob = order[rb] != null ? order[rb] : 1;
+                    if (oa !== ob) return oa - ob;
+                    return String(a.match || '').localeCompare(String(b.match || ''));
+                });
+            }
+            function monitorDayTable(rows, emptyText) {
+                var head = '<tr><th>Match</th><th>Value</th><th>Model%</th><th>Odds</th><th>Edge</th><th>V W/L</th><th>Score</th><th>1X2</th><th>CLV</th></tr>';
+                var sorted = monitorSortRows(rows);
+                var body = sorted.map(function (row) {
+                    var res = row.value_result === 'W' ? 'W' : (row.value_result === 'L' ? 'L' : (row.result === 'W' ? 'W' : (row.result === 'L' ? 'L' : 'pending')));
+                    var cls = monitorRowClass(row.value_result === 'W' || row.value_result === 'L' ? row.value_result : res);
+                    var vres = row.has_value ? monitorResultBadge(row.value_result === 'W' ? 'W' : (row.value_result === 'L' ? 'L' : 'pending')) : '—';
+                    var lean = esc(row.pick || '—') + ' ' + monitorResultBadge(row.result === 'W' ? 'W' : (row.result === 'L' ? 'L' : 'pending'));
+                    return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + esc(row.match) + '</td><td>'
+                        + esc(row.has_value ? (row.value_market || '—') : '—') + '</td><td>'
+                        + (row.has_value && row.value_model_pct != null ? esc(row.value_model_pct) + '%' : '—') + '</td><td>'
+                        + (row.has_value && row.value_odds != null ? esc(row.value_odds) : '—') + '</td><td>'
+                        + (row.has_value && row.value_edge_pct != null ? '+' + esc(row.value_edge_pct) + '%' : '—') + '</td><td>' + vres
+                        + '</td><td>' + esc(row.score || '—') + '</td><td>' + lean + '</td><td>'
+                        + (row.clv_pp != null ? esc(row.clv_pp) + ' pp' : '—') + '</td></tr>';
+                }).join('');
+                return head + (body || '<tr><td colspan="9">' + esc(emptyText) + '</td></tr>');
+            }
+            var ydKo = yd.kickoff || yd;
+            var ydSc = yd.scored || {};
+            var tdKo = td.kickoff || td;
+            var tdSc = td.scored || {};
+            var myh = document.getElementById('status-monitor-yesterday-headline');
+            if (myh) myh.textContent = monitorDayHeadline(yd, 'Yesterday');
+            var mYestKoTbl = document.getElementById('status-monitor-yesterday-kickoff-rows');
+            if (mYestKoTbl) mYestKoTbl.innerHTML = monitorDayTable(ydKo.rows, 'No kickoff rows');
+            var mysh = document.getElementById('status-monitor-yesterday-scored-headline');
+            if (mysh) mysh.textContent = monitorSliceHeadline(ydSc, 'Results recorded');
+            var mYestScTbl = document.getElementById('status-monitor-yesterday-scored-rows');
+            if (mYestScTbl) mYestScTbl.innerHTML = monitorDayTable(ydSc.rows, 'No results recorded');
+            var mth = document.getElementById('status-monitor-today-headline');
+            if (mth) mth.textContent = monitorDayHeadline(td, 'Today');
+            var mTodayKoTbl = document.getElementById('status-monitor-today-kickoff-rows');
+            if (mTodayKoTbl) mTodayKoTbl.innerHTML = monitorDayTable(tdKo.rows, 'No kickoff rows');
+            var mtsh = document.getElementById('status-monitor-today-scored-headline');
+            if (mtsh) mtsh.textContent = monitorSliceHeadline(tdSc, 'Results recorded');
+            var mTodayScTbl = document.getElementById('status-monitor-today-scored-rows');
+            if (mTodayScTbl) mTodayScTbl.innerHTML = monitorDayTable(tdSc.rows, 'No results recorded');
+            var mh = document.getElementById('status-monitor-headline');
+            if (mh) {
+                if (parseInt(mon.n_logged, 10) > 0) {
+                    var parts = [mon.n_logged + ' logged', mon.n_scored + ' scored'];
+                    if (mon.brier_score_1x2 != null) {
+                        parts.push('Brier ' + mon.brier_score_1x2);
+                        if (mon.best_pick_accuracy_pct != null) parts.push('best pick ' + mon.best_pick_accuracy_pct + '%');
+                        if (mon.beat_close_pct != null) parts.push('beat-close ' + mon.beat_close_pct + '%');
+                    }
+                    mh.textContent = 'Last ' + (mon.window_days || 28) + 'd: ' + parts.join(' · ');
+                } else {
+                    mh.textContent = mon.message || 'No snapshots in monitor window — enable prediction log and use dashboard.';
+                }
+            }
+            var mTbl = document.getElementById('status-monitor-leagues');
+            if (mTbl) {
+                var mth = '<tr><th>League</th><th>Scored</th><th>Brier</th><th>Pick %</th><th>Beat close</th></tr>';
+                var mbody = (mon.by_league || []).map(function (row) {
+                    return '<tr><td>' + esc(row.league) + '</td><td>' + esc(row.n_scored) + '</td><td>'
+                        + esc(row.brier) + '</td><td>' + esc(row.best_pick_accuracy_pct) + '</td><td>'
+                        + (row.beat_close_pct != null ? esc(row.beat_close_pct) + '%' : '—') + '</td></tr>';
+                }).join('');
+                mTbl.innerHTML = mth + (mbody || '<tr><td colspan="5">No scored rows in window</td></tr>');
+            }
+            var mc = document.getElementById('status-monitor-cron');
+            var cron = ao.pred_log_sync_cron || mon.pred_log_sync_cron || {};
+            if (mc) {
+                if (cron.needs_reminder && cron.message) {
+                    mc.innerHTML = '<strong>Cron:</strong> ' + esc(cron.message);
+                } else if (cron.scheduled) {
+                    mc.textContent = 'pred-log-sync scheduled (' + (cron.cron_user || 'crontab') + ')'
+                        + (cron.log_age_hours != null ? ', log age ' + cron.log_age_hours + 'h' : '');
+                } else {
+                    mc.textContent = '';
+                }
+            }
+            var clv28 = ao.clv_beat_close_28d || {};
+            var clv28N = parseInt(clv28.n_clv_rows, 10) || 0;
+            var clv = ao.clv_by_league || {};
+            var clvN = parseInt(clv.n_clv_rows, 10) || 0;
+            var ah = document.getElementById('status-audit-headline');
+            if (ah) {
+                if (clv28N > 0 && clv28.beat_close_pct != null) {
+                    ah.textContent = 'CLV (28d kickoff): beat-close ' + clv28.beat_close_pct + '% on ' + clv28N + ' row(s)'
+                        + (clvN > clv28N && clv.beat_close_pct != null ? ' · all-time ' + clv.beat_close_pct + '% (' + clvN + ' rows)' : '');
+                } else if (clvN > 0 && clv.beat_close_pct != null) {
+                    ah.textContent = 'CLV: ' + clvN + ' row(s), beat-close ' + clv.beat_close_pct + '% overall';
+                } else if (ao.clv_log_enabled) {
+                    ah.textContent = 'CLV logging on — run daily sync after matches finish to populate closing odds.';
+                } else if (ao.prediction_log_enabled) {
+                    ah.textContent = 'Prediction audit on — set HIBS_CLV_LOG_ENABLED=1 for beat-close tracking.';
+                } else {
+                    ah.textContent = 'Prediction audit off — enable HIBS_PREDICTION_LOG_ENABLED=1 for calibration / CLV.';
+                }
+            }
+            var clvUl = document.getElementById('status-audit-clv');
+            if (clvUl) {
+                clvUl.innerHTML = '';
+                (clv.leagues || []).forEach(function (row) {
+                    var li = document.createElement('li');
+                    li.innerHTML = '<strong>' + esc(row.league) + '</strong>: '
+                        + esc(row.n_clv) + ' CLV row(s), beat-close '
+                        + esc(row.beat_close_pct) + '%, avg CLV '
+                        + esc(row.avg_clv_pp) + ' pp';
+                    clvUl.appendChild(li);
+                });
+            }
+            var calUl = document.getElementById('status-audit-cal');
+            var cal = ao.calibration_cache || {};
+            if (calUl) {
+                calUl.innerHTML = '';
+                if (cal.ok) {
+                    var li = document.createElement('li');
+                    li.textContent = 'Shrink cache: ' + (cal.n_leagues || 0) + ' league(s), generated '
+                        + (cal.generated_at || '?') + ', baseline Brier ' + (cal.baseline_brier || '?');
+                    calUl.appendChild(li);
+                } else {
+                    var li2 = document.createElement('li');
+                    li2.textContent = cal.message || 'No calibration cache — run calibration-fit weekly after pred-log-sync.';
+                    calUl.appendChild(li2);
+                }
+            }
+            var drift = ao.calibration_drift || {};
+            var driftCard = document.getElementById('status-calibration-drift-card');
+            var driftH = document.getElementById('status-calibration-drift-headline');
+            var driftAlerts = document.getElementById('status-calibration-drift-alerts');
+            if (driftCard && drift && !drift.error) {
+                showEl(driftCard, true);
+                if (driftH) {
+                    driftH.textContent = (drift.headline || '—') + ' · status ' + (drift.status || '—');
+                }
+                if (driftAlerts) {
+                    driftAlerts.innerHTML = '';
+                    (drift.alerts || []).slice(0, 6).forEach(function (a) {
+                        var li = document.createElement('li');
+                        li.textContent = (a.severity === 'critical' ? '✗ ' : '⚠ ') + (a.message || a.id || '');
+                        driftAlerts.appendChild(li);
+                    });
+                }
+            } else if (driftCard) {
+                showEl(driftCard, false);
+            }
+            var fh = '';
+            (d.features || []).forEach(function (f) { fh += featureRowHtml(f); });
+            if (fRoot) fRoot.innerHTML = fh || '<div class="health-row"><span class="health-name">No feature rows</span></div>';
+            var gaps = d.league_api_gaps;
+            var gapRows = Array.isArray(gaps) ? gaps : (gaps && gaps.rows ? gaps.rows : []);
+            var gapH = document.getElementById('status-api-gaps-headline');
+            if (gapH) {
+                if (gapRows.length) {
+                    gapH.textContent = 'Share of fixtures missing injuries, topscorers, or lineup context in the current disk bundle.';
+                } else if (gaps && gaps.error) {
+                    gapH.textContent = 'Could not compute gaps: ' + gaps.error;
+                } else {
+                    gapH.textContent = 'No fixture bundle on disk yet — load the dashboard once, then refresh.';
+                }
+            }
+            var gapTbl = document.getElementById('status-api-gaps');
+            if (gapTbl) {
+                var gth = '<tr><th>League</th><th>Fixtures</th><th>No injuries</th><th>No topscorers</th><th>No lineup</th></tr>';
+                var gbody = gapRows.map(function (row) {
+                    return '<tr><td>' + esc(row.league) + '</td><td>' + esc(row.fixtures) + '</td><td>'
+                        + esc(row.missing_injuries_pct) + '%</td><td>' + esc(row.missing_top_scorers_pct)
+                        + '%</td><td>' + esc(row.missing_lineup_pct) + '%</td></tr>';
+                }).join('');
+                gapTbl.innerHTML = gth + (gbody || '<tr><td colspan="5">No rows</td></tr>');
+            }
+            var guard = d.api_sports_guard || {};
+            if (guard.blocked && gapH) {
+                gapH.textContent = (gapH.textContent || '') + ' API guard: ' + esc(guard.block_reason || 'blocked') + '.';
+            }
+            var ah = '';
+            (d.apis || []).forEach(function (a) { ah += rowHtml(a, okMs, true); });
+            var sh = '';
+            (d.scrapers || []).forEach(function (s) { sh += rowHtml(s, okMs, true); });
+            if (aRoot) aRoot.innerHTML = ah || '<div class="health-row"><span class="health-name">No API rows</span></div>';
+            if (sRoot) sRoot.innerHTML = sh || '<div class="health-row"><span class="health-name">No scraper rows</span></div>';
+        } catch (e) {
+            if (aRoot) aRoot.innerHTML = '<div class="health-row"><span class="health-name">Request failed</span></div>';
+            if (sRoot) sRoot.innerHTML = '';
+            if (fRoot) fRoot.innerHTML = '';
+        }
+    }
+
+    function clearCacheThenLoad() {
+        fetch('/api/cache/clear?all=1', { method: 'POST' })
+            .catch(function () { return null; })
+            .finally(load);
+    }
+
+    function wire() {
+        var b1 = document.getElementById('btn-status-refresh');
+        var b2 = document.getElementById('btn-status-refresh-2');
+        var bc = document.getElementById('btn-clear-cache');
+        if (b1) b1.addEventListener('click', load);
+        if (b2) b2.addEventListener('click', load);
+        if (bc) bc.addEventListener('click', clearCacheThenLoad);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        wire();
+        load();
+    });
+})();
+</script>
+{% endblock %}

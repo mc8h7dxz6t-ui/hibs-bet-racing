@@ -1,0 +1,818 @@
+{% extends "base.html" %}
+{% block title %}hibs-bet — Live Dashboard{% endblock %}
+{% block container_class %} dash-outer{% endblock %}
+{% block content %}
+{% from '_term_hint.html' import hint %}
+<div class="ref-page">
+    <header class="site-top">
+        <div class="site-top-left">
+            {% include '_football_site_nav.html' %}
+        </div>
+        <div class="site-top-right">
+            {% include '_site_ops_chips.html' %}
+            <span class="pill-soft"><span class="dot dot-pulse" style="width:8px;height:8px;"></span> <span data-hibs-setting-label="profile">Balanced</span></span>
+            <div class="odds-toggle" role="group" aria-label="Odds format">
+                <button type="button" class="ot ot-active" data-odds="dec" aria-pressed="true">Dec</button>
+                <button type="button" class="ot" data-odds="frac" aria-pressed="false">Frac</button>
+            </div>
+            <button type="button" class="btn-betslip" data-betslip-open>Betslip</button>
+            <label class="fetch-days-toolbar" title="How far ahead to load fixtures">
+                <span class="fetch-days-lbl">Window</span>
+                <select id="dash-fetch-days" class="fetch-days-select" aria-label="Fixture window days">
+                    <option value="5"{% if fetch_days == 5 %} selected{% endif %}>5 days</option>
+                    <option value="7"{% if fetch_days == 7 %} selected{% endif %}>7 days</option>
+                </select>
+            </label>
+            <button type="button" class="btn-refresh" id="btn-refresh">Refresh</button>
+        </div>
+    </header>
+
+    {% if cold_start %}
+    <div class="api-missing-banner" role="status">
+        <strong>Loading fixtures…</strong> Rebuilding fixture data (often 1–2 minutes). This page will reload automatically; avoid clicking <strong>Refresh</strong> again until fixtures appear.
+    </div>
+    <meta http-equiv="refresh" content="20">
+    {% endif %}
+
+    {% if ops_banner and ops_banner.quota_banner %}
+    <div class="api-missing-banner" role="alert" style="border-color:rgba(251,191,36,0.45);">
+        <strong>API quota / guard:</strong> {{ ops_banner.quota_banner }}
+    </div>
+    {% endif %}
+
+    {% if ops_banner and ops_banner.warm_banner and not cold_start %}
+    <div class="api-missing-banner" role="status" style="border-color:rgba(96,165,250,0.35);">
+        {{ ops_banner.warm_banner }}
+    </div>
+    {% endif %}
+
+    {% if not has_api_clients %}
+    <div class="api-missing-banner" role="alert">
+        <strong>No fixture API keys loaded.</strong> Add a real key (not the <code>your_*_here</code> placeholders) to <code>.env</code> in the project root: <code>API_SPORTS_FOOTBALL_KEY</code> and/or <code>FOOTBALL_DATA_ORG_KEY</code>. Restart after saving.
+    </div>
+    {% endif %}
+
+    {% if tournament_focus.active %}
+    <div class="tournament-focus-banner" role="status">
+        <strong>{{ tournament_focus.label }}</strong> first{% if tournament_focus.intl_only_fetch %} — international fixtures by default (fewer domestic API calls){% else %} — domestic leagues included{% endif %}. <strong>Friendlies</strong> use a wider window; <strong>Ireland</strong> and <strong>Nordic</strong> region chips are full daily options on your <strong>{{ fetch_days }}-day</strong> list. Use <strong>All</strong>, <strong>UK</strong>, or <strong>European</strong> for other domestic leagues when needed.
+    </div>
+    {% elif tournament_focus.post_wc_domestic_european_active %}
+    <div class="tournament-focus-banner" role="status">
+        <strong>Post–World Cup (opt-in)</strong> — default fetch is <strong>UK + European</strong> leagues on your <strong>{{ fetch_days }}-day</strong> list until domestic seasons resume ({{ tournament_focus.domestic_offseason_end }}). Use <strong>All</strong> to load every configured league.
+    </div>
+    {% elif tournament_focus.domestic_offseason_active %}
+    <div class="tournament-focus-banner" role="status">
+        <strong>World Cup</strong> first (11 Jun–18 Jul 2026), then <strong>friendlies</strong> (wider window), cup finals, and <strong>Nordic</strong> leagues on your <strong>{{ fetch_days }}-day</strong> list until {{ tournament_focus.domestic_offseason_end }}. No SPL, EPL, or European league calendars. Use <strong>All</strong> to load everything.
+    </div>
+    {% elif tournament_focus.friendlies_window_active %}
+    <div class="tournament-focus-banner" role="status">
+        <strong>Pre–World Cup friendlies</strong> through {{ tournament_focus.friendlies_window_end }} — <strong>International</strong> filter on by default; <strong>Nordic</strong> chip for summer leagues on your <strong>{{ fetch_days }}-day</strong> window. World Cup focus from 11 Jun.
+    </div>
+    {% endif %}
+
+    <div class="dash-layout">
+        <aside class="dash-sidebar" aria-label="Filters and upcoming fixtures">
+            <p class="dash-side-hd">Coming up</p>
+            <p class="dash-side-sub">Kick-offs in <strong>{{ display_tz_label }}</strong> · click to jump</p>
+
+            <details class="dash-filter-panel" open>
+                <summary class="dash-filter-panel-sum">Search &amp; filters</summary>
+            <div class="search-chips dash-sidebar-filters">
+                <input type="search" id="dash-search" class="dash-search" placeholder="Search teams…" autocomplete="off" aria-label="Search fixtures">
+                <label class="chk-inline" title="Show only fixtures flagged as value (model edge vs book)."><input type="checkbox" id="flt-value"> Value only{{ hint('Value = our model thinks the price is better than the book implies.') }}</label>
+                <label class="chk-inline" title="Only matches meeting data coverage threshold."><input type="checkbox" id="flt-data-full"> Full data (≥{{ data_quality_ui_min }}%){{ hint('Data % = share of stats loaded (form, xG, odds, etc.). Low % = thinner analysis.') }}</label>
+                {% if data_quality_show_90_chip %}
+                <div class="chip-row" id="dq-chip-row" aria-label="Data quality filter">
+                    <button type="button" class="chip chip-dq" data-dq-min="">Any data</button>
+                    <button type="button" class="chip chip-dq" data-dq-min="90">90%+ data only</button>
+                </div>
+                {% endif %}
+                <div class="chip-row" id="region-chip-row" aria-label="Region filter">
+                    {% for slug, label in dashboard_filter_regions %}
+                    <button type="button" class="chip chip-region{% if slug == tournament_focus.default_region %} active{% elif not slug and not tournament_focus.default_region %} active{% endif %}" data-region="{{ slug }}">{{ label }}</button>
+                    {% endfor %}
+                </div>
+                {% if tournament_focus.domestic_offseason_active and not tournament_focus.active %}
+                <p class="chip-hint region-filter-hint" id="region-filter-hint">Summer window: <strong>World Cup</strong>, <strong>friendlies</strong>, <strong>Nordic</strong> leagues, and <strong>cup finals</strong> (UCL etc.) load first — UK/EPL calendars return after {{ tournament_focus.domestic_offseason_end }}. Use <strong>Nordic</strong> or <strong>International</strong> region chips, or pick a league below.</p>
+                {% elif tournament_focus.active and tournament_focus.intl_only_fetch %}
+                <p class="chip-hint region-filter-hint" id="region-filter-hint">Showing <strong>International</strong> by default during {{ tournament_focus.label|lower }}. <strong>Nordic</strong> leagues are on the {{ fetch_days }}-day window — pick another region for UK/European leagues.</p>
+                {% elif tournament_focus.intl_only_fetch and not tournament_focus.active %}
+                <p class="chip-hint region-filter-hint" id="region-filter-hint"><strong>All</strong> is the default. <strong>UEFA finals</strong> (Conference League, Europa, Champions) are under <strong>European</strong> — not International. Friendlies use <strong>International</strong>; Nordics use the <strong>Nordic</strong> chip.</p>
+                {% elif tournament_focus.friendlies_window_active and not tournament_focus.intl_only_fetch %}
+                <p class="chip-hint region-filter-hint" id="region-filter-hint">Pick <strong>All</strong>, <strong>UK</strong>, or <strong>European</strong> to filter — international friendlies are included in every view.</p>
+                {% else %}
+                <p class="chip-hint region-filter-hint" id="region-filter-hint" hidden>UEFA cup finals (e.g. Europa League) are under <strong>European</strong>, not UK — switch region or choose All.</p>
+                {% endif %}
+                <div class="chip-row" id="chip-row" aria-label="League filter">
+                    <button type="button" class="chip chip-lg active" data-league="">All leagues</button>
+                    {% for code, name in leagues_for_filter %}
+                    <button type="button" class="chip chip-lg" data-league="{{ code }}">{{ name }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+            </details>
+
+            <nav class="dash-upcoming" id="dash-upcoming">
+                {% if sidebar_upcoming %}
+                {% set last_day = namespace(val='') %}
+                {% for item in sidebar_upcoming %}
+                {% if item.kickoff_day_local and item.kickoff_day_local != last_day.val %}
+                {% set last_day.val = item.kickoff_day_local %}
+                <div class="du-day">{{ item.kickoff_day_local[8:10] }}/{{ item.kickoff_day_local[5:7] }}</div>
+                {% endif %}
+                <a href="#fix-{{ item.id }}" class="du-row" data-league="{{ item.league }}" data-region="{{ item.dashboard_region|default('other') }}" data-fid="{{ item.id }}" title="{% if item.rationale_snippet %}{{ item.rationale_snippet }}{% elif item.pick %}{{ item.pick }}{% endif %}">
+                    <span class="du-ko">{% if item.confidence %}<span class="du-conf">{{ "%.0f"|format(item.confidence) }}%</span>{% endif %}{{ item.kickoff_time }}</span>
+                    <span class="du-teams">{{ item.home }} <span class="du-vs">v</span> {{ item.away }}{% if item.rationale_snippet %}<span class="du-snippet">{{ item.rationale_snippet }}</span>{% elif item.pick %}<span class="du-snippet">{{ item.pick }}</span>{% endif %}</span>
+                </a>
+                {% endfor %}
+                {% else %}
+                <p class="du-empty">No upcoming fixtures loaded.</p>
+                {% endif %}
+            </nav>
+            <p class="chip-hint du-hint"><a href="/status">API status →</a></p>
+            {% include '_dashboard_logged_results.html' %}
+        </aside>
+
+        <div class="dash-main">
+            <details class="dash-howto" id="dash-howto">
+                <summary class="dash-howto-sum">How to use this dashboard</summary>
+                <div class="dash-howto-body">
+                    <p>Browse fixtures by day and league. The <strong>data %</strong> badge shows how complete stats are for that match — higher is safer for model picks.</p>
+                    <p>Use <strong>Refresh</strong> after changing the window (5 or 7 days) or API keys. Click any <strong>row</strong> to expand form, xG, goals markets and value lines.</p>
+                    <p>Filter with search, region chips, or <strong>Value only</strong> / <strong>Full data</strong> in the sidebar. See <a href="/guide">Guide</a> for edge and Kelly, or <a href="/acca">Acca Builder</a> for multi-leg slips.</p>
+                </div>
+            </details>
+
+            <div class="hero-strip">
+                <h1 class="hero-title"><span class="hero-brand">hibs-bet</span> {{ fetch_days }}-Day Fixtures</h1>
+                <p class="hero-meta"><strong>{{ total }}</strong> fixtures <span class="live-pill"><span class="live-dot"></span> LIVE DATA</span> · showing next <strong>{{ fetch_days }} days</strong> · times in <strong>{{ display_tz_label }}</strong></p>
+                <p class="hero-sub">Full fixture list by day and league — tap any row for form, xG, markets and value picks. <a href="/insights">Insights</a> explains how the model works and which leagues loaded.</p>
+                {% if fixture_coverage %}
+                <div class="api-missing-banner" style="margin-top:10px;">
+                    <strong>{{ fixture_coverage.summary }}</strong>
+                    {{ fixture_coverage.reason }}
+                    <br><span style="color:var(--muted);">{{ fixture_coverage.detail }}</span>
+                    {% if fixture_coverage.empty_sample %}
+                    <br><span style="color:var(--muted);">No fixtures returned for: {{ fixture_coverage.empty_sample|map(attribute='name')|join(', ') }}{% if fixture_coverage.empty_count > fixture_coverage.empty_sample|length %}, +{{ fixture_coverage.empty_count - fixture_coverage.empty_sample|length }} more{% endif %}.</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+
+            {% include '_betting_guide.html' %}
+
+            <details class="acca-week-card">
+                <summary class="acca-week-sum">
+                    <span class="acca-week-ico">🏆</span>
+                    <span class="acca-week-txt">Best Acca of the Week</span>
+                    <span class="ai-pill">AI PICKS</span>
+                    <span class="acca-week-sub">Up to 5 legs · <a href="/acca">Acca Builder</a></span>
+                </summary>
+                <p class="muted small" style="padding:0 14px 12px;color:var(--accent);line-height:1.45;">Multi-leg ideas ranked by model support. <strong>Combined odds</strong> multiply each leg’s price (e.g. 2.00 × 1.50 = 3.00). Legs are treated as <strong>independent</strong> unless noted — same match or correlated markets can overlap. <a href="/acca" style="color:var(--neon-value);">Open Acca Builder →</a></p>
+            </details>
+
+            {% if value_bets and value_bets|length > 0 %}
+            <div class="value-strip-title">⚡ TOP VALUE BETS TODAY</div>
+            <div class="value-strip">
+                {% for vf in value_bets[:3] %}
+                {% set pr = vf.prediction %}
+                {% set top = pr.value_bets_display[0] if pr.value_bets_display is defined and pr.value_bets_display else none %}
+                <div class="value-strip-card">
+                    <div class="vsc-meta">{{ vf.home }} <span class="vsc-vs">v</span> {{ vf.away }}</div>
+                    {% if top %}
+                    <div class="vsc-pick">{{ top.market_label }}</div>
+                    <div class="vsc-odds" data-odds-dec="{{ top.odds }}">{{ "%.2f"|format(top.odds) }}</div>
+                    <div class="vsc-edge">+{{ "%.1f"|format(top.edge_pct) }}% edge</div>
+                    {% else %}
+                    <div class="vsc-pick">Value</div>
+                    <div class="vsc-odds">—</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div id="dash-fixture-root" class="fixtures-full-list" data-dq-min="{{ data_quality_ui_min }}" data-default-region="{{ tournament_focus.default_region }}" data-include-domestic="{{ '1' if include_domestic else '0' }}" data-intl-only-fetch="{{ '1' if tournament_focus.intl_only_fetch else '0' }}">
+                {% if total == 0 %}
+                <div class="empty-state">{% from '_hibs_brand.html' import empty_crest %}{{ empty_crest() }}
+                    <p>No fixtures in the next {{ fetch_days }} days. Check API keys and <a href="/status">status</a>, then Refresh. Scrapers add stats to fixtures after a provider returns them; they do not create league calendars.</p>
+                </div>
+                {% else %}
+                {% for day in dashboard_days %}
+                <section class="day-block" data-date="{{ day.date_iso }}">
+                    <h2 class="day-heading">{{ day.heading }}</h2>
+                    {% for lg in day.leagues %}
+                    <div class="lg-block" data-league-section="{{ lg.code }}">
+                        <h3 class="lg-heading">{{ lg.name|upper }} <span class="lg-count">({{ lg.fixtures|length }})</span></h3>
+                        <div class="ft-scroll-wrap">
+                        <div class="ft-head" aria-hidden="true">
+                            <span class="ft-h-ko">KO</span><span class="ft-h-match">MATCH</span><span class="ft-h-prob" title="Both Teams To Score — model % for Yes">BTTS{{ hint('BTTS = both teams score at least one goal (Yes market).') }}</span><span class="ft-h-prob" title="Model 1X2 lean (H/D/A)">Win</span><span class="ft-h-od">1</span><span class="ft-h-od">X</span><span class="ft-h-od">2</span><span class="ft-h-od" title="BTTS Yes book odds">B·odds</span><span class="ft-h-od">O1.5</span><span class="ft-h-od">O2.5</span><span class="ft-h-od">U2.5</span><span class="ft-h-od">O3.5</span><span class="ft-h-od">U3.5</span><span class="ft-h-chev"></span>
+                        </div>
+                        {% for fixture in lg.fixtures %}
+                        {% include '_fixture_row_compact.html' %}
+                        {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </section>
+                {% endfor %}
+                {% endif %}
+            </div>
+
+            {% if progressive_load %}
+            <div id="dash-results-mount" class="hibs-deferred" aria-busy="true"
+                 data-fetch-url="/api/dashboard/recent-results{% if include_domestic %}?domestic=1{% endif %}">
+                <section class="results-section" id="dash-results-section" aria-labelledby="dash-results-heading">
+                    <p class="hibs-deferred-loading">Loading recent results…</p>
+                </section>
+            </div>
+            {% elif recent_results_total > 0 %}
+            {% include '_dashboard_recent_results.html' %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% include '_assistant_widget.html' %}
+{% endblock %}
+{% block extra_js %}
+<script>window.HIBS_DEFER_ASSISTANT = {% if progressive_load or not assistant_packets %}true{% else %}false{% endif %};</script>
+<script type="application/json" id="hibs-assistant-data">{{ {"packets": assistant_packets, "recommendations": assistant_recommendations or none}|tojson }}</script>
+<script>window.HIBS_ASSISTANT = JSON.parse(document.getElementById('hibs-assistant-data').textContent);</script>
+<script src="{{ url_for('static', filename='hibs_assistant.js') }}"></script>
+{% if progressive_load %}<script src="{{ url_for('static', filename='hibs_deferred.js') }}"></script>{% endif %}
+<script>
+(function () {
+    var FILTER_KEY = 'hibs_league_filter_v2';
+    var firstFilterPass = true;
+    var activeRegion = '';
+    var activeLeague = '';
+    var searchQ = '';
+    var fullDataOnly = false;
+    var activeDqMin = 0;
+    var defaultRegion = '';
+    var includeDomestic = false;
+    var intlOnlyFetch = false;
+
+    function regionNeedsDomestic(rg) {
+        return rg !== 'international';
+    }
+
+    function loadDashRootFlags() {
+        var root = document.getElementById('dash-fixture-root');
+        defaultRegion = root ? (root.getAttribute('data-default-region') || '') : '';
+        includeDomestic = root ? root.getAttribute('data-include-domestic') === '1' : false;
+        intlOnlyFetch = root ? root.getAttribute('data-intl-only-fetch') === '1' : false;
+    }
+
+    function ensureDomesticLoaded() {
+        loadDashRootFlags();
+        if (!intlOnlyFetch || includeDomestic) return false;
+        if (!regionNeedsDomestic(activeRegion)) return false;
+        window.location.replace(dashboardUrl({ domestic: '1' }));
+        return true;
+    }
+
+    function loadFilterState() {
+        loadDashRootFlags();
+        var hasSavedRegion = false;
+        try {
+            var raw = localStorage.getItem(FILTER_KEY);
+            if (raw === null || raw === '') {
+                if (defaultRegion) activeRegion = defaultRegion;
+                return;
+            }
+            var s = JSON.parse(raw);
+            if (s && typeof s === 'object') {
+                if (Object.prototype.hasOwnProperty.call(s, 'region')) {
+                    activeRegion = s.region;
+                    hasSavedRegion = true;
+                }
+                if (Object.prototype.hasOwnProperty.call(s, 'league')) {
+                    activeLeague = s.league || '';
+                }
+            } else if (typeof raw === 'string') {
+                activeRegion = raw;
+                hasSavedRegion = true;
+            }
+        } catch (e) {
+            if (defaultRegion) activeRegion = defaultRegion;
+        }
+        if (!hasSavedRegion && defaultRegion) activeRegion = defaultRegion;
+        if (intlOnlyFetch && defaultRegion === '' && activeRegion === 'international') {
+            activeRegion = '';
+            try { localStorage.setItem(FILTER_KEY, JSON.stringify({ region: '', league: activeLeague })); } catch (e) {}
+        }
+        if (activeRegion === 'uk' && !activeLeague) {
+            var hint = document.getElementById('region-filter-hint');
+            if (hint && hint.hidden !== false && !defaultRegion) hint.hidden = false;
+        }
+    }
+
+    function saveFilterState() {
+        try {
+            localStorage.setItem(FILTER_KEY, JSON.stringify({ region: activeRegion, league: activeLeague }));
+        } catch (e) {}
+    }
+
+    function restoreFilterChips() {
+        var regionRow = document.getElementById('region-chip-row');
+        if (regionRow) {
+            regionRow.querySelectorAll('.chip-region').forEach(function (btn) {
+                var on = (btn.getAttribute('data-region') || '') === activeRegion;
+                btn.classList.toggle('active', on);
+            });
+        }
+        var row = document.getElementById('chip-row');
+        if (row) {
+            row.querySelectorAll('.chip').forEach(function (btn) {
+                var on = (btn.getAttribute('data-league') || '') === activeLeague;
+                btn.classList.toggle('active', on);
+            });
+        }
+    }
+
+    function currentSettings() {
+        return window.HibsSettings && typeof HibsSettings.get === 'function' ? HibsSettings.get() : {};
+    }
+
+    function currentDqMin() {
+        var root = document.getElementById('dash-fixture-root');
+        var fallback = root ? parseFloat(root.getAttribute('data-dq-min') || '85') : 85;
+        var s = currentSettings();
+        var fromSetting = s.dataQualityMin ? parseFloat(s.dataQualityMin) : fallback;
+        var n = isNaN(fromSetting) ? fallback : fromSetting;
+        return isNaN(n) ? 85 : n;
+    }
+
+    function applyDashFilters() {
+        var valCb = document.getElementById('flt-value');
+        var valOnly = valCb ? valCb.checked : false;
+        var dqMin = currentDqMin();
+        var hint = document.getElementById('region-filter-hint');
+        if (hint && !defaultRegion) hint.hidden = activeRegion !== 'uk' || !!activeLeague;
+        var totalCards = 0;
+        var visibleCards = 0;
+        document.querySelectorAll('#dash-fixture-root .fixture-card').forEach(function (card) {
+            totalCards += 1;
+            var rg = activeRegion;
+            var okR = !rg || card.getAttribute('data-region') === rg;
+            var lg = activeLeague;
+            var okL = !lg || card.getAttribute('data-league') === lg;
+            var okV = !valOnly || card.getAttribute('data-has-value') === '1';
+            var hay = (card.getAttribute('data-search') || '');
+            var okS = !searchQ || hay.indexOf(searchQ) !== -1;
+            var dq = parseFloat(card.getAttribute('data-data-q') || '0');
+            if (isNaN(dq)) dq = 0;
+            var okD = !fullDataOnly || dq >= dqMin;
+            var ok90 = !activeDqMin || dq >= activeDqMin;
+            var show = okR && okL && okV && okS && okD && ok90;
+            if (show) visibleCards += 1;
+            card.style.display = show ? '' : 'none';
+        });
+        if (firstFilterPass && totalCards > 0 && visibleCards === 0 && (activeLeague || activeRegion)) {
+            activeLeague = '';
+            activeRegion = defaultRegion || '';
+            saveFilterState();
+            restoreFilterChips();
+            firstFilterPass = false;
+            applyDashFilters();
+            return;
+        }
+        if (firstFilterPass && totalCards > 0 && visibleCards === 0 && activeDqMin) {
+            activeDqMin = 0;
+            var dqRow = document.getElementById('dq-chip-row');
+            if (dqRow) {
+                dqRow.querySelectorAll('.chip-dq').forEach(function (b) { b.classList.remove('active'); });
+                var allDq = dqRow.querySelector('.chip-dq[data-dq-min=""]');
+                if (allDq) allDq.classList.add('active');
+            }
+            firstFilterPass = false;
+            applyDashFilters();
+            return;
+        }
+        firstFilterPass = false;
+        document.querySelectorAll('#dash-fixture-root .lg-block').forEach(function (block) {
+            var vis = false;
+            block.querySelectorAll('.fixture-card').forEach(function (c) {
+                if (c.style.display !== 'none') vis = true;
+            });
+            block.style.display = vis ? '' : 'none';
+        });
+        document.querySelectorAll('#dash-fixture-root .day-block').forEach(function (day) {
+            var v = false;
+            day.querySelectorAll('.lg-block').forEach(function (b) {
+                if (b.style.display !== 'none') v = true;
+            });
+            day.style.display = v ? '' : 'none';
+        });
+        var resultsRoot = document.getElementById('dash-results-root');
+        if (resultsRoot) {
+            resultsRoot.querySelectorAll('.results-row').forEach(function (row) {
+                var rg = activeRegion;
+                var okR = !rg || row.getAttribute('data-region') === rg;
+                var lg = activeLeague;
+                var okL = !lg || row.getAttribute('data-league') === lg;
+                var hay = (row.getAttribute('data-search') || '');
+                var okS = !searchQ || hay.indexOf(searchQ) !== -1;
+                row.style.display = (okR && okL && okS) ? '' : 'none';
+            });
+            resultsRoot.querySelectorAll('.results-lg-block').forEach(function (block) {
+                var vis = false;
+                block.querySelectorAll('.results-row').forEach(function (r) {
+                    if (r.style.display !== 'none') vis = true;
+                });
+                block.style.display = vis ? '' : 'none';
+            });
+            resultsRoot.querySelectorAll('.results-day-block').forEach(function (day) {
+                var v = false;
+                day.querySelectorAll('.results-lg-block').forEach(function (b) {
+                    if (b.style.display !== 'none') v = true;
+                });
+                day.style.display = v ? '' : 'none';
+            });
+            var resultsSection = document.getElementById('dash-results-section');
+            if (resultsSection) {
+                var anyResults = false;
+                resultsRoot.querySelectorAll('.results-row').forEach(function (r) {
+                    if (r.style.display !== 'none') anyResults = true;
+                });
+                resultsSection.style.display = anyResults ? '' : 'none';
+            }
+        }
+        document.querySelectorAll('#dash-upcoming .du-row').forEach(function (row) {
+            var rg = activeRegion;
+            var okR = !rg || row.getAttribute('data-region') === rg;
+            var lg = activeLeague;
+            var okL = !lg || row.getAttribute('data-league') === lg;
+            var fid = row.getAttribute('data-fid');
+            var card = fid ? document.getElementById('fix-' + fid) : null;
+            var okV = !valOnly || (card && card.getAttribute('data-has-value') === '1');
+            var okS = !searchQ || (card && (card.getAttribute('data-search') || '').indexOf(searchQ) !== -1);
+            var dq = card ? parseFloat(card.getAttribute('data-data-q') || '0') : 0;
+            if (isNaN(dq)) dq = 0;
+            var okD = !fullDataOnly || dq >= dqMin;
+            var ok90 = !activeDqMin || dq >= activeDqMin;
+            row.style.display = (okR && okL && okV && okS && okD && ok90) ? '' : 'none';
+        });
+    }
+
+    function wireDqChips() {
+        var dqRow = document.getElementById('dq-chip-row');
+        if (!dqRow) return;
+        dqRow.querySelectorAll('.chip-dq').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                dqRow.querySelectorAll('.chip-dq').forEach(function (b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+                var raw = btn.getAttribute('data-dq-min') || '';
+                activeDqMin = raw ? parseFloat(raw) : 0;
+                if (isNaN(activeDqMin)) activeDqMin = 0;
+                applyDashFilters();
+            });
+        });
+        var first = dqRow.querySelector('.chip-dq[data-dq-min=""]');
+        if (first) first.classList.add('active');
+    }
+
+    function wireRegionChips() {
+        var regionRow = document.getElementById('region-chip-row');
+        if (!regionRow) return;
+        regionRow.querySelectorAll('.chip-region').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                regionRow.querySelectorAll('.chip-region').forEach(function (b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+                activeRegion = btn.getAttribute('data-region') || '';
+                loadDashRootFlags();
+                if (intlOnlyFetch && !includeDomestic && regionNeedsDomestic(activeRegion)) {
+                    saveFilterState();
+                    window.location.href = dashboardUrl({ domestic: '1' });
+                    return;
+                }
+                saveFilterState();
+                applyDashFilters();
+            });
+        });
+    }
+
+    function wireChips() {
+        var row = document.getElementById('chip-row');
+        if (!row) return;
+        row.querySelectorAll('.chip').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                row.querySelectorAll('.chip').forEach(function (b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+                activeLeague = btn.getAttribute('data-league') || '';
+                saveFilterState();
+                applyDashFilters();
+            });
+        });
+    }
+
+    function wireSearch() {
+        var inp = document.getElementById('dash-search');
+        if (!inp) return;
+        inp.addEventListener('input', function () {
+            searchQ = (inp.value || '').trim().toLowerCase();
+            applyDashFilters();
+        });
+    }
+
+    function wireUpcomingNav() {
+        document.querySelectorAll('#dash-upcoming .du-row').forEach(function (row) {
+            row.addEventListener('click', function (e) {
+                var href = row.getAttribute('href');
+                if (!href || href.charAt(0) !== '#') return;
+                var el = document.querySelector(href);
+                if (!el) return;
+                e.preventDefault();
+                el.open = true;
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('fixture-highlight');
+                setTimeout(function () { el.classList.remove('fixture-highlight'); }, 2200);
+            });
+        });
+    }
+
+    function currentFetchDays() {
+        var sel = document.getElementById('dash-fetch-days');
+        if (sel && (sel.value === '5' || sel.value === '7')) return sel.value;
+        if (window.HibsSettings && typeof HibsSettings.normalizeFetchDays === 'function') {
+            return HibsSettings.normalizeFetchDays(currentSettings().fetchDays);
+        }
+        return '5';
+    }
+
+    function dashboardUrl(extra) {
+        var params = new URLSearchParams(window.location.search);
+        params.set('days', currentFetchDays());
+        if (extra) {
+            Object.keys(extra).forEach(function (k) {
+                if (extra[k] == null) params.delete(k);
+                else params.set(k, String(extra[k]));
+            });
+        }
+        return '/?' + params.toString();
+    }
+
+    function syncFetchDaysFromUrl() {
+        var params = new URLSearchParams(window.location.search);
+        var urlDays = params.get('days');
+        if (urlDays === '5' || urlDays === '7') {
+            if (window.HibsSettings) {
+                var s = currentSettings();
+                if (s.fetchDays !== urlDays) {
+                    s.fetchDays = urlDays;
+                    HibsSettings.save(s);
+                }
+            }
+            return urlDays;
+        }
+        var stored = '5';
+        if (window.HibsSettings) {
+            stored = HibsSettings.normalizeFetchDays(currentSettings().fetchDays);
+        }
+        try {
+            var legacy = localStorage.getItem('hibs_fetch_days');
+            if (legacy) stored = (legacy === '7') ? '7' : '5';
+        } catch (e) {}
+        params.set('days', stored);
+        window.location.replace('/?' + params.toString());
+        return stored;
+    }
+
+    function wireFetchDays() {
+        var sel = document.getElementById('dash-fetch-days');
+        if (!sel) return;
+        sel.addEventListener('change', function () {
+            var d = sel.value;
+            if (window.HibsSettings) {
+                var s = currentSettings();
+                s.fetchDays = d;
+                HibsSettings.save(s);
+            }
+            window.location.href = dashboardUrl();
+        });
+    }
+
+    function wireRefresh() {
+        var b = document.getElementById('btn-refresh');
+        if (!b) return;
+        b.addEventListener('click', function () {
+            if (window.hibsShowLaunchOverlay) window.hibsShowLaunchOverlay();
+            b.disabled = true;
+            b.textContent = 'Refreshing…';
+            // Server snapshots disk bundle on ?refresh=1 before clearing fixture caches.
+            // Do not POST /api/cache/clear?all=1 first — that wipes the bundle and causes 0 fixtures.
+            window.location.href = dashboardUrl({ refresh: '1' });
+        });
+    }
+
+    function formatLiveXg(v) {
+        if (v == null || v === '') return '—';
+        var n = Number(v);
+        return isNaN(n) ? String(v) : n.toFixed(2);
+    }
+
+    function applyLiveXgBar(card, live) {
+        var bar = card.querySelector('[data-live-xg-bar]');
+        if (!bar) return;
+        var hasXg = live.live_xg_home != null || live.live_xg_away != null;
+        bar.hidden = !hasXg;
+        if (!hasXg) return;
+        var hEl = bar.querySelector('[data-live-xg-home]');
+        var aEl = bar.querySelector('[data-live-xg-away]');
+        var hFill = bar.querySelector('[data-live-xg-fill-h]');
+        var aFill = bar.querySelector('[data-live-xg-fill-a]');
+        var xh = Number(live.live_xg_home) || 0;
+        var xa = Number(live.live_xg_away) || 0;
+        if (hEl) hEl.textContent = formatLiveXg(live.live_xg_home);
+        if (aEl) aEl.textContent = formatLiveXg(live.live_xg_away);
+        var sum = xh + xa;
+        if (sum > 0 && hFill && aFill) {
+            hFill.style.width = (100 * xh / sum).toFixed(1) + '%';
+            aFill.style.width = (100 * xa / sum).toFixed(1) + '%';
+        }
+    }
+
+    function applyLiveStatsTable(card, live) {
+        var table = card.querySelector('[data-live-stats-table]');
+        var empty = card.querySelector('[data-live-stats-empty]');
+        var rows = live.live_stats && live.live_stats.rows;
+        if (!rows || !rows.length) {
+            if (table) table.hidden = true;
+            if (empty) empty.style.display = '';
+            return;
+        }
+        if (empty) empty.style.display = 'none';
+        if (!table) return;
+        table.hidden = false;
+        var tbody = table.querySelector('[data-live-stats-body]') || table.tBodies[0];
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        rows.forEach(function (r) {
+            var tr = document.createElement('tr');
+            tr.innerHTML = '<td style="color:var(--muted);">' + (r.label || '') + '</td>'
+                + '<td class="home-row">' + (r.home != null ? r.home : '—') + '</td>'
+                + '<td class="away-row">' + (r.away != null ? r.away : '—') + '</td>';
+            tbody.appendChild(tr);
+        });
+    }
+
+    function applyLivePayload(payload) {
+        var map = (payload && payload.fixtures) || {};
+        Object.keys(map).forEach(function (fid) {
+            var live = map[fid];
+            var card = document.querySelector('.fixture-card[data-fid="' + fid + '"]');
+            if (!card || !live) return;
+            card.setAttribute('data-is-live', live.is_live ? '1' : '0');
+            if (live.is_live) card.classList.add('fr-in-play');
+            var scoreEls = card.querySelectorAll('[data-live-score]');
+            if (live.live_score && scoreEls.length) {
+                scoreEls.forEach(function (el) { el.textContent = live.live_score; });
+            }
+            var st = card.querySelector('[data-live-status]');
+            if (st && live.live_status) {
+                st.textContent = live.live_status + (live.live_minute != null ? ' · ' + live.live_minute + "'" : '');
+            }
+            var ev = card.querySelector('[data-live-last-event]');
+            var evWrap = card.querySelector('[data-live-last-event-wrap]');
+            if (live.live_last_event && live.live_last_event.label) {
+                if (ev) { ev.textContent = live.live_last_event.label; }
+                if (evWrap) evWrap.hidden = false;
+            }
+            var ko = card.querySelector('.fr-ko');
+            if (ko && live.is_live) {
+                var pill = live.live_status || 'LIVE';
+                if (live.live_minute != null) pill += ' ' + live.live_minute + "'";
+                ko.innerHTML = '<span class="fr-live-pill"><span class="live-dot"></span>' + pill + '</span>';
+            }
+            applyLiveXgBar(card, live);
+            applyLiveStatsTable(card, live);
+        });
+    }
+
+    function wireLivePoll() {
+        var cards = document.querySelectorAll('.fixture-card[data-fid]');
+        if (!cards.length) return;
+        var nowMs = Date.now();
+        var priority = [];
+        var other = [];
+        cards.forEach(function (c) {
+            var id = c.getAttribute('data-fid');
+            if (!id) return;
+            var koRaw = c.getAttribute('data-kickoff-utc');
+            var near = false;
+            if (c.getAttribute('data-is-live') === '1') {
+                near = true;
+            } else if (koRaw) {
+                var koMs = Date.parse(koRaw);
+                if (!isNaN(koMs)) {
+                    var diffH = (koMs - nowMs) / 3600000;
+                    near = diffH <= 0.5 && diffH >= -3.5;
+                }
+            }
+            (near ? priority : other).push(id);
+        });
+        var ids = priority.concat(other).slice(0, 160);
+        if (!ids.length) return;
+        var pollMs = 60000;
+        var timer = null;
+        var domesticQ = window.location.search.indexOf('domestic=1') >= 0 ? '&domestic=1' : '';
+        function poll() {
+            var q = ids.join(',');
+            fetch('/api/fixtures/live?ids=' + encodeURIComponent(q) + '&stats=1' + domesticQ)
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    applyLivePayload(data);
+                    if (data && data.poll_after_sec) pollMs = Math.max(20000, data.poll_after_sec * 1000);
+                    if (timer) clearInterval(timer);
+                    timer = setInterval(poll, pollMs);
+                })
+                .catch(function () {});
+        }
+        var anyLive = priority.length > 0 || document.querySelector('.fixture-card[data-is-live="1"]');
+        setTimeout(poll, anyLive ? 2500 : 8000);
+        timer = setInterval(poll, pollMs);
+    }
+
+    function wireOddsToggle() {
+        if (window.HibsOdds && typeof HibsOdds.bindToggles === 'function') {
+            HibsOdds.bindToggles(document);
+        }
+    }
+
+    function wireVal() {
+        var v = document.getElementById('flt-value');
+        if (v) v.addEventListener('change', applyDashFilters);
+        var fd = document.getElementById('flt-data-full');
+        var s = currentSettings();
+        if (fd && s.fullDataDefault) {
+            fd.checked = true;
+            fullDataOnly = true;
+        }
+        if (fd) fd.addEventListener('change', function () {
+            fullDataOnly = fd.checked;
+            applyDashFilters();
+        });
+        document.addEventListener('hibs-settings-change', function (evt) {
+            var next = evt.detail || {};
+            if (fd && typeof next.fullDataDefault === 'boolean') {
+                fd.checked = !!next.fullDataDefault;
+                fullDataOnly = fd.checked;
+            }
+            applyDashFilters();
+        });
+    }
+
+    function mapPickToOutcome(key) {
+        var m = { home_win: 'home', away_win: 'away', draw: 'draw' };
+        return m[key] || key;
+    }
+
+    function wireSlipButtons() {
+        document.querySelectorAll('.fr-add-slip').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var card = btn.closest('.fixture-card');
+                var sel = card && card.querySelector('.fr-pick-menu');
+                if (!sel || !window.HibsBetslip) return;
+                var opt = sel.options[sel.selectedIndex];
+                var odds = parseFloat(opt.getAttribute('data-odds'));
+                if (!odds || odds <= 1) {
+                    alert('No book price on this pick — choose a market with odds.');
+                    return;
+                }
+                HibsBetslip.addSelection({
+                    fid: card.getAttribute('data-fid'),
+                    home: card.getAttribute('data-home'),
+                    away: card.getAttribute('data-away'),
+                    league: sel.getAttribute('data-league') || card.getAttribute('data-league'),
+                    outcome: mapPickToOutcome(opt.value),
+                    odds: odds,
+                    label: opt.getAttribute('data-label') || opt.textContent
+                });
+                HibsBetslip.openDrawer();
+            });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        syncFetchDaysFromUrl();
+        loadFilterState();
+        if (ensureDomesticLoaded()) return;
+        restoreFilterChips();
+        wireDqChips();
+        wireRegionChips();
+        wireChips();
+        wireSearch();
+        wireVal();
+        wireFetchDays();
+        wireRefresh();
+        wireOddsToggle();
+        wireUpcomingNav();
+        wireSlipButtons();
+        wireLivePoll();
+        applyDashFilters();
+    });
+})();
+</script>
+{% endblock %}

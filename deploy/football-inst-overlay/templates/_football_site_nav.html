@@ -1,0 +1,18 @@
+{# Football in-app nav — logo lives in product bar above. #}
+{% set nav = football_nav_active|default('') %}
+<nav class="site-links" aria-label="Football">
+    <a href="/" class="site-link{% if nav == 'dashboard' %} site-link-active{% endif %}">Dashboard</a>
+    <a href="/acca" class="site-link{% if nav == 'acca' %} site-link-active{% endif %}">Acca Builder</a>
+    <a href="/insights" class="site-link{% if nav == 'insights' %} site-link-active{% endif %}">Insights</a>
+    <a href="/performance" class="site-link{% if nav == 'performance' %} site-link-active{% endif %}">Performance</a>
+    <a href="/tables" class="site-link{% if nav == 'tables' %} site-link-active{% endif %}">Tables</a>
+    <details class="nav-more">
+        <summary>More ▾</summary>
+        <div class="nav-more-menu">
+            <a href="/players" class="{% if nav == 'players' %}active{% endif %}">Players</a>
+            <a href="/status" class="{% if nav == 'status' %}active{% endif %}">API status</a>
+            <a href="/guide" class="{% if nav == 'guide' %}active{% endif %}">Guide</a>
+            <a href="/settings" class="{% if nav == 'settings' %}active{% endif %}">Settings</a>
+        </div>
+    </details>
+</nav>
