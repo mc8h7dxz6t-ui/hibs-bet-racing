@@ -44,6 +44,7 @@ EXTRA=(
   scripts/lib_scrape_first_cache.sh
   scripts/seed_fotmob_minimal_bundle.py
   scripts/evaluate_trading_day15_gate.py
+  deploy/vps-consolidated-gold-standard.sh
   deploy/sync-trading-day15-gate.sh
   scripts/data_producer_repair.sh
   src/hibs_predictor/scrapers/scrape_resilience.py
