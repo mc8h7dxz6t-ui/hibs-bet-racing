@@ -7,8 +7,8 @@ import json
 import sys
 from pathlib import Path
 
-from compliance_log.ingest import log_decision
-from inst_spine.check import run_institutional_check
+from compliance_log.ingest import log_decision, manifest_from_dict
+from inst_spine.check import build_compliance_context, run_institutional_check
 from inst_spine.ledger import AppendOnlyLedger
 
 
@@ -20,6 +20,7 @@ def main(argv: list[str] | None = None) -> int:
     p_ingest.add_argument("--snapshot", required=True, help="Path to snapshot JSON")
     p_ingest.add_argument("--outcome", default="{}", help="Outcome JSON string or path")
     p_ingest.add_argument("--actor", default="system")
+    p_ingest.add_argument("--manifest", type=Path, default=None, help="RunManifest JSON file")
     p_ingest.add_argument("--database", type=Path, default=Path("data/compliance_ledger.sqlite"))
 
     p_check = sub.add_parser("check", help="Run F1–F9 institutional check")
@@ -33,7 +34,13 @@ def main(argv: list[str] | None = None) -> int:
     p_export.add_argument("--database", type=Path, default=Path("data/compliance_ledger.sqlite"))
     p_export.add_argument("--out-dir", type=Path, default=None)
     p_export.add_argument("--tarball", type=Path, default=None)
+    p_export.add_argument("--anchor", type=Path, default=None, help="Offsite genesis anchor JSON")
     p_export.add_argument("--repro-check", action="store_true", help="F9 reproducibility test")
+
+    p_bundle = sub.add_parser("verify-bundle", help="Offline auditor dry-run on exported tarball")
+    p_bundle.add_argument("--tarball", type=Path, required=True)
+    p_bundle.add_argument("--anchor", type=Path, default=None, help="Offsite genesis anchor JSON")
+    p_bundle.add_argument("--sha256", default=None, help="Expected bundle SHA256 hex")
 
     args = parser.parse_args(argv)
 
@@ -44,10 +51,16 @@ def main(argv: list[str] | None = None) -> int:
             outcome = json.loads(Path(outcome_raw).read_text(encoding="utf-8"))
         else:
             outcome = json.loads(outcome_raw)
+        manifest = None
+        if args.manifest is not None:
+            manifest = manifest_from_dict(
+                json.loads(Path(args.manifest).read_text(encoding="utf-8"))
+            )
         entry = log_decision(
             snapshot=snap,
             outcome=outcome,
             actor=args.actor,
+            manifest=manifest,
             database=args.database,
         )
         print(json.dumps(entry, indent=2))
@@ -55,17 +68,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "check":
         ledger = AppendOnlyLedger(args.database)
-        entries = ledger.list_entries()
-        report = run_institutional_check(
-            ledger=ledger,
-            context={
-                "ledger_entries": entries,
-                "expected_count": len(entries),
-                "actual_count": len(entries),
-                "source_coverage_pct": 100.0,
-            },
-            observation_lane=args.observation_lane,
-        )
+        ctx = build_compliance_context(ledger, run_f9=True)
+        report = run_institutional_check(ledger=ledger, context=ctx, run_f9=False)
         print(json.dumps(report.to_dict(), indent=2))
         return 0 if report.passed else 1
 
@@ -85,14 +89,41 @@ def main(argv: list[str] | None = None) -> int:
             args.database,
             out_dir=args.out_dir,
             tarball_path=args.tarball,
+            anchor_path=args.anchor,
         )
         print(
             json.dumps(
                 {
                     "ok": result.ok,
                     "bundle_sha256": result.bundle_sha256,
-                    "tarball": str(result.tarball_path),
+                    "tarball": str(result.tarball_path) if result.tarball_path else None,
                     "validation": result.validation.message,
+                    "institutional_passed": result.institutional_passed,
+                },
+                indent=2,
+            )
+        )
+        return 0 if result.ok else 1
+
+    if args.cmd == "verify-bundle":
+        from inst_spine.export import verify_audit_bundle
+
+        result = verify_audit_bundle(
+            args.tarball,
+            anchor_path=args.anchor,
+            expected_sha256=args.sha256,
+        )
+        print(
+            json.dumps(
+                {
+                    "ok": result.ok,
+                    "genesis_ok": result.genesis_ok,
+                    "chain_ok": result.chain_ok,
+                    "lamport_ok": result.lamport_ok,
+                    "bundle_sha256_ok": result.bundle_sha256_ok,
+                    "institutional_passed": result.institutional_passed,
+                    "message": result.message,
+                    "details": result.details,
                 },
                 indent=2,
             )

@@ -13,6 +13,7 @@ echo "==> Running Inst++ test suite"
   tests/test_inst_spine_core.py \
   tests/test_inst_products.py \
   tests/test_inst_export.py \
+  tests/test_proxy_risk.py \
   tests/test_webhook_mesh.py \
   tests/test_ad_guard.py \
   -q

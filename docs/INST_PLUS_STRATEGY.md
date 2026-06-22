@@ -57,8 +57,8 @@ Built on `src/inst_spine/` — **zero sports imports**. Sell **individually**, n
 
 | # | Product | One job | Code status | Next to 95% |
 |---|---------|---------|-------------|-------------|
-| 1 | **Compliance Logger** | Tamper-proof decision audit | P2 export done | Auditor dry-run + offsite genesis |
-| 2 | **Proxy-Risk Gateway** | Outbound circuit breaker | P1 shadow | Upstream forward + p99 bench |
+| 1 | **Compliance Logger** | Tamper-proof decision audit | **Inst++ complete** | Auditor dry-run + offsite genesis |
+| 2 | **Proxy-Risk Gateway** | Outbound circuit breaker | **Inst++ complete (live)** | p99 bench under prod Redis |
 | 3 | **Alt-Data Extractor** | One feed, ≥95% coverage | P1 demo | One real non-sports target |
 | 4 | **AI Kit** | Rate limits + checkpoints | P1 demo | Pydantic retry E2E |
 
@@ -271,8 +271,8 @@ Product 6 **is** Proxy-Risk with different config:
 
 ```
 DONE   inst_spine v3 (WAL, genesis, Redis buckets, export P2)
-NEXT   Compliance auditor dry-run (close P2)
-       Proxy-Risk P2 (upstream forward)
+DONE   Compliance Logger Inst++ (offline verify-bundle + F9 context)
+DONE   Proxy-Risk P2 (upstream forward, log-before-forward, Redis idempotency)
 
 EASY WINS (pick one):
   5a. Webhook Mesh P0–P1  ← recommended (fastest to £199/mo)

@@ -18,8 +18,8 @@ chmod +x scripts/instpp_smoke_test.sh scripts/export_*.sh
 
 | # | Product | Advertise-ready | Demo command |
 |---|---------|-----------------|--------------|
-| 1 | Compliance Logger | **Yes** (P2 export) | `compliance-log export --repro-check` |
-| 2 | Proxy-Risk Gateway | **Yes** (shadow) | `proxy-risk evaluate --reference-price 50` |
+| 1 | Compliance Logger | **Yes** (Inst++ complete) | `compliance-log export --repro-check` + `verify-bundle` |
+| 2 | Proxy-Risk Gateway | **Yes** (live + shadow) | `proxy-risk evaluate --live` (with upstream base) |
 | 3 | Alt-Data Extractor | Demo only | `altdata poll --url …` |
 | 4 | AI Kit | Demo only | `ai-kit run --max-tokens 1000` |
 | 5 | Webhook Mesh | **Yes** (P1) | `webhook-mesh serve` |
@@ -144,9 +144,11 @@ See `docs/AD_GUARD_INSTITUTIONAL_STACK.md`.
 ## Product 1 — Compliance Logger (anchor product)
 
 ```bash
-compliance-log ingest --snapshot /tmp/snapshot.json --actor demo --database ./data/demo_compliance.sqlite
+compliance-log ingest --snapshot docs/demo_snapshot.json --actor demo --database ./data/demo_compliance.sqlite
 compliance-log verify-chain --database ./data/demo_compliance.sqlite
+compliance-log check --database ./data/demo_compliance.sqlite
 compliance-log export --database ./data/demo_compliance.sqlite --repro-check
+compliance-log verify-bundle --tarball ./audit_bundle.tar
 ```
 
 ---
@@ -154,11 +156,19 @@ compliance-log export --database ./data/demo_compliance.sqlite --repro-check
 ## Product 2 — Proxy-Risk Gateway
 
 ```bash
+# Shadow (default) — gates only, no upstream call
 proxy-risk evaluate \
   --client-id broker-1 \
   --reference-price 10.5 \
   --body '{"symbol":"AAPL","qty":100}' \
   --database ./data/demo_proxy.sqlite
+
+# Live forward — requires PROXY_RISK_UPSTREAM_BASE (+ optional PROXY_RISK_UPSTREAM_TOKEN)
+export PROXY_RISK_UPSTREAM_BASE=https://httpbin.org
+proxy-risk evaluate --live --client-id broker-1 --method POST --path /post --body '{"ok":true}'
+
+proxy-risk check --database ./data/demo_proxy.sqlite
+proxy-risk export --database ./data/demo_proxy.sqlite --repro-check
 ```
 
 ---
@@ -180,7 +190,7 @@ proxy-risk evaluate \
 |-----|---------------------|
 | Sub-5ms RTB exchange insert | Say no on RTB RFPs — no harm to API proxy buyers |
 | Multi-tenant SaaS UI | Not needed for first £2k MRR |
-| Proxy-Risk live upstream forward | Shadow demo OK; say "shadow" in listing |
+| Proxy-Risk live upstream forward | **Done** — use `--live` + `PROXY_RISK_UPSTREAM_BASE` |
 | Health Telemetry (#7) | Do not list |
 
 ---

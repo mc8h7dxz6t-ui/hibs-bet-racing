@@ -13,6 +13,18 @@ def _default_db() -> Path:
     return Path("data/compliance_ledger.sqlite")
 
 
+def manifest_from_dict(data: dict[str, Any]) -> RunManifest:
+    """Build RunManifest from JSON file or CLI payload."""
+    return RunManifest(
+        manifest_id=str(data["manifest_id"]),
+        run_kind=str(data.get("run_kind") or "compliance"),
+        config_hash=str(data.get("config_hash") or stable_id("compliance", "config", "v1")),
+        writer_id=str(data.get("writer_id") or "compliance"),
+        created_at=str(data.get("created_at") or ""),
+        extras=dict(data.get("extras") or {}),
+    )
+
+
 def log_decision(
     *,
     snapshot: dict[str, Any],
