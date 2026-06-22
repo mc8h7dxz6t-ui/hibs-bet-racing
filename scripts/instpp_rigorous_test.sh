@@ -65,8 +65,9 @@ section "Unit tests — Compliance + Proxy-Risk"
 "$PYTHON" -m pytest \
   tests/test_inst_spine_core.py \
   tests/test_inst_export.py \
-  tests/test_inst_products.py \
   tests/test_proxy_risk.py \
+  tests/test_inst_coverage.py \
+  tests/test_compliance_cli.py \
   -v --tb=short
 pass "Unit test suite"
 
@@ -334,7 +335,7 @@ PROXY_EXPORT=$("$PYTHON" -m proxy_risk.cli export \
 echo "$PROXY_EXPORT"
 echo "$PROXY_EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 
-PROXY_VERIFY=$("$PYTHON" -m compliance_log.cli verify-bundle --tarball "$PROXY_TAR")
+PROXY_VERIFY=$("$PYTHON" -m proxy_risk.cli verify-bundle --tarball "$PROXY_TAR")
 echo "$PROXY_VERIFY"
 echo "$PROXY_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "Proxy institutional check + export + offline verify"

@@ -9,8 +9,11 @@ import sys
 from pathlib import Path
 
 from inst_spine.check import build_compliance_context, run_institutional_check
+from inst_spine.cli_util import run_cli
 from inst_spine.ledger import AppendOnlyLedger
 from proxy_risk.router import ProxyRequest, ProxyRiskGateway
+
+PRODUCT = "proxy-risk"
 
 
 def _use_uvloop() -> None:
@@ -79,6 +82,11 @@ def main(argv: list[str] | None = None) -> int:
     p_export.add_argument("--anchor", type=Path, default=None)
     p_export.add_argument("--repro-check", action="store_true", help="F9 reproducibility test")
 
+    p_bundle = sub.add_parser("verify-bundle", help="Offline auditor dry-run on exported tarball")
+    p_bundle.add_argument("--tarball", type=Path, required=True)
+    p_bundle.add_argument("--anchor", type=Path, default=None)
+    p_bundle.add_argument("--sha256", default=None)
+
     p_serve = sub.add_parser("serve", help="Run HTTP gateway server")
     p_serve.add_argument("--host", default="127.0.0.1")
     p_serve.add_argument("--port", type=int, default=18443)
@@ -108,22 +116,49 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.repro_check:
             ok, msg = verify_bundle_reproducible(args.database)
-            print(json.dumps({"ok": ok, "message": msg, "product": "proxy-risk"}, indent=2))
+            print(json.dumps({"ok": ok, "message": msg, "product": PRODUCT}, indent=2))
             return 0 if ok else 1
         result = build_audit_bundle(
             args.database,
             out_dir=args.out_dir,
             tarball_path=args.tarball,
             anchor_path=args.anchor,
+            product=PRODUCT,
         )
         print(
             json.dumps(
                 {
                     "ok": result.ok,
-                    "product": "proxy-risk",
+                    "product": PRODUCT,
                     "bundle_sha256": result.bundle_sha256,
                     "tarball": str(result.tarball_path) if result.tarball_path else None,
                     "institutional_passed": result.institutional_passed,
+                },
+                indent=2,
+            )
+        )
+        return 0 if result.ok else 1
+
+    if args.cmd == "verify-bundle":
+        from inst_spine.export import verify_audit_bundle
+
+        result = verify_audit_bundle(
+            args.tarball,
+            anchor_path=args.anchor,
+            expected_sha256=args.sha256,
+        )
+        print(
+            json.dumps(
+                {
+                    "ok": result.ok,
+                    "product": PRODUCT,
+                    "genesis_ok": result.genesis_ok,
+                    "chain_ok": result.chain_ok,
+                    "lamport_ok": result.lamport_ok,
+                    "bundle_sha256_ok": result.bundle_sha256_ok,
+                    "institutional_passed": result.institutional_passed,
+                    "message": result.message,
+                    "details": result.details,
                 },
                 indent=2,
             )
@@ -149,4 +184,4 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    run_cli(lambda: main())

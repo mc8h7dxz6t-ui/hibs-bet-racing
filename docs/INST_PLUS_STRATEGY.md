@@ -57,8 +57,8 @@ Built on `src/inst_spine/` — **zero sports imports**. Sell **individually**, n
 
 | # | Product | One job | Code status | Next to 95% |
 |---|---------|---------|-------------|-------------|
-| 1 | **Compliance Logger** | Tamper-proof decision audit | **Inst++ complete** | Auditor dry-run + offsite genesis |
-| 2 | **Proxy-Risk Gateway** | Outbound circuit breaker | **Inst++ complete (live)** | p99 bench under prod Redis |
+| 1 | **Compliance Logger** | Tamper-proof decision audit | **Gold standard** | Multi-tenant SaaS UI |
+| 2 | **Proxy-Risk Gateway** | Outbound circuit breaker | **Gold standard (live)** | Vault HSM adapter |
 | 3 | **Alt-Data Extractor** | One feed, ≥95% coverage | P1 demo | One real non-sports target |
 | 4 | **AI Kit** | Rate limits + checkpoints | P1 demo | Pydantic retry E2E |
 

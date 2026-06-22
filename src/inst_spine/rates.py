@@ -87,11 +87,22 @@ class RedisTokenBucketBackend(TokenBucketBackend):
         return f"{self._prefix}{key}"
 
     def consume(self, *, key: str, capacity: float, refill_rate: float, cost: float, now: float) -> bool:
-        result = self._script(
-            keys=[self._full_key(key)],
-            args=[capacity, refill_rate, cost, now],
-        )
-        return int(result or 0) == 1
+        import logging
+
+        logger = logging.getLogger("inst-spine.rates")
+        try:
+            result = self._script(
+                keys=[self._full_key(key)],
+                args=[capacity, refill_rate, cost, now],
+            )
+            return int(result or 0) == 1
+        except Exception as exc:
+            logger.critical(
+                "TOKEN_BUCKET_BACKEND_DISRUPTED: key %s failed (%s) — fail-closed",
+                key,
+                exc,
+            )
+            return False
 
     def peek(self, *, key: str, capacity: float, refill_rate: float, now: float) -> float:
         full = self._full_key(key)

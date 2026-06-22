@@ -8,7 +8,7 @@
 
 ```bash
 pip install -e ".[dev,instpp]"
-chmod +x scripts/instpp_smoke_test.sh scripts/export_*.sh scripts/instpp_rigorous_test.sh
+chmod +x scripts/instpp_smoke_test.sh scripts/export_*.sh scripts/instpp_rigorous_test.sh scripts/demo_*.sh
 ./scripts/instpp_smoke_test.sh
 ```
 
@@ -28,8 +28,8 @@ Full integration test with timestamped log:
 
 | # | Product | Advertise-ready | Demo command |
 |---|---------|-----------------|--------------|
-| 1 | Compliance Logger | **Yes** (Inst++ complete) | `compliance-log export --repro-check` + `verify-bundle` |
-| 2 | Proxy-Risk Gateway | **Yes** (live + shadow) | `proxy-risk evaluate --live` (with upstream base) |
+| 1 | Compliance Logger | **Yes** (gold standard) | `./scripts/demo_compliance_logger.sh` |
+| 2 | Proxy-Risk Gateway | **Yes** (gold standard) | `./scripts/demo_proxy_risk.sh` |
 | 3 | Alt-Data Extractor | Demo only | `altdata poll --url …` |
 | 4 | AI Kit | Demo only | `ai-kit run --max-tokens 1000` |
 | 5 | Webhook Mesh | **Yes** (P1) | `webhook-mesh serve` |

@@ -9,7 +9,18 @@ from pathlib import Path
 
 from compliance_log.ingest import log_decision, manifest_from_dict
 from inst_spine.check import build_compliance_context, run_institutional_check
+from inst_spine.cli_util import run_cli
+from inst_spine.errors import IngestValidationError
 from inst_spine.ledger import AppendOnlyLedger
+
+PRODUCT = "compliance-logger"
+
+
+def _load_json(path_or_raw: str) -> dict:
+    p = Path(path_or_raw)
+    if p.is_file():
+        return json.loads(p.read_text(encoding="utf-8"))
+    return json.loads(path_or_raw)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -45,12 +56,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.cmd == "ingest":
-        snap = json.loads(Path(args.snapshot).read_text(encoding="utf-8"))
-        outcome_raw = args.outcome
-        if Path(outcome_raw).is_file():
-            outcome = json.loads(Path(outcome_raw).read_text(encoding="utf-8"))
-        else:
-            outcome = json.loads(outcome_raw)
+        snap = _load_json(args.snapshot)
+        if not isinstance(snap, dict):
+            raise IngestValidationError("--snapshot must be a JSON object")
+        outcome = _load_json(args.outcome)
         manifest = None
         if args.manifest is not None:
             manifest = manifest_from_dict(
@@ -69,7 +78,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "check":
         ledger = AppendOnlyLedger(args.database)
         ctx = build_compliance_context(ledger, run_f9=True)
-        report = run_institutional_check(ledger=ledger, context=ctx, run_f9=False)
+        report = run_institutional_check(
+            ledger=ledger,
+            context=ctx,
+            observation_lane=args.observation_lane,
+            run_f9=False,
+        )
         print(json.dumps(report.to_dict(), indent=2))
         return 0 if report.passed else 1
 
@@ -83,18 +97,20 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.repro_check:
             ok, msg = verify_bundle_reproducible(args.database)
-            print(json.dumps({"ok": ok, "message": msg}, indent=2))
+            print(json.dumps({"ok": ok, "message": msg, "product": PRODUCT}, indent=2))
             return 0 if ok else 1
         result = build_audit_bundle(
             args.database,
             out_dir=args.out_dir,
             tarball_path=args.tarball,
             anchor_path=args.anchor,
+            product=PRODUCT,
         )
         print(
             json.dumps(
                 {
                     "ok": result.ok,
+                    "product": PRODUCT,
                     "bundle_sha256": result.bundle_sha256,
                     "tarball": str(result.tarball_path) if result.tarball_path else None,
                     "validation": result.validation.message,
@@ -117,6 +133,7 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps(
                 {
                     "ok": result.ok,
+                    "product": PRODUCT,
                     "genesis_ok": result.genesis_ok,
                     "chain_ok": result.chain_ok,
                     "lamport_ok": result.lamport_ok,
@@ -134,4 +151,4 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    run_cli(lambda: main())

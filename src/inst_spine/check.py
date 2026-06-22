@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from inst_spine.contracts import InstitutionalCheckReport
+from inst_spine.coverage import aggregate_source_coverage
 from inst_spine.gates.engine import GateEngine
 from inst_spine.hash import read_genesis_anchor
 from inst_spine.ledger import AppendOnlyLedger
@@ -27,7 +28,7 @@ def build_compliance_context(
         "actual_count": len(entries),
         "expected_snapshots": max(decisions, 1) if entries else 0,
         "actual_snapshots": decisions,
-        "source_coverage_pct": 100.0,
+        "source_coverage_pct": aggregate_source_coverage(entries),
         "retention_policy_ok": True,
         "config_hash_drift": False,
     }

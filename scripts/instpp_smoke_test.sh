@@ -14,6 +14,8 @@ echo "==> Running Inst++ test suite"
   tests/test_inst_products.py \
   tests/test_inst_export.py \
   tests/test_proxy_risk.py \
+  tests/test_inst_coverage.py \
+  tests/test_compliance_cli.py \
   tests/test_webhook_mesh.py \
   tests/test_ad_guard.py \
   -q
@@ -43,7 +45,9 @@ PY
 echo ""
 echo "INST++ SMOKE TEST PASSED"
 echo "Ready to demo:"
+echo "  ./scripts/demo_compliance_logger.sh"
+echo "  ./scripts/demo_proxy_risk.sh"
+echo "  ./scripts/instpp_rigorous_test.sh"
 echo "  webhook-mesh serve --port 8787"
 echo "  ad-guard serve --port 8788"
-echo "  compliance-log ingest --snapshot docs/demo_snapshot.json  # optional"
-echo "See docs/INST_PLUS_TEST_AND_DEMO.md"
+echo "See docs/INST_PLUS_GOLD_STANDARD.md"

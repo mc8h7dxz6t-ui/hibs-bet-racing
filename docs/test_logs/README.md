@@ -12,4 +12,6 @@
 
 Latest archived passing run: see `instpp_rigorous_latest.log`.
 
-Coverage: 40 unit tests + 20 E2E sections (Compliance ingest/F1–F9/export/verify-bundle/negatives + Proxy shadow/live/idempotency/kill/bench).
+Coverage: 45 unit tests + 20 E2E sections (Compliance + Proxy-Risk gold standard).
+
+See `docs/INST_PLUS_GOLD_STANDARD.md` for dimension definitions.

@@ -44,6 +44,80 @@ async def test_proxy_risk_circuit_kill_env():
 
 
 @pytest.mark.asyncio
+async def test_proxy_risk_logs_reject_and_kill(tmp_path: Path):
+    db = tmp_path / "audit.sqlite"
+    ledger = AppendOnlyLedger(db, async_writes=True)
+    ledger.start_async_writer()
+    gw = ProxyRiskGateway(
+        ledger=ledger,
+        shadow_mode=True,
+        idempotency=MemoryIdempotencyBackend(),
+    )
+    await gw.evaluate(
+        ProxyRequest(
+            client_id="c1",
+            method="POST",
+            path="/dup",
+            body={},
+            idempotency_key="same-key",
+        )
+    )
+    await gw.evaluate(
+        ProxyRequest(
+            client_id="c1",
+            method="POST",
+            path="/dup",
+            body={},
+            idempotency_key="same-key",
+        )
+    )
+    ledger.stop_async_writer(flush=True)
+    rows = [e for e in ledger.list_entries() if e.get("event_type") == "proxy_request"]
+    decisions = [r.get("payload", {}).get("decision") for r in rows]
+    assert "approve" in decisions
+    assert "reject" in decisions
+
+
+@pytest.mark.asyncio
+async def test_proxy_risk_upstream_failure_rejects():
+    mock_resp = MagicMock()
+    mock_resp.status_code = 503
+    mock_resp.json.return_value = {"error": "unavailable"}
+    mock_resp.text = '{"error":"unavailable"}'
+    mock_client = AsyncMock()
+    mock_client.request = AsyncMock(return_value=mock_resp)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    gw = ProxyRiskGateway(
+        shadow_mode=False,
+        upstream_base="https://api.example.com",
+        idempotency=MemoryIdempotencyBackend(),
+    )
+    with patch("proxy_risk.router.httpx.AsyncClient", return_value=mock_client):
+        resp = await gw.evaluate(
+            ProxyRequest(
+                client_id="c",
+                method="POST",
+                path="/orders",
+                idempotency_key="fail-1",
+            )
+        )
+    assert resp.decision == GateDecision.REJECT
+    assert resp.upstream_status == 503
+
+
+@pytest.mark.asyncio
+async def test_redis_token_bucket_fail_closed():
+    from inst_spine.rates import RedisTokenBucketBackend
+
+    backend = object.__new__(RedisTokenBucketBackend)
+    backend._script = MagicMock(side_effect=RuntimeError("redis down"))
+    backend._prefix = "t:"
+    assert backend.consume(key="k", capacity=10.0, refill_rate=1.0, cost=1.0, now=1.0) is False
+
+
+@pytest.mark.asyncio
 async def test_proxy_risk_ledger_chain(tmp_path: Path):
     db = tmp_path / "proxy.sqlite"
     ledger = AppendOnlyLedger(db, async_writes=True)

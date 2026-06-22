@@ -23,6 +23,7 @@ from inst_spine.rates import (
 
 _UPSTREAM_LIMITS = httpx.Limits(max_keepalive_connections=20, max_connections=100)
 _UPSTREAM_TIMEOUT = httpx.Timeout(5.0, connect=2.0)
+_ALLOWED_METHODS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE"})
 
 
 class GateDecision(str, Enum):
@@ -53,7 +54,8 @@ class ProxyRiskGateway:
     """
     Hot-path gate chain (<5ms target in-memory):
       circuit → schema → token bucket → idempotency → z-score drift → forward
-    Cold path: async ledger append (shadow) or sync WAL before forward (live).
+    Cold path: ledger append on every gate outcome (full audit trail).
+    Live mode: sync WAL before upstream; upstream 4xx/5xx → REJECT (fail-closed).
     """
 
     def __init__(
@@ -87,16 +89,19 @@ class ProxyRiskGateway:
         self.idempotency = idempotency or idempotency_backend_from_env()
         self.upstream_base = (upstream_base or os.environ.get("PROXY_RISK_UPSTREAM_BASE", "")).strip()
         self.idempotency_ttl_sec = idempotency_ttl_sec
-        self._required_fields = ("client_id", "method", "path")
 
     async def evaluate(self, req: ProxyRequest) -> ProxyResponse:
-        """Hot-path gate evaluation — no disk I/O except live log-before-forward."""
+        """Hot-path gate evaluation — every outcome logged when ledger attached."""
         allowed, reason = self.circuit.allows_traffic()
         if not allowed:
-            return ProxyResponse(decision=GateDecision.KILL, reason=reason)
+            return await self._finish(req, GateDecision.KILL, reason)
 
         if not req.client_id or not req.method or not req.path:
-            return ProxyResponse(decision=GateDecision.REJECT, reason="schema: missing required fields")
+            return await self._finish(req, GateDecision.REJECT, "schema: missing required fields")
+
+        method = req.method.upper()
+        if method not in _ALLOWED_METHODS:
+            return await self._finish(req, GateDecision.REJECT, f"schema: method {method!r} not allowed")
 
         bucket = self.bucket or TokenBucket(
             capacity=self._bucket_capacity,
@@ -105,33 +110,66 @@ class ProxyRiskGateway:
             backend=self._rate_backend,
         )
         if not bucket.consume(1.0):
-            return ProxyResponse(decision=GateDecision.REJECT, reason="token_bucket: rate exceeded")
+            return await self._finish(req, GateDecision.REJECT, "token_bucket: rate exceeded")
 
         idem_key = req.idempotency_key or (
             f"{req.client_id}:{req.method}:{req.path}:{json.dumps(req.body, sort_keys=True)}"
         )
         if not await self.idempotency.consume_idempotency_token(idem_key, self.idempotency_ttl_sec):
-            return ProxyResponse(decision=GateDecision.REJECT, reason="idempotency: duplicate request")
+            return await self._finish(req, GateDecision.REJECT, "idempotency: duplicate request")
 
         if req.reference_price is not None:
             anomaly, z = self.drift.is_anomaly(req.reference_price)
             if anomaly:
                 self.circuit.kill(f"z_score drift |Z|>{self.drift.z_max} (z={z:.2f})")
-                await self._log_async(req, GateDecision.KILL, f"drift: z={z:.2f}")
-                return ProxyResponse(decision=GateDecision.KILL, reason=f"drift: z={z:.2f}")
+                return await self._finish(req, GateDecision.KILL, f"drift: z={z:.2f}")
 
         if self.shadow_mode:
-            await self._log_async(req, GateDecision.APPROVE, "shadow forward")
-            return ProxyResponse(decision=GateDecision.APPROVE, reason="shadow: approved")
+            return await self._finish(req, GateDecision.APPROVE, "shadow: approved")
 
         await asyncio.to_thread(self._log_sync, req, GateDecision.APPROVE, "forward pending")
         status, body, detail = await self._forward_upstream(req)
-        await self._log_async(req, GateDecision.APPROVE, detail, upstream_status=status)
-        return ProxyResponse(
-            decision=GateDecision.APPROVE,
-            reason=detail,
+        if status < 200 or status >= 400:
+            return await self._finish(
+                req,
+                GateDecision.REJECT,
+                detail,
+                upstream_status=status,
+                upstream_body=body,
+            )
+
+        return await self._finish(
+            req,
+            GateDecision.APPROVE,
+            detail,
             upstream_status=status,
             upstream_body=body,
+        )
+
+    async def _finish(
+        self,
+        req: ProxyRequest,
+        decision: GateDecision,
+        detail: str,
+        *,
+        upstream_status: int | None = None,
+        upstream_body: dict[str, Any] | None = None,
+        sync_only: bool = False,
+    ) -> ProxyResponse:
+        extra: dict[str, Any] = {}
+        if upstream_status is not None:
+            extra["upstream_status"] = upstream_status
+        if upstream_body is not None:
+            extra["upstream_body"] = upstream_body
+        if sync_only:
+            self._log_sync(req, decision, detail, **extra)
+        else:
+            await self._log_async(req, decision, detail, **extra)
+        return ProxyResponse(
+            decision=decision,
+            reason=detail,
+            upstream_status=upstream_status,
+            upstream_body=upstream_body,
         )
 
     def _payload(self, req: ProxyRequest, decision: GateDecision, detail: str, **extra: Any) -> dict[str, Any]:
@@ -221,6 +259,7 @@ async def serve_shadow_demo(
     ledger = AppendOnlyLedger(database, async_writes=True)
     ledger.start_async_writer()
     gw = ProxyRiskGateway(ledger=ledger, shadow_mode=shadow_mode)
+    api_token = os.environ.get("PROXY_RISK_API_TOKEN", "").strip()
 
     async def health(_: web.Request) -> web.Response:
         return web.json_response(
@@ -228,11 +267,35 @@ async def serve_shadow_demo(
                 "ok": True,
                 "mode": "shadow" if shadow_mode else "live",
                 "upstream_base": gw.upstream_base or None,
+                "auth_required": bool(api_token),
             }
         )
 
     async def evaluate(request: web.Request) -> web.Response:
-        body = await request.json()
+        if request.method != "POST":
+            return web.json_response(
+                {"ok": False, "error": {"code": "METHOD_NOT_ALLOWED", "message": "POST only"}},
+                status=405,
+            )
+        if api_token:
+            auth = request.headers.get("Authorization", "")
+            if auth != f"Bearer {api_token}":
+                return web.json_response(
+                    {"ok": False, "error": {"code": "UNAUTHORIZED", "message": "invalid bearer token"}},
+                    status=401,
+                )
+        try:
+            body = await request.json()
+        except (json.JSONDecodeError, ValueError):
+            return web.json_response(
+                {"ok": False, "error": {"code": "INVALID_JSON", "message": "request body must be JSON"}},
+                status=400,
+            )
+        if not isinstance(body, dict):
+            return web.json_response(
+                {"ok": False, "error": {"code": "INVALID_JSON", "message": "JSON object required"}},
+                status=400,
+            )
         req = ProxyRequest(
             client_id=str(body.get("client_id") or "anon"),
             method=str(body.get("method") or "POST"),

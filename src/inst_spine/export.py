@@ -110,26 +110,29 @@ def _write_bundle_files(
     validation: ExportValidation,
     report_dict: dict[str, Any],
     verify_dict: dict[str, Any],
+    product: str | None = None,
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     entries = ledger.list_entries()
     wal_all = ledger.wal.read_all()
 
+    manifest: dict[str, Any] = {
+        "protocol": "inst-spine-audit-bundle-v1",
+        "instance_uuid": ledger._instance_uuid,
+        "entry_count": len(entries),
+        "wal_record_count": len(wal_all),
+        "validation": {
+            "genesis_ok": validation.genesis_ok,
+            "chain_ok": validation.chain_ok,
+            "lamport_ok": validation.lamport_ok,
+            "message": validation.message,
+        },
+    }
+    if product:
+        manifest["product"] = product
+
     files: dict[str, bytes] = {
-        "MANIFEST.json": _canonical_json_bytes(
-            {
-                "protocol": "inst-spine-audit-bundle-v1",
-                "instance_uuid": ledger._instance_uuid,
-                "entry_count": len(entries),
-                "wal_record_count": len(wal_all),
-                "validation": {
-                    "genesis_ok": validation.genesis_ok,
-                    "chain_ok": validation.chain_ok,
-                    "lamport_ok": validation.lamport_ok,
-                    "message": validation.message,
-                },
-            }
-        ),
+        "MANIFEST.json": _canonical_json_bytes(manifest),
         "ledger_entries.json": _canonical_json_bytes(entries),
         "verify.json": _canonical_json_bytes(verify_dict),
         "institutional_check.json": _canonical_json_bytes(report_dict),
@@ -142,6 +145,7 @@ def _write_bundle_files(
 
     readme = (
         "Inst++ audit bundle (P2 deterministic export)\n"
+        f"product: {product or 'inst-spine'}\n"
         f"entries: {len(entries)}\n"
         f"genesis_ok: {validation.genesis_ok}\n"
         f"chain_ok: {validation.chain_ok}\n"
@@ -273,6 +277,7 @@ def verify_audit_bundle(
             "bundle_sha256": digest,
             "entry_count": len(entries),
             "protocol": (manifest or {}).get("protocol") if isinstance(manifest, dict) else None,
+            "product": (manifest or {}).get("product") if isinstance(manifest, dict) else None,
             "instance_uuid": (manifest or {}).get("instance_uuid") if isinstance(manifest, dict) else None,
         },
     )
@@ -286,6 +291,7 @@ def build_audit_bundle(
     abort_on_fail: bool = True,
     anchor_path: Path | None = None,
     repro_run: bool = False,
+    product: str | None = None,
 ) -> AuditBundleResult:
     """
     Full P2 pipeline:
@@ -332,6 +338,7 @@ def build_audit_bundle(
         validation=validation,
         report_dict=report.to_dict(),
         verify_dict=verify_dict,
+        product=product,
     )
 
     tar_bytes = deterministic_tarball(out)
@@ -345,6 +352,8 @@ def build_audit_bundle(
         "instance_uuid": ledger._instance_uuid,
         "protocol": "inst-spine-audit-bundle-v1",
     }
+    if product:
+        sidecar["product"] = product
     (tar_path.with_suffix(tar_path.suffix + ".sha256.json")).write_text(
         json.dumps(sidecar, indent=2, sort_keys=True),
         encoding="utf-8",
