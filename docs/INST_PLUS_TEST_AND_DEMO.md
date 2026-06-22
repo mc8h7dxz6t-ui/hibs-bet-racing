@@ -8,9 +8,11 @@
 
 ```bash
 pip install -e ".[dev,instpp]"
-chmod +x scripts/instpp_smoke_test.sh scripts/export_*.sh scripts/instpp_rigorous_test.sh scripts/demo_*.sh
-./scripts/instpp_smoke_test.sh
+chmod +x scripts/demo_instpp.sh scripts/demo_*.sh scripts/instpp_*.sh scripts/export_*.sh
+./scripts/demo_instpp.sh
 ```
+
+See **`docs/DEMO.md`** for the full buyer demo guide.
 
 ### Rigorous E2E (Compliance + Proxy-Risk)
 
@@ -28,8 +30,8 @@ Full integration test with timestamped log:
 
 | # | Product | Advertise-ready | Demo command |
 |---|---------|-----------------|--------------|
-| 1 | Compliance Logger | **Yes** (gold standard) | `./scripts/demo_compliance_logger.sh` |
-| 2 | Proxy-Risk Gateway | **Yes** (gold standard) | `./scripts/demo_proxy_risk.sh` |
+| 1 | Compliance Logger | **Yes** (gold standard) | `./scripts/demo_instpp.sh` |
+| 2 | Proxy-Risk Gateway | **Yes** (gold standard) | `./scripts/demo_instpp.sh` |
 | 3 | Alt-Data Extractor | Demo only | `altdata poll --url …` |
 | 4 | AI Kit | Demo only | `ai-kit run --max-tokens 1000` |
 | 5 | Webhook Mesh | **Yes** (P1) | `webhook-mesh serve` |
@@ -151,7 +153,18 @@ See `docs/AD_GUARD_INSTITUTIONAL_STACK.md`.
 
 ---
 
-## Product 1 — Compliance Logger (anchor product)
+## Product 1 & 2 — One-command demo (recommended)
+
+```bash
+./scripts/demo_instpp.sh
+# Artifacts → data/demo/compliance_bundle.tar + data/demo/proxy_bundle.tar
+```
+
+Individual products: `./scripts/demo_compliance_logger.sh` · `./scripts/demo_proxy_risk.sh`
+
+---
+
+## Product 1 — Compliance Logger (manual steps)
 
 ```bash
 compliance-log ingest --snapshot docs/demo_snapshot.json --actor demo --database ./data/demo_compliance.sqlite
