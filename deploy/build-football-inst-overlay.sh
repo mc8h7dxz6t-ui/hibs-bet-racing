@@ -45,7 +45,13 @@ EXTRA=(
   scripts/seed_fotmob_minimal_bundle.py
   scripts/evaluate_trading_day15_gate.py
   deploy/vps-consolidated-gold-standard.sh
+  deploy/vps-three-host-layout.sh
+  deploy/apply-vps-trading-link.sh
+  deploy/cron-hibs-trading-shadow-paper-recon.sh
   deploy/sync-trading-day15-gate.sh
+  scripts/lib_stack_bootstrap.sh
+  scripts/lib_stack_boundaries.sh
+  scripts/lib_trading_probe.sh
   scripts/data_producer_repair.sh
   src/hibs_predictor/scrapers/scrape_resilience.py
   src/hibs_predictor/scrapers/robust_scrape_cycle.py

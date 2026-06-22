@@ -6,11 +6,11 @@
 # On the 1GB VPS (e.g. 77.68.89.75):
 #   curl -fsSL https://raw.githubusercontent.com/mc8h7dxz6t-ui/hibs-bet/cursor/three-platform-inst-prime-c6a1/deploy/bootstrap-fve-dedicated-1gb.sh | sudo \
 #     HIBS_UPSTREAM_BASE_URL=https://hibs-bet.co.uk \
-#     HIBS_MAIN_IP=77.68.89.73 \
+#     HIBS_MAIN_IP=87.106.100.52 \
 #     bash
 #
 # Or from a synced repo:
-#   sudo HIBS_MAIN_IP=77.68.89.73 bash /opt/hibs-bet/deploy/bootstrap-fve-dedicated-1gb.sh
+#   sudo HIBS_MAIN_IP=87.106.100.52 bash /opt/hibs-bet/deploy/bootstrap-fve-dedicated-1gb.sh
 set -euo pipefail
 
 FVE_ROOT="${FVE_DEPLOY_PATH:-/opt/fve}"
@@ -190,7 +190,7 @@ else
 fi
 
 log "done — on MAIN hibs VPS run:"
-echo "  sudo HIBS_MAIN_IP=77.68.89.73 FVE_REMOTE_HOST=$(hostname -I | awk '{print $1}') \\"
+echo "  sudo HIBS_MAIN_IP=87.106.100.52 FVE_REMOTE_HOST=$(hostname -I | awk '{print $1}') \\"
 echo "    bash /opt/hibs-bet/deploy/apply-vps-fve-remote-host.sh"
 echo ""
 echo "verify from main:"
