@@ -43,6 +43,8 @@ EXTRA=(
   scripts/install_racing_vps_cron.sh
   scripts/lib_scrape_first_cache.sh
   scripts/seed_fotmob_minimal_bundle.py
+  scripts/evaluate_trading_day15_gate.py
+  deploy/sync-trading-day15-gate.sh
   scripts/data_producer_repair.sh
   src/hibs_predictor/scrapers/scrape_resilience.py
   src/hibs_predictor/scrapers/robust_scrape_cycle.py
