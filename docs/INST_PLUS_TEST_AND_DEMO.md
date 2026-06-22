@@ -8,8 +8,18 @@
 
 ```bash
 pip install -e ".[dev,instpp]"
-chmod +x scripts/instpp_smoke_test.sh scripts/export_*.sh
+chmod +x scripts/instpp_smoke_test.sh scripts/export_*.sh scripts/instpp_rigorous_test.sh
 ./scripts/instpp_smoke_test.sh
+```
+
+### Rigorous E2E (Compliance + Proxy-Risk)
+
+Full integration test with timestamped log:
+
+```bash
+./scripts/instpp_rigorous_test.sh
+# Log: docs/test_logs/instpp_rigorous_<timestamp>.log
+# Latest: docs/test_logs/instpp_rigorous_latest.log
 ```
 
 ---

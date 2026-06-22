@@ -1,0 +1,490 @@
+================================================================
+INST++ RIGOROUS TEST — Compliance Logger + Proxy-Risk Gateway
+Started: 2026-06-22T21:44:05Z UTC
+Log: /workspace/logs/instpp_rigorous_2026-06-22T214405Z.log
+================================================================
+
+----------------------------------------------------------------
+SECTION: Install dependencies
+----------------------------------------------------------------
+  WARNING: The scripts ad-guard, ai-kit, altdata, compliance-log, hibs-racing, hibs-racing-web, inst-spine-export, proxy-risk and webhook-mesh are installed in '/home/ubuntu/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+Work dir: /tmp/tmp.lGczslZyZ0
+
+----------------------------------------------------------------
+SECTION: Unit tests — Compliance + Proxy-Risk
+----------------------------------------------------------------
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /workspace
+configfile: pyproject.toml
+plugins: anyio-4.14.0, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 40 items
+
+tests/test_inst_spine_core.py::test_lamport_monotonic PASSED             [  2%]
+tests/test_inst_spine_core.py::test_vector_clock_causal PASSED           [  5%]
+tests/test_inst_spine_core.py::test_monotonic_never_backward PASSED      [  7%]
+tests/test_inst_spine_core.py::test_chain_hash_links_prev_with_genesis PASSED [ 10%]
+tests/test_inst_spine_core.py::test_empty_chain_fails_without_genesis PASSED [ 12%]
+tests/test_inst_spine_core.py::test_genesis_anchor_tamper_fails PASSED   [ 15%]
+tests/test_inst_spine_core.py::test_chain_detects_tamper PASSED          [ 17%]
+tests/test_inst_spine_core.py::test_token_bucket_burst_then_sustain PASSED [ 20%]
+tests/test_inst_spine_core.py::test_token_bucket_shared_backend_multi_instance PASSED [ 22%]
+tests/test_inst_spine_core.py::test_zscore_triggers_anomaly PASSED       [ 25%]
+tests/test_inst_spine_core.py::test_ledger_append_and_verify PASSED      [ 27%]
+tests/test_inst_spine_core.py::test_wal_survives_sqlite_lag PASSED       [ 30%]
+tests/test_inst_spine_core.py::test_ledger_async_write_behind PASSED     [ 32%]
+tests/test_inst_spine_core.py::test_wiped_sqlite_without_wal_fails_genesis PASSED [ 35%]
+tests/test_inst_spine_core.py::test_idempotency_guard PASSED             [ 37%]
+tests/test_inst_spine_core.py::test_circuit_kill PASSED                  [ 40%]
+tests/test_inst_spine_core.py::test_f_gates_with_ledger PASSED           [ 42%]
+tests/test_inst_export.py::test_export_aborts_on_empty_chain PASSED      [ 45%]
+tests/test_inst_export.py::test_p2_bundle_with_entries PASSED            [ 47%]
+tests/test_inst_export.py::test_f9_reproducible_tarball PASSED           [ 50%]
+tests/test_inst_export.py::test_export_fails_tampered_genesis PASSED     [ 52%]
+tests/test_inst_export.py::test_deterministic_tar_sorted PASSED          [ 55%]
+tests/test_inst_export.py::test_offline_verify_audit_bundle PASSED       [ 57%]
+tests/test_inst_export.py::test_export_aborts_on_institutional_fail PASSED [ 60%]
+tests/test_inst_export.py::test_build_compliance_context_f9 PASSED       [ 62%]
+tests/test_inst_products.py::test_compliance_log_chain PASSED            [ 65%]
+tests/test_inst_products.py::test_compliance_clock_attack_chain_still_valid PASSED [ 67%]
+tests/test_inst_products.py::test_proxy_risk_token_bucket_blocks_burst PASSED [ 70%]
+tests/test_inst_products.py::test_proxy_risk_zscore_kill PASSED          [ 72%]
+tests/test_inst_products.py::test_altdata_structural_rescue PASSED       [ 75%]
+tests/test_inst_products.py::test_altdata_poll_coverage PASSED           [ 77%]
+tests/test_inst_products.py::test_altdata_rescue_rung PASSED             [ 80%]
+tests/test_inst_products.py::test_ai_kit_checkpoint_resume PASSED        [ 82%]
+tests/test_inst_products.py::test_institutional_check_passes_clean_ledger PASSED [ 85%]
+tests/test_proxy_risk.py::test_proxy_risk_idempotency_duplicate PASSED   [ 87%]
+tests/test_proxy_risk.py::test_proxy_risk_circuit_kill_env PASSED        [ 90%]
+tests/test_proxy_risk.py::test_proxy_risk_ledger_chain PASSED            [ 92%]
+tests/test_proxy_risk.py::test_proxy_risk_live_upstream_forward PASSED   [ 95%]
+tests/test_proxy_risk.py::test_proxy_risk_live_log_before_forward PASSED [ 97%]
+tests/test_proxy_risk.py::test_proxy_risk_p99_shadow_latency PASSED      [100%]
+
+============================== 40 passed in 0.63s ==============================
+[PASS] Unit test suite
+
+----------------------------------------------------------------
+SECTION: Compliance Logger — ingest + chain
+----------------------------------------------------------------
+{
+  "entry_id": "25efa81a053df8a34d18ca549306af14",
+  "event_type": "decision",
+  "writer_id": "rigorous-auditor",
+  "lamport_seq": 1,
+  "wall_time_utc": "2026-06-22T21:44:08+00:00",
+  "manifest_id": "65bbee431c76c4891c22454429623850",
+  "payload": {
+    "actor": "rigorous-auditor",
+    "snapshot": {
+      "action": "approve",
+      "amount": 1000,
+      "currency": "GBP",
+      "customer_id": "cust_demo_001",
+      "policy": "kyc_tier_2",
+      "risk_score": 0.12
+    },
+    "outcome": {
+      "status": "approved",
+      "ref": "rigorous-001"
+    }
+  },
+  "prev_hash": "77221b259feb9afdcefb82b786aefc574b7a0002d52102e5f34d09f452e3a3f7",
+  "entry_hash": "4b6a2f3ff93eaf0f19ca13768c29a984661a041303eb7dc68406058a36380eae"
+}
+{
+  "entry_id": "f1488ff76f9f4a7c9db8150acf4d77d0",
+  "event_type": "decision",
+  "writer_id": "rigorous-auditor",
+  "lamport_seq": 3,
+  "wall_time_utc": "2026-06-22T21:44:08+00:00",
+  "manifest_id": "65bbee431c76c4891c22454429623850",
+  "payload": {
+    "actor": "rigorous-auditor",
+    "snapshot": {
+      "action": "approve",
+      "amount": 1000,
+      "currency": "GBP",
+      "customer_id": "cust_demo_001",
+      "policy": "kyc_tier_2",
+      "risk_score": 0.12
+    },
+    "outcome": {
+      "status": "approved",
+      "ref": "rigorous-002"
+    }
+  },
+  "prev_hash": "4b6a2f3ff93eaf0f19ca13768c29a984661a041303eb7dc68406058a36380eae",
+  "entry_hash": "e40e6277dce2c9439e34c14944a3c9a4d6ed14173e2e5cece41ce39b624df0e6"
+}
+{
+  "chain_ok": true,
+  "chain_message": "chain verified (3 entries incl. genesis)",
+  "genesis_ok": true,
+  "genesis_message": "genesis block valid",
+  "entries_checked": 3,
+  "first_mismatch_index": null,
+  "lamport_monotonic": true,
+  "wal_records": 3,
+  "wal_sqlite_pending": 0,
+  "instance_uuid": "7565f95e-53b5-40fe-aad0-781829745bcd"
+}
+[PASS] Hash chain + genesis verified
+
+----------------------------------------------------------------
+SECTION: Compliance Logger — F1–F9 institutional check
+----------------------------------------------------------------
+{
+  "passed": true,
+  "checks": [
+    {
+      "name": "ledger_chain",
+      "passed": true,
+      "detail": "True"
+    },
+    {
+      "name": "genesis_block",
+      "passed": true,
+      "detail": "genesis block valid"
+    },
+    {
+      "name": "lamport_order",
+      "passed": true,
+      "detail": "True"
+    },
+    {
+      "name": "F1",
+      "passed": true,
+      "detail": "snapshots 2/2"
+    },
+    {
+      "name": "F2",
+      "passed": true,
+      "detail": "manifest missing on 0 entries"
+    },
+    {
+      "name": "F3",
+      "passed": true,
+      "detail": "chain verified (3 entries incl. genesis)"
+    },
+    {
+      "name": "F4",
+      "passed": true,
+      "detail": "lamport strictly increasing"
+    },
+    {
+      "name": "F5",
+      "passed": true,
+      "detail": "config stable"
+    },
+    {
+      "name": "F6",
+      "passed": true,
+      "detail": "expected=3 actual=3"
+    },
+    {
+      "name": "F7",
+      "passed": true,
+      "detail": "coverage 100.0% (min 85.0%)"
+    },
+    {
+      "name": "F8",
+      "passed": true,
+      "detail": "retention policy ok"
+    },
+    {
+      "name": "F9",
+      "passed": true,
+      "detail": "export hashes match"
+    }
+  ],
+  "message": "Institutional check PASSED.",
+  "extras": {
+    "observation_lane": false
+  }
+}
+All gates passed: ['ledger_chain', 'genesis_block', 'lamport_order', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9']
+[PASS] Institutional F1–F9 check
+
+----------------------------------------------------------------
+SECTION: Compliance Logger — export + F9 repro
+----------------------------------------------------------------
+{
+  "ok": true,
+  "bundle_sha256": "f26661605162a8a9c9098ddb3ea16f20ec34f377afc0062a4daa7bb0a4c6292e",
+  "tarball": "/tmp/tmp.lGczslZyZ0/compliance_bundle.tar",
+  "validation": "export validation passed",
+  "institutional_passed": true
+}
+[PASS] Audit bundle + SHA256 sidecar
+{
+  "ok": true,
+  "message": "2686f3f4ba50445218775a6f3572cb1cc5b21b16d51a154b05247131364cb144"
+}
+[PASS] F9 reproducibility
+
+----------------------------------------------------------------
+SECTION: Compliance Logger — offline verify-bundle (auditor dry-run)
+----------------------------------------------------------------
+{
+  "ok": true,
+  "genesis_ok": true,
+  "chain_ok": true,
+  "lamport_ok": true,
+  "bundle_sha256_ok": true,
+  "institutional_passed": true,
+  "message": "offline bundle verification passed",
+  "details": {
+    "bundle_sha256": "f26661605162a8a9c9098ddb3ea16f20ec34f377afc0062a4daa7bb0a4c6292e",
+    "entry_count": 3,
+    "protocol": "inst-spine-audit-bundle-v1",
+    "instance_uuid": "7565f95e-53b5-40fe-aad0-781829745bcd"
+  }
+}
+[PASS] Offline auditor verify-bundle
+
+----------------------------------------------------------------
+SECTION: Compliance Logger — negative gate (genesis-only abort)
+----------------------------------------------------------------
+{'ok': False, 'institutional_passed': False}
+[PASS] Export correctly aborts on genesis-only ledger
+
+----------------------------------------------------------------
+SECTION: Compliance Logger — tampered genesis detection
+----------------------------------------------------------------
+{'validation_ok': False, 'export_ok': False, 'message': 'genesis anchor hash mismatch'}
+[PASS] Tampered genesis anchor rejected
+
+----------------------------------------------------------------
+SECTION: Proxy-Risk — shadow evaluate + ledger
+----------------------------------------------------------------
+{
+  "decision": "approve",
+  "reason": "shadow: approved",
+  "upstream_status": null,
+  "upstream_body": null
+}
+{
+  "chain_ok": true,
+  "chain_message": "chain verified (2 entries incl. genesis)",
+  "genesis_ok": true,
+  "genesis_message": "genesis block valid",
+  "entries_checked": 2,
+  "first_mismatch_index": null,
+  "lamport_monotonic": true,
+  "wal_records": 2,
+  "wal_sqlite_pending": 0,
+  "instance_uuid": "ed94f9c5-d64f-4e97-b76b-3fc97809880d"
+}
+[PASS] Shadow evaluate + ledger chain
+
+----------------------------------------------------------------
+SECTION: Proxy-Risk — idempotency duplicate rejection (in-process session)
+----------------------------------------------------------------
+{"first": "approve", "duplicate": "reject", "reason": "idempotency: duplicate request"}
+[PASS] Duplicate idempotency key rejected
+
+----------------------------------------------------------------
+SECTION: Proxy-Risk — Z-score circuit kill (in-process session)
+----------------------------------------------------------------
+{"decision": "kill", "reason": "drift: z=364.71"}
+[PASS] Z-score drift triggers circuit kill
+
+----------------------------------------------------------------
+SECTION: Proxy-Risk — env circuit kill (CLI)
+----------------------------------------------------------------
+{
+  "decision": "kill",
+  "reason": "KILL: INST_CIRCUIT_KILL env",
+  "upstream_status": null,
+  "upstream_body": null
+}
+{
+  "chain_ok": true,
+  "chain_message": "chain verified (2 entries incl. genesis)",
+  "genesis_ok": true,
+  "genesis_message": "genesis block valid",
+  "entries_checked": 2,
+  "first_mismatch_index": null,
+  "lamport_monotonic": true,
+  "wal_records": 2,
+  "wal_sqlite_pending": 0,
+  "instance_uuid": "ed94f9c5-d64f-4e97-b76b-3fc97809880d"
+}
+[PASS] INST_CIRCUIT_KILL env severs traffic
+
+----------------------------------------------------------------
+SECTION: Proxy-Risk — live upstream forward (httpbin)
+----------------------------------------------------------------
+{
+  "decision": "approve",
+  "reason": "forwarded status=200",
+  "upstream_status": 200,
+  "upstream_body": {
+    "args": {},
+    "data": "{\"rigorous\":\"live-forward\"}",
+    "files": {},
+    "form": {},
+    "headers": {
+      "Accept": "*/*",
+      "Accept-Encoding": "gzip, deflate",
+      "Content-Length": "27",
+      "Content-Type": "application/json",
+      "Host": "httpbin.org",
+      "User-Agent": "python-httpx/0.28.1",
+      "X-Amzn-Trace-Id": "Root=1-6a39aca9-1e63e4b578b632a714562b2e"
+    },
+    "json": {
+      "rigorous": "live-forward"
+    },
+    "origin": "3.226.203.3",
+    "url": "https://httpbin.org/post"
+  }
+}
+{
+  "chain_ok": true,
+  "chain_message": "chain verified (4 entries incl. genesis)",
+  "genesis_ok": true,
+  "genesis_message": "genesis block valid",
+  "entries_checked": 4,
+  "first_mismatch_index": null,
+  "lamport_monotonic": true,
+  "wal_records": 4,
+  "wal_sqlite_pending": 0,
+  "instance_uuid": "ed94f9c5-d64f-4e97-b76b-3fc97809880d"
+}
+[PASS] Live upstream forward to httpbin.org/post
+
+----------------------------------------------------------------
+SECTION: Proxy-Risk — log-before-forward WAL evidence
+----------------------------------------------------------------
+{
+  "proxy_rows": 3,
+  "details": [
+    "shadow forward",
+    "forward pending",
+    "forwarded status=200"
+  ]
+}
+[PASS] Log-before-forward + post-forward ledger entries present
+
+----------------------------------------------------------------
+SECTION: Proxy-Risk — institutional check + export
+----------------------------------------------------------------
+{
+  "passed": true,
+  "checks": [
+    {
+      "name": "ledger_chain",
+      "passed": true,
+      "detail": "True"
+    },
+    {
+      "name": "genesis_block",
+      "passed": true,
+      "detail": "genesis block valid"
+    },
+    {
+      "name": "lamport_order",
+      "passed": true,
+      "detail": "True"
+    },
+    {
+      "name": "F1",
+      "passed": true,
+      "detail": "snapshots 3/3"
+    },
+    {
+      "name": "F2",
+      "passed": true,
+      "detail": "manifest missing on 0 entries"
+    },
+    {
+      "name": "F3",
+      "passed": true,
+      "detail": "chain verified (4 entries incl. genesis)"
+    },
+    {
+      "name": "F4",
+      "passed": true,
+      "detail": "lamport strictly increasing"
+    },
+    {
+      "name": "F5",
+      "passed": true,
+      "detail": "config stable"
+    },
+    {
+      "name": "F6",
+      "passed": true,
+      "detail": "expected=4 actual=4"
+    },
+    {
+      "name": "F7",
+      "passed": true,
+      "detail": "coverage 100.0% (min 85.0%)"
+    },
+    {
+      "name": "F8",
+      "passed": true,
+      "detail": "retention policy ok"
+    },
+    {
+      "name": "F9",
+      "passed": true,
+      "detail": "export hashes match"
+    }
+  ],
+  "message": "Institutional check PASSED.",
+  "extras": {
+    "observation_lane": false
+  }
+}
+{
+  "ok": true,
+  "product": "proxy-risk",
+  "bundle_sha256": "3c2845b1316928119889f58b8cd56a4d56ea9ac549de7534f511997ad6173f44",
+  "tarball": "/tmp/tmp.lGczslZyZ0/proxy_bundle.tar",
+  "institutional_passed": true
+}
+{
+  "ok": true,
+  "genesis_ok": true,
+  "chain_ok": true,
+  "lamport_ok": true,
+  "bundle_sha256_ok": true,
+  "institutional_passed": true,
+  "message": "offline bundle verification passed",
+  "details": {
+    "bundle_sha256": "3c2845b1316928119889f58b8cd56a4d56ea9ac549de7534f511997ad6173f44",
+    "entry_count": 4,
+    "protocol": "inst-spine-audit-bundle-v1",
+    "instance_uuid": "ed94f9c5-d64f-4e97-b76b-3fc97809880d"
+  }
+}
+[PASS] Proxy institutional check + export + offline verify
+
+----------------------------------------------------------------
+SECTION: Proxy-Risk — p99 shadow latency bench
+----------------------------------------------------------------
+{
+  "iterations": 10000,
+  "p50_ms": 0.0041,
+  "p99_ms": 0.0061,
+  "p999_ms": 0.0147
+}
+[PASS] p99 shadow latency < 10ms (10k iterations)
+
+----------------------------------------------------------------
+SECTION: Summary
+----------------------------------------------------------------
+
+================================================================
+ALL RIGOROUS TESTS PASSED
+Finished: 2026-06-22T21:44:10Z UTC
+Log: /workspace/logs/instpp_rigorous_2026-06-22T214405Z.log
+================================================================
+Latest symlink: /workspace/logs/instpp_rigorous_latest.log -> instpp_rigorous_2026-06-22T214405Z.log
