@@ -70,6 +70,7 @@ audit_bundle.tar.sha256.json — cryptographic seal
 
 ## Related docs
 
+- `docs/INST_PLUS_DEEP_DIVE_COMPLIANCE_PROXY.md` — industry incumbent map + tech edge (both platforms)
 - `docs/COMPLIANCE_LOGGER_BUYER.md` — product #1 sales sheet
 - `docs/PROXY_RISK_BUYER.md` — product #2 sales sheet
 - `docs/INST_PLUS_TEST_AND_DEMO.md` — command playbook

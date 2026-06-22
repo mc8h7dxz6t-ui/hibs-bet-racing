@@ -53,6 +53,10 @@ Built on `src/inst_spine/` — **zero sports imports**. Sell **individually**, n
 
 **Enterprise stack map:** `docs/INSTITUTIONAL_ENTERPRISE_STACK.md` — how Inst++ fits inside DV/IAS + NeMo/Bedrock nested firewalls.
 
+**Gold standard criteria:** `docs/INST_PLUS_GOLD_STANDARD.md` — correctness, proof, demoability, diligence, legibility.
+
+**Industry deep dive (both platforms):** `docs/INST_PLUS_DEEP_DIVE_COMPLIANCE_PROXY.md` — incumbent map, tech edge, RFP deflection, evidence package.
+
 ### Core four (in build order)
 
 | # | Product | One job | Code status | Next to 95% |
