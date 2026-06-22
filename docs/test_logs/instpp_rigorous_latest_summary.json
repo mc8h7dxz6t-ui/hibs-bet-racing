@@ -1,0 +1,12 @@
+{
+  "suite": "instpp_rigorous",
+  "products": [
+    "compliance_logger",
+    "proxy_risk"
+  ],
+  "status": "PASSED",
+  "unit_tests": 40,
+  "e2e_sections": 20,
+  "finished_utc": "2026-06-22T21:47:35Z",
+  "log_file": "instpp_rigorous_2026-06-22T214730Z.log"
+}

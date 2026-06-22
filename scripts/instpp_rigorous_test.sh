@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Rigorous Inst++ E2E test — Compliance Logger (#1) + Proxy-Risk Gateway (#2).
-# Logs full output to logs/instpp_rigorous_<timestamp>.log
+# Logs full output to docs/test_logs/instpp_rigorous_<timestamp>.log
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -87,6 +87,36 @@ echo "$CHAIN"
 echo "$CHAIN" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('chain_ok') and d.get('genesis_ok') else 1)"
 pass "Hash chain + genesis verified"
 
+section "Compliance Logger — manifest ingest"
+MANIFEST_DB="$WORK/compliance_manifest.sqlite"
+cat > "$WORK/manifest.json" <<'JSON'
+{
+  "manifest_id": "rigorous-run-001",
+  "run_kind": "compliance",
+  "writer_id": "rigorous-auditor",
+  "created_at": "2026-06-22T00:00:00+00:00",
+  "config_hash": "rigorous-config-v1"
+}
+JSON
+"$PYTHON" -m compliance_log.cli ingest \
+  --snapshot docs/demo_snapshot.json \
+  --outcome '{"status":"approved","ref":"manifest-001"}' \
+  --actor rigorous-auditor \
+  --manifest "$WORK/manifest.json" \
+  --database "$MANIFEST_DB" | tee "$WORK/compliance_manifest_ingest.json"
+"$PYTHON" - "$WORK/manifest.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+from compliance_log.ingest import manifest_from_dict
+
+m = manifest_from_dict(json.loads(Path(sys.argv[1]).read_text(encoding="utf-8")))
+assert m.manifest_id == "rigorous-run-001"
+assert m.manifest_hash
+print(json.dumps({"manifest_id": m.manifest_id, "manifest_hash": m.manifest_hash}, indent=2))
+PY
+pass "RunManifest ingest + hash"
+
 section "Compliance Logger — F1–F9 institutional check"
 CHECK=$("$PYTHON" -m compliance_log.cli check --database "$COMPLIANCE_DB")
 echo "$CHECK"
@@ -131,6 +161,16 @@ if not all(d.get(k) for k in required):
 "
 pass "Offline auditor verify-bundle"
 
+section "Compliance Logger — offline verify with offsite anchor"
+OFFSITE_ANCHOR="$WORK/offsite_genesis.json"
+cp "$WORK/compliance_bundle/genesis_anchor.json" "$OFFSITE_ANCHOR"
+OFFSITE_VERIFY=$("$PYTHON" -m compliance_log.cli verify-bundle \
+  --tarball "$COMPLIANCE_TAR" \
+  --anchor "$OFFSITE_ANCHOR")
+echo "$OFFSITE_VERIFY"
+echo "$OFFSITE_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+pass "Offsite genesis anchor verify-bundle"
+
 section "Compliance Logger — negative gate (genesis-only abort)"
 GENESIS_ONLY="$WORK/genesis_only.sqlite"
 "$PYTHON" - <<PY
@@ -150,7 +190,7 @@ TAMPER_DB="$WORK/tamper.sqlite"
 "$PYTHON" - <<PY
 from pathlib import Path
 from inst_spine.ledger import AppendOnlyLedger
-from inst_spine.export import validate_before_export, verify_audit_bundle, build_audit_bundle
+from inst_spine.export import validate_before_export, build_audit_bundle
 from compliance_log.ingest import log_decision
 
 db = Path("$TAMPER_DB")
@@ -329,11 +369,27 @@ PY
 pass "p99 shadow latency < 10ms (10k iterations)"
 
 section "Summary"
+ENDED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+SUMMARY_JSON=$("$PYTHON" -c "
+import json
+print(json.dumps({
+    'suite': 'instpp_rigorous',
+    'products': ['compliance_logger', 'proxy_risk'],
+    'status': 'PASSED',
+    'unit_tests': 40,
+    'e2e_sections': 20,
+    'finished_utc': '$ENDED_AT',
+    'log_file': '$(basename "$LOG_FILE")',
+}, indent=2))
+")
+echo ""
+echo "$SUMMARY_JSON" | tee "$LOG_DIR/instpp_rigorous_latest_summary.json"
 echo ""
 echo "================================================================"
 echo "ALL RIGOROUS TESTS PASSED"
-echo "Finished: $(date -u +%Y-%m-%dT%H:%M:%SZ) UTC"
+echo "Finished: $ENDED_AT UTC"
 echo "Log: $LOG_FILE"
+echo "Summary: $LOG_DIR/instpp_rigorous_latest_summary.json"
 echo "================================================================"
 
 ln -sf "$(basename "$LOG_FILE")" "$LATEST_LINK"

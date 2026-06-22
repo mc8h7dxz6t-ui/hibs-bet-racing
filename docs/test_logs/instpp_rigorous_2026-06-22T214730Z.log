@@ -1,7 +1,7 @@
 ================================================================
 INST++ RIGOROUS TEST — Compliance Logger + Proxy-Risk Gateway
-Started: 2026-06-22T21:44:05Z UTC
-Log: /workspace/logs/instpp_rigorous_2026-06-22T214405Z.log
+Started: 2026-06-22T21:47:30Z UTC
+Log: /workspace/docs/test_logs/instpp_rigorous_2026-06-22T214730Z.log
 ================================================================
 
 ----------------------------------------------------------------
@@ -9,7 +9,7 @@ SECTION: Install dependencies
 ----------------------------------------------------------------
   WARNING: The scripts ad-guard, ai-kit, altdata, compliance-log, hibs-racing, hibs-racing-web, inst-spine-export, proxy-risk and webhook-mesh are installed in '/home/ubuntu/.local/bin' which is not on PATH.
   Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
-Work dir: /tmp/tmp.lGczslZyZ0
+Work dir: /tmp/tmp.qybpqeK5xt
 
 ----------------------------------------------------------------
 SECTION: Unit tests — Compliance + Proxy-Risk
@@ -64,18 +64,18 @@ tests/test_proxy_risk.py::test_proxy_risk_live_upstream_forward PASSED   [ 95%]
 tests/test_proxy_risk.py::test_proxy_risk_live_log_before_forward PASSED [ 97%]
 tests/test_proxy_risk.py::test_proxy_risk_p99_shadow_latency PASSED      [100%]
 
-============================== 40 passed in 0.63s ==============================
+============================== 40 passed in 0.55s ==============================
 [PASS] Unit test suite
 
 ----------------------------------------------------------------
 SECTION: Compliance Logger — ingest + chain
 ----------------------------------------------------------------
 {
-  "entry_id": "25efa81a053df8a34d18ca549306af14",
+  "entry_id": "600b4a326ed3439aa3234e58bfb38ee7",
   "event_type": "decision",
   "writer_id": "rigorous-auditor",
   "lamport_seq": 1,
-  "wall_time_utc": "2026-06-22T21:44:08+00:00",
+  "wall_time_utc": "2026-06-22T21:47:33+00:00",
   "manifest_id": "65bbee431c76c4891c22454429623850",
   "payload": {
     "actor": "rigorous-auditor",
@@ -92,15 +92,15 @@ SECTION: Compliance Logger — ingest + chain
       "ref": "rigorous-001"
     }
   },
-  "prev_hash": "77221b259feb9afdcefb82b786aefc574b7a0002d52102e5f34d09f452e3a3f7",
-  "entry_hash": "4b6a2f3ff93eaf0f19ca13768c29a984661a041303eb7dc68406058a36380eae"
+  "prev_hash": "519d84307db09f923be7dc4460f5e672bbd69613e4be87fae855ecccbb72e8f0",
+  "entry_hash": "ba2a3c7c6fd85f4fc5338d0264879280b91b5d8cbb7b807694b91e7402bc7364"
 }
 {
-  "entry_id": "f1488ff76f9f4a7c9db8150acf4d77d0",
+  "entry_id": "f173816177d91611509aa2d2072de5f6",
   "event_type": "decision",
   "writer_id": "rigorous-auditor",
   "lamport_seq": 3,
-  "wall_time_utc": "2026-06-22T21:44:08+00:00",
+  "wall_time_utc": "2026-06-22T21:47:33+00:00",
   "manifest_id": "65bbee431c76c4891c22454429623850",
   "payload": {
     "actor": "rigorous-auditor",
@@ -117,8 +117,8 @@ SECTION: Compliance Logger — ingest + chain
       "ref": "rigorous-002"
     }
   },
-  "prev_hash": "4b6a2f3ff93eaf0f19ca13768c29a984661a041303eb7dc68406058a36380eae",
-  "entry_hash": "e40e6277dce2c9439e34c14944a3c9a4d6ed14173e2e5cece41ce39b624df0e6"
+  "prev_hash": "ba2a3c7c6fd85f4fc5338d0264879280b91b5d8cbb7b807694b91e7402bc7364",
+  "entry_hash": "a100643a59554bcabeb926cb4dbd968e14ee0cfaf0afdd84d9c3c6b682a2fff1"
 }
 {
   "chain_ok": true,
@@ -130,9 +130,43 @@ SECTION: Compliance Logger — ingest + chain
   "lamport_monotonic": true,
   "wal_records": 3,
   "wal_sqlite_pending": 0,
-  "instance_uuid": "7565f95e-53b5-40fe-aad0-781829745bcd"
+  "instance_uuid": "ab380312-4d46-43f2-8418-8ca0f4f5f6e7"
 }
 [PASS] Hash chain + genesis verified
+
+----------------------------------------------------------------
+SECTION: Compliance Logger — manifest ingest
+----------------------------------------------------------------
+{
+  "entry_id": "5cd2add2af89062b5dcb7f15485d75d1",
+  "event_type": "decision",
+  "writer_id": "rigorous-auditor",
+  "lamport_seq": 1,
+  "wall_time_utc": "2026-06-22T21:47:33+00:00",
+  "manifest_id": "rigorous-run-001",
+  "payload": {
+    "actor": "rigorous-auditor",
+    "snapshot": {
+      "action": "approve",
+      "amount": 1000,
+      "currency": "GBP",
+      "customer_id": "cust_demo_001",
+      "policy": "kyc_tier_2",
+      "risk_score": 0.12
+    },
+    "outcome": {
+      "status": "approved",
+      "ref": "manifest-001"
+    }
+  },
+  "prev_hash": "2780d067a9bb71d0f9f89d36f108fa0bc423d7ea23abc1e62d10f556f82e92cf",
+  "entry_hash": "fd98168ad587b226959d2717886e989b7ded337e19a5fc42f6b3742cec9d93cf"
+}
+{
+  "manifest_id": "rigorous-run-001",
+  "manifest_hash": "6f3eddfebb3bb1da5195520a30668f6904f60dd72c4996f47830ae77613263b6"
+}
+[PASS] RunManifest ingest + hash
 
 ----------------------------------------------------------------
 SECTION: Compliance Logger — F1–F9 institutional check
@@ -214,15 +248,15 @@ SECTION: Compliance Logger — export + F9 repro
 ----------------------------------------------------------------
 {
   "ok": true,
-  "bundle_sha256": "f26661605162a8a9c9098ddb3ea16f20ec34f377afc0062a4daa7bb0a4c6292e",
-  "tarball": "/tmp/tmp.lGczslZyZ0/compliance_bundle.tar",
+  "bundle_sha256": "ef12767f0ce94ab05a9393c5789f04c26990ed3e128c61d632d2a9b3819a0ee6",
+  "tarball": "/tmp/tmp.qybpqeK5xt/compliance_bundle.tar",
   "validation": "export validation passed",
   "institutional_passed": true
 }
 [PASS] Audit bundle + SHA256 sidecar
 {
   "ok": true,
-  "message": "2686f3f4ba50445218775a6f3572cb1cc5b21b16d51a154b05247131364cb144"
+  "message": "3bac85139ee903511d48cde1d944c8cd27ec9df4b4cb7142185af73c5aabfa73"
 }
 [PASS] F9 reproducibility
 
@@ -238,13 +272,33 @@ SECTION: Compliance Logger — offline verify-bundle (auditor dry-run)
   "institutional_passed": true,
   "message": "offline bundle verification passed",
   "details": {
-    "bundle_sha256": "f26661605162a8a9c9098ddb3ea16f20ec34f377afc0062a4daa7bb0a4c6292e",
+    "bundle_sha256": "ef12767f0ce94ab05a9393c5789f04c26990ed3e128c61d632d2a9b3819a0ee6",
     "entry_count": 3,
     "protocol": "inst-spine-audit-bundle-v1",
-    "instance_uuid": "7565f95e-53b5-40fe-aad0-781829745bcd"
+    "instance_uuid": "ab380312-4d46-43f2-8418-8ca0f4f5f6e7"
   }
 }
 [PASS] Offline auditor verify-bundle
+
+----------------------------------------------------------------
+SECTION: Compliance Logger — offline verify with offsite anchor
+----------------------------------------------------------------
+{
+  "ok": true,
+  "genesis_ok": true,
+  "chain_ok": true,
+  "lamport_ok": true,
+  "bundle_sha256_ok": true,
+  "institutional_passed": true,
+  "message": "offline bundle verification passed",
+  "details": {
+    "bundle_sha256": "ef12767f0ce94ab05a9393c5789f04c26990ed3e128c61d632d2a9b3819a0ee6",
+    "entry_count": 3,
+    "protocol": "inst-spine-audit-bundle-v1",
+    "instance_uuid": "ab380312-4d46-43f2-8418-8ca0f4f5f6e7"
+  }
+}
+[PASS] Offsite genesis anchor verify-bundle
 
 ----------------------------------------------------------------
 SECTION: Compliance Logger — negative gate (genesis-only abort)
@@ -277,7 +331,7 @@ SECTION: Proxy-Risk — shadow evaluate + ledger
   "lamport_monotonic": true,
   "wal_records": 2,
   "wal_sqlite_pending": 0,
-  "instance_uuid": "ed94f9c5-d64f-4e97-b76b-3fc97809880d"
+  "instance_uuid": "f7624adc-1d1a-4ad8-b89b-7082df9ae3a0"
 }
 [PASS] Shadow evaluate + ledger chain
 
@@ -312,7 +366,7 @@ SECTION: Proxy-Risk — env circuit kill (CLI)
   "lamport_monotonic": true,
   "wal_records": 2,
   "wal_sqlite_pending": 0,
-  "instance_uuid": "ed94f9c5-d64f-4e97-b76b-3fc97809880d"
+  "instance_uuid": "f7624adc-1d1a-4ad8-b89b-7082df9ae3a0"
 }
 [PASS] INST_CIRCUIT_KILL env severs traffic
 
@@ -335,12 +389,12 @@ SECTION: Proxy-Risk — live upstream forward (httpbin)
       "Content-Type": "application/json",
       "Host": "httpbin.org",
       "User-Agent": "python-httpx/0.28.1",
-      "X-Amzn-Trace-Id": "Root=1-6a39aca9-1e63e4b578b632a714562b2e"
+      "X-Amzn-Trace-Id": "Root=1-6a39ad77-2767be721029435f5451fb55"
     },
     "json": {
       "rigorous": "live-forward"
     },
-    "origin": "3.226.203.3",
+    "origin": "3.212.32.120",
     "url": "https://httpbin.org/post"
   }
 }
@@ -354,7 +408,7 @@ SECTION: Proxy-Risk — live upstream forward (httpbin)
   "lamport_monotonic": true,
   "wal_records": 4,
   "wal_sqlite_pending": 0,
-  "instance_uuid": "ed94f9c5-d64f-4e97-b76b-3fc97809880d"
+  "instance_uuid": "f7624adc-1d1a-4ad8-b89b-7082df9ae3a0"
 }
 [PASS] Live upstream forward to httpbin.org/post
 
@@ -446,8 +500,8 @@ SECTION: Proxy-Risk — institutional check + export
 {
   "ok": true,
   "product": "proxy-risk",
-  "bundle_sha256": "3c2845b1316928119889f58b8cd56a4d56ea9ac549de7534f511997ad6173f44",
-  "tarball": "/tmp/tmp.lGczslZyZ0/proxy_bundle.tar",
+  "bundle_sha256": "3c4868f0a0d8693445c649953ba1b83f8fcfd02f071a37a3c7a3039263559748",
+  "tarball": "/tmp/tmp.qybpqeK5xt/proxy_bundle.tar",
   "institutional_passed": true
 }
 {
@@ -459,10 +513,10 @@ SECTION: Proxy-Risk — institutional check + export
   "institutional_passed": true,
   "message": "offline bundle verification passed",
   "details": {
-    "bundle_sha256": "3c2845b1316928119889f58b8cd56a4d56ea9ac549de7534f511997ad6173f44",
+    "bundle_sha256": "3c4868f0a0d8693445c649953ba1b83f8fcfd02f071a37a3c7a3039263559748",
     "entry_count": 4,
     "protocol": "inst-spine-audit-bundle-v1",
-    "instance_uuid": "ed94f9c5-d64f-4e97-b76b-3fc97809880d"
+    "instance_uuid": "f7624adc-1d1a-4ad8-b89b-7082df9ae3a0"
   }
 }
 [PASS] Proxy institutional check + export + offline verify
@@ -472,9 +526,9 @@ SECTION: Proxy-Risk — p99 shadow latency bench
 ----------------------------------------------------------------
 {
   "iterations": 10000,
-  "p50_ms": 0.0041,
-  "p99_ms": 0.0061,
-  "p999_ms": 0.0147
+  "p50_ms": 0.0042,
+  "p99_ms": 0.0059,
+  "p999_ms": 0.0116
 }
 [PASS] p99 shadow latency < 10ms (10k iterations)
 
@@ -482,9 +536,23 @@ SECTION: Proxy-Risk — p99 shadow latency bench
 SECTION: Summary
 ----------------------------------------------------------------
 
+{
+  "suite": "instpp_rigorous",
+  "products": [
+    "compliance_logger",
+    "proxy_risk"
+  ],
+  "status": "PASSED",
+  "unit_tests": 40,
+  "e2e_sections": 20,
+  "finished_utc": "2026-06-22T21:47:35Z",
+  "log_file": "instpp_rigorous_2026-06-22T214730Z.log"
+}
+
 ================================================================
 ALL RIGOROUS TESTS PASSED
-Finished: 2026-06-22T21:44:10Z UTC
-Log: /workspace/logs/instpp_rigorous_2026-06-22T214405Z.log
+Finished: 2026-06-22T21:47:35Z UTC
+Log: /workspace/docs/test_logs/instpp_rigorous_2026-06-22T214730Z.log
+Summary: /workspace/docs/test_logs/instpp_rigorous_latest_summary.json
 ================================================================
-Latest symlink: /workspace/logs/instpp_rigorous_latest.log -> instpp_rigorous_2026-06-22T214405Z.log
+Latest symlink: /workspace/docs/test_logs/instpp_rigorous_latest.log -> instpp_rigorous_2026-06-22T214730Z.log
