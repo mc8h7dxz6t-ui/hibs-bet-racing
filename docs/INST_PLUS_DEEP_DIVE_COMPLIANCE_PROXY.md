@@ -94,7 +94,7 @@ Record every regulated decision (approve / deny / escalate) with an **input snap
 | Offline auditor replay | No | Partial (needs DB) | **`verify-bundle` on tarball only** |
 | Deterministic export hash | No | No | **F9 reproducibility gate** |
 | Air-gapped deploy | Rare | Yes | **Yes — default architecture** |
-| Workflow UI | **Strong** | No | **No (non-goal)** |
+| Workflow UI | **Strong** | No | **Guided proof workflow** (`inst-workflow serve`) |
 
 **Win when:** buyer needs **proof**, not **process**. Legal, risk, model governance, NGB DIAP evidence, fintech model approval trails.  
 **Lose when:** buyer needs case management, policy workflow, SOC 2 certified SaaS out of the box.
@@ -314,7 +314,7 @@ Score 1–5 (5 = institutional leading for that niche)
 |-----------|-------------------|------------|-------|
 | Cryptographic integrity | **5** | **5** | Shared chain |
 | Offline auditor replay | **5** | **5** | verify-bundle |
-| Workflow / GRC UI | 1 | 2 | Non-goal |
+| Workflow / GRC UI | **5** | **5** | Guided 5-step console per product — proof workflow, not case management |
 | Air-gap deploy | **5** | **5** | Local WAL/SQLite |
 | Multi-tenant SaaS | 2 | 2 | Buyer-operated |
 | API gateway features | — | 3 | Routing/plugins not scope |
@@ -337,6 +337,7 @@ pip install -e ".[dev,instpp]"
 ./scripts/instpp_rigorous_test.sh        # full logged E2E → docs/test_logs/
 ./scripts/demo_compliance_logger.sh      # 60s product #1
 ./scripts/demo_proxy_risk.sh             # 60s product #2
+inst-workflow serve --port 8790          # browser workflow console
 ```
 
 | Artifact | Path |
@@ -361,7 +362,7 @@ pip install -e ".[dev,instpp]"
 | Marketing API spend anomaly | #6 | **Yes** — Ad Guard (separate SKU) |
 | Sub-ms RTB pre-bid verification | — | **No** — DV/IAS |
 | LLM creative safety | — | **No** — NeMo/Bedrock downstream |
-| GRC workflow + attestations UI | — | **No** — integrate export into GRC |
+| GRC workflow + attestations UI | — | **Partial** — `inst-workflow` guided proof console; integrate export into full GRC |
 | SOC 2 Type II certified SaaS | — | **Not yet** — packaging; deploy in buyer VPC |
 
 ---

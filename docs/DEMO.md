@@ -63,6 +63,30 @@ SKIP_LIVE=1 ./scripts/demo_instpp.sh   # offline / no httpbin
 # → docs/test_logs/instpp_rigorous_latest.log
 ```
 
+## Workflow UI (guided console)
+
+After the CLI demo (or standalone), launch the browser workflow console:
+
+```bash
+inst-workflow serve --port 8790
+# open http://127.0.0.1:8790
+```
+
+| Tab | What you get |
+|-----|----------------|
+| **Architecture** | Side-by-side ingest→export vs proxy gate chain map |
+| **Compliance Logger** | 5-step workflow: ingest → chain → F1–F9 → export → offline verify |
+| **Proxy-Risk** | Shadow → live forward → F1–F9 → export → verify |
+
+Uses the same `data/demo/` databases when run after `./scripts/demo_instpp.sh`.
+
+```bash
+inst-workflow serve \
+  --compliance-db data/demo/compliance.sqlite \
+  --proxy-db data/demo/proxy.sqlite \
+  --export-dir data/demo/ui_exports
+```
+
 ## More
 
 - `docs/INST_PLUS_GOLD_STANDARD.md` — quality bar

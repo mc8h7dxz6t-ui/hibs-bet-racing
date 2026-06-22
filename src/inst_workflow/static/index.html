@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Inst++ Workflow Console</title>
+  <link rel="stylesheet" href="/static/workflow.css" />
+</head>
+<body>
+  <header>
+    <h1>Inst++ Workflow Console</h1>
+    <span class="badge">Compliance Logger · Proxy-Risk Gateway</span>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button type="button" class="active" data-tab="arch">Architecture</button>
+    <button type="button" data-tab="compliance">Compliance Logger</button>
+    <button type="button" data-tab="proxy">Proxy-Risk</button>
+  </nav>
+
+  <main>
+    <!-- Architecture -->
+    <section id="panel-arch" class="panel active">
+      <h2>Institutional stack — workflow map</h2>
+      <div class="card">
+        <div class="arch-split">
+          <div>
+            <div class="arch-flow">
+              <div class="arch-box">Business decision / snapshot</div>
+              <div class="arch-arrow">↓</div>
+              <div class="arch-box highlight">Compliance Logger — ingest</div>
+              <div class="arch-arrow">↓</div>
+              <div class="arch-box">Hash chain + F1–F9 gates</div>
+              <div class="arch-arrow">↓</div>
+              <div class="arch-box">Export → verify-bundle (offline auditor)</div>
+            </div>
+          </div>
+          <div>
+            <div class="arch-flow">
+              <div class="arch-box">Outbound API intent</div>
+              <div class="arch-arrow">↓</div>
+              <div class="arch-box highlight">Proxy-Risk — gate chain</div>
+              <div class="gate-chain">
+                <span>circuit</span><span class="arrow">→</span>
+                <span>schema</span><span class="arrow">→</span>
+                <span>bucket</span><span class="arrow">→</span>
+                <span>idempotency</span><span class="arrow">→</span>
+                <span>drift</span><span class="arrow">→</span>
+                <span>forward</span>
+              </div>
+              <div class="arch-arrow">↓</div>
+              <div class="arch-box">Ledger (every outcome) → export</div>
+            </div>
+          </div>
+        </div>
+        <p style="font-size:0.8rem;color:var(--muted);margin:1rem 0 0">
+          Shared <code>inst_spine</code> — genesis WAL, Lamport clocks, deterministic audit bundles.
+          Not GRC case management — cryptographic proof workflow.
+        </p>
+      </div>
+    </section>
+
+    <!-- Compliance -->
+    <section id="panel-compliance" class="panel">
+      <h2>Compliance Logger workflow</h2>
+      <div class="workflow-steps" id="compliance-steps">
+        <div class="step-card" data-step="1">1 Ingest</div>
+        <div class="step-card" data-step="2">2 Chain</div>
+        <div class="step-card" data-step="3">3 F1–F9</div>
+        <div class="step-card" data-step="4">4 Export</div>
+        <div class="step-card" data-step="5">5 Verify</div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <label>Snapshot JSON</label>
+          <textarea id="compliance-snapshot">{}</textarea>
+          <label style="margin-top:0.5rem">Outcome JSON</label>
+          <textarea id="compliance-outcome">{"status":"approved"}</textarea>
+          <div class="btn-row">
+            <button type="button" class="action secondary" id="btn-compliance-demo">Load demo</button>
+            <button type="button" class="action" id="btn-compliance-ingest">1 · Ingest decision</button>
+            <button type="button" class="action" id="btn-compliance-check">3 · Run F1–F9</button>
+            <button type="button" class="action" id="btn-compliance-export">4 · Export bundle</button>
+            <button type="button" class="action" id="btn-compliance-verify">5 · Verify offline</button>
+          </div>
+        </div>
+        <div class="card">
+          <label>Gate matrix</label>
+          <div class="gate-grid" id="compliance-gates"></div>
+          <label style="margin-top:1rem">Output</label>
+          <pre class="output" id="compliance-output">Ready.</pre>
+        </div>
+      </div>
+      <div class="card">
+        <label>Ledger</label>
+        <div id="compliance-ledger"></div>
+      </div>
+    </section>
+
+    <!-- Proxy -->
+    <section id="panel-proxy" class="panel">
+      <h2>Proxy-Risk workflow</h2>
+      <div class="workflow-steps" id="proxy-steps">
+        <div class="step-card" data-step="1">1 Shadow</div>
+        <div class="step-card" data-step="2">2 Live</div>
+        <div class="step-card" data-step="3">3 Check</div>
+        <div class="step-card" data-step="4">4 Export</div>
+        <div class="step-card" data-step="5">5 Verify</div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <label>Request JSON</label>
+          <textarea id="proxy-request">{}</textarea>
+          <div class="btn-row">
+            <button type="button" class="action secondary" id="btn-proxy-demo">Load demo</button>
+            <button type="button" class="action" id="btn-proxy-shadow">1 · Shadow evaluate</button>
+            <button type="button" class="action" id="btn-proxy-live">2 · Live forward</button>
+            <button type="button" class="action" id="btn-proxy-check">3 · F1–F9 check</button>
+            <button type="button" class="action" id="btn-proxy-export">4 · Export bundle</button>
+            <button type="button" class="action" id="btn-proxy-verify">5 · Verify offline</button>
+          </div>
+          <div id="proxy-decision" style="margin-top:0.75rem"></div>
+        </div>
+        <div class="card">
+          <label>Gate matrix</label>
+          <div class="gate-grid" id="proxy-gates"></div>
+          <label style="margin-top:1rem">Output</label>
+          <pre class="output" id="proxy-output">Ready.</pre>
+        </div>
+      </div>
+      <div class="card">
+        <label>Proxy request ledger</label>
+        <div id="proxy-ledger"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/workflow.js"></script>
+</body>
+</html>
