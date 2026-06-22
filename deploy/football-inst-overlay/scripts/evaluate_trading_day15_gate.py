@@ -48,6 +48,37 @@ def _equity_stream_days(scan_rows: list[dict], *, symbol: str = "AAPL") -> int:
     return len(days)
 
 
+def _symbol_status_counts(scan_rows: list[dict], *, symbol: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    sym = symbol.upper()
+    for row in scan_rows:
+        if str(row.get("symbol", "")).upper() != sym:
+            continue
+        status = str(row.get("status") or "UNKNOWN")
+        counts[status] = counts.get(status, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+def _max_abs_ofi(scan_rows: list[dict], *, symbol: str) -> float | None:
+    sym = symbol.upper()
+    peak: float | None = None
+    for row in scan_rows:
+        if str(row.get("symbol", "")).upper() != sym:
+            continue
+        details = row.get("details") or {}
+        if not isinstance(details, dict):
+            continue
+        raw = details.get("ofi")
+        if raw is None:
+            continue
+        try:
+            value = abs(float(raw))
+        except (TypeError, ValueError):
+            continue
+        peak = value if peak is None else max(peak, value)
+    return peak
+
+
 def _resolve_audit_path(
     trading_root: Path,
     *,
@@ -116,6 +147,11 @@ def evaluate_day15(
         and str(r.get("symbol", "")).upper() == symbol.upper()
     ]
     stream_days = _equity_stream_days(scan_rows, symbol=symbol)
+    aapl_status_counts = _symbol_status_counts(scan_rows, symbol=symbol)
+    max_abs_ofi = _max_abs_ofi(scan_rows, symbol=symbol)
+    total_would_route = sum(
+        1 for r in scan_rows if r.get("status") == "SHADOW_WOULD_ROUTE"
+    )
     p95 = spread_stats.get("p95")
     recon_drifts = None
     metrics_path = trading_root / "data" / "metrics_snapshot.json"
@@ -159,6 +195,9 @@ def evaluate_day15(
         "spread_row_count": int(spread_stats.get("count") or 0),
         "scan_row_count": len(scan_rows),
         "recon_drifts": recon_drifts,
+        "aapl_status_counts": aapl_status_counts,
+        "max_abs_ofi": max_abs_ofi,
+        "total_shadow_would_route_all_symbols": total_would_route,
         "reasons": reasons,
         "artifacts": {
             "scan": str(scan_path),
@@ -203,6 +242,15 @@ def main(argv: list[str] | None = None) -> int:
             f"stream_days={report['equity_stream_days']} "
             f"spread_p95={report['spread_p95_bps']}"
         )
+        if report.get("aapl_status_counts"):
+            print(f"  {symbol} status breakdown: {report['aapl_status_counts']}")
+        if report.get("max_abs_ofi") is not None:
+            print(f"  {symbol} max |OFI| observed: {report['max_abs_ofi']:.4f}")
+        if report.get("total_shadow_would_route_all_symbols"):
+            print(
+                "  total SHADOW_WOULD_ROUTE (all symbols): "
+                f"{report['total_shadow_would_route_all_symbols']}"
+            )
     return 0 if report["verdict"] == "PASS" else 1
 
 
