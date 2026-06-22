@@ -61,4 +61,5 @@ compliance-log verify-bundle --tarball ./audit_bundle.tar
 | `export` | Deterministic audit bundle |
 | `verify-bundle` | Offline auditor replay |
 
-See `src/compliance_log/README.md` for architecture.
+See `src/compliance_log/README.md` for architecture.  
+**Full spec:** `docs/COMPLIANCE_LOGGER_SALES_TECH_SPEC.md`

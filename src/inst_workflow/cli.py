@@ -43,6 +43,13 @@ def main(argv: list[str] | None = None) -> int:
         default=Path(os.getenv("INST_EXPORT_DIR", "data/demo/ui_exports")),
     )
     p_serve.add_argument(
+        "--product",
+        choices=["compliance", "proxy", "both"],
+        default=os.getenv("INST_WORKFLOW_PRODUCT", "both"),
+        help="Single-product console or both (default: both)",
+    )
+
+    p_serve.add_argument(
         "--no-shadow",
         action="store_true",
         help="Disable proxy shadow mode by default",
@@ -60,8 +67,14 @@ def main(argv: list[str] | None = None) -> int:
         serve.state.proxy_db = args.proxy_db
         serve.state.export_dir = args.export_dir
         serve.state.proxy_shadow = not args.no_shadow
+        serve.state.product = serve.normalize_product(args.product)
 
-        print(f"Inst++ Workflow Console → http://{args.host}:{args.port}")
+        label = {
+            "compliance": "Compliance Logger",
+            "proxy": "Proxy-Risk Gateway",
+            "both": "Inst++ (Compliance + Proxy-Risk)",
+        }[serve.state.product]
+        print(f"{label} Workflow Console → http://{args.host}:{args.port}")
         uvicorn.run(serve.app, host=args.host, port=args.port, log_level="info")
         return 0
 

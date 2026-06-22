@@ -133,14 +133,55 @@
   function initTabs() {
     document.querySelectorAll(".tabs button").forEach((btn) => {
       btn.addEventListener("click", () => {
-        document.querySelectorAll(".tabs button").forEach((b) => b.classList.remove("active"));
-        document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
-        btn.classList.add("active");
-        const tab = btn.getAttribute("data-tab");
-        const panel = document.getElementById(`panel-${tab}`);
-        if (panel) panel.classList.add("active");
+        activateTab(btn.getAttribute("data-tab"));
       });
     });
+  }
+
+  function activateTab(tab) {
+    if (!tab) return;
+    document.querySelectorAll(".tabs button").forEach((b) => {
+      b.classList.toggle("active", b.getAttribute("data-tab") === tab);
+    });
+    document.querySelectorAll(".panel").forEach((p) => {
+      p.classList.toggle("active", p.id === `panel-${tab}`);
+    });
+  }
+
+  function applyProductConfig(cfg) {
+    const title = document.getElementById("header-title");
+    const badge = document.getElementById("header-badge");
+    if (title) title.textContent = cfg.title || "Inst++ Workflow Console";
+    if (badge) badge.textContent = cfg.badge || "";
+
+    const tabs = cfg.tabs || {};
+    const tabMap = {
+      arch: "tab-arch",
+      compliance: "tab-compliance",
+      proxy: "tab-proxy",
+    };
+    Object.entries(tabMap).forEach(([key, id]) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = tabs[key] ? "" : "none";
+    });
+
+    const archCompliance = document.getElementById("arch-compliance");
+    const archProxy = document.getElementById("arch-proxy");
+    if (archCompliance) archCompliance.style.display = tabs.compliance ? "" : "none";
+    if (archProxy) archProxy.style.display = tabs.proxy ? "" : "none";
+
+    const archSplit = document.querySelector(".arch-split");
+    if (archSplit && cfg.product !== "both") {
+      archSplit.style.gridTemplateColumns = "1fr";
+    }
+
+    activateTab(cfg.default_tab || "arch");
+  }
+
+  async function loadProductConfig() {
+    const cfg = await api("GET", "/api/config");
+    applyProductConfig(cfg);
+    return cfg;
   }
 
   async function loadComplianceLedger() {
@@ -273,8 +314,14 @@
     if (el) el.addEventListener("click", fn);
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", async () => {
     initTabs();
+    let cfg = { tabs: { compliance: true, proxy: true } };
+    try {
+      cfg = await loadProductConfig();
+    } catch {
+      /* keep defaults */
+    }
     bind("btn-compliance-demo", onComplianceDemo);
     bind("btn-compliance-ingest", onComplianceIngest);
     bind("btn-compliance-check", onComplianceCheck);
@@ -286,7 +333,7 @@
     bind("btn-proxy-check", onProxyCheck);
     bind("btn-proxy-export", onProxyExport);
     bind("btn-proxy-verify", onProxyVerify);
-    loadComplianceLedger().catch(() => {});
-    loadProxyLedger().catch(() => {});
+    if (cfg.tabs?.compliance) loadComplianceLedger().catch(() => {});
+    if (cfg.tabs?.proxy) loadProxyLedger().catch(() => {});
   });
 })();

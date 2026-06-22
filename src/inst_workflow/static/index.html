@@ -8,14 +8,14 @@
 </head>
 <body>
   <header>
-    <h1>Inst++ Workflow Console</h1>
-    <span class="badge">Compliance Logger · Proxy-Risk Gateway</span>
+    <h1 id="header-title">Inst++ Workflow Console</h1>
+    <span class="badge" id="header-badge">Compliance Logger · Proxy-Risk Gateway</span>
   </header>
 
-  <nav class="tabs" role="tablist">
-    <button type="button" class="active" data-tab="arch">Architecture</button>
-    <button type="button" data-tab="compliance">Compliance Logger</button>
-    <button type="button" data-tab="proxy">Proxy-Risk</button>
+  <nav class="tabs" role="tablist" id="workflow-tabs">
+    <button type="button" class="active" data-tab="arch" id="tab-arch">Architecture</button>
+    <button type="button" data-tab="compliance" id="tab-compliance">Compliance Logger</button>
+    <button type="button" data-tab="proxy" id="tab-proxy">Proxy-Risk</button>
   </nav>
 
   <main>
@@ -24,7 +24,7 @@
       <h2>Institutional stack — workflow map</h2>
       <div class="card">
         <div class="arch-split">
-          <div>
+          <div id="arch-compliance">
             <div class="arch-flow">
               <div class="arch-box">Business decision / snapshot</div>
               <div class="arch-arrow">↓</div>
@@ -35,7 +35,7 @@
               <div class="arch-box">Export → verify-bundle (offline auditor)</div>
             </div>
           </div>
-          <div>
+          <div id="arch-proxy">
             <div class="arch-flow">
               <div class="arch-box">Outbound API intent</div>
               <div class="arch-arrow">↓</div>

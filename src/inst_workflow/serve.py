@@ -19,8 +19,16 @@ from inst_spine.ledger import AppendOnlyLedger
 from proxy_risk.router import ProxyRequest, ProxyRiskGateway
 
 STATIC_DIR = Path(__file__).parent / "static"
+VALID_PRODUCTS = frozenset({"compliance", "proxy", "both"})
 
 app = FastAPI(title="Inst++ Workflow Console", version="1.0.0")
+
+
+def normalize_product(value: str) -> str:
+    product = (value or "both").strip().lower()
+    if product not in VALID_PRODUCTS:
+        raise ValueError(f"product must be one of: {', '.join(sorted(VALID_PRODUCTS))}")
+    return product
 
 
 class RuntimeState:
@@ -29,6 +37,26 @@ class RuntimeState:
     export_dir: Path = Path(os.getenv("INST_EXPORT_DIR", "data/demo/ui_exports"))
     proxy_shadow: bool = os.getenv("INST_PROXY_SHADOW", "1") != "0"
     upstream_base: str = os.getenv("PROXY_RISK_UPSTREAM_BASE", "https://httpbin.org")
+    product: str = normalize_product(os.getenv("INST_WORKFLOW_PRODUCT", "both"))
+
+
+def _product_enabled(name: str) -> bool:
+    if state.product == "both":
+        return True
+    return state.product == name
+
+
+def _require_product(name: str) -> None:
+    if not _product_enabled(name):
+        raise HTTPException(404, f"{name} workflow not enabled (product={state.product})")
+
+
+def _active_products() -> list[str]:
+    if state.product == "both":
+        return ["compliance-logger", "proxy-risk"]
+    if state.product == "compliance":
+        return ["compliance-logger"]
+    return ["proxy-risk"]
 
 
 state = RuntimeState()
@@ -93,15 +121,47 @@ class ProxyEvaluateBody(BaseModel):
 async def health() -> dict[str, Any]:
     return {
         "ok": True,
-        "products": ["compliance-logger", "proxy-risk"],
+        "product": state.product,
+        "products": _active_products(),
         "compliance_db": str(state.compliance_db),
         "proxy_db": str(state.proxy_db),
         "proxy_shadow": state.proxy_shadow,
     }
 
 
+@app.get("/api/config")
+async def workflow_config() -> dict[str, Any]:
+    titles = {
+        "compliance": "Compliance Logger — Workflow Console",
+        "proxy": "Proxy-Risk Gateway — Workflow Console",
+        "both": "Inst++ Workflow Console",
+    }
+    badges = {
+        "compliance": "Compliance Logger",
+        "proxy": "Proxy-Risk Gateway",
+        "both": "Compliance Logger · Proxy-Risk Gateway",
+    }
+    default_tab = {
+        "compliance": "compliance",
+        "proxy": "proxy",
+        "both": "arch",
+    }
+    return {
+        "product": state.product,
+        "title": titles[state.product],
+        "badge": badges[state.product],
+        "default_tab": default_tab[state.product],
+        "tabs": {
+            "arch": state.product == "both",
+            "compliance": _product_enabled("compliance"),
+            "proxy": _product_enabled("proxy"),
+        },
+    }
+
+
 @app.get("/api/demo/compliance-snapshot")
 async def demo_compliance_snapshot() -> dict[str, Any]:
+    _require_product("compliance")
     path = Path("docs/demo_snapshot.json")
     if not path.is_file():
         raise HTTPException(404, "demo snapshot missing")
@@ -110,6 +170,7 @@ async def demo_compliance_snapshot() -> dict[str, Any]:
 
 @app.get("/api/demo/proxy-request")
 async def demo_proxy_request() -> dict[str, Any]:
+    _require_product("proxy")
     path = Path("docs/demo_proxy_request.json")
     if not path.is_file():
         raise HTTPException(404, "demo proxy request missing")
@@ -118,6 +179,7 @@ async def demo_proxy_request() -> dict[str, Any]:
 
 @app.get("/api/compliance/ledger")
 async def compliance_ledger() -> dict[str, Any]:
+    _require_product("compliance")
     ledger = AppendOnlyLedger(_compliance_db())
     entries = ledger.list_entries()
     return {"entries": entries, "verify": ledger.verify(), "count": len(entries)}
@@ -125,6 +187,7 @@ async def compliance_ledger() -> dict[str, Any]:
 
 @app.post("/api/compliance/ingest")
 async def compliance_ingest(body: IngestBody) -> dict[str, Any]:
+    _require_product("compliance")
     entry = log_decision(
         snapshot=body.snapshot,
         outcome=body.outcome,
@@ -136,6 +199,7 @@ async def compliance_ingest(body: IngestBody) -> dict[str, Any]:
 
 @app.post("/api/compliance/check")
 async def compliance_check() -> dict[str, Any]:
+    _require_product("compliance")
     ledger = AppendOnlyLedger(_compliance_db())
     ctx = build_compliance_context(ledger, run_f9=True)
     report = run_institutional_check(ledger=ledger, context=ctx, run_f9=False)
@@ -144,6 +208,7 @@ async def compliance_check() -> dict[str, Any]:
 
 @app.post("/api/compliance/export")
 async def compliance_export() -> dict[str, Any]:
+    _require_product("compliance")
     state.export_dir.mkdir(parents=True, exist_ok=True)
     out = state.export_dir / "compliance_bundle"
     tar = state.export_dir / "compliance_bundle.tar"
@@ -166,6 +231,7 @@ async def compliance_export() -> dict[str, Any]:
 
 @app.post("/api/compliance/verify-bundle")
 async def compliance_verify_bundle() -> dict[str, Any]:
+    _require_product("compliance")
     tar = state.export_dir / "compliance_bundle.tar"
     if not tar.is_file():
         raise HTTPException(404, "export bundle first")
@@ -184,6 +250,7 @@ async def compliance_verify_bundle() -> dict[str, Any]:
 
 @app.get("/api/proxy/ledger")
 async def proxy_ledger() -> dict[str, Any]:
+    _require_product("proxy")
     ledger = AppendOnlyLedger(_proxy_db())
     entries = ledger.list_entries()
     proxy_rows = [e for e in entries if e.get("event_type") == "proxy_request"]
@@ -192,6 +259,7 @@ async def proxy_ledger() -> dict[str, Any]:
 
 @app.post("/api/proxy/evaluate")
 async def proxy_evaluate(body: ProxyEvaluateBody) -> dict[str, Any]:
+    _require_product("proxy")
     gw = _proxy_gateway()
     prev_shadow = gw.shadow_mode
     gw.shadow_mode = not body.live
@@ -219,6 +287,7 @@ async def proxy_evaluate(body: ProxyEvaluateBody) -> dict[str, Any]:
 
 @app.post("/api/proxy/check")
 async def proxy_check() -> dict[str, Any]:
+    _require_product("proxy")
     ledger = AppendOnlyLedger(_proxy_db())
     ctx = build_compliance_context(ledger, run_f9=True)
     report = run_institutional_check(ledger=ledger, context=ctx, run_f9=False)
@@ -227,6 +296,7 @@ async def proxy_check() -> dict[str, Any]:
 
 @app.post("/api/proxy/export")
 async def proxy_export() -> dict[str, Any]:
+    _require_product("proxy")
     state.export_dir.mkdir(parents=True, exist_ok=True)
     out = state.export_dir / "proxy_bundle"
     tar = state.export_dir / "proxy_bundle.tar"
@@ -249,6 +319,7 @@ async def proxy_export() -> dict[str, Any]:
 
 @app.post("/api/proxy/verify-bundle")
 async def proxy_verify_bundle() -> dict[str, Any]:
+    _require_product("proxy")
     tar = state.export_dir / "proxy_bundle.tar"
     if not tar.is_file():
         raise HTTPException(404, "export bundle first")

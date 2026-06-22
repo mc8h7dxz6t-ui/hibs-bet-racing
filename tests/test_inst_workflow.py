@@ -9,10 +9,11 @@ import pytest
 
 
 @pytest.fixture
-def workflow_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def workflow_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest):
     pytest.importorskip("fastapi")
     from fastapi.testclient import TestClient
 
+    product = getattr(request, "param", "both")
     compliance_db = tmp_path / "compliance.sqlite"
     proxy_db = tmp_path / "proxy.sqlite"
     export_dir = tmp_path / "exports"
@@ -21,6 +22,7 @@ def workflow_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("INST_PROXY_DB", str(proxy_db))
     monkeypatch.setenv("INST_EXPORT_DIR", str(export_dir))
     monkeypatch.setenv("INST_PROXY_SHADOW", "1")
+    monkeypatch.setenv("INST_WORKFLOW_PRODUCT", product)
 
     import inst_workflow.serve as serve_mod
 
@@ -28,10 +30,11 @@ def workflow_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     serve_mod.state.proxy_db = proxy_db
     serve_mod.state.export_dir = export_dir
     serve_mod.state.proxy_shadow = True
+    serve_mod.state.product = product
     serve_mod.reset_proxy_runtime()
 
     with TestClient(serve_mod.app) as client:
-        yield client, serve_mod, compliance_db, proxy_db, export_dir
+        yield client, serve_mod, compliance_db, proxy_db, export_dir, product
 
 
 def test_health(workflow_client):
@@ -59,7 +62,7 @@ def test_static_assets(workflow_client):
 
 
 def test_compliance_workflow(workflow_client):
-    client, _, compliance_db, _, export_dir = workflow_client
+    client, _, compliance_db, _, export_dir, _ = workflow_client
     snap_path = Path("docs/demo_snapshot.json")
     snapshot = json.loads(snap_path.read_text(encoding="utf-8"))
 
@@ -92,7 +95,7 @@ def test_compliance_workflow(workflow_client):
 
 
 def test_proxy_evaluate_shadow(workflow_client):
-    client, serve_mod, _, proxy_db, _ = workflow_client
+    client, _, _, proxy_db, _, _ = workflow_client
     req = {
         "client_id": "ui-test",
         "method": "POST",
@@ -116,3 +119,34 @@ def test_demo_loaders(workflow_client):
     client, *_ = workflow_client
     assert client.get("/api/demo/compliance-snapshot").status_code == 200
     assert client.get("/api/demo/proxy-request").status_code == 200
+
+
+def test_workflow_config(workflow_client):
+    client, *_ = workflow_client
+    r = client.get("/api/config")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["product"] == "both"
+    assert body["tabs"]["arch"] is True
+    assert body["tabs"]["compliance"] is True
+    assert body["tabs"]["proxy"] is True
+
+
+@pytest.mark.parametrize("workflow_client", ["compliance"], indirect=True)
+def test_compliance_only_product(workflow_client):
+    client, *_ = workflow_client
+    cfg = client.get("/api/config").json()
+    assert cfg["product"] == "compliance"
+    assert cfg["tabs"]["proxy"] is False
+    assert cfg["default_tab"] == "compliance"
+    assert client.post("/api/proxy/evaluate", json={"client_id": "x"}).status_code == 404
+
+
+@pytest.mark.parametrize("workflow_client", ["proxy"], indirect=True)
+def test_proxy_only_product(workflow_client):
+    client, *_ = workflow_client
+    cfg = client.get("/api/config").json()
+    assert cfg["product"] == "proxy"
+    assert cfg["tabs"]["compliance"] is False
+    assert cfg["default_tab"] == "proxy"
+    assert client.post("/api/compliance/ingest", json={"snapshot": {}}).status_code == 404

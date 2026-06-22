@@ -72,6 +72,13 @@ inst-workflow serve --port 8790
 # open http://127.0.0.1:8790
 ```
 
+**Single-product consoles** (for separate SKU demos):
+
+```bash
+inst-workflow serve --product compliance --port 8790
+inst-workflow serve --product proxy --port 8790
+```
+
 | Tab | What you get |
 |-----|----------------|
 | **Architecture** | Side-by-side ingest→export vs proxy gate chain map |
@@ -89,5 +96,8 @@ inst-workflow serve \
 
 ## More
 
+- `docs/COMPLIANCE_LOGGER_SALES_TECH_SPEC.md` — full sales + tech spec (#1)
+- `docs/PROXY_RISK_SALES_TECH_SPEC.md` — full sales + tech spec (#2)
+- `docs/INST_PLUS_PRE_REV_VALUATION.md` — pre-revenue IP valuation ranges
 - `docs/INST_PLUS_GOLD_STANDARD.md` — quality bar
 - `docs/INST_PLUS_DEEP_DIVE_COMPLIANCE_PROXY.md` — industry positioning

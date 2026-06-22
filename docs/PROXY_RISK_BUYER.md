@@ -77,4 +77,5 @@ proxy-risk evaluate --live --path /orders --body '{"symbol":"AAPL"}'
 | `verify-bundle` | Offline auditor replay |
 | `serve` | HTTP gateway (shadow or live) |
 
-See `src/proxy_risk/README.md` for architecture.
+See `src/proxy_risk/README.md` for architecture.  
+**Full spec:** `docs/PROXY_RISK_SALES_TECH_SPEC.md`
