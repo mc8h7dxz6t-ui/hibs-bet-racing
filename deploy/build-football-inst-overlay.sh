@@ -40,6 +40,9 @@ EXTRA=(
   scripts/hands_off_cycle.sh
   scripts/install_all_platform_automation.sh
   scripts/install_hands_off_automation.sh
+  scripts/install_racing_vps_cron.sh
+  scripts/lib_scrape_first_cache.sh
+  scripts/seed_fotmob_minimal_bundle.py
   scripts/data_producer_repair.sh
   src/hibs_predictor/scrapers/scrape_resilience.py
   src/hibs_predictor/scrapers/robust_scrape_cycle.py
