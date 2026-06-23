@@ -478,7 +478,8 @@ Production Python kit: **token-bucket rate control**, structured output validati
 
 ---
 
-## Implementation status (started)
+## Implementation status (v3 + P2 export)
+
 
 Packages live under `src/`:
 
@@ -507,15 +508,15 @@ altdata poll --feed demo --ctx '{"demo_price":120,"demo_seats":4,"demo_route":"L
 # AI Kit checkpoint demo
 ai-kit run --steps 3
 
-# Audit export
-./scripts/export_audit.sh data/compliance_ledger.sqlite ./audit_bundle
+# Audit export (P2 — deterministic tar + SHA256)
+compliance-log export --database data/compliance_ledger.sqlite
+compliance-log export --repro-check
+./scripts/export_audit.sh data/compliance_ledger.sqlite ./audit_bundle ./audit_bundle.tar
 ```
 
-Optional async server: `pip install -e ".[instpp]"` then `proxy-risk serve`.
+See `docs/INST_PLUS_STRATEGY.md` for HIBS vs Inst++ valuation and UK Code mapping.
 
-Multi-instance Proxy-Risk: `export INST_REDIS_URL=redis://127.0.0.1:6379/0`
-
-**26 tests passing** (WAL crash recovery, genesis anchor, shared token bucket).
+**31 tests passing** (WAL, genesis, shared bucket, P2 export reproducibility).
 
 
 ---

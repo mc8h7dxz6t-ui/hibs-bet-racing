@@ -12,7 +12,7 @@ from altdata.poll import poll_once
 from altdata.structural_rescue import structural_rescue
 from ai_kit.pipeline import AgentLoop
 from compliance_log.ingest import log_decision
-from inst_spine.check import run_institutional_check
+from inst_spine.check import build_compliance_context, run_institutional_check
 from inst_spine.hash import GENESIS_EVENT, verify_chain
 from inst_spine.ledger import AppendOnlyLedger
 from proxy_risk.router import ProxyRequest, ProxyRiskGateway
@@ -127,15 +127,8 @@ def test_ai_kit_checkpoint_resume(tmp_path: Path):
 def test_institutional_check_passes_clean_ledger(tmp_path: Path):
     db = tmp_path / "inst.sqlite"
     ledger = AppendOnlyLedger(db)
-    ledger.append(event_type="x", payload={"a": 1}, manifest_id="m")
+    ledger.append(event_type="decision", payload={"a": 1}, manifest_id="m")
     entries = ledger.list_entries()
-    report = run_institutional_check(
-        ledger=ledger,
-        context={
-            "ledger_entries": entries,
-            "expected_count": len(entries),
-            "actual_count": len(entries),
-            "source_coverage_pct": 100.0,
-        },
-    )
+    ctx = build_compliance_context(ledger, run_f9=True)
+    report = run_institutional_check(ledger=ledger, context=ctx, run_f9=False)
     assert report.passed

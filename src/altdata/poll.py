@@ -29,10 +29,11 @@ def poll_once(
     ctx: dict[str, Any],
     fields: list[str] | None = None,
     database: Path | None = None,
+    resolver: FieldResolver | None = None,
 ) -> PollResult:
     """Single poll cycle — resolve fields, snapshot to ledger."""
     fields = fields or list(FIELD_LADDERS.keys())
-    resolver = FieldResolver()
+    resolver = resolver or FieldResolver()
     record = resolver.resolve_record(fields, ctx)
     coverage = resolver.coverage_pct(record, fields)
     meta = record.get("_meta") or {}

@@ -1,0 +1,16 @@
+{
+  "suite": "institutional_rigorous",
+  "products": [
+    "compliance_logger",
+    "proxy_risk",
+    "altdata",
+    "ai_kit",
+    "webhook_mesh",
+    "ad_guard",
+    "health_telemetry"
+  ],
+  "status": "PASSED",
+  "e2e_sections": 27,
+  "finished_utc": "2026-06-23T07:47:17Z",
+  "log_file": "instpp_rigorous_2026-06-23T074704Z.log"
+}

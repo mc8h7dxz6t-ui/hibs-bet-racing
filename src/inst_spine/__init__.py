@@ -7,7 +7,17 @@ from inst_spine.gates.circuit import CircuitBreaker, CircuitState
 from inst_spine.gates.engine import GateEngine, GateResult
 from inst_spine.hash import chain_hash, verify_chain
 from inst_spine.ledger import AppendOnlyLedger
-from inst_spine.rates import TokenBucket, ZScoreConfig, ZScoreDriftDetector, token_bucket_backend_from_env
+from inst_spine.rates import (
+    IdempotencyBackend,
+    MemoryIdempotencyBackend,
+    RedisIdempotencyBackend,
+    TokenBucket,
+    ZScoreConfig,
+    ZScoreDriftDetector,
+    idempotency_backend_from_env,
+    token_bucket_backend_from_env,
+)
+from inst_spine.wal import WALWriter
 
 __all__ = [
     "ApiIntent",
@@ -16,17 +26,22 @@ __all__ = [
     "CircuitState",
     "GateEngine",
     "GateResult",
+    "IdempotencyBackend",
     "LamportClock",
     "LedgerEntry",
+    "MemoryIdempotencyBackend",
+    "RedisIdempotencyBackend",
     "RunManifest",
     "TokenBucket",
+    "WALWriter",
     "ZScoreConfig",
     "VectorClock",
     "ZScoreDriftDetector",
-    "token_bucket_backend_from_env",
     "chain_hash",
+    "idempotency_backend_from_env",
     "monotonic_seconds",
     "run_institutional_check",
+    "token_bucket_backend_from_env",
     "verify_chain",
 ]
 
