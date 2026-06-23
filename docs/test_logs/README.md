@@ -1,4 +1,4 @@
-# Inst++ rigorous test logs (committed evidence)
+# Institutional rigorous test logs (committed evidence)
 
 ```bash
 ./scripts/instpp_rigorous_test.sh

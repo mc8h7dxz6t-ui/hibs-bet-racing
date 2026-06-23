@@ -18,7 +18,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("ad_guard.serve")
 
-app = FastAPI(title="Inst++ Ad-Tech Budget Guardrail")
+app = FastAPI(title="Ad-Tech Budget Guardrail")
 
 
 class RuntimeState:
@@ -75,6 +75,8 @@ async def guard_spend(client_id: str, request: Request) -> dict[str, Any] | Resp
 
     provider = request.headers.get("X-Ad-Provider", body.get("provider", "generic"))
     campaign_id = request.headers.get("X-Campaign-Id") or body.get("campaign_id")
+    creative_hdr = request.headers.get("X-Creative-Approved", "").strip().lower()
+    creative_approved = creative_hdr in {"1", "true", "yes"} if creative_hdr else None
     req = AdSpendRequest(
         client_id=client_id,
         method=request.headers.get("X-Http-Method", "POST"),
@@ -83,6 +85,7 @@ async def guard_spend(client_id: str, request: Request) -> dict[str, Any] | Resp
         provider=str(provider),
         campaign_id=str(campaign_id) if campaign_id else None,
         idempotency_key=request.headers.get("X-Idempotency-Key"),
+        creative_approved=creative_approved,
     )
     resp = await state.gateway.evaluate(req)
     payload = {

@@ -24,7 +24,7 @@ PRODUCT = "webhook-mesh"
 
 
 def _run_serve(argv: list[str]) -> None:
-    parser = argparse.ArgumentParser(description="Inst++ Webhook Idempotency Mesh")
+    parser = argparse.ArgumentParser(description="Webhook Idempotency Mesh")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8787)
     parser.add_argument("--wal", default=None, help="WAL path (or INST_WAL_PATH env)")

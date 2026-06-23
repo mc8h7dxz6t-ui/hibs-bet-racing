@@ -1,4 +1,4 @@
-"""Shared CLI helpers for Inst++ product gold standard."""
+"""Shared CLI helpers for institutional product gold standard."""
 
 from __future__ import annotations
 

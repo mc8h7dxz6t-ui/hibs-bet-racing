@@ -1,6 +1,6 @@
 # Compliance Logger (`compliance_log`)
 
-Tamper-proof decision audit on Inst++ spine.
+Tamper-proof decision audit on institutional spine.
 
 ## Architecture
 
@@ -37,4 +37,4 @@ compliance-log verify-bundle --tarball audit_bundle.tar
 
 ## Gold standard
 
-`docs/INST_PLUS_GOLD_STANDARD.md`
+`docs/INSTITUTIONAL_STANDARD.md`

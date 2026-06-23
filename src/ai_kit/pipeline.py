@@ -10,6 +10,7 @@ from typing import Any, Callable
 
 from ai_kit.limits import ProviderRateLimiter
 from inst_spine.clocks import LamportClock, utc_now_iso
+from inst_spine.contracts import RunManifest, stable_id
 from inst_spine.errors import RateLimitError
 from inst_spine.ledger import AppendOnlyLedger
 
@@ -86,9 +87,19 @@ class AgentLoop:
             conn.commit()
         cp = AgentCheckpoint(step=step, lamport_seq=lamport, state=state, wall_time_utc=wall)
         if self.trace:
+            manifest = RunManifest(
+                manifest_id=stable_id(self.agent_id, "step", str(step)),
+                run_kind="ai_kit_checkpoint",
+                config_hash=stable_id(self.agent_id, "config", "v1"),
+                writer_id=self.agent_id,
+                created_at=wall,
+                extras={"step": step},
+            )
             self.trace.append(
                 event_type="agent_checkpoint",
                 payload={"agent_id": self.agent_id, "step": step, "state_keys": sorted(state.keys())},
+                manifest_id=manifest.manifest_id,
+                metadata={"manifest_hash": manifest.manifest_hash},
             )
         return cp
 

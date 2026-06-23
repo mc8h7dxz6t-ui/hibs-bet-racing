@@ -1,8 +1,8 @@
 # Proxy-Risk Gateway — Sales & Technical Specification
 
-**Product:** Inst++ #2 · Proxy-Risk Gateway  
+**Product:** Proxy-Risk Gateway (#2)  
 **SKU:** `proxy-risk`  
-**Version:** Gold standard (70+ Inst++ tests, live httpx forward, workflow UI)  
+**Version:** Gold standard (full institutional test suite, live httpx forward, workflow UI)  
 **Audience:** Fintech ops, quant infra, platform engineering, procurement, auditors
 
 ---

@@ -1,4 +1,4 @@
-"""Inst++ Workflow UI — FastAPI backend for Compliance + Proxy-Risk."""
+"""Workflow UI — FastAPI backend for Compliance + Proxy-Risk."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from proxy_risk.router import ProxyRequest, ProxyRiskGateway
 STATIC_DIR = Path(__file__).parent / "static"
 VALID_PRODUCTS = frozenset({"compliance", "proxy", "both"})
 
-app = FastAPI(title="Inst++ Workflow Console", version="1.0.0")
+app = FastAPI(title="Workflow Console", version="1.0.0")
 
 
 def normalize_product(value: str) -> str:
@@ -134,7 +134,7 @@ async def workflow_config() -> dict[str, Any]:
     titles = {
         "compliance": "Compliance Logger — Workflow Console",
         "proxy": "Proxy-Risk Gateway — Workflow Console",
-        "both": "Inst++ Workflow Console",
+        "both": "Workflow Console",
     }
     badges = {
         "compliance": "Compliance Logger",

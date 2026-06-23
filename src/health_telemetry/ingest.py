@@ -1,4 +1,4 @@
-"""Health Telemetry Recorder — batch ingest on Inst++ spine."""
+"""Health Telemetry Recorder — batch ingest on institutional spine."""
 
 from __future__ import annotations
 

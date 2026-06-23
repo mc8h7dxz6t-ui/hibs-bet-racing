@@ -1,4 +1,4 @@
-"""Typed Inst++ errors — structured CLI envelopes, fail-closed semantics."""
+"""Typed institutional errors — structured CLI envelopes, fail-closed semantics."""
 
 from __future__ import annotations
 

@@ -7,7 +7,9 @@ import json
 import sys
 from pathlib import Path
 
+from altdata.ladders import default_fetchers, fetch_url_context, http_fetchers
 from altdata.poll import poll_once
+from altdata.resolver import FieldResolver
 from inst_spine.cli_util import run_cli
 from inst_spine.errors import CoverageError
 from inst_spine.product_cli import (
@@ -26,9 +28,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p_poll = sub.add_parser("poll", help="Run one poll cycle")
     p_poll.add_argument("--feed", default="demo_feed")
-    p_poll.add_argument("--ctx", default="{}", help="Context JSON for fetchers")
+    p_poll.add_argument("--url", default=None, help="HTTP(S) URL to fetch (enables live fetchers)")
+    p_poll.add_argument("--timeout", type=float, default=10.0)
     p_poll.add_argument("--database", type=Path, default=Path("data/altdata_demo.sqlite"))
     p_poll.add_argument("--min-coverage", type=float, default=85.0)
+    p_poll.add_argument("--ctx", default="{}", help="Extra context JSON merged after URL fetch")
 
     p_check = sub.add_parser("check", help="F1–F9 institutional check + coverage floor")
     p_check.add_argument("--database", type=Path, required=True)
@@ -48,7 +52,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "poll":
         ctx = json.loads(args.ctx)
-        result = poll_once(feed_id=args.feed, ctx=ctx, database=args.database)
+        fetchers = default_fetchers()
+        if args.url:
+            ctx = {**fetch_url_context(args.url, timeout=args.timeout), **ctx}
+            fetchers = http_fetchers()
+        result = poll_once(
+            feed_id=args.feed,
+            ctx=ctx,
+            database=args.database,
+            resolver=FieldResolver(fetchers=fetchers),
+        )
         print_json({**result.__dict__, "product": PRODUCT})
         if result.coverage_pct < args.min_coverage:
             raise CoverageError(

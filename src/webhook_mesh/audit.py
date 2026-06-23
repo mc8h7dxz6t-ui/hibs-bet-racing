@@ -11,7 +11,7 @@ from inst_spine.ledger import AppendOnlyLedger
 
 
 def ledger_path() -> Path:
-    return Path(os.getenv("WEBHOOK_MESH_LEDGER", "data/webhook_mesh.sqlite"))
+    return Path(os.getenv("WEBHOOK_MESH_LEDGER", "data/webhook_mesh_ledger.sqlite"))
 
 
 def append_ingress_event(
@@ -27,8 +27,7 @@ def append_ingress_event(
 ) -> None:
     """Cold-path genesis ledger append (every accepted ingress)."""
     db = ledger_path()
-    ledger = AppendOnlyLedger(db, writer_id="webhook-mesh", async_writes=True)
-    ledger.start_async_writer()
+    ledger = AppendOnlyLedger(db, writer_id="webhook-mesh", async_writes=False)
     payload: dict[str, Any] = {
         "manifest_id": manifest_id,
         "client_id": client_id,
@@ -45,4 +44,3 @@ def append_ingress_event(
         payload=payload,
         manifest_id=manifest_id,
     )
-    ledger.stop_async_writer(flush=True)

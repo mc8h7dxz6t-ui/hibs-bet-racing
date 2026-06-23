@@ -1,6 +1,8 @@
-# Inst++ Gold Standard — All 7 Products
+# Institutional Gold Standard — All 7 Products
 
-**Purpose:** What **Institutional++** grade means for every Inst++ SKU, and how we prove each dimension.
+**Purpose:** The bar every infrastructure product in this portfolio strives to meet — not a customer-facing brand name.
+
+**Internal spine:** `inst_spine` (genesis WAL, F-gates, deterministic export).
 
 ---
 
@@ -12,24 +14,24 @@
 | **Failure handling** | `InstError` + `run_cli()` envelope | CLI stderr JSON on error |
 | **Proof** | `export` + offline `verify-bundle` | `*-bundle verify-bundle --tarball …` |
 | **Demoability** | One script, &lt;60s | `scripts/demo_<product>.sh` |
-| **Diligence** | README + buyer/spec doc | `docs/*_BUYER.md` or sales tech spec |
+| **Diligence** | README + buyer doc | `docs/*_BUYER.md` |
 | **Strategic legibility** | One job + explicit non-goals | Deep dive per product |
 
 ---
 
 ## Product readiness matrix
 
-| # | Product | CLI | verify-bundle | F1–F9 check | run_cli | Demo script | Grade |
-|---|---------|-----|---------------|-------------|---------|-------------|-------|
-| 1 | Compliance Logger | ✅ | ✅ | ✅ | ✅ | `demo_compliance_logger.sh` | **Gold** |
-| 2 | Proxy-Risk | ✅ | ✅ | ✅ | ✅ | `demo_proxy_risk.sh` | **Gold** |
-| 3 | Alt-Data | ✅ | ✅ | ✅ | ✅ | `demo_altdata.sh` | **P1+** |
-| 4 | AI Kit | ✅ | ✅ | ✅ | ✅ | `demo_ai_kit.sh` | **P1+** |
-| 5 | Webhook Mesh | ✅ | ✅ | ✅ | ✅ | `demo_webhook_mesh.sh` | **P1+** |
-| 6 | Ad Guard | ✅ | ✅ | ✅ | ✅ | `demo_ad_guard.sh` | **P1+** |
-| 7 | Health Telemetry | ✅ | ✅ | ✅ | ✅ | `demo_health_telemetry.sh` | **Scaffold** |
+| # | Product | CLI | verify-bundle | F1–F9 check | run_cli | Demo script | Buyer doc | Grade |
+|---|---------|-----|---------------|-------------|---------|-------------|-----------|-------|
+| 1 | Compliance Logger | ✅ | ✅ | ✅ | ✅ | `demo_compliance_logger.sh` | `COMPLIANCE_LOGGER_BUYER.md` | **Gold** |
+| 2 | Proxy-Risk | ✅ | ✅ | ✅ | ✅ | `demo_proxy_risk.sh` | `PROXY_RISK_BUYER.md` | **Gold** |
+| 3 | Alt-Data | ✅ | ✅ | ✅ | ✅ | `demo_altdata.sh` | `ALTDATA_BUYER.md` | **Gold** |
+| 4 | AI Kit | ✅ | ✅ | ✅ | ✅ | `demo_ai_kit.sh` | `AI_KIT_BUYER.md` | **Gold** |
+| 5 | Webhook Mesh | ✅ | ✅ | ✅ | ✅ | `demo_webhook_mesh.sh` | `WEBHOOK_MESH_BUYER.md` | **Gold** |
+| 6 | Ad Guard | ✅ | ✅ | ✅ | ✅ | `demo_ad_guard.sh` | `AD_GUARD_BUYER.md` | **Gold** |
+| 7 | Health Telemetry | ✅ | ✅ | ✅ | ✅ | `demo_health_telemetry.sh` | `HEALTH_TELEMETRY_BUYER.md` | **Gold** |
 
-**Rigorous E2E log:** `scripts/instpp_rigorous_test.sh` — products #1–#2 (extend to #5–#6 next).
+**Rigorous E2E log:** `scripts/instpp_rigorous_test.sh` — all 7 products.
 
 ---
 
@@ -48,7 +50,7 @@
 ### #3 Alt-Data
 - `CoverageError` below floor
 - Field ladder + rescue metadata in ledger
-- Export aborts on F-gate fail
+- HTTP `--url` fetch + export aborts on F-gate fail
 
 ### #4 AI Kit
 - `RateLimitError` typed (not traceback)
@@ -59,16 +61,18 @@
 - HMAC fail → 401
 - Idempotency fail-closed on Redis error
 - WAL before HTTP 200; genesis ledger cold path
+- Stripe ingress route
 
 ### #6 Ad Guard
 - All approve/reject/kill logged
 - Redis idempotency (not process-local only)
 - Live upstream fail-closed
+- Optional creative approval header
 
 ### #7 Health Telemetry
 - Batch schema validation
 - Genesis chain per device batch
-- Export + verify-bundle (scaffold)
+- Export + verify-bundle + HIPAA diligence pack
 
 ---
 
@@ -77,18 +81,19 @@
 ```bash
 pip install -e ".[dev,instpp]"
 ./scripts/instpp_smoke_test.sh
-./scripts/demo_instpp.sh                    # #1 + #2
-./scripts/demo_altdata.sh                   # #3
-./scripts/demo_ai_kit.sh                    # #4
-./scripts/demo_webhook_mesh.sh                # #5
-./scripts/demo_ad_guard.sh                  # #6
-./scripts/demo_health_telemetry.sh          # #7
+./scripts/instpp_rigorous_test.sh          # all 7 products + log
+./scripts/demo_instpp.sh                   # #1 + #2
+./scripts/demo_altdata.sh                  # #3
+./scripts/demo_ai_kit.sh                   # #4
+./scripts/demo_webhook_mesh.sh             # #5
+./scripts/demo_ad_guard.sh                 # #6
+./scripts/demo_health_telemetry.sh         # #7
 ```
 
 ---
 
-## Related
+## Related documents
 
-- `docs/INST_PLUS_DEEP_DIVE_ALL_7.md` — full tech edge per product
-- `docs/INST_PLUS_PRE_REV_VALUATION.md` — IP valuation
-- `docs/INST_PLUS_TEST_AND_DEMO.md` — command playbook
+- `docs/INSTITUTIONAL_STANDARD.md` — portfolio overview
+- `docs/INST_PLUS_DEEP_DIVE_ALL_7.md` — technical deep dive (all 7)
+- `docs/INST_PLUS_PRE_REV_VALUATION.md` — IP valuation ranges

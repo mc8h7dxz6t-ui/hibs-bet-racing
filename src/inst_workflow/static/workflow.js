@@ -151,7 +151,7 @@
   function applyProductConfig(cfg) {
     const title = document.getElementById("header-title");
     const badge = document.getElementById("header-badge");
-    if (title) title.textContent = cfg.title || "Inst++ Workflow Console";
+    if (title) title.textContent = cfg.title || "Workflow Console";
     if (badge) badge.textContent = cfg.badge || "";
 
     const tabs = cfg.tabs || {};

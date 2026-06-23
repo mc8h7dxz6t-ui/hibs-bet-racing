@@ -1,4 +1,4 @@
-"""Inst++ Workflow UI CLI."""
+"""Workflow UI CLI."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def _use_uvloop() -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="inst-workflow",
-        description="Inst++ guided workflow console — Compliance Logger + Proxy-Risk",
+        description="Guided workflow console — Compliance Logger + Proxy-Risk",
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -72,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         label = {
             "compliance": "Compliance Logger",
             "proxy": "Proxy-Risk Gateway",
-            "both": "Inst++ (Compliance + Proxy-Risk)",
+            "both": "Compliance Logger + Proxy-Risk",
         }[serve.state.product]
         print(f"{label} Workflow Console → http://{args.host}:{args.port}")
         uvicorn.run(serve.app, host=args.host, port=args.port, log_level="info")

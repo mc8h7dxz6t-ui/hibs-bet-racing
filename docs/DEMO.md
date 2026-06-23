@@ -1,4 +1,4 @@
-# Inst++ Demo — Compliance Logger + Proxy-Risk
+# Portfolio Demo — Compliance Logger + Proxy-Risk
 
 **One command** runs both gold-standard product demos and writes proof artifacts to `data/demo/`.
 

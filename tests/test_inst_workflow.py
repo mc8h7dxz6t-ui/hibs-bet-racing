@@ -1,4 +1,4 @@
-"""Inst++ workflow UI — FastAPI routes."""
+"""Workflow UI — FastAPI routes."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def test_index_serves_html(workflow_client):
     client, *_ = workflow_client
     r = client.get("/")
     assert r.status_code == 200
-    assert "Inst++ Workflow Console" in r.text
+    assert "Workflow Console" in r.text
 
 
 def test_static_assets(workflow_client):

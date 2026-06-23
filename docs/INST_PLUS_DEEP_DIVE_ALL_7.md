@@ -1,15 +1,15 @@
-# Inst++ Deep Dive — All 7 Products (Institutional++ Grade)
+# Institutional Deep Dive — All 7 Products
 
 **Audience:** Technical buyers, auditors, procurement, enterprise architects  
-**Standard:** Institutional++ — fail-closed, offline verify-bundle, F1–F9 gates, typed errors, one-command demo  
+**Standard:** Institutional gold standard — fail-closed, offline verify-bundle, F1–F9 gates, typed errors, one-command demo  
 **Spine:** `inst_spine` — genesis WAL, Lamport clocks, deterministic export, Redis fail-closed backends  
-**Proof:** `./scripts/instpp_smoke_test.sh` · `./scripts/instpp_rigorous_test.sh` (products #1–#2) · per-product `demo_*.sh`
+**Proof:** `./scripts/instpp_smoke_test.sh` · `./scripts/instpp_rigorous_test.sh` (all 7 products) · per-product `demo_*.sh`
 
 ---
 
-## Institutional++ grade definition
+## Institutional grade definition
 
-| Dimension | Institutional++ requirement |
+| Dimension | Institutional requirement |
 |-----------|----------------------------|
 | **Correctness** | Fail-closed; no silent drops; every gate outcome logged where applicable |
 | **Proof** | `export` → deterministic tar + SHA256 → offline `verify-bundle` without vendor |
@@ -21,17 +21,17 @@
 
 ### Portfolio scorecard (June 2026)
 
-| # | Product | Institutional++ | Tech edge headline | Pre-rev IP |
+| # | Product | Grade | Tech edge headline | Pre-rev IP |
 |---|---------|-----------------|-------------------|------------|
 | 1 | Compliance Logger | **✅ Gold** | Offline decision proof | £25k–£75k |
 | 2 | Proxy-Risk | **✅ Gold** | Fail-closed outbound + shadow | £30k–£90k |
-| 3 | Alt-Data | **✅ P1+** | Coverage ladder + F7 + export | £20k–£50k |
-| 4 | AI Kit | **✅ P1+** | Lamport checkpoints + trace export | £10k–£30k |
-| 5 | Webhook Mesh | **✅ P1+** | WAL-before-ack + genesis ledger | £15k–£40k |
-| 6 | Ad Guard | **✅ P1+** | Spend Z-score kill + full gate log | £15k–£45k |
-| 7 | Health Telemetry | **✅ Scaffold** | Batch Lamport ingest + export | £30k–£80k |
+| 3 | Alt-Data | **✅ Gold** | Coverage ladder + F7 + export | £20k–£50k |
+| 4 | AI Kit | **✅ Gold** | Lamport checkpoints + trace export | £10k–£30k |
+| 5 | Webhook Mesh | **✅ Gold** | WAL-before-ack + genesis ledger | £15k–£40k |
+| 6 | Ad Guard | **✅ Gold** | Spend Z-score kill + full gate log | £15k–£45k |
+| 7 | Health Telemetry | **✅ Gold** | Batch Lamport ingest + export | £30k–£80k |
 
-**Combined Inst++ ecosystem (one spine):** £60k–£130k pre-rev · £250k–£350k with £50k+ ARR
+**Combined portfolio ecosystem (one spine):** £60k–£130k pre-rev · £250k–£350k with £50k+ ARR
 
 ---
 
@@ -55,7 +55,7 @@ Tamper-proof audit trail for regulated decisions — prove what was decided, whe
 snapshot + outcome → WAL fsync → hash chain → F1–F9 → export → verify-bundle
 ```
 
-## Institutional++ guarantees
+## Institutional guarantees
 - Export **aborts** if chain, genesis, or F1–F9 fails
 - F7 source coverage from real snapshot field completeness
 - `verify-bundle` replays without live database
@@ -95,7 +95,7 @@ circuit → schema → token bucket → idempotency → z-score → [shadow | li
          ↓ every APPROVE / REJECT / KILL logged
 ```
 
-## Institutional++ guarantees
+## Institutional guarantees
 - WAL sync **before** upstream in live mode
 - Redis token bucket + idempotency: backend down → **reject**
 - `INST_CIRCUIT_KILL=1` emergency sever
@@ -135,7 +135,7 @@ poll → field ladder (primary → fallback → structural rescue) → coverage 
                                                               → F1–F9 check → export
 ```
 
-## Institutional++ upgrades (this release)
+## Gold standard (this release)
 - `check` · `export` · `verify-bundle` CLI (parity with #1/#2)
 - `run_cli()` + `CoverageError` on sub-floor coverage
 - `scripts/demo_altdata.sh`
@@ -173,7 +173,7 @@ Ship agentic AI features without rate-limit explosions, lost state, or unvalidat
 rate limit → step_fn → validate_with_retry → Lamport checkpoint → trace ledger → export
 ```
 
-## Institutional++ upgrades (this release)
+## Gold standard (this release)
 - `validate_with_retry` integrated in `ai-kit run`
 - Trace ledger default path + `check` / `export` / `verify-bundle`
 - `RateLimitError` (not raw RuntimeError)
@@ -216,7 +216,7 @@ POST /v1/ingress/{tenant}
   → cold path: genesis ledger append (WEBHOOK_MESH_LEDGER)
 ```
 
-## Institutional++ upgrades (this release)
+## Gold standard (this release)
 - Cold-path `append_ingress_event` → genesis ledger
 - `check` · `export` · `verify-bundle` CLI
 - `scripts/demo_webhook_mesh.sh`
@@ -255,7 +255,7 @@ Guard marketing API spend — Z-score kill on anomalous velocity, per-campaign b
 NeMo (creative) → Ad Guard (spend) → DSP → DV/IAS (placement)
 ```
 
-## Institutional++ upgrades (this release)
+## Gold standard (this release)
 - **All gate outcomes logged** (circuit, schema, bucket, idempotency, kill)
 - Redis `IdempotencyBackend` (fail-closed multi-instance)
 - Live `httpx` forward via `AD_GUARD_UPSTREAM_BASE`
@@ -296,7 +296,7 @@ High-frequency device batches → Lamport-ordered sealed log → auditor export 
 POST batch → schema validate → ledger append (telemetry_batch) → F1–F9 → export
 ```
 
-## Institutional++ status (scaffold)
+## Gold standard
 - `health-telemetry ingest|check|export|verify-bundle`
 - `scripts/demo_health_telemetry.sh`
 - Fork of Compliance Logger ingest pattern
@@ -341,7 +341,7 @@ flowchart TB
     DVIAS[DV / IAS pre-bid]
   end
 
-  subgraph inst [Inst++ products]
+  subgraph inst [Portfolio products]
     CL[1 Compliance Logger]
     PR[2 Proxy-Risk]
     AD[3 Alt-Data]
@@ -368,7 +368,7 @@ flowchart TB
 pip install -e ".[dev,instpp]"
 ./scripts/instpp_smoke_test.sh
 
-# Gold standard (#1 + #2)
+# All 7 products
 ./scripts/instpp_rigorous_test.sh
 ./scripts/demo_instpp.sh
 
@@ -392,7 +392,7 @@ pip install -e ".[dev,instpp]"
 | AI agent rate limits + checkpoints | #4 ✅ |
 | Webhook double-billing protection | #5 ✅ |
 | Marketing API spend anomaly | #6 ✅ |
-| Device telemetry tamper evidence | #7 ✅ (scaffold) |
+| Device telemetry tamper evidence | #7 ✅ |
 | GRC case management UI | ❌ integrate export |
 | SOC 2 Type II SaaS | ❌ buyer VPC deploy |
 | Sub-5ms RTB | ❌ |

@@ -39,4 +39,4 @@ proxy-risk serve --port 18443
 
 ## Gold standard
 
-`docs/INST_PLUS_GOLD_STANDARD.md`
+`docs/INSTITUTIONAL_STANDARD.md`

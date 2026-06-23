@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Inst++ buyer demo — Compliance Logger (#1) + Proxy-Risk Gateway (#2) in one command.
+# Institutional portfolio demo — Compliance Logger (#1) + Proxy-Risk Gateway (#2) in one command.
 #
 # Usage:
 #   ./scripts/demo_instpp.sh              # full demo (includes live httpbin forward)
@@ -23,7 +23,7 @@ banner() {
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   echo "Usage: ./scripts/demo_instpp.sh [--clean]"
   echo ""
-  echo "  Runs both Inst++ gold-standard demos:"
+  echo "  Runs both gold-standard demos:"
   echo "    1. Compliance Logger  — ingest → F1–F9 → export → verify-bundle"
   echo "    2. Proxy-Risk       — shadow → live forward → export → verify-bundle"
   echo ""
@@ -42,7 +42,7 @@ fi
 
 mkdir -p data/demo
 
-banner "Inst++ DEMO — install dependencies"
+banner "PORTFOLIO DEMO — install dependencies"
 pip install -e ".[dev,instpp]" -q
 
 banner "1/2 — Compliance Logger"

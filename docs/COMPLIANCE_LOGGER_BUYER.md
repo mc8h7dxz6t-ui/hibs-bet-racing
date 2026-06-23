@@ -6,7 +6,7 @@
 
 ## Buyer
 
-| Segment | Pain | Inst++ answer |
+| Segment | Pain | Institutional answer |
 |---------|------|---------------|
 | Fintech / payments ops | “Prove what the system decided on date X” | Genesis-anchored hash chain + export bundle |
 | Legal / risk / compliance | CSV exports are editable | Deterministic tar + SHA256 sidecar |

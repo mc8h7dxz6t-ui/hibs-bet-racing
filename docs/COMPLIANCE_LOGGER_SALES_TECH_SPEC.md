@@ -1,8 +1,8 @@
 # Compliance Logger — Sales & Technical Specification
 
-**Product:** Inst++ #1 · Compliance Logger  
+**Product:** Compliance Logger (#1)  
 **SKU:** `compliance-log`  
-**Version:** Gold standard (70+ Inst++ tests, offline verify-bundle, workflow UI)  
+**Version:** Gold standard (full institutional test suite, offline verify-bundle, workflow UI)  
 **Audience:** Legal, risk, governance, procurement, auditors, enterprise architects
 
 ---

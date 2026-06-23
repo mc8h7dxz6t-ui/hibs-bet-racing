@@ -31,7 +31,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("webhook_mesh.ingress")
 
-app = FastAPI(title="Inst++ Webhook Idempotency Mesh Engine")
+app = FastAPI(title="Webhook Idempotency Mesh Engine")
 
 
 class RuntimeState:
@@ -95,8 +95,37 @@ async def handle_webhook_ingress(
     client_id: str,
     request: Request,
 ) -> dict[str, Any] | Response:
-    provider_sig = request.headers.get("X-Provider-Signature", "")
-    payload_id = request.headers.get("X-Webhook-Id", "")
+    return await _handle_ingress(
+        client_id,
+        request,
+        signature_header="X-Provider-Signature",
+        webhook_id_header="X-Webhook-Id",
+    )
+
+
+@app.post("/v1/ingress/stripe/{client_id}", status_code=status.HTTP_200_OK, response_model=None)
+async def handle_stripe_ingress(
+    client_id: str,
+    request: Request,
+) -> dict[str, Any] | Response:
+    """Stripe-compatible route — maps Stripe-Signature + event id headers."""
+    return await _handle_ingress(
+        client_id,
+        request,
+        signature_header="Stripe-Signature",
+        webhook_id_header="Stripe-Event-Id",
+    )
+
+
+async def _handle_ingress(
+    client_id: str,
+    request: Request,
+    *,
+    signature_header: str,
+    webhook_id_header: str,
+) -> dict[str, Any] | Response:
+    provider_sig = request.headers.get(signature_header, "")
+    payload_id = request.headers.get(webhook_id_header, "") or request.headers.get("X-Webhook-Id", "")
     target_url = request.headers.get("X-Target-Forward-Url", "")
 
     if not payload_id or not target_url:

@@ -10,6 +10,7 @@ from typing import Any
 
 import httpx
 
+from inst_spine.contracts import stable_id
 from inst_spine.gates.circuit import CircuitBreaker, CredentialVault
 from inst_spine.ledger import AppendOnlyLedger
 from inst_spine.rates import (
@@ -38,6 +39,7 @@ class AdSpendRequest:
     provider: str = "generic"
     campaign_id: str | None = None
     idempotency_key: str | None = None
+    creative_approved: bool | None = None
 
 
 class AdGuardGateway:
@@ -97,6 +99,16 @@ class AdGuardGateway:
 
         if not req.client_id or not req.method or not req.path:
             return await self._finish(req, "", GateDecision.REJECT, "schema: missing required fields")
+
+        require_creative = os.getenv("AD_GUARD_REQUIRE_CREATIVE_APPROVAL", "0") == "1"
+        approved = req.creative_approved
+        if require_creative and approved is not True:
+            return await self._finish(
+                req,
+                req.campaign_id or "",
+                GateDecision.REJECT,
+                "creative: X-Creative-Approved required",
+            )
 
         campaign_id, bid_amount, spend_delta = extract_spend_metrics(req.body, provider=req.provider)
         if req.campaign_id:
@@ -248,6 +260,17 @@ class AdGuardGateway:
             payload["upstream_body"] = upstream_body
 
         def _append() -> None:
-            self.ledger.append(event_type="ad_spend_request", payload=payload)
+            manifest_id = stable_id(
+                req.client_id,
+                campaign_id,
+                req.idempotency_key or req.path,
+                decision.value,
+                detail,
+            )
+            self.ledger.append(
+                event_type="ad_spend_request",
+                payload=payload,
+                manifest_id=manifest_id,
+            )
 
         await asyncio.to_thread(_append)

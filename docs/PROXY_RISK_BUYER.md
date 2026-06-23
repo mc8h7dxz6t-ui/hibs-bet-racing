@@ -6,7 +6,7 @@
 
 ## Buyer
 
-| Segment | Pain | Inst++ answer |
+| Segment | Pain | Institutional answer |
 |---------|------|---------------|
 | Fintech / broker ops | Runaway API calls after bug or fat finger | Token bucket + Z-score kill switch |
 | Quant / trading infra | Need shadow mode before live capital | Shadow default; `--live` when ready |
