@@ -2,6 +2,8 @@
 
 **One job:** Institutional outbound API firewall — rate limit, dedupe, drift kill, and cryptographic audit before traffic hits upstream brokers or payment rails.
 
+**Pitch:** *Control what leaves your boundary — and prove every gate decision.*
+
 ---
 
 ## Buyer
@@ -79,3 +81,14 @@ proxy-risk evaluate --live --path /orders --body '{"symbol":"AAPL"}'
 
 See `src/proxy_risk/README.md` for architecture.  
 **Full spec:** `docs/PROXY_RISK_SALES_TECH_SPEC.md`
+
+---
+
+## Next step
+
+| Step | Action |
+|------|--------|
+| 1 | `./scripts/demo_proxy_risk.sh` (60s) |
+| 2 | `proxy-risk verify-bundle --tarball ./proxy_bundle.tar` |
+| 3 | RFP depth → `docs/PROXY_RISK_SALES_TECH_SPEC.md` |
+| 4 | Portfolio pricing → `docs/PORTFOLIO_SALES_SHEET.md` |

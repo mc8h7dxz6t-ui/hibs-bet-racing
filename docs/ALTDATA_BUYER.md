@@ -2,6 +2,8 @@
 
 **One job:** One clean telemetry feed with ≥85% field coverage, structural fallback when primary fetchers break, and cryptographic proof per poll cycle.
 
+**Pitch:** *Know what your feed contained on date X — and fail closed when coverage drops.*
+
 ---
 
 ## Buyer
@@ -64,4 +66,16 @@ altdata poll --url https://httpbin.org/json --feed live_feed --database ./live.s
 | `export` | Deterministic audit bundle |
 | `verify-bundle` | Offline auditor replay |
 
-See `src/altdata/README.md` for architecture.
+See `src/altdata/README.md` for architecture.  
+**Full spec:** `docs/ALTDATA_SALES_TECH_SPEC.md`
+
+---
+
+## Next step
+
+| Step | Action |
+|------|--------|
+| 1 | `./scripts/demo_altdata.sh` (60s) |
+| 2 | `altdata verify-bundle --tarball ./altdata_bundle.tar` |
+| 3 | RFP depth → `docs/ALTDATA_SALES_TECH_SPEC.md` |
+| 4 | Portfolio pricing → `docs/PORTFOLIO_SALES_SHEET.md` |

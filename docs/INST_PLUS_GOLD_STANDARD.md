@@ -14,22 +14,22 @@
 | **Failure handling** | `InstError` + `run_cli()` envelope | CLI stderr JSON on error |
 | **Proof** | `export` + offline `verify-bundle` | `*-bundle verify-bundle --tarball …` |
 | **Demoability** | One script, &lt;60s | `scripts/demo_<product>.sh` |
-| **Diligence** | README + buyer doc | `docs/*_BUYER.md` |
+| **Diligence** | README + buyer doc + sales spec | `docs/*_BUYER.md` + `docs/*_SALES_TECH_SPEC.md` |
 | **Strategic legibility** | One job + explicit non-goals | Deep dive per product |
 
 ---
 
 ## Product readiness matrix
 
-| # | Product | CLI | verify-bundle | F1–F9 check | run_cli | Demo script | Buyer doc | Grade |
-|---|---------|-----|---------------|-------------|---------|-------------|-----------|-------|
-| 1 | Compliance Logger | ✅ | ✅ | ✅ | ✅ | `demo_compliance_logger.sh` | `COMPLIANCE_LOGGER_BUYER.md` | **Gold** |
-| 2 | Proxy-Risk | ✅ | ✅ | ✅ | ✅ | `demo_proxy_risk.sh` | `PROXY_RISK_BUYER.md` | **Gold** |
-| 3 | Alt-Data | ✅ | ✅ | ✅ | ✅ | `demo_altdata.sh` | `ALTDATA_BUYER.md` | **Gold** |
-| 4 | AI Kit | ✅ | ✅ | ✅ | ✅ | `demo_ai_kit.sh` | `AI_KIT_BUYER.md` | **Gold** |
-| 5 | Webhook Mesh | ✅ | ✅ | ✅ | ✅ | `demo_webhook_mesh.sh` | `WEBHOOK_MESH_BUYER.md` | **Gold** |
-| 6 | Ad Guard | ✅ | ✅ | ✅ | ✅ | `demo_ad_guard.sh` | `AD_GUARD_BUYER.md` | **Gold** |
-| 7 | Health Telemetry | ✅ | ✅ | ✅ | ✅ | `demo_health_telemetry.sh` | `HEALTH_TELEMETRY_BUYER.md` | **Gold** |
+| # | Product | CLI | verify-bundle | F1–F9 check | run_cli | Demo script | Buyer doc | Sales spec | Grade |
+|---|---------|-----|---------------|-------------|---------|-------------|-----------|------------|-------|
+| 1 | Compliance Logger | ✅ | ✅ | ✅ | ✅ | `demo_compliance_logger.sh` | `COMPLIANCE_LOGGER_BUYER.md` | `COMPLIANCE_LOGGER_SALES_TECH_SPEC.md` | **Gold** |
+| 2 | Proxy-Risk | ✅ | ✅ | ✅ | ✅ | `demo_proxy_risk.sh` | `PROXY_RISK_BUYER.md` | `PROXY_RISK_SALES_TECH_SPEC.md` | **Gold** |
+| 3 | Alt-Data | ✅ | ✅ | ✅ | ✅ | `demo_altdata.sh` | `ALTDATA_BUYER.md` | `ALTDATA_SALES_TECH_SPEC.md` | **Gold** |
+| 4 | AI Kit | ✅ | ✅ | ✅ | ✅ | `demo_ai_kit.sh` | `AI_KIT_BUYER.md` | `AI_KIT_SALES_TECH_SPEC.md` | **Gold** |
+| 5 | Webhook Mesh | ✅ | ✅ | ✅ | ✅ | `demo_webhook_mesh.sh` | `WEBHOOK_MESH_BUYER.md` | `WEBHOOK_MESH_SALES_TECH_SPEC.md` | **Gold** |
+| 6 | Ad Guard | ✅ | ✅ | ✅ | ✅ | `demo_ad_guard.sh` | `AD_GUARD_BUYER.md` | `AD_GUARD_SALES_TECH_SPEC.md` | **Gold** |
+| 7 | Health Telemetry | ✅ | ✅ | ✅ | ✅ | `demo_health_telemetry.sh` | `HEALTH_TELEMETRY_BUYER.md` | `HEALTH_TELEMETRY_SALES_TECH_SPEC.md` | **Gold** |
 
 **Rigorous E2E log:** `scripts/instpp_rigorous_test.sh` — all 7 products.
 
@@ -61,7 +61,7 @@
 - HMAC fail → 401
 - Idempotency fail-closed on Redis error
 - WAL before HTTP 200; genesis ledger cold path
-- Stripe ingress route
+- Stripe + Shopify ingress routes
 
 ### #6 Ad Guard
 - All approve/reject/kill logged
@@ -94,6 +94,8 @@ pip install -e ".[dev,instpp]"
 
 ## Related documents
 
+- `docs/PORTFOLIO_SALES_SHEET.md` — unified commercial sheet
+- `docs/BUYER_EVIDENCE_PACK.md` — procurement evidence index
 - `docs/INSTITUTIONAL_STANDARD.md` — portfolio overview
 - `docs/INST_PLUS_DEEP_DIVE_ALL_7.md` — technical deep dive (all 7)
 - `docs/INST_PLUS_PRE_REV_VALUATION.md` — IP valuation ranges

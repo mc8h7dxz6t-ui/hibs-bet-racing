@@ -295,5 +295,7 @@ proxy-risk verify-bundle --tarball data/demo/proxy_bundle.tar
 ## Related documents
 
 - `docs/PROXY_RISK_BUYER.md` — one-page buyer sheet  
+- `docs/PORTFOLIO_SALES_SHEET.md` — portfolio pricing matrix  
+- `docs/BUYER_EVIDENCE_PACK.md` — procurement dry-run  
 - `docs/INST_PLUS_PRE_REV_VALUATION.md` — IP valuation framework  
 - `docs/DEMO.md` — demo commands

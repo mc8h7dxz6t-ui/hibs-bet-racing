@@ -2,6 +2,8 @@
 
 **One job:** Guard marketing API spend — Z-score kill on anomalous velocity, per-campaign bucket, genesis audit before dollars leave the account.
 
+**Pitch:** *Stop runaway ad API spend at the boundary — with a gate log finance can verify offline.*
+
 ---
 
 ## Buyer
@@ -70,4 +72,16 @@ ad-guard serve --port 8788
 | `export` | Audit bundle |
 | `verify-bundle` | Offline auditor replay |
 
-See `src/ad_guard/README.md` for architecture.
+See `src/ad_guard/README.md` for architecture.  
+**Full spec:** `docs/AD_GUARD_SALES_TECH_SPEC.md`
+
+---
+
+## Next step
+
+| Step | Action |
+|------|--------|
+| 1 | `./scripts/demo_ad_guard.sh` (60s) |
+| 2 | `ad-guard verify-bundle --tarball ./ad_guard_bundle.tar` |
+| 3 | RFP depth → `docs/AD_GUARD_SALES_TECH_SPEC.md` |
+| 4 | Portfolio pricing → `docs/PORTFOLIO_SALES_SHEET.md` |

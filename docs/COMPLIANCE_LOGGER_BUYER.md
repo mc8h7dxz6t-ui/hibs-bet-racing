@@ -2,6 +2,8 @@
 
 **One job:** Tamper-proof audit trail for regulated decisions (approve/deny/escalate) with cryptographic proof an auditor can verify offline.
 
+**Pitch:** *Prove what your systems decided and when — with math, not slides.*
+
 ---
 
 ## Buyer
@@ -63,3 +65,14 @@ compliance-log verify-bundle --tarball ./audit_bundle.tar
 
 See `src/compliance_log/README.md` for architecture.  
 **Full spec:** `docs/COMPLIANCE_LOGGER_SALES_TECH_SPEC.md`
+
+---
+
+## Next step
+
+| Step | Action |
+|------|--------|
+| 1 | `./scripts/demo_compliance_logger.sh` (60s) |
+| 2 | `compliance-log verify-bundle --tarball ./compliance_bundle.tar` |
+| 3 | RFP depth → `docs/COMPLIANCE_LOGGER_SALES_TECH_SPEC.md` |
+| 4 | Portfolio pricing → `docs/PORTFOLIO_SALES_SHEET.md` |

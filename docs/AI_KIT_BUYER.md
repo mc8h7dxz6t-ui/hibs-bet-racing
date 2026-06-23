@@ -2,6 +2,8 @@
 
 **One job:** Ship agentic AI features without rate-limit explosions, lost state, or unvalidated JSON blobs — with a tamper-evident trace ledger.
 
+**Pitch:** *Run agents in production with checkpoints, rate limits, and an audit trail auditors can verify offline.*
+
 ---
 
 ## Buyer
@@ -60,4 +62,16 @@ ai-kit verify-bundle --tarball ./ai_kit_bundle.tar
 | `verify-bundle` | Offline auditor replay |
 | `validate-demo` | Structured output validation demo |
 
-See `src/ai_kit/README.md` for architecture.
+See `src/ai_kit/README.md` for architecture.  
+**Full spec:** `docs/AI_KIT_SALES_TECH_SPEC.md`
+
+---
+
+## Next step
+
+| Step | Action |
+|------|--------|
+| 1 | `./scripts/demo_ai_kit.sh` (60s) |
+| 2 | `ai-kit verify-bundle --tarball ./ai_kit_bundle.tar` |
+| 3 | RFP depth → `docs/AI_KIT_SALES_TECH_SPEC.md` |
+| 4 | Portfolio pricing → `docs/PORTFOLIO_SALES_SHEET.md` |
