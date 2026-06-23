@@ -42,6 +42,7 @@ ai-kit = "ai_kit.cli:main"
 inst-spine-export = "inst_spine.export_cli:main"
 webhook-mesh = "webhook_mesh.cli:main"
 ad-guard = "ad_guard.cli:main"
+health-telemetry = "health_telemetry.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

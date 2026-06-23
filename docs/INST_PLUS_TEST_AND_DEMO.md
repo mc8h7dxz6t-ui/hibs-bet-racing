@@ -32,10 +32,11 @@ Full integration test with timestamped log:
 |---|---------|-----------------|--------------|
 | 1 | Compliance Logger | **Yes** (gold standard) | `./scripts/demo_instpp.sh` |
 | 2 | Proxy-Risk Gateway | **Yes** (gold standard) | `./scripts/demo_instpp.sh` |
-| 3 | Alt-Data Extractor | Demo only | `altdata poll --url …` |
-| 4 | AI Kit | Demo only | `ai-kit run --max-tokens 1000` |
-| 5 | Webhook Mesh | **Yes** (P1) | `webhook-mesh serve` |
-| 6 | Ad Guard | **Yes** (P1) | `ad-guard serve` |
+| 3 | Alt-Data Extractor | **P1+** | `altdata poll --ctx '{...}'` · `./scripts/demo_altdata.sh` |
+| 4 | AI Kit | **P1+** | `ai-kit run --steps 3` · `./scripts/demo_ai_kit.sh` |
+| 5 | Webhook Mesh | **P1+** | `webhook-mesh serve` · `./scripts/demo_webhook_mesh.sh` |
+| 6 | Ad Guard | **P1+** | `ad-guard evaluate` · `./scripts/demo_ad_guard.sh` |
+| 7 | Health Telemetry | **Scaffold** | `health-telemetry ingest` · `./scripts/demo_health_telemetry.sh` |
 | 7 | Health Telemetry | Not started | — |
 
 **Sell now:** Products **1, 2, 5, 6**. Position **3, 4** as pilots. Do not advertise **7** without a buyer.

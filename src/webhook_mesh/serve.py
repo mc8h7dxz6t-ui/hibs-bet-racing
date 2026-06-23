@@ -15,6 +15,7 @@ from inst_spine.clocks import LamportClock
 from inst_spine.rates import IdempotencyBackend, RedisIdempotencyBackend, idempotency_backend_from_env
 from inst_spine.wal import WALWriter
 from webhook_mesh.hmac_verify import verify_provider_signature
+from webhook_mesh.audit import append_ingress_event
 from webhook_mesh.queue import (
     BackgroundDeliveryQueue,
     DeliveryManifest,
@@ -154,6 +155,20 @@ async def handle_webhook_ingress(
             dead_letter_dir=state.dead_letter_dir,
         )
     )
+
+    try:
+        append_ingress_event(
+            manifest_id=manifest_id,
+            client_id=client_id,
+            payload_id=payload_id,
+            target_url=target_url,
+            status="RECEIVED",
+            lamport=state.clock.value,
+            raw_bytes=raw_payload,
+            dispatch_mode=state.dispatch_mode,
+        )
+    except Exception:
+        logger.exception("ledger append failed (ingress already WAL-acked)")
 
     return {
         "status": "ACCEPTED",

@@ -10,6 +10,7 @@ from typing import Any, Callable
 
 from ai_kit.limits import ProviderRateLimiter
 from inst_spine.clocks import LamportClock, utc_now_iso
+from inst_spine.errors import RateLimitError
 from inst_spine.ledger import AppendOnlyLedger
 
 
@@ -110,8 +111,10 @@ class AgentLoop:
 
         for step in range(start_step, start_step + steps):
             if not self.limiter.acquire(provider, model):
-                raise RuntimeError(
-                    f"rate limit exceeded; retry in {self.limiter.wait_hint_seconds(provider, model):.2f}s"
+                wait = self.limiter.wait_hint_seconds(provider, model)
+                raise RateLimitError(
+                    f"rate limit exceeded for {provider}/{model}",
+                    retry_after_sec=wait,
                 )
             state = step_fn(step, state)
             self.save_checkpoint(step, state)

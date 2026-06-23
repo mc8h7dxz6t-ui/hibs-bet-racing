@@ -1,19 +1,74 @@
-# Inst++ Gold Standard — Compliance Logger & Proxy-Risk Gateway
+# Inst++ Gold Standard — All 7 Products
 
-**Purpose:** What “industry gold standard” means for Inst++ products #1 and #2, and how we prove each dimension.
+**Purpose:** What **Institutional++** grade means for every Inst++ SKU, and how we prove each dimension.
 
 ---
 
-## Six dimensions
+## Six dimensions (every product)
 
-| Dimension | What buyers expect | How we prove it |
-|-----------|-------------------|-----------------|
-| **Correctness** | Fail-closed; no silent drops | All gate outcomes logged; upstream 4xx/5xx → REJECT; Redis backends fail-closed |
-| **Failure handling** | Typed errors, no raw tracebacks | `InstError` hierarchy + `run_cli()` JSON envelope |
-| **Proof** | Auditor can verify without vendor | Deterministic tar + SHA256; offline `verify-bundle`; F1–F9 report in bundle |
-| **Demoability** | One command, repeatable | `demo_compliance_logger.sh`, `demo_proxy_risk.sh`, `instpp_rigorous_test.sh` |
-| **Diligence** | Clean package boundaries | Product READMEs, buyer one-pagers, CLI integration tests |
-| **Strategic legibility** | One job, clear non-goals | `COMPLIANCE_LOGGER_BUYER.md`, `PROXY_RISK_BUYER.md` |
+| Dimension | Requirement | Proof command |
+|-----------|-------------|---------------|
+| **Correctness** | Fail-closed; all gate outcomes logged | Unit + integration tests |
+| **Failure handling** | `InstError` + `run_cli()` envelope | CLI stderr JSON on error |
+| **Proof** | `export` + offline `verify-bundle` | `*-bundle verify-bundle --tarball …` |
+| **Demoability** | One script, &lt;60s | `scripts/demo_<product>.sh` |
+| **Diligence** | README + buyer/spec doc | `docs/*_BUYER.md` or sales tech spec |
+| **Strategic legibility** | One job + explicit non-goals | Deep dive per product |
+
+---
+
+## Product readiness matrix
+
+| # | Product | CLI | verify-bundle | F1–F9 check | run_cli | Demo script | Grade |
+|---|---------|-----|---------------|-------------|---------|-------------|-------|
+| 1 | Compliance Logger | ✅ | ✅ | ✅ | ✅ | `demo_compliance_logger.sh` | **Gold** |
+| 2 | Proxy-Risk | ✅ | ✅ | ✅ | ✅ | `demo_proxy_risk.sh` | **Gold** |
+| 3 | Alt-Data | ✅ | ✅ | ✅ | ✅ | `demo_altdata.sh` | **P1+** |
+| 4 | AI Kit | ✅ | ✅ | ✅ | ✅ | `demo_ai_kit.sh` | **P1+** |
+| 5 | Webhook Mesh | ✅ | ✅ | ✅ | ✅ | `demo_webhook_mesh.sh` | **P1+** |
+| 6 | Ad Guard | ✅ | ✅ | ✅ | ✅ | `demo_ad_guard.sh` | **P1+** |
+| 7 | Health Telemetry | ✅ | ✅ | ✅ | ✅ | `demo_health_telemetry.sh` | **Scaffold** |
+
+**Rigorous E2E log:** `scripts/instpp_rigorous_test.sh` — products #1–#2 (extend to #5–#6 next).
+
+---
+
+## Per-product correctness guarantees
+
+### #1 Compliance Logger
+- Export aborts on institutional failure
+- F7 from real snapshot coverage
+- Offline `verify-bundle`
+
+### #2 Proxy-Risk
+- Every gate outcome logged
+- Live: WAL before upstream; 4xx/5xx → REJECT
+- Redis fail-closed
+
+### #3 Alt-Data
+- `CoverageError` below floor
+- Field ladder + rescue metadata in ledger
+- Export aborts on F-gate fail
+
+### #4 AI Kit
+- `RateLimitError` typed (not traceback)
+- Lamport checkpoints + trace ledger export
+- `validate_with_retry` in run path
+
+### #5 Webhook Mesh
+- HMAC fail → 401
+- Idempotency fail-closed on Redis error
+- WAL before HTTP 200; genesis ledger cold path
+
+### #6 Ad Guard
+- All approve/reject/kill logged
+- Redis idempotency (not process-local only)
+- Live upstream fail-closed
+
+### #7 Health Telemetry
+- Batch schema validation
+- Genesis chain per device batch
+- Export + verify-bundle (scaffold)
 
 ---
 
@@ -21,57 +76,19 @@
 
 ```bash
 pip install -e ".[dev,instpp]"
-./scripts/instpp_rigorous_test.sh          # full logged E2E
-./scripts/demo_compliance_logger.sh        # product #1 buyer demo
-./scripts/demo_proxy_risk.sh               # product #2 buyer demo
-```
-
-Logs: `docs/test_logs/instpp_rigorous_latest.log`
-
----
-
-## Correctness guarantees
-
-### Compliance Logger
-- Export aborts if genesis/chain/lamport **or** institutional F1–F9 fails
-- F7 source coverage computed from snapshot field completeness (not hardcoded 100%)
-- Offline `verify-bundle` replays chain without live database
-
-### Proxy-Risk Gateway
-- **Every** gate outcome (approve / reject / kill) written to ledger when attached
-- Live mode: sync WAL **before** upstream call; upstream failure → REJECT (not approve)
-- `INST_CIRCUIT_KILL=1` severs traffic at circuit layer
-- Redis token bucket + idempotency: backend outage → reject (fail-closed)
-
----
-
-## Proof artifacts (per export)
-
-```
-MANIFEST.json          — product id, entry count, validation summary
-ledger_entries.json    — full hash chain
-institutional_check.json — F1–F9 + chain gates
-genesis_anchor.json    — offsite-verifiable genesis
-wal_full.json          — crash-safe WAL replay
-audit_bundle.tar       — deterministic bytes
-audit_bundle.tar.sha256.json — cryptographic seal
+./scripts/instpp_smoke_test.sh
+./scripts/demo_instpp.sh                    # #1 + #2
+./scripts/demo_altdata.sh                   # #3
+./scripts/demo_ai_kit.sh                    # #4
+./scripts/demo_webhook_mesh.sh                # #5
+./scripts/demo_ad_guard.sh                  # #6
+./scripts/demo_health_telemetry.sh          # #7
 ```
 
 ---
 
-## Non-goals (say no in RFPs)
+## Related
 
-| Product | Not this |
-|---------|----------|
-| Compliance Logger | GRC workflow UI, e-discovery platform, sports betting |
-| Proxy-Risk | Sub-5ms RTB insert, pre-bid DV/IAS, HashiCorp Vault (P1 uses env token adapter) |
-
----
-
-## Related docs
-
-- `docs/INST_PLUS_DEEP_DIVE_COMPLIANCE_PROXY.md` — industry incumbent map + tech edge (both platforms)
-- `docs/COMPLIANCE_LOGGER_BUYER.md` — product #1 sales sheet
-- `docs/PROXY_RISK_BUYER.md` — product #2 sales sheet
+- `docs/INST_PLUS_DEEP_DIVE_ALL_7.md` — full tech edge per product
+- `docs/INST_PLUS_PRE_REV_VALUATION.md` — IP valuation
 - `docs/INST_PLUS_TEST_AND_DEMO.md` — command playbook
-- `docs/INSTITUTIONAL_ENTERPRISE_STACK.md` — enterprise positioning

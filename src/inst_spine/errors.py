@@ -40,3 +40,15 @@ class UpstreamError(InstError):
     def __init__(self, message: str, *, status: int | None = None) -> None:
         details = {"upstream_status": status} if status is not None else None
         super().__init__(code="UPSTREAM_FAIL", message=message, details=details)
+
+
+class RateLimitError(InstError):
+    def __init__(self, message: str, *, retry_after_sec: float | None = None) -> None:
+        details = {"retry_after_sec": retry_after_sec} if retry_after_sec is not None else None
+        super().__init__(code="RATE_LIMIT", message=message, details=details)
+
+
+class CoverageError(InstError):
+    def __init__(self, message: str, *, coverage_pct: float | None = None) -> None:
+        details = {"coverage_pct": coverage_pct} if coverage_pct is not None else None
+        super().__init__(code="COVERAGE_FAIL", message=message, details=details)

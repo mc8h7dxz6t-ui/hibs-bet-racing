@@ -20,7 +20,16 @@ def build_compliance_context(
 ) -> dict[str, Any]:
     """Rich F1–F9 context for compliance / proxy institutional checks."""
     entries = ledger.list_entries()
-    decisions = sum(1 for e in entries if e.get("event_type") in {"decision", "proxy_request"})
+    snapshot_events = {
+        "decision",
+        "proxy_request",
+        "snapshot",
+        "telemetry_batch",
+        "webhook_ingress",
+        "ad_spend_request",
+        "agent_checkpoint",
+    }
+    decisions = sum(1 for e in entries if e.get("event_type") in snapshot_events)
     anchor = read_genesis_anchor(ledger.anchor_path)
     ctx: dict[str, Any] = {
         "ledger_entries": entries,

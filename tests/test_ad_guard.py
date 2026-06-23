@@ -109,6 +109,34 @@ async def test_ad_guard_ledger_event(tmp_path: Path):
 
 
 @pytest.mark.asyncio
+async def test_ad_guard_reject_logs_to_ledger(tmp_path: Path):
+    db = tmp_path / "ad.sqlite"
+    ledger = AppendOnlyLedger(db, async_writes=True)
+    ledger.start_async_writer()
+    from inst_spine.rates import MemoryIdempotencyBackend
+
+    gw = AdGuardGateway(
+        ledger=ledger,
+        shadow_mode=True,
+        idempotency=MemoryIdempotencyBackend(),
+    )
+    req = AdSpendRequest(
+        client_id="agency",
+        method="POST",
+        path="/mutate",
+        body={"campaign_id": "c1", "bid_amount": 1.0},
+        idempotency_key="dup-key",
+    )
+    await gw.evaluate(req)
+    resp = await gw.evaluate(req)
+    assert resp.decision.value == "reject"
+    ledger.stop_async_writer(flush=True)
+    events = [e for e in ledger.list_entries() if e.get("event_type") == "ad_spend_request"]
+    assert len(events) >= 2
+    assert any(e["payload"]["decision"] == "reject" for e in events)
+
+
+@pytest.mark.asyncio
 async def test_ad_guard_serve_approves(tmp_path: Path):
     pytest.importorskip("fastapi")
     from fastapi.testclient import TestClient
