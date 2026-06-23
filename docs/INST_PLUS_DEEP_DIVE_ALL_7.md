@@ -140,9 +140,10 @@ poll → field ladder (primary → fallback → structural rescue) → coverage 
 - `run_cli()` + `CoverageError` on sub-floor coverage
 - `scripts/demo_altdata.sh`
 
-## Honest gaps
-- Production HTTP fetcher for one real target URL still buyer-specific (stub ctx for demo)
-- ≥95% on live feed 30 days = design partner milestone
+## Production feed
+- `altdata poll --production-feed fx_gbp_cross` — Frankfurter FX API (real HTTP)
+- `altdata list-feeds` — registry; override via `ALTDATA_PRODUCTION_URL`
+- Stub ctx still available offline (`SKIP_LIVE=1`)
 
 ## Demo
 ```bash
@@ -179,9 +180,10 @@ rate limit → step_fn → validate_with_retry → Lamport checkpoint → trace 
 - `RateLimitError` (not raw RuntimeError)
 - `scripts/demo_ai_kit.sh`
 
-## Honest gaps
-- Not a real LLM client — step_fn is demo closure (by design for boilerplate SKU)
-- Not NeMo/Bedrock safety inference
+## Live LLM
+- `ai-kit run --live-llm` — OpenAI-compatible client (`OPENAI_API_KEY`, `AI_KIT_LLM_BASE_URL`)
+- Stub mode default (no key required)
+- **Not** NeMo/Bedrock safety inference — safety stays upstream
 
 ## Demo
 ```bash
@@ -262,9 +264,10 @@ NeMo (creative) → Ad Guard (spend) → DSP → DV/IAS (placement)
 - `check` · `verify-bundle` · `product="ad-guard"` export
 - `scripts/demo_ad_guard.sh`
 
-## Honest gaps
+## NeMo / creative gate
+- Headers: `X-Nemo-Approved`, `X-Nemo-Safety-Passed`, `X-Bedrock-Guard-Passed`, `X-Creative-Approved`
+- `AD_GUARD_REQUIRE_CREATIVE_APPROVAL=1` fail-closed without approval
 - Not sub-5ms RTB exchange insert
-- Creative approval header (NeMo hook) = P2
 
 ## Demo
 ```bash
@@ -301,9 +304,10 @@ POST batch → schema validate → ledger append (telemetry_batch) → F1–F9 �
 - `scripts/demo_health_telemetry.sh`
 - Fork of Compliance Logger ingest pattern
 
-## Honest gaps
-- No EMR/HL7 FHIR · No FDA/DTAC cert · 6–12 mo enterprise sales cycle
-- Batching at extreme volume needs tuning (not new math)
+## Hospital pilot
+- `docs/HEALTH_TELEMETRY_HIPAA_PACK.md` — BAA diligence template
+- `docs/HEALTH_TELEMETRY_HOSPITAL_PILOT.md` — ward pilot playbook
+- No EMR/FHIR in P1 · No FDA/DTAC cert
 
 ## Demo
 ```bash
@@ -394,7 +398,7 @@ pip install -e ".[dev,instpp]"
 | Marketing API spend anomaly | #6 ✅ |
 | Device telemetry tamper evidence | #7 ✅ |
 | GRC case management UI | ❌ integrate export |
-| SOC 2 Type II SaaS | ❌ buyer VPC deploy |
+| SOC 2 Type II SaaS | ❌ buyer VPC deploy — see `SOC2_VPC_DILIGENCE_PACK.md` |
 | Sub-5ms RTB | ❌ |
 | LLM safety inference | ❌ NeMo downstream |
 

@@ -38,4 +38,5 @@ pip install -e ".[dev,instpp]"
 ./scripts/instpp_rigorous_test.sh    # all 7 products
 ```
 
-**Deep dive:** `docs/INST_PLUS_DEEP_DIVE_ALL_7.md`
+**Deep dive:** `docs/INST_PLUS_DEEP_DIVE_ALL_7.md`  
+**SOC 2 / VPC diligence:** `docs/SOC2_VPC_DILIGENCE_PACK.md`

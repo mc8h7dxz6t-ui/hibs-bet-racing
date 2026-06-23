@@ -107,7 +107,7 @@ class AdGuardGateway:
                 req,
                 req.campaign_id or "",
                 GateDecision.REJECT,
-                "creative: X-Creative-Approved required",
+                "creative: NeMo/safety approval header required",
             )
 
         campaign_id, bid_amount, spend_delta = extract_spend_metrics(req.body, provider=req.provider)

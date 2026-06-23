@@ -9,6 +9,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request, Response, status
 
+from ad_guard.creative import parse_creative_approved
 from ad_guard.proxy import AdGuardGateway, AdSpendRequest
 from inst_spine.ledger import AppendOnlyLedger
 
@@ -75,8 +76,7 @@ async def guard_spend(client_id: str, request: Request) -> dict[str, Any] | Resp
 
     provider = request.headers.get("X-Ad-Provider", body.get("provider", "generic"))
     campaign_id = request.headers.get("X-Campaign-Id") or body.get("campaign_id")
-    creative_hdr = request.headers.get("X-Creative-Approved", "").strip().lower()
-    creative_approved = creative_hdr in {"1", "true", "yes"} if creative_hdr else None
+    creative_approved = parse_creative_approved(dict(request.headers))
     req = AdSpendRequest(
         client_id=client_id,
         method=request.headers.get("X-Http-Method", "POST"),

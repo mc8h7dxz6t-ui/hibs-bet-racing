@@ -30,7 +30,7 @@ ad-guard verify-bundle --tarball ad_guard_bundle.tar
 | Variable | Purpose |
 |----------|---------|
 | `AD_GUARD_UPSTREAM_BASE` | Live marketing API base URL |
-| `AD_GUARD_REQUIRE_CREATIVE_APPROVAL` | Require `X-Creative-Approved: true` |
+| `AD_GUARD_REQUIRE_CREATIVE_APPROVAL` | Require NeMo/safety approval headers |
 | `INST_REDIS_URL` | Multi-instance idempotency |
 
 ## Demo

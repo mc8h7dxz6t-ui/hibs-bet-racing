@@ -19,7 +19,11 @@ from webhook_mesh.fsm import (
     dispatch_webhook_delivery,
     handle_dead_letter_allocation,
 )
-from webhook_mesh.hmac_verify import verify_provider_signature
+from webhook_mesh.hmac_verify import (
+    verify_provider_signature,
+    verify_shopify_hmac,
+    verify_stripe_signature,
+)
 from webhook_mesh.queue import BackgroundDeliveryQueue, DeliveryManifest
 from webhook_mesh.replay import assess_payload_integrity, can_replay_dead_letter, load_dead_letter_meta
 
@@ -65,6 +69,30 @@ def test_hmac_verify_roundtrip():
     assert verify_provider_signature(body, sig, secret)
     assert not verify_provider_signature(body, "bad", secret)
     assert not verify_provider_signature(body, sig, "")
+
+
+def test_shopify_hmac_roundtrip():
+    secret = "shopify-secret"
+    body = b'{"id":1}'
+    import base64
+
+    digest = hmac.new(secret.encode(), body, hashlib.sha256).digest()
+    sig = base64.b64encode(digest).decode("ascii")
+    assert verify_shopify_hmac(body, sig, secret)
+    assert not verify_shopify_hmac(body, "bad", secret)
+
+
+def test_stripe_signature_roundtrip():
+    import time
+
+    secret = "whsec_test"
+    body = b'{"id":"evt_123"}'
+    ts = int(time.time())
+    signed = f"{ts}.".encode("utf-8") + body
+    v1 = hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest()
+    header = f"t={ts},v1={v1}"
+    assert verify_stripe_signature(body, header, secret)
+    assert not verify_stripe_signature(body, header, "wrong")
 
 
 def test_wal_writer_fsync_append(tmp_path: Path):

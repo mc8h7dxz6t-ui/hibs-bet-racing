@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
 
+from ai_kit.llm import OpenAICompatibleClient
 from ai_kit.pipeline import AgentLoop
 from ai_kit.validate import validate_with_retry
 from inst_spine.cli_util import run_cli
+from inst_spine.errors import InstError
 from inst_spine.ledger import AppendOnlyLedger
 from inst_spine.product_cli import (
     print_json,
@@ -38,6 +41,12 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--checkpoint-db", type=Path, default=None)
     p_run.add_argument("--trace-db", type=Path, default=Path("data/ai_kit_trace.sqlite"))
     p_run.add_argument("--max-tokens", type=int, default=1000, help="Token budget hint for limiter")
+    p_run.add_argument(
+        "--live-llm",
+        action="store_true",
+        help="Call OpenAI-compatible API (requires OPENAI_API_KEY)",
+    )
+    p_run.add_argument("--prompt", default="Return JSON with ok:true and a one-line summary.")
 
     p_check = sub.add_parser("check", help="F1–F9 on trace ledger")
     p_check.add_argument("--database", type=Path, default=Path("data/ai_kit_trace.sqlite"))
@@ -63,18 +72,49 @@ def main(argv: list[str] | None = None) -> int:
             checkpoint_db=args.checkpoint_db,
             trace_ledger=trace,
         )
+        llm = OpenAICompatibleClient()
 
         def _step(step: int, state: dict[str, Any]) -> dict[str, Any]:
-            raw = json.dumps({"ok": True, "step": step, "max_tokens": args.max_tokens})
-            result = validate_with_retry(raw, _demo_validator, max_attempts=3)
-            if not result.ok:
-                raise ValueError(result.error or "validation failed")
+            if args.live_llm:
+                if not llm.configured:
+                    raise InstError(
+                        code="LLM_NOT_CONFIGURED",
+                        message="OPENAI_API_KEY required for --live-llm",
+                    )
+                resp = llm.chat_json(
+                    system='Respond with JSON only: {"ok": true, "summary": "..."}',
+                    user=f"{args.prompt} (step {step})",
+                    max_tokens=min(args.max_tokens, 512),
+                )
+                if not resp.ok or resp.parsed is None:
+                    raise ValueError(resp.error or "LLM call failed")
+                result = validate_with_retry(
+                    json.dumps(resp.parsed),
+                    _demo_validator,
+                    max_attempts=1,
+                )
+                if not result.ok:
+                    raise ValueError(result.error or "validation failed")
+                value = {**result.value, "llm": True, "step": step, "model": llm.model}
+            else:
+                raw = json.dumps({"ok": True, "step": step, "max_tokens": args.max_tokens})
+                result = validate_with_retry(raw, _demo_validator, max_attempts=3)
+                if not result.ok:
+                    raise ValueError(result.error or "validation failed")
+                value = result.value
             state = dict(state)
-            state[f"step_{step}"] = result.value
+            state[f"step_{step}"] = value
             return state
 
         final = loop.run_steps(start_step=0, steps=args.steps, step_fn=_step)
-        print_json({"product": PRODUCT, "final_state": final, "trace_db": str(args.trace_db)})
+        print_json(
+            {
+                "product": PRODUCT,
+                "final_state": final,
+                "trace_db": str(args.trace_db),
+                "live_llm": args.live_llm and llm.configured,
+            }
+        )
         return 0
 
     if args.cmd == "check":

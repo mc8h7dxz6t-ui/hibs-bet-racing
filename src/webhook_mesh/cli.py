@@ -66,13 +66,42 @@ def _run_replay(argv: list[str]) -> int:
 
 
 def _run_demo_sign(argv: list[str]) -> int:
+    import base64
+    import time
+
     parser = argparse.ArgumentParser(description="Sign a webhook body for ingress test")
     parser.add_argument("--secret", required=True)
     parser.add_argument("--body-file", type=Path, required=True)
+    parser.add_argument(
+        "--provider",
+        choices=["generic", "stripe", "shopify"],
+        default="generic",
+        help="Signature format for provider route",
+    )
     args = parser.parse_args(argv)
     body = args.body_file.read_bytes()
-    sig = hmac.new(args.secret.encode(), body, hashlib.sha256).hexdigest()
-    print_json({"signature": sig, "body_sha256": hashlib.sha256(body).hexdigest()})
+    provider = args.provider
+    if provider == "shopify":
+        digest = hmac.new(args.secret.encode(), body, hashlib.sha256).digest()
+        sig = base64.b64encode(digest).decode("ascii")
+        header = "X-Shopify-Hmac-Sha256"
+    elif provider == "stripe":
+        ts = int(time.time())
+        signed = f"{ts}.".encode("utf-8") + body
+        v1 = hmac.new(args.secret.encode(), signed, hashlib.sha256).hexdigest()
+        sig = f"t={ts},v1={v1}"
+        header = "Stripe-Signature"
+    else:
+        sig = hmac.new(args.secret.encode(), body, hashlib.sha256).hexdigest()
+        header = "X-Provider-Signature"
+    print_json(
+        {
+            "provider": provider,
+            "signature": sig,
+            "header": header,
+            "body_sha256": hashlib.sha256(body).hexdigest(),
+        }
+    )
     return 0
 
 

@@ -18,7 +18,9 @@ echo "==> Running institutional test suite (all 7 products)"
   tests/test_compliance_cli.py \
   tests/test_altdata_cli.py \
   tests/test_ai_kit_cli.py \
-  tests/test_ad_guard_cli.py \
+  tests/test_altdata_production.py \
+  tests/test_ai_kit_llm.py \
+  tests/test_ad_guard_creative.py \
   tests/test_webhook_mesh.py \
   tests/test_ad_guard.py \
   tests/test_health_telemetry.py \

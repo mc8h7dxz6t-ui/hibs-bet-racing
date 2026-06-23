@@ -19,7 +19,8 @@ pip install -e ".[dev,instpp]"
 
 ```bash
 altdata poll --feed demo_feed --ctx '{"demo_price":42.5,"demo_seats":180}'
-altdata poll --url https://httpbin.org/json --feed live_feed
+altdata poll --production-feed fx_gbp_cross   # real Frankfurter FX API
+altdata list-feeds
 altdata check --database data/altdata_demo.sqlite
 altdata export --database data/altdata_demo.sqlite --tarball altdata_bundle.tar
 altdata verify-bundle --tarball altdata_bundle.tar

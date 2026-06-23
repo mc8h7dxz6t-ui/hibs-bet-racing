@@ -137,6 +137,29 @@ async def test_ad_guard_reject_logs_to_ledger(tmp_path: Path):
 
 
 @pytest.mark.asyncio
+async def test_ad_guard_creative_gate_required(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("AD_GUARD_REQUIRE_CREATIVE_APPROVAL", "1")
+    gw = AdGuardGateway(shadow_mode=True)
+    resp = await gw.evaluate(AdSpendRequest(
+        client_id="agency",
+        method="POST",
+        path="/mutate",
+        body={"campaign_id": "c1", "bid_amount": 1.0},
+    ))
+    assert resp.decision.value == "reject"
+    assert "NeMo" in resp.reason or "creative" in resp.reason
+
+    resp2 = await gw.evaluate(AdSpendRequest(
+        client_id="agency",
+        method="POST",
+        path="/mutate",
+        body={"campaign_id": "c1", "bid_amount": 1.0},
+        creative_approved=True,
+    ))
+    assert resp2.decision.value == "approve"
+
+
+@pytest.mark.asyncio
 async def test_ad_guard_serve_approves(tmp_path: Path):
     pytest.importorskip("fastapi")
     from fastapi.testclient import TestClient

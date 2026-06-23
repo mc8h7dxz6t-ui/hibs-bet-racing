@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from altdata.feeds import PRODUCTION_FEEDS, fetch_production_context, list_production_feeds
 from altdata.ladders import default_fetchers, fetch_url_context, http_fetchers
 from altdata.poll import poll_once
 from altdata.resolver import FieldResolver
@@ -29,6 +30,12 @@ def main(argv: list[str] | None = None) -> int:
     p_poll = sub.add_parser("poll", help="Run one poll cycle")
     p_poll.add_argument("--feed", default="demo_feed")
     p_poll.add_argument("--url", default=None, help="HTTP(S) URL to fetch (enables live fetchers)")
+    p_poll.add_argument(
+        "--production-feed",
+        default=None,
+        choices=sorted(PRODUCTION_FEEDS.keys()),
+        help="Registered production feed (real HTTP URL + field map)",
+    )
     p_poll.add_argument("--timeout", type=float, default=10.0)
     p_poll.add_argument("--database", type=Path, default=Path("data/altdata_demo.sqlite"))
     p_poll.add_argument("--min-coverage", type=float, default=85.0)
@@ -48,12 +55,21 @@ def main(argv: list[str] | None = None) -> int:
     p_bundle.add_argument("--tarball", type=Path, required=True)
     p_bundle.add_argument("--anchor", type=Path, default=None)
 
+    p_feeds = sub.add_parser("list-feeds", help="List registered production feeds")
+
     args = parser.parse_args(argv)
+
+    if args.cmd == "list-feeds":
+        print_json({"feeds": list_production_feeds(), "product": PRODUCT})
+        return 0
 
     if args.cmd == "poll":
         ctx = json.loads(args.ctx)
         fetchers = default_fetchers()
-        if args.url:
+        if args.production_feed:
+            ctx = {**fetch_production_context(args.production_feed, timeout=args.timeout), **ctx}
+            fetchers = http_fetchers()
+        elif args.url:
             ctx = {**fetch_url_context(args.url, timeout=args.timeout), **ctx}
             fetchers = http_fetchers()
         result = poll_once(

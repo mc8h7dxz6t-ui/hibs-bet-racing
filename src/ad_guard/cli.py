@@ -40,6 +40,7 @@ async def _eval_once(args: argparse.Namespace) -> int:
         provider=args.provider,
         campaign_id=args.campaign_id,
         idempotency_key=args.idempotency_key,
+        creative_approved=True if args.creative_approved else None,
     )
     resp = await gw.evaluate(req)
     print_json(
@@ -71,6 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.add_argument("--path", default="/v1/campaigns/mutate")
         parser.add_argument("--body", default="{}")
         parser.add_argument("--idempotency-key")
+        parser.add_argument("--creative-approved", action="store_true", help="Simulate NeMo/safety pass")
         parser.add_argument("--database", type=Path, default=Path("data/ad_guard_ledger.sqlite"))
         parser.add_argument("--live", action="store_true", help="Live upstream forward")
         return asyncio.run(_eval_once(parser.parse_args(argv[1:])))

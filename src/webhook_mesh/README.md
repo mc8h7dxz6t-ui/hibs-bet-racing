@@ -7,6 +7,7 @@ Inbound webhook signature verify, idempotency CAS, WAL-before-ack, async forward
 ```
 POST /v1/ingress/{tenant} → HMAC → Redis idempotency → WAL fsync → 200 OK → queue → forward
 Stripe route: POST /v1/ingress/stripe/{tenant}
+Shopify route: POST /v1/ingress/shopify/{tenant}
 ```
 
 ## Install

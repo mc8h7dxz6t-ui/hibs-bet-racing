@@ -14,7 +14,7 @@ from fastapi import FastAPI, Request, Response, status
 from inst_spine.clocks import LamportClock
 from inst_spine.rates import IdempotencyBackend, RedisIdempotencyBackend, idempotency_backend_from_env
 from inst_spine.wal import WALWriter
-from webhook_mesh.hmac_verify import verify_provider_signature
+from webhook_mesh.hmac_verify import verify_webhook_signature
 from webhook_mesh.audit import append_ingress_event
 from webhook_mesh.queue import (
     BackgroundDeliveryQueue,
@@ -108,12 +108,30 @@ async def handle_stripe_ingress(
     client_id: str,
     request: Request,
 ) -> dict[str, Any] | Response:
-    """Stripe-compatible route — maps Stripe-Signature + event id headers."""
+    """Stripe-compatible route — ``Stripe-Signature`` + ``Stripe-Event-Id``."""
     return await _handle_ingress(
         client_id,
         request,
         signature_header="Stripe-Signature",
         webhook_id_header="Stripe-Event-Id",
+        signature_provider="stripe",
+        payload_id_json_key="id",
+    )
+
+
+@app.post("/v1/ingress/shopify/{client_id}", status_code=status.HTTP_200_OK, response_model=None)
+async def handle_shopify_ingress(
+    client_id: str,
+    request: Request,
+) -> dict[str, Any] | Response:
+    """Shopify-compatible route — ``X-Shopify-Hmac-Sha256`` + webhook id."""
+    return await _handle_ingress(
+        client_id,
+        request,
+        signature_header="X-Shopify-Hmac-Sha256",
+        webhook_id_header="X-Shopify-Webhook-Id",
+        signature_provider="shopify",
+        payload_id_json_key="id",
     )
 
 
@@ -123,19 +141,33 @@ async def _handle_ingress(
     *,
     signature_header: str,
     webhook_id_header: str,
+    signature_provider: str = "generic",
+    payload_id_json_key: str | None = None,
 ) -> dict[str, Any] | Response:
     provider_sig = request.headers.get(signature_header, "")
+    raw_payload = await request.body()
     payload_id = request.headers.get(webhook_id_header, "") or request.headers.get("X-Webhook-Id", "")
+    if not payload_id and payload_id_json_key:
+        try:
+            body = json.loads(raw_payload.decode("utf-8"))
+            if isinstance(body, dict):
+                payload_id = str(body.get(payload_id_json_key) or "")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            payload_id = ""
     target_url = request.headers.get("X-Target-Forward-Url", "")
 
     if not payload_id or not target_url:
         return _json_response(
-            {"error": "Missing X-Webhook-Id or X-Target-Forward-Url."},
+            {"error": "Missing webhook id or X-Target-Forward-Url."},
             status.HTTP_400_BAD_REQUEST,
         )
 
-    raw_payload = await request.body()
-    if not verify_provider_signature(raw_payload, provider_sig, state.provider_secret):
+    if not verify_webhook_signature(
+        raw_payload,
+        provider_sig,
+        state.provider_secret,
+        provider=signature_provider,
+    ):
         return _json_response(
             {"error": "Unauthorized: signature verification failed."},
             status.HTTP_401_UNAUTHORIZED,
