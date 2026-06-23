@@ -49,6 +49,20 @@ grep -q '^HIBS_EVIDENCE_DEPLOY_DATE=' "${APP}/.env" 2>/dev/null || \
   echo "HIBS_EVIDENCE_DEPLOY_DATE=$(date -u +%Y-%m-%d)" >>"${APP}/.env"
 chown www-data:www-data "${APP}/.env"
 
+step "1b) Scrape-first cache when API-Sports off"
+if grep -qE '^HIBS_DISABLE_API_SPORTS=1' "${APP}/.env" 2>/dev/null || \
+   grep -qE '^HIBS_SKIP_API_SPORTS_FIXTURES=1' "${APP}/.env" 2>/dev/null; then
+  echo "API off — applying scrape-first institutional profile"
+  if [[ -f "${APP}/deploy/apply-vps-scrape-first-institutional.sh" ]]; then
+    bash "${APP}/deploy/apply-vps-scrape-first-institutional.sh"
+  fi
+  if [[ -f "${APP}/scripts/lib_scrape_first_cache.sh" ]]; then
+    # shellcheck source=lib_scrape_first_cache.sh
+    source "${APP}/scripts/lib_scrape_first_cache.sh"
+    scrape_first_cache_warm || true
+  fi
+fi
+
 step "2) All ops crons"
 bash "${APP}/deploy/cron-hibs-ops-automation.sh" --install
 

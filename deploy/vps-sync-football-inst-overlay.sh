@@ -45,9 +45,16 @@ if [[ -f "${BET}/requirements.txt" && -x "${BET}/.venv/bin/pip" ]]; then
   sudo -u www-data "${BET}/.venv/bin/pip" install -q -r "${BET}/requirements.txt" 2>/dev/null || true
 fi
 
-if [[ -f "${OVERLAY}/OVERLAY_REVISION" ]]; then
-  cp "${OVERLAY}/OVERLAY_REVISION" "${BET}/.football-overlay-revision"
+if [[ -f "${BET}/.football-overlay-revision" ]]; then
   cat "${BET}/.football-overlay-revision"
+fi
+
+if [[ -f "${BET}/scripts/evaluate_trading_day15_gate.py" && -d "${TRADING_INSTALL_ROOT:-/opt/trading-core}/scripts" ]]; then
+  echo "==> sync Day-15 gate -> trading-core"
+  TRADING_INSTALL_ROOT="${TRADING_INSTALL_ROOT:-/opt/trading-core}" \
+    bash "${BET}/deploy/sync-trading-day15-gate.sh" 2>/dev/null || \
+    rsync -a "${BET}/scripts/evaluate_trading_day15_gate.py" \
+      "${TRADING_INSTALL_ROOT:-/opt/trading-core}/scripts/evaluate_trading_day15_gate.py"
 fi
 
 echo "==> football overlay applied to ${BET}"

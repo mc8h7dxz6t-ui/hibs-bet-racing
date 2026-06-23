@@ -26,7 +26,7 @@ for arg in "$@"; do
 done
 
 if [[ "${REMOTE}" -eq 1 ]]; then
-  HOST="${DEPLOY_HOST:-77.68.89.73}"
+  HOST="${DEPLOY_HOST:-87.106.100.52}"
   USER="${DEPLOY_USER:-root}"
   exec ssh -o BatchMode=yes -o ConnectTimeout=25 "${USER}@${HOST}" \
     "export DEPLOY_PATH='${APP}'; bash '${APP}/scripts/institutional_vps_watchdog.sh' --repair"
@@ -114,7 +114,7 @@ repair_infra() {
   fi
 
   log "repair: systemd units (throttled)"
-  for unit in hibs-bet hibs-racing trading-shadow-soak; do
+  for unit in hibs-bet hibs-racing; do
     if systemctl is-enabled "${unit}" &>/dev/null; then
       if ! systemctl is-active --quiet "${unit}" 2>/dev/null; then
         allowed="$(HOME="${APP}" PYTHONPATH="${APP}/src" "${PY}" -c "
@@ -131,6 +131,26 @@ print('yes' if service_restart_allowed('${unit}', min_minutes=45) else 'no')
       fi
     fi
   done
+  if HOME="${APP}" PYTHONPATH="${APP}/src" "${PY}" -c "
+from hibs_predictor.hands_off_guard import trading_shadow_hard_stop
+import sys
+sys.exit(0 if trading_shadow_hard_stop() else 1)
+" 2>/dev/null; then
+    log "trading-shadow-soak hard stop — skip restart"
+    systemctl stop trading-shadow-soak 2>/dev/null || true
+  elif systemctl is-enabled trading-shadow-soak &>/dev/null; then
+    if ! systemctl is-active --quiet trading-shadow-soak 2>/dev/null; then
+      allowed="$(HOME="${APP}" PYTHONPATH="${APP}/src" "${PY}" -c "
+from hibs_predictor.hands_off_guard import service_restart_allowed
+print('yes' if service_restart_allowed('trading-shadow-soak', min_minutes=45) else 'no')
+" 2>/dev/null || echo no)"
+      if [[ "${allowed}" == "yes" ]]; then
+        warn "restarting trading-shadow-soak"
+        systemctl reset-failed trading-shadow-soak 2>/dev/null || true
+        systemctl restart trading-shadow-soak 2>/dev/null || true
+      fi
+    fi
+  fi
 }
 
 [[ "${REPAIR}" -eq 1 ]] && repair_infra

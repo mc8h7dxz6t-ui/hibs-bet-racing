@@ -34,26 +34,70 @@ fi
 if [[ -z "${SRC}" || ! -d "${SRC}" ]]; then
   echo "==> archive unavailable (private repo?) — trying git"
   command -v git >/dev/null || { echo "git required for fallback" >&2; exit 1; }
+  export GIT_TERMINAL_PROMPT=0
   GIT_URL="https://github.com/${REPO}.git"
   TOKEN_FILE="${HIBS_RACING_GITHUB_TOKEN_FILE:-/etc/hibs-bet/secrets/racing_github_token}"
+  TOK=""
   if [[ -n "${HIBS_RACING_GITHUB_TOKEN:-}" ]]; then
-    GIT_URL="https://${HIBS_RACING_GITHUB_TOKEN}@github.com/${REPO}.git"
+    TOK="${HIBS_RACING_GITHUB_TOKEN}"
   elif [[ -f "${TOKEN_FILE}" ]]; then
     TOK="$(tr -d '[:space:]' <"${TOKEN_FILE}")"
-    [[ -n "${TOK}" ]] && GIT_URL="https://${TOK}@github.com/${REPO}.git"
+  fi
+  if [[ -n "${TOK}" ]]; then
+    GIT_URL="https://${TOK}@github.com/${REPO}.git"
   fi
   if [[ -d "${RACING_ROOT}/.git" ]]; then
-    git -C "${RACING_ROOT}" fetch --depth 1 origin "${REF}" 2>/dev/null || git -C "${RACING_ROOT}" fetch origin "${REF}"
-    git -C "${RACING_ROOT}" checkout "${REF}" 2>/dev/null || true
-    git -C "${RACING_ROOT}" pull --ff-only origin "${REF}" 2>/dev/null || true
+    if [[ -z "${TOK}" ]]; then
+      git -C "${RACING_ROOT}" remote set-url origin "${GIT_URL}" 2>/dev/null || true
+    fi
+    if ! git -C "${RACING_ROOT}" -c credential.helper= fetch --depth 1 origin "${REF}" 2>/dev/null; then
+      if ! git -C "${RACING_ROOT}" -c credential.helper= fetch origin "${REF}" 2>/dev/null; then
+        cat >&2 <<EOF
+ERROR: git fetch failed (private repo needs a token).
+
+Fix (one-time):
+  sudo mkdir -p /etc/hibs-bet/secrets
+  sudo bash -c 'echo YOUR_GITHUB_PAT > /etc/hibs-bet/secrets/racing_github_token'
+  sudo chmod 600 /etc/hibs-bet/secrets/racing_github_token
+
+Or inline for this session:
+  export HIBS_RACING_GITHUB_TOKEN=ghp_xxxxxxxx
+  sudo -E HIBS_RACING_SYNC_REF=${REF} bash $0
+
+No git? Arm automation from football tree only:
+  sudo bash ${HIBS_BET_DEPLOY_PATH:-/opt/hibs-bet}/deploy/vps-arm-hands-off-no-racing-sync.sh
+EOF
+        exit 1
+      fi
+    fi
+    git -C "${RACING_ROOT}" checkout "${REF}" 2>/dev/null || git -C "${RACING_ROOT}" checkout -B "${REF}" "origin/${REF}" 2>/dev/null || true
     SRC="${RACING_ROOT}"
     SYNC_SOURCE="github_git_pull"
   else
-    rm -rf "${RACING_ROOT}.gitclone"
-    git clone --depth 1 --branch "${REF}" "${GIT_URL}" "${RACING_ROOT}.gitclone" || {
-      echo "git clone failed — set HIBS_RACING_GITHUB_TOKEN or deploy from Mac: ./scripts/deploy_racing_to_vps.sh" >&2
+    if [[ -z "${TOK}" ]]; then
+      cat >&2 <<EOF
+ERROR: cannot clone private repo without a GitHub token (no interactive login).
+
+Fix (one-time):
+  sudo mkdir -p /etc/hibs-bet/secrets
+  sudo bash -c 'echo YOUR_GITHUB_PAT > /etc/hibs-bet/secrets/racing_github_token'
+  sudo chmod 600 /etc/hibs-bet/secrets/racing_github_token
+  sudo HIBS_RACING_SYNC_REF=${REF} bash $0
+
+Or:
+  export HIBS_RACING_GITHUB_TOKEN=ghp_xxxxxxxx
+  sudo -E HIBS_RACING_SYNC_REF=${REF} bash $0
+
+No git? Arm automation from football tree only:
+  sudo bash ${HIBS_BET_DEPLOY_PATH:-/opt/hibs-bet}/deploy/vps-arm-hands-off-no-racing-sync.sh
+EOF
       exit 1
-    }
+    fi
+    rm -rf "${RACING_ROOT}.gitclone"
+    if ! git -c credential.helper= clone --depth 1 --branch "${REF}" "${GIT_URL}" "${RACING_ROOT}.gitclone"; then
+      echo "git clone failed — check PAT has repo read access to ${REPO}" >&2
+      exit 1
+    fi
     SRC="${RACING_ROOT}.gitclone"
     SYNC_SOURCE="github_git_clone"
   fi

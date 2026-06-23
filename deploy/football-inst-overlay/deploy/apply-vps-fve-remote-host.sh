@@ -3,7 +3,7 @@
 #
 # Prereqs: bootstrap-fve-dedicated-1gb.sh already ran on the FVE VPS.
 #
-# On hibs-bet-vps (77.68.89.73):
+# On consolidated main VPS (87.106.100.52):
 #   sudo FVE_REMOTE_HOST=77.68.89.75 bash /opt/hibs-bet/deploy/apply-vps-fve-remote-host.sh
 set -euo pipefail
 

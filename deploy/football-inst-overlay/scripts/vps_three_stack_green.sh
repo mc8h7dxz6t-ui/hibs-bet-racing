@@ -25,7 +25,7 @@ for arg in "$@"; do
 done
 
 if [[ "${REMOTE}" -eq 1 ]]; then
-  HOST="${DEPLOY_HOST:-77.68.89.73}"
+  HOST="${DEPLOY_HOST:-87.106.100.52}"
   USER="${DEPLOY_USER:-root}"
   extra=""
   [[ "${REPAIR}" -eq 1 ]] && extra="--repair"
@@ -119,6 +119,23 @@ sys.exit(0 if service_restart_allowed('hibs-bet', min_minutes=45) else 1)
   fi
   fb_ping="$(probe_http http://127.0.0.1:8000/api/ping 15)"
   echo "  ping: ${fb_ping}"
+  if [[ "${fb_unit}" == "active" && "${fb_ping}" != "200" && "${REPAIR}" -eq 1 ]]; then
+    if HOME="${APP}" PYTHONPATH="${APP}/src" "${PY}" -c "
+from hibs_predictor.hands_off_guard import service_restart_allowed
+import sys
+sys.exit(0 if service_restart_allowed('hibs-bet-stuck', min_minutes=60) else 1)
+" 2>/dev/null; then
+      warn "football ping not 200 — fixture repair + restart"
+      [[ -f "${APP}/scripts/vps_fixture_repair.sh" ]] && \
+        bash "${APP}/scripts/vps_fixture_repair.sh" >>"${LOG_DIR}/fixture-repair.log" 2>&1 || true
+      systemctl restart hibs-bet 2>/dev/null || true
+      sleep 8
+      fb_ping="$(probe_http http://127.0.0.1:8000/api/ping 20)"
+      echo "  ping after repair: ${fb_ping}"
+    else
+      warn "football stuck repair throttled (60m)"
+    fi
+  fi
   fb_api=0
   fb_api_optional=0
   if [[ -f "${APP}/.env" ]] && grep -qE '^HIBS_DISABLE_API_SPORTS=1' "${APP}/.env" 2>/dev/null; then
@@ -201,13 +218,26 @@ sys.exit(0 if service_restart_allowed('hibs-racing', min_minutes=45) else 1)
   echo ""
   log "TRADING shadow soak"
   tr_unit="$(systemctl is-active trading-shadow-soak 2>/dev/null || echo inactive)"
+  tr_hard_stop=0
+  if HOME="${APP}" PYTHONPATH="${APP}/src" "${PY}" -c "
+from hibs_predictor.hands_off_guard import trading_shadow_hard_stop
+import sys
+sys.exit(0 if trading_shadow_hard_stop() else 1)
+" 2>/dev/null; then
+    tr_hard_stop=1
+    echo "  hard_stop: 1 (Day-15 FAIL — soak must stay off)"
+  fi
   echo "  unit: ${tr_unit}"
-  if [[ "${tr_unit}" != "active" && -f "${TRADING}/deploy/install-harvested-execution-shadow.sh" ]]; then
-    warn "starting trading-shadow-soak"
-    systemctl stop trading-paper 2>/dev/null || true
-    cd "${TRADING}"
-    TRADING_INSTALL_ROOT="${TRADING}" bash deploy/install-harvested-execution-shadow.sh --install-root "${TRADING}" 2>/dev/null || true
-    tr_unit="$(systemctl is-active trading-shadow-soak 2>/dev/null || echo inactive)"
+  if [[ "${tr_hard_stop}" -eq 0 && "${tr_unit}" != "active" && -f "${TRADING}/deploy/install-harvested-execution-shadow.sh" ]]; then
+    if systemctl is-enabled trading-shadow-soak &>/dev/null; then
+      warn "starting trading-shadow-soak"
+      systemctl stop trading-paper 2>/dev/null || true
+      cd "${TRADING}"
+      TRADING_INSTALL_ROOT="${TRADING}" bash deploy/install-harvested-execution-shadow.sh --install-root "${TRADING}" 2>/dev/null || true
+      tr_unit="$(systemctl is-active trading-shadow-soak 2>/dev/null || echo inactive)"
+    else
+      echo "  soak disabled — skip auto-start"
+    fi
   fi
   if [[ "${REPAIR}" -eq 1 && -f "${APP}/deploy/apply-vps-trading-crypto-lane.sh" ]]; then
     if ! grep -qE '^TRADING_ENABLE_CRYPTO=1' /etc/trading_secrets 2>/dev/null; then
@@ -220,7 +250,10 @@ sys.exit(0 if service_restart_allowed('hibs-racing', min_minutes=45) else 1)
   tr_live="$(probe_http http://127.0.0.1:9108/live 8)"
   tr_ready="$(probe_http http://127.0.0.1:9108/ready 8)"
   echo "  metrics live: ${tr_live} ready: ${tr_ready}"
-  if [[ "${tr_unit}" == "active" && ( "${tr_live}" == "200" || "${tr_ready}" == "200" ) ]]; then
+  if [[ "${tr_hard_stop}" -eq 1 ]]; then
+    trading_ok=1
+    echo "  TRADING: PARKED (archived evidence; soak intentionally off)"
+  elif [[ "${tr_unit}" == "active" && ( "${tr_live}" == "200" || "${tr_ready}" == "200" ) ]]; then
     trading_ok=1
     echo "  TRADING: GREEN"
   elif [[ "${tr_unit}" == "active" ]]; then

@@ -1417,7 +1417,9 @@ def fetch_next_48h_fixtures(league_code: str, *, allow_stale: bool = False) -> L
                 if fetched:
                     break
             except Exception as ex:
-                print(f"[Football-Data.org] {league_code} {comp} season={season}: {ex!r}")
+                msg = str(ex).lower()
+                if "403" not in msg and "forbidden" not in msg:
+                    print(f"[Football-Data.org] {league_code} {comp} season={season}: {ex!r}")
                 continue
 
     def try_fotmob() -> None:
