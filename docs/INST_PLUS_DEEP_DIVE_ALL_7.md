@@ -152,6 +152,8 @@ poll → field ladder (primary → fallback → structural rescue) → coverage 
 
 **Price:** £500–£2,000/mo per feed
 
+**Docs:** `docs/ALTDATA_SALES_TECH_SPEC.md`
+
 ---
 
 # Product #4 — AI Kit
@@ -193,6 +195,8 @@ ai-kit validate-demo --raw '{"ok":true}'
 
 **Price:** £99–£249/seat or £50–150/mo team
 
+**Docs:** `docs/AI_KIT_SALES_TECH_SPEC.md`
+
 ---
 
 # Product #5 — Webhook Idempotency Mesh
@@ -221,11 +225,14 @@ POST /v1/ingress/{tenant}
 ## Gold standard (this release)
 - Cold-path `append_ingress_event` → genesis ledger
 - `check` · `export` · `verify-bundle` CLI
+- Stripe route: `POST /v1/ingress/stripe/{tenant}` + signature verify
+- Shopify route: `POST /v1/ingress/shopify/{tenant}` + HMAC verify
+- `webhook-mesh demo-sign --provider stripe|shopify`
 - `scripts/demo_webhook_mesh.sh`
 
-## Honest gaps
-- Stripe/Shopify-specific route mounts still generic ingress (buyer config)
-- Background queue: tasks lost on crash if not Redis Stream (documented)
+## Honest limits
+- Background queue: tasks lost on crash if not Redis Stream (documented — configure Stream for production)
+- Not a full event bus (Kafka, SNS)
 
 ## Demo
 ```bash
@@ -234,6 +241,8 @@ export WEBHOOK_PROVIDER_SECRET=demo-secret
 ```
 
 **Price:** £199–£599/mo per tenant
+
+**Docs:** `docs/WEBHOOK_MESH_SALES_TECH_SPEC.md`
 
 ---
 
@@ -277,6 +286,8 @@ ad-guard serve --port 8788
 
 **Price:** £300–£800/mo per instance
 
+**Docs:** `docs/AD_GUARD_SALES_TECH_SPEC.md`
+
 ---
 
 # Product #7 — Health Telemetry Recorder
@@ -315,6 +326,8 @@ POST batch → schema validate → ledger append (telemetry_batch) → F1–F9 �
 ```
 
 **Price:** £5k–£15k license + £500/mo maintenance
+
+**Docs:** `docs/HEALTH_TELEMETRY_SALES_TECH_SPEC.md`
 
 ---
 
@@ -404,9 +417,28 @@ pip install -e ".[dev,instpp]"
 
 ---
 
+---
+
+# Commercial readiness (portfolio)
+
+| Asset | Status |
+|-------|--------|
+| Portfolio sales sheet | `docs/PORTFOLIO_SALES_SHEET.md` — pricing, pilot ladder, RFP matrix |
+| Buyer evidence pack | `docs/BUYER_EVIDENCE_PACK.md` — 15-min procurement dry-run |
+| Buyer one-pagers | `docs/*_BUYER.md` — all 7 with pitch + next step |
+| Sales tech specs | `docs/*_SALES_TECH_SPEC.md` — all 7 (RFP depth) |
+| SOC 2 VPC pack | `docs/SOC2_VPC_DILIGENCE_PACK.md` |
+| Rigorous E2E proof | `docs/test_logs/instpp_rigorous_latest_summary.json` — 7/7 PASSED |
+
+**Sell motion:** Demo (60s) → `verify-bundle` offline → shadow pilot → paid LOI.
+
+---
+
 ## Related documents
 
+- `docs/PORTFOLIO_SALES_SHEET.md` — unified commercial sheet (start here for sales)
+- `docs/BUYER_EVIDENCE_PACK.md` — procurement / auditor evidence index
 - `docs/INST_PLUS_GOLD_STANDARD.md` — six-dimension bar (all 7)
-- `docs/INST_PLUS_PRE_REV_VALUATION.md` — IP ranges
+- `docs/INST_PLUS_PRE_REV_VALUATION.md` — IP ranges (full portfolio)
 - `docs/INST_PLUS_DEEP_DIVE_COMPLIANCE_PROXY.md` — #1 + #2 extended
 - `docs/INSTITUTIONAL_ENTERPRISE_STACK.md` — enterprise positioning

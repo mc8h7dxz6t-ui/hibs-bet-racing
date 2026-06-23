@@ -2,6 +2,8 @@
 
 **One job:** High-frequency device batches → Lamport-ordered sealed log → auditor export — **audit spine, not FDA certification**.
 
+**Pitch:** *Prove your device telemetry wasn't tampered with — deploy in your VPC, verify offline.*
+
 ---
 
 ## Buyer
@@ -59,4 +61,16 @@ health-telemetry verify-bundle --tarball ./health_bundle.tar
 | `export` | Audit bundle |
 | `verify-bundle` | Offline auditor replay |
 
-See `src/health_telemetry/README.md` and `docs/HEALTH_TELEMETRY_HIPAA_PACK.md`.
+See `src/health_telemetry/README.md` and `docs/HEALTH_TELEMETRY_HIPAA_PACK.md`.  
+**Full spec:** `docs/HEALTH_TELEMETRY_SALES_TECH_SPEC.md`
+
+---
+
+## Next step
+
+| Step | Action |
+|------|--------|
+| 1 | `./scripts/demo_health_telemetry.sh` (60s) |
+| 2 | `health-telemetry verify-bundle --tarball ./health_bundle.tar` |
+| 3 | RFP depth → `docs/HEALTH_TELEMETRY_SALES_TECH_SPEC.md` |
+| 4 | Hospital pilot → `docs/HEALTH_TELEMETRY_HOSPITAL_PILOT.md` |

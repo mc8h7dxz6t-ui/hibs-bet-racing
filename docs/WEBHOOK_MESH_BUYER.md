@@ -2,6 +2,8 @@
 
 **One job:** Inbound webhooks → signature verify → idempotency CAS → WAL fsync → HTTP 200 → async forward — never double-process a billing event.
 
+**Pitch:** *Ack webhooks only after durability — with cryptographic proof you never charged twice.*
+
 ---
 
 ## Buyer
@@ -61,4 +63,16 @@ export WEBHOOK_PROVIDER_SECRET=demo-secret
 | `export` | Audit bundle |
 | `verify-bundle` | Offline auditor replay |
 
-See `src/webhook_mesh/README.md` for architecture.
+See `src/webhook_mesh/README.md` for architecture.  
+**Full spec:** `docs/WEBHOOK_MESH_SALES_TECH_SPEC.md`
+
+---
+
+## Next step
+
+| Step | Action |
+|------|--------|
+| 1 | `export WEBHOOK_PROVIDER_SECRET=demo-secret && ./scripts/demo_webhook_mesh.sh` |
+| 2 | `webhook-mesh verify-bundle --tarball ./webhook_mesh_bundle.tar` |
+| 3 | RFP depth → `docs/WEBHOOK_MESH_SALES_TECH_SPEC.md` |
+| 4 | Portfolio pricing → `docs/PORTFOLIO_SALES_SHEET.md` |
