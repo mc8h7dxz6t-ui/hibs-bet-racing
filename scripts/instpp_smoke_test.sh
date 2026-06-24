@@ -31,6 +31,7 @@ echo "==> Running institutional test suite (all 8 products)"
   tests/test_drift_gate.py \
   tests/test_webhook_replay.py \
   tests/test_spend_guard.py \
+  tests/test_agent_ledger.py \
   tests/test_industry_gold.py \
   -q
 
@@ -55,7 +56,7 @@ raise SystemExit(0 if ok else 1)
 PY
 
 echo ""
-echo "INSTITUTIONAL SMOKE TEST PASSED (11/11 Industry Gold)"
+echo "INSTITUTIONAL SMOKE TEST PASSED (12/12 Industry Gold)"
 echo "Ready to demo:"
 echo "  ./scripts/demo_instpp.sh              # compliance + proxy (~60s)"
 echo "  ./scripts/demo_altdata.sh             # product #3"

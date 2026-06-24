@@ -138,6 +138,15 @@ PRODUCT_CATALOG: tuple[ProductCatalogEntry, ...] = (
         "spend_guard_bundle",
         "spend-guard",
     ),
+    ProductCatalogEntry(
+        "agent-ledger",
+        "agent-ledger",
+        "Agent Ledger",
+        "Permit agent tools before execution",
+        "agent_ledger.sqlite",
+        "agent_ledger_bundle",
+        "agent-ledger",
+    ),
 )
 
 
