@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Portfolio demo — all 11 institutional products in one run.
+# Portfolio demo — all 12 institutional products in one run.
 #
 # Usage:
-#   ./scripts/demo_portfolio_all.sh              # all 11 demos
+#   ./scripts/demo_portfolio_all.sh              # all 12 demos
 #   ./scripts/demo_portfolio_all.sh --clean    # wipe data/demo/portfolio first
 #   SKIP_LIVE=1 ./scripts/demo_portfolio_all.sh   # offline-safe (no httpbin / FX)
 #   PAUSE=1 ./scripts/demo_portfolio_all.sh     # press Enter between products (recording)
@@ -19,7 +19,7 @@ instpp_bootstrap
 DEMO_DIR="${PORTFOLIO_DEMO_DIR:-./data/demo/portfolio}"
 SKIP_LIVE="${SKIP_LIVE:-0}"
 PAUSE="${PAUSE:-0}"
-TOTAL=11
+TOTAL=12
 
 export WEBHOOK_PROVIDER_SECRET="${WEBHOOK_PROVIDER_SECRET:-demo-secret}"
 export SKIP_LIVE_LLM="${SKIP_LIVE_LLM:-1}"
@@ -47,7 +47,7 @@ product_pause() {
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   echo "Usage: ./scripts/demo_portfolio_all.sh [--clean]"
   echo ""
-  echo "  Runs all 11 gold-standard product demos → $DEMO_DIR/"
+  echo "  Runs all 12 gold-standard product demos → $DEMO_DIR/"
   echo ""
   echo "  Environment:"
   echo "    SKIP_LIVE=1          No external HTTP (proxy, alt-data FX)"
@@ -152,7 +152,15 @@ product_pause "11" "Spend Guard" \
   "$DEMO_DIR/spend_guard.sqlite" \
   "$DEMO_DIR/spend_guard_bundle.tar"
 
-banner "PORTFOLIO DEMO COMPLETE — 11/11"
+product_pause "12" "Agent Ledger" \
+  "Plain: Permit before agent tools run — prove who allowed what, before execution."
+
+./scripts/demo_agent_ledger.sh \
+  "$DEMO_DIR/agent_ledger.sqlite" \
+  "$DEMO_DIR/agent_ledger_permits.sqlite" \
+  "$DEMO_DIR/agent_ledger_bundle.tar"
+
+banner "PORTFOLIO DEMO COMPLETE — 12/12"
 
 "$PYTHON" - <<PY
 import json
@@ -171,6 +179,7 @@ products = [
     ("drift_gate", demo / "drift_gate_bundle.tar"),
     ("webhook_replay", demo / "webhook_replay_bundle.tar"),
     ("spend_guard", demo / "spend_guard_bundle.tar"),
+    ("agent_ledger", demo / "agent_ledger_bundle.tar"),
 ]
 artifacts = {}
 for name, tar in products:
@@ -188,6 +197,7 @@ echo ""
 echo "Verify any bundle offline, e.g.:"
 echo "  compliance-log verify-bundle --tarball $DEMO_DIR/compliance_bundle.tar"
 echo "  spend-guard verify-bundle --tarball $DEMO_DIR/spend_guard_bundle.tar"
+echo "  agent-ledger verify-bundle --tarball $DEMO_DIR/agent_ledger_bundle.tar"
 echo ""
 echo "Spend-plane sales walkthrough: make demo-gold"
 echo "Video recording: PAUSE=1 ./scripts/demo_portfolio_all.sh"

@@ -22,7 +22,7 @@ make demo-all            # all 11 SKUs → data/demo/portfolio/
 | Goal | Command | Time |
 |------|---------|------|
 | **Preflight** (before any demo) | `make demo-ready` | ~30s |
-| **Full portfolio demo** (11 SKUs) | `make demo-all` | ~3–5 min |
+| **Full portfolio demo** (12 SKUs) | `make demo-all` | ~4–6 min |
 | **Spend-plane sales walkthrough** | `make demo-gold` | ~60s |
 | **Proof Console** (11 SKU picker + workflows) | `make demo-gold-up` → http://127.0.0.1:8790 | ~30s |
 | **Spend gateway** (OpenAI-compat) | `make spend-gateway` → http://127.0.0.1:8789 | ~10s |

@@ -178,7 +178,7 @@ def test_proof_catalog_and_spine_workflow(workflow_client, tmp_path: Path):
     r = client.get("/api/products")
     assert r.status_code == 200
     catalog = r.json()["catalog"]
-    assert len(catalog) == 11
+    assert len(catalog) == 12
 
     r = client.post("/api/proof/select", json={"product_id": "altdata"})
     assert r.status_code == 200
@@ -204,4 +204,4 @@ def test_workflow_config_includes_proof_tab(workflow_client):
     client, *_ = workflow_client
     cfg = client.get("/api/config").json()
     assert cfg["tabs"]["proof"] is True
-    assert len(cfg["proof"]["catalog"]) == 11
+    assert len(cfg["proof"]["catalog"]) == 12

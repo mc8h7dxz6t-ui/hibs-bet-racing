@@ -18,7 +18,7 @@ mkdir -p "$LOG_DIR"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "================================================================"
-echo "INSTITUTIONAL RIGOROUS TEST — All 11 Products (8 + Phase 2)"
+echo "INSTITUTIONAL RIGOROUS TEST — All 12 Products"
 echo "Started: $(date -u +%Y-%m-%dT%H:%M:%SZ) UTC"
 echo "Log: $LOG_FILE"
 echo "================================================================"
@@ -102,6 +102,7 @@ section "Unit tests — full institutional suite"
   tests/test_drift_gate.py \
   tests/test_webhook_replay.py \
   tests/test_spend_guard.py \
+  tests/test_agent_ledger.py \
   tests/test_industry_gold.py \
   -v --tb=short
 pass "Unit test suite"
@@ -728,6 +729,35 @@ echo "$SG_HTTP_CHECK"
 echo "$SG_HTTP_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
 pass "Spend Guard OpenAI-compat gateway rigorous E2E"
 
+section "Agent Ledger — authorize/complete + check + export + verify"
+AL_DB="$WORK/agent_ledger.sqlite"
+AL_PERMIT="$WORK/agent_ledger_permits.sqlite"
+AL_TAR="$WORK/agent_ledger_bundle.tar"
+AUTH_JSON=$("$PYTHON" -m agent_ledger.cli authorize \
+  --agent-id rigorous-agent --tool read_file \
+  --args '{"path":"docs/demo_snapshot.json"}' \
+  --database "$AL_DB" --permit-db "$AL_PERMIT" \
+  --idempotency-key al-rigorous-1)
+AL_PERMIT_ID=$(echo "$AUTH_JSON" | "$PYTHON" -c "import sys,json; print(json.load(sys.stdin).get('permit_id',''))")
+"$PYTHON" -m agent_ledger.cli complete \
+  --permit-id "$AL_PERMIT_ID" \
+  --result '{"status":"ok"}' \
+  --database "$AL_DB" --permit-db "$AL_PERMIT"
+"$PYTHON" -m agent_ledger.cli authorize \
+  --agent-id rigorous-agent --tool transfer_funds \
+  --args '{"amount":9999}' \
+  --database "$AL_DB" --permit-db "$AL_PERMIT" || true
+AL_CHECK=$("$PYTHON" -m agent_ledger.cli check --database "$AL_DB")
+echo "$AL_CHECK"
+echo "$AL_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
+AL_EXPORT=$("$PYTHON" -m agent_ledger.cli export --database "$AL_DB" --tarball "$AL_TAR")
+echo "$AL_EXPORT"
+echo "$AL_EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+AL_VERIFY=$("$PYTHON" -m agent_ledger.cli verify-bundle --tarball "$AL_TAR")
+echo "$AL_VERIFY"
+echo "$AL_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+pass "Agent Ledger institutional E2E"
+
 section "Industry gold — chaos + integration"
 "$PYTHON" -m pytest tests/test_industry_gold.py -v --tb=short
 pass "Industry gold chaos suite"
@@ -741,10 +771,10 @@ print(json.dumps({
     'products': [
         'compliance_logger', 'proxy_risk', 'altdata', 'ai_kit',
         'webhook_mesh', 'ad_guard', 'health_telemetry', 'model_governor',
-        'drift_gate', 'webhook_replay', 'spend_guard',
+        'drift_gate', 'webhook_replay', 'spend_guard', 'agent_ledger',
     ],
     'status': 'PASSED',
-    'e2e_sections': 34,
+    'e2e_sections': 36,
     'industry_gold': True,
     'finished_utc': '$ENDED_AT',
     'log_file': '$(basename "$LOG_FILE")',
@@ -754,7 +784,7 @@ echo ""
 echo "$SUMMARY_JSON" | tee "$LOG_DIR/instpp_rigorous_latest_summary.json"
 echo ""
 echo "================================================================"
-echo "ALL RIGOROUS TESTS PASSED — 11/11 PRODUCTS (INDUSTRY GOLD)"
+echo "ALL RIGOROUS TESTS PASSED — 12/12 PRODUCTS (INDUSTRY GOLD)"
 echo "Finished: $ENDED_AT UTC"
 echo "Log: $LOG_FILE"
 echo "Summary: $LOG_DIR/instpp_rigorous_latest_summary.json"

@@ -311,6 +311,21 @@ async def test_spend_guard_http_reserve_settle_path(tmp_path: Path):
         assert "reserve" in phases and "settle" in phases
 
 
+def test_agent_ledger_fail_closed_duplicate_complete(tmp_path: Path):
+    from agent_ledger.permits import PermitStore
+
+    store = PermitStore(tmp_path / "p.sqlite")
+    store.create_permit(
+        agent_id="chaos",
+        tool_name="read_file",
+        decision="permit",
+        reason="ok",
+        permit_id="chaos-p1",
+    )
+    assert store.complete("chaos-p1")[0] is True
+    assert store.complete("chaos-p1")[0] is False
+
+
 @pytest.mark.asyncio
 async def test_proxy_shadow_latency_p99_under_10ms():
     gw = ProxyRiskGateway(shadow_mode=True, idempotency=MemoryIdempotencyBackend())

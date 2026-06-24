@@ -33,7 +33,7 @@ step "CLI entry points (11 SKUs)"
 CLIS=(
   compliance-log proxy-risk altdata ai-kit webhook-mesh
   ad-guard health-telemetry model-governor
-  drift-gate webhook-replay spend-guard
+  drift-gate webhook-replay spend-guard agent-ledger
 )
 for cli in "${CLIS[@]}"; do
   if command -v "$cli" >/dev/null 2>&1; then
@@ -67,7 +67,7 @@ step "Core imports"
 mods = [
     "inst_spine", "compliance_log", "proxy_risk", "altdata", "ai_kit",
     "webhook_mesh", "ad_guard", "health_telemetry", "model_governor",
-    "drift_gate", "webhook_replay", "spend_guard", "inst_workflow",
+    "drift_gate", "webhook_replay", "spend_guard", "inst_workflow", "agent_ledger",
 ]
 for m in mods:
     __import__(m)
