@@ -4,7 +4,7 @@
 
 **Pitch:** *Prove which model version was approved for production on date X — with math, not a spreadsheet.*
 
-> **Strategic north star (roadmap):** LLM spend ledger control plane — reserve-before-dispatch, wallet settlement, multi-provider gateway. That is **not** what ships in #8 today. See [MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md](MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md) for comps, exit framing, and shipped vs roadmap.
+> **LLM spend control plane:** Canonical sales demo is **`make demo-gold`** (11 steps, drift lockout in step 10). See [DEMO_GOLD.md](DEMO_GOLD.md) and [MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md](MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md). This buyer sheet covers the **#8 lifecycle CLI** SKU on `inst_spine`.
 
 ---
 
@@ -42,9 +42,19 @@ model-governor verify-bundle --tarball ./model_governor_bundle.tar
 
 ## 60-second demo
 
+**Lifecycle CLI (#8):**
+
 ```bash
 ./scripts/demo_model_governor.sh
 ```
+
+**LLM spend control plane (canonical sales):**
+
+```bash
+make demo-gold-up && make demo-gold
+```
+
+See [DEMO_GOLD.md](DEMO_GOLD.md) — drift lockout is step 10; use `make demo-gold-reset` before rerun.
 
 ---
 
@@ -68,7 +78,8 @@ model-governor verify-bundle --tarball ./model_governor_bundle.tar
 
 See `src/model_governor/README.md` for architecture.  
 **Full spec:** `docs/MODEL_GOVERNOR_SALES_TECH_SPEC.md`  
-**Strategic comps & valuation:** `docs/MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md`
+**Strategic comps & valuation:** `docs/MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md`  
+**Gold demo:** `docs/DEMO_GOLD.md` — `make demo-gold`
 
 ---
 

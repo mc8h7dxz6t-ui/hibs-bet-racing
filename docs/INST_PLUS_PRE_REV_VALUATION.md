@@ -174,5 +174,6 @@ Inst++ today sits in the **IP asset / small acqui-hire** band — **not** seed-r
 - `docs/ALTDATA_SALES_TECH_SPEC.md` through `HEALTH_TELEMETRY_SALES_TECH_SPEC.md`  
 - `docs/MODEL_GOVERNOR_SALES_TECH_SPEC.md`  
 - `docs/MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md` — north star comps & exit framing  
+- `docs/DEMO_GOLD.md` — canonical `make demo-gold` sales walkthrough  
 - `docs/INST_PLUS_DEEP_DIVE_ALL_7.md`  
 - `docs/INST_PLUS_GOLD_STANDARD.md`

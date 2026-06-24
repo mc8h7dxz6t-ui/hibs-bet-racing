@@ -13,7 +13,7 @@
 
 **One-line pitch:** *Prove which model version was approved for production on date X — with math, not a spreadsheet.*
 
-> **This spec describes shipped #8** (model lifecycle governance). For the LLM spend control-plane thesis, LiteLLM/Portkey comps, and exit valuation bands, see [MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md](MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md).
+> **This spec describes shipped #8 CLI** (model lifecycle governance). For the LLM spend control-plane demo, comps, and exit valuation bands, see [MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md](MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md) and [DEMO_GOLD.md](DEMO_GOLD.md) (`make demo-gold`).
 
 | | |
 |---|---|

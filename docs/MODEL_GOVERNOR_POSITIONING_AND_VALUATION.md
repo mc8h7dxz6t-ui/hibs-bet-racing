@@ -10,7 +10,7 @@
 
 **LiteLLM and Portkey govern traffic; ModelGovernor governs money** — reserve-before-dispatch, ledger settlement, and audit surfaces that proxies and observability tools were not built to own.
 
-*That line applies to the **strategic north star** (LLM spend control plane). The **shipped SKU (#8)** today is model lifecycle governance on the same institutional spine — see [Shipped today vs north star](#shipped-today-vs-north-star).*
+*That line is the product thesis. Runnable proof is `make demo-gold` (11-step walkthrough). The portfolio **#8 CLI** also ships model lifecycle governance on `inst_spine` — see [Shipped today vs north star](#shipped-today-vs-north-star).*
 
 ---
 
@@ -18,23 +18,32 @@
 
 | Layer | Status | What it is |
 |-------|--------|------------|
-| **#8 ModelGovernor (shipped)** | ✅ Gold standard in repo | ML model lifecycle governance ledger — `register` / `approve` / `deploy` / `retire` / `drift_alert` on `inst_spine`, offline `verify-bundle` |
-| **LLM spend control plane (north star)** | 🔲 Roadmap | OpenAI-shaped multi-provider gateway + Postgres wallet + reserve → dispatch → settle on real tokens + drift lockout + leader-elected reconciler + K8s/GitOps demos |
+| **LLM spend control plane (canonical demo)** | ✅ `make demo-gold` | Gateway + sidecar + reconciler on `docker-compose.demo.yml` — reserve → dispatch → settle, drift lockout in step 10 |
+| **#8 ModelGovernor CLI (portfolio SKU)** | ✅ Gold standard | ML model lifecycle governance ledger — `register` / `approve` / `deploy` / `drift_alert` on `inst_spine`, offline `verify-bundle` |
 
-**Do not conflate the two in diligence.** Buyers comparing you to LiteLLM/Portkey are evaluating the north star. Buyers evaluating SR 11-7 / model-risk evidence are evaluating #8 as-built.
+**Diligence lens:** Buyers comparing you to LiteLLM/Portkey should run **`make demo-gold`**. Buyers evaluating SR 11-7 / model-risk evidence use the **#8 CLI** lifecycle ledger.
 
-### Runnable proof today
+### Canonical sales demo (`make demo-gold`)
+
+```bash
+make demo-gold-up
+make demo-gold          # full 11-step walkthrough
+make demo-gold-reset    # before rerun (wallet locked after step 10)
+make demo-gold-down     # teardown
+```
+
+| Command | Stack | Purpose |
+|---------|-------|---------|
+| `make demo-gold` | `docker-compose.demo.yml` (gateway + sidecar + reconciler) | **Canonical** — governance + reliability; drift lockout in **step 10** (`DRIFT_THRESHOLD_EXCEEDED` → wallet locked → 409 on next reserve) |
+| `make demo-drift-lock` | `docker-compose.yml` (sidecar only, legacy) | Optional standalone drift drill — **not** required for sales; redundant if you ran gold |
+
+Full reference: [DEMO_GOLD.md](DEMO_GOLD.md)
+
+### Portfolio CLI proof (#8 lifecycle)
 
 ```bash
 ./scripts/demo_model_governor.sh
 model-governor verify-bundle --tarball ./model_governor_bundle.tar
-```
-
-### Runnable proof on north star (not in repo yet)
-
-```bash
-make demo-gold-up && make demo-gold    # full reserve → settle story
-make demo-drift-lock                   # finance is hard policy, not a chart
 ```
 
 ---
@@ -293,7 +302,7 @@ You're not worthless — you're **pre-traction**, so price is buyer-specific, no
 
 ## One line for a buyer conversation
 
-“We're the ledger control plane for LLM spend — not LiteLLM with budgets. Pre-revenue on the finance plane, but institutional++ on the audit spine: demo in 5 minutes, production patterns in-repo, reserve-before-dispatch on the roadmap. We're open to cash + small rollover for the right strategic.”
+“We're the ledger control plane for LLM spend — not LiteLLM with budgets. Institutional++: `make demo-gold` in five minutes (reserve-before-dispatch, drift lockout in step 10). We're open to cash + small rollover for the right strategic.”
 
 ---
 
@@ -301,6 +310,7 @@ You're not worthless — you're **pre-traction**, so price is buyer-specific, no
 
 | Doc | Scope |
 |-----|-------|
+| [DEMO_GOLD.md](DEMO_GOLD.md) | Canonical `make demo-gold` walkthrough |
 | [MODEL_GOVERNOR_BUYER.md](MODEL_GOVERNOR_BUYER.md) | Shipped #8 buyer sheet |
 | [MODEL_GOVERNOR_SALES_TECH_SPEC.md](MODEL_GOVERNOR_SALES_TECH_SPEC.md) | Shipped #8 RFP depth |
 | [INST_PLUS_PRE_REV_VALUATION.md](INST_PLUS_PRE_REV_VALUATION.md) | Portfolio pre-rev valuation (as-built) |
