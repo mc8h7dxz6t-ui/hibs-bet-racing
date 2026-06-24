@@ -24,7 +24,8 @@ make demo-all            # all 11 SKUs → data/demo/portfolio/
 | **Preflight** (before any demo) | `make demo-ready` | ~30s |
 | **Full portfolio demo** (11 SKUs) | `make demo-all` | ~3–5 min |
 | **Spend-plane sales walkthrough** | `make demo-gold` | ~60s |
-| **Workflow UI** (Compliance + Proxy) | `make demo-gold-up` → http://127.0.0.1:8790 | ~30s |
+| **Proof Console** (11 SKU picker + workflows) | `make demo-gold-up` → http://127.0.0.1:8790 | ~30s |
+| **Spend gateway** (OpenAI-compat) | `make spend-gateway` → http://127.0.0.1:8789 | ~10s |
 | **Unit + integration smoke** | `make smoke` | ~2 min |
 | **Rigorous E2E 11/11** | `make rigorous` | ~3 min |
 | **Chaos drills** | `make chaos` | ~1 min |
@@ -132,6 +133,8 @@ See [BUYER_EVIDENCE_PACK.md](BUYER_EVIDENCE_PACK.md).
 |------|--------|
 | **11/11 CLI demos** | ✅ `make demo-all` |
 | **Spend-plane gold demo** | ✅ `make demo-gold` (Spend Guard CLI) |
-| **Workflow UI** | ✅ Compliance + Proxy only (`make demo-gold-up`) |
+| **Workflow UI** | ✅ Proof Console 11 SKU picker + Compliance + Proxy (`make demo-gold-up`) |
+| **Redis Stream delivery** | ✅ `WEBHOOK_DISPATCH_MODE=redis` + rigorous E2E + chaos |
+| **Spend gateway (OpenAI-compat)** | ✅ `spend-guard serve` + rigorous HTTP E2E |
 | **Postgres compose stack** | Design-partner north star — not required for proof |
 | **Sports (hibs-racing)** | Separate product — not part of inst++ sale |

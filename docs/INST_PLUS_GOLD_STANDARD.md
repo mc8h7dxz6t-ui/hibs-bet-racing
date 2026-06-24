@@ -50,8 +50,8 @@
 |------|------|
 | Offline `verify-bundle` (auditor never calls vendor) | All 11 |
 | Genesis anti-wipe + Lamport clocks | All 11 |
-| WAL-before-side-effect | #5 Webhook Mesh, ingress capture |
-| Reserve → settle → drift lockout | #11 Spend Guard |
+| WAL-before-side-effect + Redis Stream delivery | #5 Webhook Mesh |
+| Reserve → settle → drift lockout + OpenAI-compat gateway | #11 Spend Guard |
 | PSI/KS enforce at proxy | #9 Drift Gate + #2 Proxy-Risk |
 | Byte-identical webhook replay | #10 Webhook Replay |
 | Shadow → live burn-in | #2 Proxy-Risk, #9 Drift Gate |

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import time
+import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -164,6 +165,150 @@ def test_replay_tamper_fails_closed(tmp_path: Path):
     engine = ReplayEngine(store)
     result = engine.replay_capture(m, b + b"tampered")
     assert not result.ok
+
+
+@pytest.mark.asyncio
+async def test_redis_stream_delivery_integration(monkeypatch, tmp_path: Path):
+    """Redis Stream enqueue → worker dispatch → ACK (mocked redis)."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from webhook_mesh.queue import (
+        CONSUMER_GROUP,
+        DeliveryManifest,
+        RedisStreamDeliveryQueue,
+        STREAM_KEY,
+    )
+
+    redis_client = MagicMock()
+    redis_client.xgroup_create = AsyncMock()
+    redis_client.xautoclaim = AsyncMock(return_value=("0-0", [], []))
+    manifest = DeliveryManifest(
+        manifest_id="chaos-stream-1",
+        payload=b'{"id":"stream-1"}',
+        target_url="https://example.com/hook",
+        lamport=9,
+        payload_id="stream-1",
+    )
+    redis_client.xadd = AsyncMock(return_value="100-0")
+    redis_client.xreadgroup = AsyncMock(
+        side_effect=[
+            [(STREAM_KEY, [("100-0", manifest.to_stream_fields())])],
+            asyncio.CancelledError(),
+        ]
+    )
+    redis_client.xack = AsyncMock()
+    queue = RedisStreamDeliveryQueue(redis_client)
+    await queue.enqueue(manifest)
+    redis_client.xadd.assert_awaited_once()
+
+    delivered = {"ok": False}
+
+    async def _fake_dispatch(**kwargs):  # noqa: ANN003
+        delivered["ok"] = True
+        return True
+
+    monkeypatch.setattr("webhook_mesh.fsm.dispatch_webhook_delivery", _fake_dispatch)
+    queue._running = True
+    with pytest.raises(asyncio.CancelledError):
+        await queue._consume_loop()
+    assert delivered["ok"] is True
+    redis_client.xack.assert_awaited_with(STREAM_KEY, CONSUMER_GROUP, "100-0")
+
+
+@pytest.mark.asyncio
+async def test_redis_stream_with_capture_integration(tmp_path: Path):
+    """Ingress + Redis stream mode + replay capture (industry gold)."""
+    capture_dir = tmp_path / "caps"
+    os.environ["WEBHOOK_REPLAY_CAPTURE_DIR"] = str(capture_dir)
+    os.environ["WEBHOOK_DISPATCH_MODE"] = "redis"
+    try:
+        from unittest.mock import AsyncMock, MagicMock
+
+        from fastapi.testclient import TestClient
+
+        import webhook_mesh.serve as serve_mod
+        from inst_spine.wal import WALWriter
+        from webhook_mesh.queue import RedisStreamDeliveryQueue
+
+        db = tmp_path / "wh.sqlite"
+        wal = tmp_path / "ingress.wal"
+        secret = "stream-capture-secret"
+        os.environ["WEBHOOK_MESH_LEDGER"] = str(db)
+
+        redis_client = MagicMock()
+        redis_client.xgroup_create = AsyncMock()
+        redis_client.xadd = AsyncMock(return_value="1-0")
+
+        class _StreamQueue(RedisStreamDeliveryQueue):
+            async def start_worker(self, handler=None):  # noqa: ANN001
+                return None
+
+        serve_mod.state = serve_mod.RuntimeState()
+        serve_mod.state.provider_secret = secret
+        serve_mod.state.wal_writer = WALWriter(wal)
+        serve_mod.state.idempotency_db = MemoryIdempotencyBackend()
+        serve_mod.state.dead_letter_dir = str(tmp_path / "dlq")
+        serve_mod.state.delivery_queue = _StreamQueue(redis_client)
+        serve_mod.state.dispatch_mode = "redis"
+
+        import hashlib
+        import hmac
+
+        body = b'{"id":"stream-cap-1"}'
+        sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+        client = TestClient(serve_mod.app)
+        r = client.post(
+            "/v1/ingress/tenant-stream",
+            content=body,
+            headers={
+                "X-Provider-Signature": sig,
+                "X-Webhook-Id": "stream-cap-1",
+                "X-Target-Forward-Url": "https://example.com/hook",
+            },
+        )
+        assert r.status_code == 200
+        assert r.json()["dispatch_mode"] == "redis"
+        redis_client.xadd.assert_awaited_once()
+        caps = list(capture_dir.glob("*.wrcap"))
+        assert len(caps) == 1
+    finally:
+        os.environ.pop("WEBHOOK_REPLAY_CAPTURE_DIR", None)
+        os.environ.pop("WEBHOOK_DISPATCH_MODE", None)
+
+
+@pytest.mark.asyncio
+async def test_spend_guard_http_reserve_settle_path(tmp_path: Path):
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    import spend_guard.serve as serve_mod
+
+    wallet_db = tmp_path / "wallet.sqlite"
+    ledger_db = tmp_path / "ledger.sqlite"
+    from spend_guard.wallet import SpendWallet
+
+    SpendWallet(wallet_db, initial_balance=200.0)
+    serve_mod.state.wallet_db = str(wallet_db)
+    serve_mod.state.ledger_db = str(ledger_db)
+    serve_mod.state.mock_upstream = True
+    serve_mod.state.gateway = None
+
+    with TestClient(serve_mod.app) as client:
+        r = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "demo-model",
+                "messages": [{"role": "user", "content": "rigorous"}],
+                "max_tokens": 16,
+            },
+            headers={"X-Request-Id": "industry-gold-http-1"},
+        )
+        assert r.status_code == 200
+        if serve_mod.state.ledger:
+            serve_mod.state.ledger.stop_async_writer(flush=True)
+        ledger = AppendOnlyLedger(ledger_db)
+        phases = [e["payload"].get("phase") for e in ledger.list_entries() if e.get("event_type") == "spend_guard"]
+        assert "reserve" in phases and "settle" in phases
 
 
 @pytest.mark.asyncio

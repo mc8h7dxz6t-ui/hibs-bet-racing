@@ -505,6 +505,59 @@ echo "$WH_VERIFY"
 echo "$WH_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "Webhook Mesh institutional E2E"
 
+section "Webhook Mesh — Redis Stream delivery (mocked)"
+"$PYTHON" - <<PY
+import asyncio
+import hashlib
+import hmac
+import json
+import os
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
+
+from fastapi.testclient import TestClient
+from inst_spine.rates import MemoryIdempotencyBackend
+from inst_spine.wal import WALWriter
+import webhook_mesh.serve as serve_mod
+from webhook_mesh.queue import RedisStreamDeliveryQueue
+
+db = Path("$WEBHOOK_DB")
+wal = Path("$WORK/ingress_stream.wal")
+secret = "rigorous-stream-secret"
+os.environ["WEBHOOK_MESH_LEDGER"] = str(db)
+os.environ["WEBHOOK_DISPATCH_MODE"] = "redis"
+
+redis_client = MagicMock()
+redis_client.xgroup_create = AsyncMock()
+redis_client.xadd = AsyncMock(return_value="1-0")
+
+class _StreamQueue(RedisStreamDeliveryQueue):
+    async def start_worker(self, handler=None):
+        return None
+
+serve_mod.state = serve_mod.RuntimeState()
+serve_mod.state.provider_secret = secret
+serve_mod.state.wal_writer = WALWriter(wal)
+serve_mod.state.idempotency_db = MemoryIdempotencyBackend()
+serve_mod.state.dead_letter_dir = str(Path("$WORK") / "dlq_stream")
+serve_mod.state.delivery_queue = _StreamQueue(redis_client)
+serve_mod.state.dispatch_mode = "redis"
+
+body = b'{"id":"evt-stream-1"}'
+sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+headers = {
+    "X-Provider-Signature": sig,
+    "X-Webhook-Id": "evt-stream-1",
+    "X-Target-Forward-Url": "https://example.com/forward",
+}
+client = TestClient(serve_mod.app)
+r = client.post("/v1/ingress/tenant-stream", content=body, headers=headers)
+assert r.status_code == 200 and r.json()["dispatch_mode"] == "redis", r.text
+redis_client.xadd.assert_awaited_once()
+print(json.dumps({"redis_stream": "ok", "dispatch_mode": "redis"}))
+PY
+pass "Webhook Mesh Redis Stream rigorous E2E"
+
 section "Ad Guard — evaluate + check + export + verify"
 AD_BODY='{"campaignId":"rigorous-99","bidMicros":2500000,"costMicros":10000000}'
 "$PYTHON" -m ad_guard.cli evaluate --provider google --body "$AD_BODY" --database "$ADGUARD_DB" || true
@@ -627,6 +680,53 @@ SG_VERIFY=$("$PYTHON" -m spend_guard.cli verify-bundle --tarball "$SG_TAR")
 echo "$SG_VERIFY"
 echo "$SG_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "Spend Guard institutional E2E"
+
+section "Spend Guard — OpenAI-compat gateway (mock upstream)"
+SG_HTTP_WALLET="$WORK/spend_http_wallet.sqlite"
+SG_HTTP_DB="$WORK/spend_http.sqlite"
+rm -f "$SG_HTTP_WALLET" "$SG_HTTP_DB"
+"$PYTHON" -m spend_guard.cli init-wallet --wallet-db "$SG_HTTP_WALLET" --balance 500
+export SPEND_GUARD_WALLET_DB="$SG_HTTP_WALLET"
+export SPEND_GUARD_LEDGER_DB="$SG_HTTP_DB"
+export SPEND_GUARD_MOCK_UPSTREAM=1
+"$PYTHON" - <<PY
+import json
+import os
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+import spend_guard.serve as serve_mod
+
+serve_mod.state.wallet_db = os.environ["SPEND_GUARD_WALLET_DB"]
+serve_mod.state.ledger_db = os.environ["SPEND_GUARD_LEDGER_DB"]
+serve_mod.state.mock_upstream = True
+serve_mod.state.gateway = None
+
+client = TestClient(serve_mod.app)
+r = client.post(
+    "/v1/chat/completions",
+    json={
+        "model": "demo-model",
+        "messages": [{"role": "user", "content": "rigorous spend gateway"}],
+        "max_tokens": 24,
+    },
+    headers={"X-Request-Id": "sg-rigorous-http-1"},
+)
+assert r.status_code == 200, r.text
+body = r.json()
+assert body.get("_spend_guard", {}).get("request_id") == "sg-rigorous-http-1"
+if serve_mod.state.ledger:
+    serve_mod.state.ledger.stop_async_writer(flush=True)
+from inst_spine.ledger import AppendOnlyLedger
+ledger = AppendOnlyLedger(Path(os.environ["SPEND_GUARD_LEDGER_DB"]))
+phases = [e["payload"].get("phase") for e in ledger.list_entries() if e.get("event_type") == "spend_guard"]
+assert "reserve" in phases and "settle" in phases, phases
+print(json.dumps({"spend_gateway_http": "ok", "phases": phases}))
+PY
+SG_HTTP_CHECK=$("$PYTHON" -m spend_guard.cli check --database "$SG_HTTP_DB")
+echo "$SG_HTTP_CHECK"
+echo "$SG_HTTP_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
+pass "Spend Guard OpenAI-compat gateway rigorous E2E"
 
 section "Industry gold — chaos + integration"
 "$PYTHON" -m pytest tests/test_industry_gold.py -v --tb=short

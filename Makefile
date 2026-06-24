@@ -53,6 +53,9 @@ demo-gold-up:
 demo-gold-down:
 	./scripts/demo_gold_down.sh
 
+spend-gateway:
+	SPEND_GUARD_MOCK_UPSTREAM=1 spend-guard serve --mock-upstream
+
 workflow-up: demo-gold-up
 
 workflow-down: demo-gold-down

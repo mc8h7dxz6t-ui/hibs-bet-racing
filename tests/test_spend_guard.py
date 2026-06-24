@@ -70,3 +70,83 @@ def test_gateway_logs_to_ledger(tmp_path: Path):
     s = gw.settle(r.hold_id or "", actual_cost=9.0, request_id="g1")
     assert s.decision.value == "approve"
     assert any(e["event_type"] == "spend_guard" for e in ledger.list_entries())
+
+
+def test_estimate_reserve_cost():
+    from spend_guard.cost import actual_cost_from_usage, estimate_reserve_cost
+
+    est, model = estimate_reserve_cost({"model": "gpt-4o-mini", "max_tokens": 100, "messages": [{"content": "hi"}]})
+    assert est > 0
+    assert model == "gpt-4o-mini"
+    actual = actual_cost_from_usage({"prompt_tokens": 10, "completion_tokens": 5}, model="gpt-4o-mini")
+    assert actual > 0
+
+
+def test_spend_guard_serve_mock_chat(tmp_path: Path, monkeypatch):
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    import spend_guard.serve as serve_mod
+
+    wallet_db = tmp_path / "wallet.sqlite"
+    ledger_db = tmp_path / "ledger.sqlite"
+    from spend_guard.wallet import SpendWallet
+
+    SpendWallet(wallet_db, initial_balance=500.0)
+
+    serve_mod.state.wallet_db = str(wallet_db)
+    serve_mod.state.ledger_db = str(ledger_db)
+    serve_mod.state.mock_upstream = True
+    serve_mod.state.shadow_mode = False
+    serve_mod.state.upstream_api_key = ""
+
+    with TestClient(serve_mod.app) as client:
+        r = client.get("/health")
+        assert r.status_code == 200
+        assert r.json()["product"] == "spend-guard"
+
+        body = {
+            "model": "demo-model",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 32,
+        }
+        r2 = client.post(
+            "/v1/chat/completions",
+            json=body,
+            headers={"X-Request-Id": "http-test-1"},
+        )
+        assert r2.status_code == 200, r2.text
+        data = r2.json()
+        assert "choices" in data
+        assert data["_spend_guard"]["request_id"] == "http-test-1"
+
+        if serve_mod.state.ledger:
+            serve_mod.state.ledger.stop_async_writer(flush=True)
+        ledger = AppendOnlyLedger(ledger_db)
+        assert any(e.get("event_type") == "spend_guard" for e in ledger.list_entries())
+
+
+def test_spend_guard_serve_locked_wallet(tmp_path: Path, monkeypatch):
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    import spend_guard.serve as serve_mod
+    from spend_guard.wallet import SpendWallet
+
+    wallet_db = tmp_path / "wallet.sqlite"
+    ledger_db = tmp_path / "ledger.sqlite"
+    w = SpendWallet(wallet_db, initial_balance=100.0)
+    w.lock("DRIFT_THRESHOLD_EXCEEDED: test")
+
+    serve_mod.state.wallet_db = str(wallet_db)
+    serve_mod.state.ledger_db = str(ledger_db)
+    serve_mod.state.mock_upstream = True
+    serve_mod.state.gateway = None
+
+    with TestClient(serve_mod.app) as client:
+        r = client.post(
+            "/v1/chat/completions",
+            json={"model": "demo-model", "messages": [{"role": "user", "content": "x"}]},
+            headers={"X-Request-Id": "locked-1"},
+        )
+        assert r.status_code == 409
