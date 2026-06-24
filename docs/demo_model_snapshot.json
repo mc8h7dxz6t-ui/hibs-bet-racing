@@ -1,0 +1,14 @@
+{
+  "model_id": "credit-risk-v3",
+  "version": "3.2.1",
+  "artifact_hash": "sha256:demo-artifact-7f3a9c2e1b004d8a",
+  "risk_tier": "high",
+  "framework": "xgboost",
+  "metrics": {
+    "auc": 0.84,
+    "psi": 0.03,
+    "population_stability": "stable"
+  },
+  "training_data_ref": "dataset-2026-q1",
+  "owner": "ml-platform"
+}

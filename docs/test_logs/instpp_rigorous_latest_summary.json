@@ -7,10 +7,11 @@
     "ai_kit",
     "webhook_mesh",
     "ad_guard",
-    "health_telemetry"
+    "health_telemetry",
+    "model_governor"
   ],
   "status": "PASSED",
-  "e2e_sections": 27,
-  "finished_utc": "2026-06-23T07:47:17Z",
-  "log_file": "instpp_rigorous_2026-06-23T074704Z.log"
+  "e2e_sections": 28,
+  "finished_utc": "2026-06-24T09:32:33Z",
+  "log_file": "instpp_rigorous_2026-06-24T093214Z.log"
 }
