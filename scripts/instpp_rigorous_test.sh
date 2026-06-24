@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rigorous institutional E2E test — all 7 portfolio products.
+# Rigorous institutional E2E test — all 8 portfolio products.
 # Logs full output to docs/test_logs/instpp_rigorous_<timestamp>.log
 set -euo pipefail
 
@@ -15,7 +15,7 @@ mkdir -p "$LOG_DIR"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "================================================================"
-echo "INSTITUTIONAL RIGOROUS TEST — All 7 Products"
+echo "INSTITUTIONAL RIGOROUS TEST — All 8 Products"
 echo "Started: $(date -u +%Y-%m-%dT%H:%M:%SZ) UTC"
 echo "Log: $LOG_FILE"
 echo "================================================================"
@@ -68,6 +68,8 @@ ADGUARD_DB="$WORK/ad_guard.sqlite"
 ADGUARD_TAR="$WORK/ad_guard_bundle.tar"
 HEALTH_DB="$WORK/health.sqlite"
 HEALTH_TAR="$WORK/health_bundle.tar"
+MG_DB="$WORK/model_governor.sqlite"
+MG_TAR="$WORK/model_governor_bundle.tar"
 echo "Work dir: $WORK"
 
 section "Unit tests — full institutional suite"
@@ -84,6 +86,7 @@ section "Unit tests — full institutional suite"
   tests/test_webhook_mesh.py \
   tests/test_ad_guard.py \
   tests/test_health_telemetry.py \
+  tests/test_model_governor.py \
   -v --tb=short
 pass "Unit test suite"
 
@@ -514,6 +517,29 @@ echo "$HT_VERIFY"
 echo "$HT_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "Health Telemetry institutional E2E"
 
+section "ModelGovernor — record + check + export + verify"
+"$PYTHON" -m model_governor.cli record \
+  --action register \
+  --model docs/demo_model_snapshot.json \
+  --outcome '{"status":"registered","ref":"rigorous-mg-001"}' \
+  --database "$MG_DB"
+"$PYTHON" -m model_governor.cli record \
+  --action approve \
+  --model docs/demo_model_snapshot.json \
+  --outcome '{"status":"approved","approver":"rigorous-board"}' \
+  --actor rigorous-board \
+  --database "$MG_DB"
+MG_CHECK=$("$PYTHON" -m model_governor.cli check --database "$MG_DB")
+echo "$MG_CHECK"
+echo "$MG_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
+MG_EXPORT=$("$PYTHON" -m model_governor.cli export --database "$MG_DB" --tarball "$MG_TAR")
+echo "$MG_EXPORT"
+echo "$MG_EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+MG_VERIFY=$("$PYTHON" -m model_governor.cli verify-bundle --tarball "$MG_TAR")
+echo "$MG_VERIFY"
+echo "$MG_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+pass "ModelGovernor institutional E2E"
+
 section "Summary"
 ENDED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 SUMMARY_JSON=$("$PYTHON" -c "
@@ -522,10 +548,10 @@ print(json.dumps({
     'suite': 'institutional_rigorous',
     'products': [
         'compliance_logger', 'proxy_risk', 'altdata', 'ai_kit',
-        'webhook_mesh', 'ad_guard', 'health_telemetry',
+        'webhook_mesh', 'ad_guard', 'health_telemetry', 'model_governor',
     ],
     'status': 'PASSED',
-    'e2e_sections': 27,
+    'e2e_sections': 28,
     'finished_utc': '$ENDED_AT',
     'log_file': '$(basename "$LOG_FILE")',
 }, indent=2))
@@ -534,7 +560,7 @@ echo ""
 echo "$SUMMARY_JSON" | tee "$LOG_DIR/instpp_rigorous_latest_summary.json"
 echo ""
 echo "================================================================"
-echo "ALL RIGOROUS TESTS PASSED — 7/7 PRODUCTS"
+echo "ALL RIGOROUS TESTS PASSED — 8/8 PRODUCTS"
 echo "Finished: $ENDED_AT UTC"
 echo "Log: $LOG_FILE"
 echo "Summary: $LOG_DIR/instpp_rigorous_latest_summary.json"

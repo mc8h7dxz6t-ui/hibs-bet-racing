@@ -1,4 +1,4 @@
-# Institutional Standard — All 7 Products
+# Institutional Standard — All 8 Products
 
 **Purpose:** The bar every infrastructure product in this portfolio strives to meet.  
 **Internal spine:** `inst_spine` (genesis WAL, F-gates, deterministic export) — not a product name.
@@ -29,13 +29,14 @@ See also: `docs/INST_PLUS_GOLD_STANDARD.md` (detailed criteria matrix).
 | 5 | Webhook Mesh | Gold | `demo_webhook_mesh.sh` | `WEBHOOK_MESH_BUYER.md` |
 | 6 | Ad Guard | Gold | `demo_ad_guard.sh` | `AD_GUARD_BUYER.md` |
 | 7 | Health Telemetry | Gold | `demo_health_telemetry.sh` | `HEALTH_TELEMETRY_BUYER.md` |
+| 8 | ModelGovernor | Gold | `demo_model_governor.sh` | `MODEL_GOVERNOR_BUYER.md` |
 
 ## Proof commands
 
 ```bash
 pip install -e ".[dev,instpp]"
 ./scripts/instpp_smoke_test.sh
-./scripts/instpp_rigorous_test.sh    # all 7 products
+./scripts/instpp_rigorous_test.sh    # all 8 products
 ```
 
 **Deep dive:** `docs/INST_PLUS_DEEP_DIVE_ALL_7.md`  

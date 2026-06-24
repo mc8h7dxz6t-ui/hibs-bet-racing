@@ -8,7 +8,7 @@ PYTHON="${PYTHON:-python3}"
 echo "==> Installing institutional dev dependencies"
 pip install -e ".[dev,instpp]" -q
 
-echo "==> Running institutional test suite (all 7 products)"
+echo "==> Running institutional test suite (all 8 products)"
 "$PYTHON" -m pytest \
   tests/test_inst_spine_core.py \
   tests/test_inst_products.py \
@@ -24,6 +24,7 @@ echo "==> Running institutional test suite (all 7 products)"
   tests/test_webhook_mesh.py \
   tests/test_ad_guard.py \
   tests/test_health_telemetry.py \
+  tests/test_model_governor.py \
   -q
 
 echo "==> Compliance export repro-check (ephemeral DB)"
@@ -49,7 +50,7 @@ raise SystemExit(0 if ok else 1)
 PY
 
 echo ""
-echo "INSTITUTIONAL SMOKE TEST PASSED (7/7 products)"
+echo "INSTITUTIONAL SMOKE TEST PASSED (8/8 products)"
 echo "Ready to demo:"
 echo "  ./scripts/demo_instpp.sh              # compliance + proxy (~60s)"
 echo "  ./scripts/demo_altdata.sh             # product #3"
@@ -57,5 +58,6 @@ echo "  ./scripts/demo_ai_kit.sh              # product #4"
 echo "  ./scripts/demo_webhook_mesh.sh        # product #5"
 echo "  ./scripts/demo_ad_guard.sh            # product #6"
 echo "  ./scripts/demo_health_telemetry.sh    # product #7"
+echo "  ./scripts/demo_model_governor.sh      # product #8"
 echo "  ./scripts/instpp_rigorous_test.sh     # full E2E + log"
 echo "See docs/INSTITUTIONAL_STANDARD.md"
