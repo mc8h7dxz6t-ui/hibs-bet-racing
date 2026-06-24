@@ -66,6 +66,8 @@ proxy-risk evaluate --live --path /orders --body '{"symbol":"AAPL"}'
 | `PROXY_RISK_API_TOKEN` | Optional auth on `/evaluate` serve |
 | `INST_CIRCUIT_KILL=1` | Emergency traffic sever |
 | `INST_REDIS_URL` | Multi-instance idempotency + token bucket |
+| `PROXY_DRIFT_BASELINE` | Optional drift-gate on feature vectors in body |
+| `PROXY_DRIFT_MODE` | `shadow` or `enforce` |
 
 ---
 

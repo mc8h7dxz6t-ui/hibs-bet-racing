@@ -205,6 +205,30 @@ async def _handle_ingress(
         raw_bytes=raw_payload,
     )
 
+    capture_dir = os.getenv("WEBHOOK_REPLAY_CAPTURE_DIR", "").strip()
+    if capture_dir:
+        try:
+            from pathlib import Path
+
+            from webhook_replay.integrate import capture_from_ingress
+
+            capture_from_ingress(
+                capture_id=payload_id,
+                tenant_id=client_id,
+                body=raw_payload,
+                headers={
+                    signature_header: provider_sig,
+                    webhook_id_header: payload_id,
+                    "X-Target-Forward-Url": target_url,
+                },
+                provider=signature_provider,
+                lamport_seq=state.clock.value,
+                target_forward_url=target_url,
+                store_dir=Path(capture_dir),
+            )
+        except Exception:
+            logger.exception("webhook-replay capture failed (ingress already WAL-acked)")
+
     await state.delivery_queue.enqueue(
         DeliveryManifest(
             manifest_id=manifest_id,

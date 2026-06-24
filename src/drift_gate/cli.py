@@ -86,8 +86,11 @@ def main(argv: list[str] | None = None) -> int:
         bl = FeatureBaseline.load(args.baseline)
         features = _load_json(args.features)
         feature_vector = {k: float(v) for k, v in features.items()}
-        state_path = args.state or RollingStateStore.default_path_for(args.baseline)
-        rolling = RollingStateStore(state_path)
+        rolling = RollingStateStore.from_baseline(
+            args.baseline,
+            state_path=args.state,
+            redis_key=args.model_id or bl.model_id,
+        )
         gate = DriftGate(
             bl,
             config=DriftGateConfig(mode=DriftGateMode(args.mode)),

@@ -8,10 +8,14 @@
     "webhook_mesh",
     "ad_guard",
     "health_telemetry",
-    "model_governor"
+    "model_governor",
+    "drift_gate",
+    "webhook_replay",
+    "spend_guard"
   ],
   "status": "PASSED",
-  "e2e_sections": 28,
-  "finished_utc": "2026-06-24T09:32:33Z",
-  "log_file": "instpp_rigorous_2026-06-24T093214Z.log"
+  "e2e_sections": 34,
+  "industry_gold": true,
+  "finished_utc": "2026-06-24T18:50:22Z",
+  "log_file": "instpp_rigorous_2026-06-24T185008Z.log"
 }

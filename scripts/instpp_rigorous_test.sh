@@ -18,7 +18,7 @@ mkdir -p "$LOG_DIR"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "================================================================"
-echo "INSTITUTIONAL RIGOROUS TEST — All 8 Products"
+echo "INSTITUTIONAL RIGOROUS TEST — All 11 Products (8 + Phase 2)"
 echo "Started: $(date -u +%Y-%m-%dT%H:%M:%SZ) UTC"
 echo "Log: $LOG_FILE"
 echo "================================================================"
@@ -73,6 +73,15 @@ HEALTH_DB="$WORK/health.sqlite"
 HEALTH_TAR="$WORK/health_bundle.tar"
 MG_DB="$WORK/model_governor.sqlite"
 MG_TAR="$WORK/model_governor_bundle.tar"
+DG_DB="$WORK/drift_gate.sqlite"
+DG_TAR="$WORK/drift_gate_bundle.tar"
+DG_BASELINE="$WORK/drift_baseline.json"
+WR_DB="$WORK/webhook_replay.sqlite"
+WR_TAR="$WORK/webhook_replay_bundle.tar"
+WR_CAP="$WORK/webhook_captures"
+SG_DB="$WORK/spend_guard.sqlite"
+SG_WALLET="$WORK/spend_guard_wallet.sqlite"
+SG_TAR="$WORK/spend_guard_bundle.tar"
 echo "Work dir: $WORK"
 
 section "Unit tests — full institutional suite"
@@ -90,6 +99,10 @@ section "Unit tests — full institutional suite"
   tests/test_ad_guard.py \
   tests/test_health_telemetry.py \
   tests/test_model_governor.py \
+  tests/test_drift_gate.py \
+  tests/test_webhook_replay.py \
+  tests/test_spend_guard.py \
+  tests/test_industry_gold.py \
   -v --tb=short
 pass "Unit test suite"
 
@@ -543,6 +556,82 @@ echo "$MG_VERIFY"
 echo "$MG_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "ModelGovernor institutional E2E"
 
+section "Drift Gate — baseline + evaluate + check + export + verify"
+"$PYTHON" -m drift_gate.cli baseline \
+  --model-id rigorous-credit-v3 \
+  --features '{"income":50000,"debt_ratio":0.35}' \
+  --out "$DG_BASELINE" --synthetic --samples 80
+for i in 1 2 3 4 5; do
+  "$PYTHON" -m drift_gate.cli evaluate \
+    --baseline "$DG_BASELINE" \
+    --features '{"income":50100,"debt_ratio":0.36}' \
+    --mode shadow --database "$DG_DB" --request-id "dg-burn-$i" || true
+done
+"$PYTHON" -m drift_gate.cli evaluate \
+  --baseline "$DG_BASELINE" \
+  --features '{"income":200000,"debt_ratio":0.95}' \
+  --mode enforce --database "$DG_DB" --request-id dg-enforce-1 || true
+DG_CHECK=$("$PYTHON" -m drift_gate.cli check --database "$DG_DB")
+echo "$DG_CHECK"
+echo "$DG_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
+DG_EXPORT=$("$PYTHON" -m drift_gate.cli export --database "$DG_DB" --tarball "$DG_TAR")
+echo "$DG_EXPORT"
+echo "$DG_EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+DG_VERIFY=$("$PYTHON" -m drift_gate.cli verify-bundle --tarball "$DG_TAR")
+echo "$DG_VERIFY"
+echo "$DG_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+pass "Drift Gate institutional E2E"
+
+section "Webhook Replay — capture + replay + check + export + verify"
+mkdir -p "$WR_CAP"
+BODY_FILE="$WORK/replay_body.json"
+echo '{"id":"evt-rigorous-replay","amount":99}' > "$BODY_FILE"
+"$PYTHON" -m webhook_replay.cli capture \
+  --capture-id evt-rigorous-replay \
+  --tenant-id tenant-rigorous \
+  --body-file "$BODY_FILE" \
+  --store-dir "$WR_CAP"
+"$PYTHON" -m webhook_replay.cli replay \
+  --capture-id evt-rigorous-replay \
+  --store-dir "$WR_CAP" \
+  --database "$WR_DB"
+WR_CHECK=$("$PYTHON" -m webhook_replay.cli check --database "$WR_DB")
+echo "$WR_CHECK"
+echo "$WR_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
+WR_EXPORT=$("$PYTHON" -m webhook_replay.cli export --database "$WR_DB" --tarball "$WR_TAR")
+echo "$WR_EXPORT"
+echo "$WR_EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+WR_VERIFY=$("$PYTHON" -m webhook_replay.cli verify-bundle --tarball "$WR_TAR")
+echo "$WR_VERIFY"
+echo "$WR_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+pass "Webhook Replay institutional E2E"
+
+section "Spend Guard — reserve/settle + drift lock + check + export + verify"
+"$PYTHON" -m spend_guard.cli init-wallet --wallet-db "$SG_WALLET" --balance 1000
+RESERVE_JSON=$("$PYTHON" -m spend_guard.cli reserve \
+  --request-id sg-rigorous-1 --cost 40 \
+  --wallet-db "$SG_WALLET" --ledger-db "$SG_DB")
+HOLD_ID=$(echo "$RESERVE_JSON" | "$PYTHON" -c "import sys,json; print(json.load(sys.stdin).get('hold_id',''))")
+"$PYTHON" -m spend_guard.cli settle \
+  --hold-id "$HOLD_ID" --request-id sg-rigorous-1 --actual-cost 38 \
+  --wallet-db "$SG_WALLET" --ledger-db "$SG_DB"
+"$PYTHON" -m spend_guard.cli demo-drift-lock \
+  --wallet-db "$SG_WALLET" --ledger-db "$SG_DB" --spend 40 --big-spend 250 --iterations 5 || true
+SG_CHECK=$("$PYTHON" -m spend_guard.cli check --database "$SG_DB")
+echo "$SG_CHECK"
+echo "$SG_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
+SG_EXPORT=$("$PYTHON" -m spend_guard.cli export --database "$SG_DB" --tarball "$SG_TAR")
+echo "$SG_EXPORT"
+echo "$SG_EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+SG_VERIFY=$("$PYTHON" -m spend_guard.cli verify-bundle --tarball "$SG_TAR")
+echo "$SG_VERIFY"
+echo "$SG_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+pass "Spend Guard institutional E2E"
+
+section "Industry gold — chaos + integration"
+"$PYTHON" -m pytest tests/test_industry_gold.py -v --tb=short
+pass "Industry gold chaos suite"
+
 section "Summary"
 ENDED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 SUMMARY_JSON=$("$PYTHON" -c "
@@ -552,9 +641,11 @@ print(json.dumps({
     'products': [
         'compliance_logger', 'proxy_risk', 'altdata', 'ai_kit',
         'webhook_mesh', 'ad_guard', 'health_telemetry', 'model_governor',
+        'drift_gate', 'webhook_replay', 'spend_guard',
     ],
     'status': 'PASSED',
-    'e2e_sections': 28,
+    'e2e_sections': 34,
+    'industry_gold': True,
     'finished_utc': '$ENDED_AT',
     'log_file': '$(basename "$LOG_FILE")',
 }, indent=2))
@@ -563,7 +654,7 @@ echo ""
 echo "$SUMMARY_JSON" | tee "$LOG_DIR/instpp_rigorous_latest_summary.json"
 echo ""
 echo "================================================================"
-echo "ALL RIGOROUS TESTS PASSED — 8/8 PRODUCTS"
+echo "ALL RIGOROUS TESTS PASSED — 11/11 PRODUCTS (INDUSTRY GOLD)"
 echo "Finished: $ENDED_AT UTC"
 echo "Log: $LOG_FILE"
 echo "Summary: $LOG_DIR/instpp_rigorous_latest_summary.json"
