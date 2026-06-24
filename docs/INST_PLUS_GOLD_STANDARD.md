@@ -1,4 +1,4 @@
-# Institutional Gold Standard — All 7 Products
+# Institutional Gold Standard — All 8 Products
 
 **Purpose:** The bar every infrastructure product in this portfolio strives to meet — not a customer-facing brand name.
 
@@ -30,8 +30,17 @@
 | 5 | Webhook Mesh | ✅ | ✅ | ✅ | ✅ | `demo_webhook_mesh.sh` | `WEBHOOK_MESH_BUYER.md` | `WEBHOOK_MESH_SALES_TECH_SPEC.md` | **Gold** |
 | 6 | Ad Guard | ✅ | ✅ | ✅ | ✅ | `demo_ad_guard.sh` | `AD_GUARD_BUYER.md` | `AD_GUARD_SALES_TECH_SPEC.md` | **Gold** |
 | 7 | Health Telemetry | ✅ | ✅ | ✅ | ✅ | `demo_health_telemetry.sh` | `HEALTH_TELEMETRY_BUYER.md` | `HEALTH_TELEMETRY_SALES_TECH_SPEC.md` | **Gold** |
+| 8 | ModelGovernor | ✅ | ✅ | ✅ | ✅ | `demo_model_governor.sh` | `MODEL_GOVERNOR_BUYER.md` | `MODEL_GOVERNOR_SALES_TECH_SPEC.md` | **Gold** |
 
-**Rigorous E2E log:** `scripts/instpp_rigorous_test.sh` — all 7 products.
+**Phase 2 extensions (standalone SKUs on `inst_spine`):**
+
+| SKU | CLI | verify-bundle | Demo | Integrates with |
+|-----|-----|---------------|------|-----------------|
+| `drift-gate` | ✅ | ✅ | `demo_drift_gate.sh` | Proxy-Risk, ModelGovernor |
+| `webhook-replay` | ✅ | ✅ | `demo_webhook_replay.sh` | Webhook Mesh |
+| `spend-guard` | ✅ | ✅ | `demo_spend_guard.sh` | Proxy-Risk, ModelGovernor 8b |
+
+**Rigorous E2E log:** `scripts/instpp_rigorous_test.sh` — all 8 products. Phase 2: `scripts/demo_phase2_all.sh`.
 
 ---
 
@@ -74,6 +83,11 @@
 - Genesis chain per device batch
 - Export + verify-bundle + HIPAA diligence pack
 
+### #8 ModelGovernor
+- Model snapshot contract (model_id, version, artifact_hash, risk_tier)
+- Governance actions: register / approve / deploy / retire / drift_alert
+- Export + verify-bundle + F7 coverage on model_snapshot
+
 ---
 
 ## Quick proof commands
@@ -81,13 +95,15 @@
 ```bash
 pip install -e ".[dev,instpp]"
 ./scripts/instpp_smoke_test.sh
-./scripts/instpp_rigorous_test.sh          # all 7 products + log
+./scripts/instpp_rigorous_test.sh          # all 8 products + log
 ./scripts/demo_instpp.sh                   # #1 + #2
+./scripts/demo_portfolio_all.sh            # all 8 products
 ./scripts/demo_altdata.sh                  # #3
 ./scripts/demo_ai_kit.sh                   # #4
 ./scripts/demo_webhook_mesh.sh             # #5
 ./scripts/demo_ad_guard.sh                 # #6
 ./scripts/demo_health_telemetry.sh         # #7
+./scripts/demo_model_governor.sh           # #8
 ```
 
 ---

@@ -1,14 +1,14 @@
-# Portfolio Sales Sheet — 7 Institutional Products
+# Portfolio Sales Sheet — 8 Institutional Products
 
 **Audience:** Procurement, legal, risk, platform engineering, CFO sponsors  
 **Posture:** Air-gap VPC audit infrastructure — **prove with math, not slides**  
-**Proof:** 87 automated tests · rigorous E2E 7/7 · offline `verify-bundle` on every SKU
+**Proof:** 91 automated tests · rigorous E2E 8/8 · offline `verify-bundle` on every SKU
 
 ---
 
 ## One-line portfolio pitch
 
-*Seven deployable products, one cryptographic audit spine — every gate decision exportable and verifiable without calling the vendor.*
+*Eight deployable products, one cryptographic audit spine — every gate decision exportable and verifiable without calling the vendor.*
 
 ---
 
@@ -23,6 +23,7 @@
 | 5 | **Webhook Mesh** | Never double-process a billing webhook | £199–£599/mo | SaaS billing, fintech ingress | `demo_webhook_mesh.sh` | [WEBHOOK_MESH_SALES_TECH_SPEC.md](WEBHOOK_MESH_SALES_TECH_SPEC.md) |
 | 6 | **Ad Guard** | Marketing API spend kill + gate audit | £300–£800/mo | Agency, growth, marketing finance | `demo_ad_guard.sh` | [AD_GUARD_SALES_TECH_SPEC.md](AD_GUARD_SALES_TECH_SPEC.md) |
 | 7 | **Health Telemetry** | Device batch tamper evidence (not FDA cert) | £5k–£15k + £500/mo | Digital health, RPM, NHS-adjacent | `demo_health_telemetry.sh` | [HEALTH_TELEMETRY_SALES_TECH_SPEC.md](HEALTH_TELEMETRY_SALES_TECH_SPEC.md) |
+| 8 | **ModelGovernor** | ML model lifecycle governance + deploy proof ([north star](MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md): LLM spend plane) | £400–£1,000/mo | MLOps, model risk, regulated lending | `demo_model_governor.sh` | [MODEL_GOVERNOR_SALES_TECH_SPEC.md](MODEL_GOVERNOR_SALES_TECH_SPEC.md) |
 
 **Buyer one-pagers:** `docs/*_BUYER.md` (60-second skim per SKU)
 
@@ -54,7 +55,7 @@
 | **Hospital / enterprise pilot** | HIPAA pack + ward playbook (#7) or SOC VPC pack (all) | Custom SOW |
 | **Maintenance** | Security patches, spine upgrades | 15–20% ARR |
 
-**Pre-revenue IP range (full portfolio):** £60k–£130k · with £50k+ ARR: £250k–£350k ecosystem value. See [INST_PLUS_PRE_REV_VALUATION.md](INST_PLUS_PRE_REV_VALUATION.md).
+**Full tech/sales sheet (per-platform comps + revenue + value):** [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md)
 
 ---
 
@@ -62,9 +63,10 @@
 
 ```bash
 pip install -e ".[dev,instpp]"
-./scripts/instpp_smoke_test.sh          # 87 tests
-./scripts/instpp_rigorous_test.sh       # 7/7 E2E → docs/test_logs/
+./scripts/instpp_smoke_test.sh          # 91 tests
+./scripts/instpp_rigorous_test.sh       # 8/8 E2E → docs/test_logs/
 ./scripts/demo_instpp.sh                # all demos
+./scripts/demo_portfolio_all.sh         # all 8 SKUs → data/demo/portfolio/
 ```
 
 **Evidence artifacts:** [BUYER_EVIDENCE_PACK.md](BUYER_EVIDENCE_PACK.md) · [SOC2_VPC_DILIGENCE_PACK.md](SOC2_VPC_DILIGENCE_PACK.md)
@@ -81,13 +83,14 @@ pip install -e ".[dev,instpp]"
 
 | Question | Answer |
 |----------|--------|
-| Tamper-evident audit trail? | **Yes** — all 7 SKUs |
+| Tamper-evident audit trail? | **Yes** — all 8 SKUs |
 | Offline third-party verification? | **Yes** — `verify-bundle` |
 | Air-gapped VPC deploy? | **Yes** — default architecture |
 | SOC 2 Type II certified SaaS? | **No** — buyer VPC; see SOC2 pack |
 | GRC case management UI? | **No** — export into Archer/ServiceNow |
 | Sub-5ms RTB / exchange insert? | **No** — Go/Rust territory |
 | LLM safety inference? | **No** — NeMo/Bedrock upstream of Ad Guard |
+| Model governance / deploy proof? | **Yes** — #8 ModelGovernor |
 | FDA / DTAC medical device cert? | **No** — audit spine only (#7) |
 
 ---
@@ -115,6 +118,7 @@ Outbound APIs     →      Proxy-Risk            →      verify-bundle
 Alt-data sources  →      Alt-Data              →      verify-bundle
 Agent workloads   →      AI Kit                →      verify-bundle
 Device batches    →      Health Telemetry      →      verify-bundle
+ML model lifecycle →     ModelGovernor         →      verify-bundle
 ```
 
 ---
@@ -123,6 +127,7 @@ Device batches    →      Health Telemetry      →      verify-bundle
 
 | Doc | Purpose |
 |-----|---------|
+| [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md) | **Full tech/sales — comps, revenue, completion, value today** |
 | [INST_PLUS_DEEP_DIVE_ALL_7.md](INST_PLUS_DEEP_DIVE_ALL_7.md) | Technical deep dive per product |
 | [INST_PLUS_PRE_REV_VALUATION.md](INST_PLUS_PRE_REV_VALUATION.md) | IP valuation framework |
 | [INSTITUTIONAL_ENTERPRISE_STACK.md](INSTITUTIONAL_ENTERPRISE_STACK.md) | Enterprise positioning |

@@ -211,6 +211,12 @@ async def test_ingress_accepts_and_dedupes(tmp_path: Path, monkeypatch: pytest.M
         async def enqueue(self, manifest: DeliveryManifest) -> None:
             captured.append(manifest)
 
+    async def _test_startup() -> None:
+        """Skip production startup — test injects RuntimeState directly."""
+        return None
+
+    monkeypatch.setattr(serve_mod, "initialize_spine_dependencies", _test_startup)
+
     serve_mod.state = serve_mod.RuntimeState()
     serve_mod.state.provider_secret = secret
     serve_mod.state.wal_writer = WALWriter(tmp_path / "ingress.wal")
@@ -228,13 +234,16 @@ async def test_ingress_accepts_and_dedupes(tmp_path: Path, monkeypatch: pytest.M
     }
 
     client = TestClient(serve_mod.app)
-    r1 = client.post("/v1/ingress/tenant-a", content=body, headers=headers)
-    r2 = client.post("/v1/ingress/tenant-a", content=body, headers=headers)
+    try:
+        r1 = client.post("/v1/ingress/tenant-a", content=body, headers=headers)
+        r2 = client.post("/v1/ingress/tenant-a", content=body, headers=headers)
 
-    assert r1.status_code == 200
-    assert r1.json()["status"] == "ACCEPTED"
-    assert r1.json()["dispatch_mode"] == "background"
-    assert "manifest_id" in r1.json()
-    assert r2.status_code == 200
-    assert r2.json()["status"] == "ALREADY_PROCESSED"
-    assert len(captured) == 1
+        assert r1.status_code == 200
+        assert r1.json()["status"] == "ACCEPTED"
+        assert r1.json()["dispatch_mode"] == "background"
+        assert "manifest_id" in r1.json()
+        assert r2.status_code == 200
+        assert r2.json()["status"] == "ALREADY_PROCESSED"
+        assert len(captured) == 1
+    finally:
+        client.close()
