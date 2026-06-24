@@ -55,7 +55,7 @@
 | **Hospital / enterprise pilot** | HIPAA pack + ward playbook (#7) or SOC VPC pack (all) | Custom SOW |
 | **Maintenance** | Security patches, spine upgrades | 15–20% ARR |
 
-**Pre-revenue IP range (full portfolio):** £70k–£150k · with £50k+ ARR: £280k–£400k ecosystem value. See [INST_PLUS_PRE_REV_VALUATION.md](INST_PLUS_PRE_REV_VALUATION.md).
+**Full tech/sales sheet (per-platform comps + revenue + value):** [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md)
 
 ---
 

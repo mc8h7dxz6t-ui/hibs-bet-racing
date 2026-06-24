@@ -167,7 +167,8 @@ Inst++ today sits in the **IP asset / small acqui-hire** band — **not** seed-r
 
 ## Related documents
 
-- `docs/PORTFOLIO_SALES_SHEET.md` — commercial pricing matrix  
+- `docs/PORTFOLIO_SALES_SHEET.md` — short commercial matrix  
+- `docs/PORTFOLIO_TECH_SALES_SHEET.md` — full tech/sales, revenue capability, value today  
 - `docs/BUYER_EVIDENCE_PACK.md` — procurement dry-run  
 - `docs/COMPLIANCE_LOGGER_SALES_TECH_SPEC.md`  
 - `docs/PROXY_RISK_SALES_TECH_SPEC.md`  
