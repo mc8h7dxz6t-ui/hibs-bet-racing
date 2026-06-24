@@ -81,6 +81,9 @@ agent-ledger-serve:
 altdata-serve:
 	altdata serve
 
+health-telemetry-serve:
+	health-telemetry serve
+
 stack-up:
 	$(COMPOSE) up -d inst-workflow
 

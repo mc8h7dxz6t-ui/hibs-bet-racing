@@ -338,3 +338,50 @@ async def test_proxy_shadow_latency_p99_under_10ms():
     latencies.sort()
     p99 = latencies[int(len(latencies) * 0.99) - 1]
     assert p99 < 10.0, f"p99 {p99:.3f}ms exceeds 10ms industry gold target"
+
+
+def test_health_telemetry_http_batch_wal_before_ack(tmp_path: Path):
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    import health_telemetry.serve as serve_mod
+    from inst_spine.wal import WALWriter
+
+    db = tmp_path / "health.sqlite"
+    ingress_wal = tmp_path / "health_ingress.wal"
+    serve_mod.state.ledger_db = db
+    serve_mod.state.wal_writer = WALWriter(ingress_wal)
+    serve_mod.state.clock = serve_mod.LamportClock("industry-gold-health")
+
+    packets = [
+        {"ts": "2026-06-01T12:00:00Z", "seq": 1, "hr": 70, "spo2": 99},
+        {"ts": "2026-06-01T12:00:01Z", "seq": 2, "hr": 71, "spo2": 98},
+    ]
+    body = {"device_id": "gold-ward", "batch_id": "ig-h1", "packets": packets}
+
+    with TestClient(serve_mod.app) as client:
+        r = client.post("/v1/telemetry/batch", json=body)
+        assert r.status_code == 200
+        assert r.json()["status"] == "ACCEPTED"
+    assert ingress_wal.exists() and ingress_wal.stat().st_size > 0
+    assert AppendOnlyLedger(db).verify()["chain_ok"]
+
+
+def test_health_telemetry_sequence_gap_fail_closed(tmp_path: Path):
+    from health_telemetry.ingest import ingest_batch
+    from inst_spine.errors import IngestValidationError
+
+    db = tmp_path / "health.sqlite"
+    packets = [
+        {"ts": "2026-06-01T12:00:00Z", "seq": 1, "hr": 72, "spo2": 98},
+        {"ts": "2026-06-01T12:00:01Z", "seq": 2, "hr": 73, "spo2": 97},
+    ]
+    ingest_batch(device_id="gap-dev", packets=packets, database=db)
+    with pytest.raises(IngestValidationError, match="gap"):
+        ingest_batch(
+            device_id="gap-dev",
+            packets=[
+                {"ts": "2026-06-01T12:00:02Z", "seq": 9, "hr": 74, "spo2": 96},
+            ],
+            database=db,
+        )

@@ -574,7 +574,7 @@ echo "$AD_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.e
 pass "Ad Guard institutional E2E"
 
 section "Health Telemetry — ingest + check + export + verify"
-HEALTH_PKTS='[{"ts":"2026-06-01T12:00:00Z","hr":72,"spo2":98},{"ts":"2026-06-01T12:00:01Z","hr":73}]'
+HEALTH_PKTS='[{"ts":"2026-06-01T12:00:00Z","seq":1,"hr":72,"spo2":98},{"ts":"2026-06-01T12:00:01Z","seq":2,"hr":73,"spo2":97}]'
 "$PYTHON" -m health_telemetry.cli ingest --device-id rigorous-ward --packets "$HEALTH_PKTS" --database "$HEALTH_DB"
 HT_CHECK=$("$PYTHON" -m health_telemetry.cli check --database "$HEALTH_DB")
 echo "$HT_CHECK"
