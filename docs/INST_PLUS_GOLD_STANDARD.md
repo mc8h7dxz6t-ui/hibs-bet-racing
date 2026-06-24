@@ -32,7 +32,15 @@
 | 7 | Health Telemetry | ✅ | ✅ | ✅ | ✅ | `demo_health_telemetry.sh` | `HEALTH_TELEMETRY_BUYER.md` | `HEALTH_TELEMETRY_SALES_TECH_SPEC.md` | **Gold** |
 | 8 | ModelGovernor | ✅ | ✅ | ✅ | ✅ | `demo_model_governor.sh` | `MODEL_GOVERNOR_BUYER.md` | `MODEL_GOVERNOR_SALES_TECH_SPEC.md` | **Gold** |
 
-**Rigorous E2E log:** `scripts/instpp_rigorous_test.sh` — all 8 products.
+**Phase 2 extensions (standalone SKUs on `inst_spine`):**
+
+| SKU | CLI | verify-bundle | Demo | Integrates with |
+|-----|-----|---------------|------|-----------------|
+| `drift-gate` | ✅ | ✅ | `demo_drift_gate.sh` | Proxy-Risk, ModelGovernor |
+| `webhook-replay` | ✅ | ✅ | `demo_webhook_replay.sh` | Webhook Mesh |
+| `spend-guard` | ✅ | ✅ | `demo_spend_guard.sh` | Proxy-Risk, ModelGovernor 8b |
+
+**Rigorous E2E log:** `scripts/instpp_rigorous_test.sh` — all 8 products. Phase 2: `scripts/demo_phase2_all.sh`.
 
 ---
 

@@ -28,6 +28,9 @@ echo "==> Running institutional test suite (all 8 products)"
   tests/test_ad_guard.py \
   tests/test_health_telemetry.py \
   tests/test_model_governor.py \
+  tests/test_drift_gate.py \
+  tests/test_webhook_replay.py \
+  tests/test_spend_guard.py \
   -q
 
 echo "==> Compliance export repro-check (ephemeral DB)"
@@ -51,7 +54,7 @@ raise SystemExit(0 if ok else 1)
 PY
 
 echo ""
-echo "INSTITUTIONAL SMOKE TEST PASSED (8/8 products)"
+echo "INSTITUTIONAL SMOKE TEST PASSED (8/8 products + Phase 2)"
 echo "Ready to demo:"
 echo "  ./scripts/demo_instpp.sh              # compliance + proxy (~60s)"
 echo "  ./scripts/demo_altdata.sh             # product #3"
@@ -60,5 +63,6 @@ echo "  ./scripts/demo_webhook_mesh.sh        # product #5"
 echo "  ./scripts/demo_ad_guard.sh            # product #6"
 echo "  ./scripts/demo_health_telemetry.sh    # product #7"
 echo "  ./scripts/demo_model_governor.sh      # product #8"
+echo "  ./scripts/demo_phase2_all.sh          # drift-gate + webhook-replay + spend-guard"
 echo "  ./scripts/instpp_rigorous_test.sh     # full E2E + log"
 echo "See docs/INSTITUTIONAL_STANDARD.md"

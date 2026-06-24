@@ -44,6 +44,9 @@ webhook-mesh = "webhook_mesh.cli:main"
 ad-guard = "ad_guard.cli:main"
 health-telemetry = "health_telemetry.cli:main"
 model-governor = "model_governor.cli:main"
+drift-gate = "drift_gate.cli:main"
+webhook-replay = "webhook_replay.cli:main"
+spend-guard = "spend_guard.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
