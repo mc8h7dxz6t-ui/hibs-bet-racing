@@ -126,6 +126,7 @@ ML model lifecycle →     ModelGovernor         →      verify-bundle
 
 | Doc | Purpose |
 |-----|---------|
+| [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md) | **Full tech/sales — comps, revenue, completion, value today** |
 | [INST_PLUS_DEEP_DIVE_ALL_7.md](INST_PLUS_DEEP_DIVE_ALL_7.md) | Technical deep dive per product |
 | [INST_PLUS_PRE_REV_VALUATION.md](INST_PLUS_PRE_REV_VALUATION.md) | IP valuation framework |
 | [INSTITUTIONAL_ENTERPRISE_STACK.md](INSTITUTIONAL_ENTERPRISE_STACK.md) | Enterprise positioning |

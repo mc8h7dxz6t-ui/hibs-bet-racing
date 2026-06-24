@@ -75,6 +75,33 @@ Assumptions for all products below:
 
 *Portfolio totals assume a holding co or integrator buys 3–5 SKUs, not eight independent GTM motions at once.*
 
+### Completion legend
+
+| Symbol | Meaning |
+|--------|---------|
+| ✅ | **Complete** — shipped, tested, documented |
+| 🟡 | **Partial** — works with documented caveats or design-partner SOW |
+| 🔲 | **Not started** — roadmap, explicit non-goal, or out of SKU scope |
+
+**Layers:** **Inst** = institutional gold (CLI, F1–F9, verify-bundle, unit + rigorous E2E) · **Prod** = production VPC deploy · **Comm** = buyer doc + sales spec + demo · **GTM** = paying tenants / LOI
+
+### Completion at a glance
+
+| # | Product | Grade | Inst | Prod | Comm | GTM | Headline gap |
+|---|---------|-------|------|------|------|-----|--------------|
+| 1 | Compliance Logger | **Gold** | ✅ | ✅ | ✅ | 🔲 | No GRC workflow / SOC 2 SaaS |
+| 2 | Proxy-Risk | **Gold** | ✅ | 🟡 | ✅ | 🔲 | Redis required for multi-instance live |
+| 3 | Alt-Data | **Gold** | ✅ | 🟡 | ✅ | 🔲 | Buyer feeds need design-partner SOW |
+| 4 | AI Kit | **Gold** | ✅ | 🟡 | ✅ | 🔲 | Hardest standalone sell; no workflow UI |
+| 5 | Webhook Mesh | **Gold** | ✅ | 🟡 | ✅ | 🔲 | Queue durability → Redis Stream in prod |
+| 6 | Ad Guard | **Gold** | ✅ | 🟡 | ✅ | 🔲 | Not RTB / DSP UI |
+| 7 | Health Telemetry | **Gold** | ✅ | 🟡 | ✅ | 🔲 | No FDA / EMR / clinical UI |
+| 8a | ModelGovernor lifecycle | **Gold** | ✅ | ✅ | ✅ | 🔲 | Not full MLOps platform |
+| 8b | ModelGovernor spend plane | **Demo gold** | 🟡 | 🟡 | ✅ | 🔲 | Not in `instpp_rigorous` CI; no managed SaaS |
+| — | **Shared `inst_spine`** | **Gold** | ✅ | ✅ | ✅ | — | 91 tests · 8/8 rigorous E2E (June 2026) |
+
+**Portfolio GTM (all SKUs):** 🔲 pre-revenue · 🔲 no signed LOI · 🔲 no SOC 2 Type II certified SaaS (VPC pack only)
+
 ---
 
 # Per platform
@@ -126,6 +153,19 @@ Assumptions for all products below:
 
 **Demo:** `./scripts/demo_compliance_logger.sh` · **Spec:** [COMPLIANCE_LOGGER_SALES_TECH_SPEC.md](COMPLIANCE_LOGGER_SALES_TECH_SPEC.md)
 
+### Completion status
+
+| Layer | Status | Detail |
+|-------|--------|--------|
+| **Institutional gold** | ✅ | `record` / `check` / `export` / `verify-bundle`; F1–F9; in rigorous E2E |
+| **Production deploy** | ✅ | Air-gap SQLite + WAL; export aborts on gate failure |
+| **Workflow UI** | ✅ | `inst-workflow serve --product compliance` (5-step proof console) |
+| **Commercial pack** | ✅ | Buyer sheet, sales spec, `demo_compliance_logger.sh` |
+| **GTM** | 🔲 | No paying tenants; no tier-1 LOI |
+| **Explicit non-goals** | — | ServiceNow/Archer GRC · SIEM · e-discovery · multi-tenant SOC 2 SaaS |
+
+**CI proof:** `compliance_logger` in `instpp_rigorous_latest_summary.json` — **PASSED**
+
 ---
 
 ## 2 — Proxy-Risk
@@ -172,6 +212,19 @@ Assumptions for all products below:
 
 **Demo:** `./scripts/demo_proxy_risk.sh` · **Spec:** [PROXY_RISK_SALES_TECH_SPEC.md](PROXY_RISK_SALES_TECH_SPEC.md)
 
+### Completion status
+
+| Layer | Status | Detail |
+|-------|--------|--------|
+| **Institutional gold** | ✅ | Full gate chain; shadow + live httpx; every APPROVE/REJECT/KILL on chain |
+| **Production deploy** | 🟡 | Shadow default ✅; live needs Redis for token bucket + idempotency; WAL before upstream |
+| **Workflow UI** | ✅ | `inst-workflow serve --product proxy` |
+| **Commercial pack** | ✅ | Buyer sheet, sales spec, rigorous bench (p99 shadow overhead in tests) |
+| **GTM** | 🔲 | **Closest to revenue-ready** — clear ROI story; still no signed tenants |
+| **Explicit non-goals** | — | Sub-5ms RTB · Kong/Apigee lifecycle · DV/IAS pre-bid |
+
+**CI proof:** `proxy_risk` in rigorous E2E — **PASSED**
+
 ---
 
 ## 3 — Alt-Data
@@ -216,6 +269,19 @@ Assumptions for all products below:
 **Lose when:** full ETL catalog or exchange tick latency.
 
 **Demo:** `./scripts/demo_altdata.sh` · **Spec:** [ALTDATA_SALES_TECH_SPEC.md](ALTDATA_SALES_TECH_SPEC.md)
+
+### Completion status
+
+| Layer | Status | Detail |
+|-------|--------|--------|
+| **Institutional gold** | ✅ | F7 coverage gate; 4-rung ladder; `CoverageError` fail-closed; export + verify-bundle |
+| **Production deploy** | 🟡 | Built-in `fx_gbp_cross` production feed (Frankfurter HTTP); **buyer-specific feeds** → design-partner SOW (£2k–£8k) |
+| **Workflow UI** | 🔲 | CLI only — no browser console |
+| **Commercial pack** | ✅ | Buyer sheet, sales spec, `altdata list-feeds` registry |
+| **GTM** | 🔲 | No paying feed contracts |
+| **Explicit non-goals** | — | Full ETL (Airflow/Fivetran) · exchange tick latency · data catalog UI |
+
+**CI proof:** `altdata` in rigorous E2E — **PASSED**
 
 ---
 
@@ -262,6 +328,19 @@ Assumptions for all products below:
 
 **Demo:** `./scripts/demo_ai_kit.sh` · **Spec:** [AI_KIT_SALES_TECH_SPEC.md](AI_KIT_SALES_TECH_SPEC.md)
 
+### Completion status
+
+| Layer | Status | Detail |
+|-------|--------|--------|
+| **Institutional gold** | ✅ | Lamport checkpoints; trace ledger; `RateLimitError` typed; `validate_with_retry` in run path |
+| **Production deploy** | 🟡 | Stub mode default; `--live-llm` optional (OpenAI-compat); buyer supplies `step_fn` for real agents |
+| **Workflow UI** | 🔲 | CLI only |
+| **Commercial pack** | ✅ | Buyer sheet, sales spec |
+| **GTM** | 🔲 | Weakest standalone SKU — usually bundled with #8 or services |
+| **Explicit non-goals** | — | Hosted LLM · LangGraph · vector DB / RAG · NeMo safety inference · multi-agent UI |
+
+**CI proof:** `ai_kit` in rigorous E2E — **PASSED**
+
 ---
 
 ## 5 — Webhook Mesh
@@ -307,6 +386,19 @@ Assumptions for all products below:
 
 **Demo:** `./scripts/demo_webhook_mesh.sh` · **Spec:** [WEBHOOK_MESH_SALES_TECH_SPEC.md](WEBHOOK_MESH_SALES_TECH_SPEC.md)
 
+### Completion status
+
+| Layer | Status | Detail |
+|-------|--------|--------|
+| **Institutional gold** | ✅ | HMAC fail-closed; Redis idempotency CAS; WAL before HTTP 200; genesis cold-path ledger |
+| **Production deploy** | 🟡 | Stripe + Shopify routes ✅; **background queue** — tasks lost on crash unless Redis Stream configured (documented) |
+| **Workflow UI** | 🔲 | CLI + `serve` only |
+| **Commercial pack** | ✅ | `demo-sign` for Stripe/Shopify; buyer sheet, sales spec |
+| **GTM** | 🔲 | No paying billing-platform tenants |
+| **Explicit non-goals** | — | Kafka-scale event bus · Stripe Connect dashboard |
+
+**CI proof:** `webhook_mesh` in rigorous E2E — **PASSED**
+
 ---
 
 ## 6 — Ad Guard
@@ -350,6 +442,19 @@ Assumptions for all products below:
 **Stack:** NeMo/Bedrock (safety) → **Ad Guard** (spend) → DSP + DV/IAS (placement)
 
 **Demo:** `./scripts/demo_ad_guard.sh` · **Spec:** [AD_GUARD_SALES_TECH_SPEC.md](AD_GUARD_SALES_TECH_SPEC.md)
+
+### Completion status
+
+| Layer | Status | Detail |
+|-------|--------|--------|
+| **Institutional gold** | ✅ | All gate outcomes logged; Z-score kill; Google/Meta parsers; Redis idempotency fail-closed |
+| **Production deploy** | 🟡 | Live `httpx` via `AD_GUARD_UPSTREAM_BASE`; NeMo/creative approval headers optional; Redis for multi-instance |
+| **Workflow UI** | 🔲 | `ad-guard serve` HTTP gateway — no guided browser console |
+| **Commercial pack** | ✅ | Buyer sheet, sales spec, stack-position docs (NeMo → Ad Guard → DSP) |
+| **GTM** | 🔲 | No agency / marketing-finance logos |
+| **Explicit non-goals** | — | Sub-5ms RTB · DSP / campaign UI · DV/IAS placement |
+
+**CI proof:** `ad_guard` in rigorous E2E — **PASSED**
 
 ---
 
@@ -396,6 +501,19 @@ Assumptions for all products below:
 
 **Demo:** `./scripts/demo_health_telemetry.sh` · **Spec:** [HEALTH_TELEMETRY_SALES_TECH_SPEC.md](HEALTH_TELEMETRY_SALES_TECH_SPEC.md)
 
+### Completion status
+
+| Layer | Status | Detail |
+|-------|--------|--------|
+| **Institutional gold** | ✅ | Batch schema validation; Lamport per batch; export + verify-bundle |
+| **Production deploy** | 🟡 | Air-gap VPC ✅; HIPAA diligence **template** + hospital pilot playbook — not a signed BAA or ward go-live |
+| **Workflow UI** | 🔲 | CLI ingest only — no clinical dashboard |
+| **Commercial pack** | ✅ | `HEALTH_TELEMETRY_HIPAA_PACK.md` · `HEALTH_TELEMETRY_HOSPITAL_PILOT.md` |
+| **GTM** | 🔲 | Long hospital sales cycle; no paid pilots signed |
+| **Explicit non-goals** | — | FDA / UKCA / DTAC · EMR / FHIR · real-time clinical alerting · cloud IoT device management |
+
+**CI proof:** `health_telemetry` in rigorous E2E — **PASSED**
+
 ---
 
 ## 8 — ModelGovernor
@@ -440,6 +558,19 @@ Two surfaces — sell separately in diligence:
 **Lose when:** MLflow UI, experiment tracking, hosted serving.
 
 **Spec:** [MODEL_GOVERNOR_SALES_TECH_SPEC.md](MODEL_GOVERNOR_SALES_TECH_SPEC.md)
+
+#### Completion status (8a lifecycle)
+
+| Layer | Status | Detail |
+|-------|--------|--------|
+| **Institutional gold** | ✅ | `register` / `approve` / `deploy` / `retire` / `drift_alert`; model snapshot contract; F7 on snapshot |
+| **Production deploy** | ✅ | Air-gap SQLite + WAL; same spine as portfolio |
+| **Workflow UI** | 🔲 | CLI only |
+| **Commercial pack** | ✅ | Buyer sheet, sales spec, `demo_model_governor.sh` |
+| **GTM** | 🔲 | No MRM / lending logos |
+| **Explicit non-goals** | — | MLflow UI · experiment tracking · hosted model serving · real-time drift monitoring service |
+
+**CI proof:** `model_governor` in rigorous E2E — **PASSED**
 
 ---
 
@@ -486,6 +617,17 @@ make demo-gold-down
 
 **Deep comps:** [MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md](MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md) (exit framing in Value today section below)
 
+#### Completion status (8b spend plane)
+
+| Layer | Status | Detail |
+|-------|--------|--------|
+| **Canonical demo** | ✅ | `make demo-gold` — 11 steps; drift lockout step 10; `docker-compose.demo.yml` stack (gateway + sidecar + reconciler) |
+| **Institutional CI** | 🟡 | **Not** in `instpp_rigorous_test.sh` path — proof is compose demo, not CLI E2E |
+| **Production deploy** | 🟡 | Reserve → dispatch → settle + reconciler in demo stack; **K8s/GitOps manifests** not in portfolio CI |
+| **Commercial pack** | ✅ | `DEMO_GOLD.md`, positioning doc, LiteLLM/Portkey comp map |
+| **GTM** | 🔲 | Pre-revenue; no paid pilot replacing LiteLLM budgets |
+| **Explicit non-goals** | — | “Another observability dashboard” · traffic-only proxy without wallet semantics |
+
 ---
 
 ## Portfolio revenue — how the numbers stack
@@ -531,22 +673,31 @@ make demo-gold-up && make demo-gold       # ModelGovernor spend plane
 **Purpose:** Honest rough value of **code + IP + diligence package** as it sits **pre-revenue** (June 2026).  
 **Not:** A formal 409A, investment memo, or guarantee of sale price.
 
+### Completion vs value (how to read this)
+
+| Completion state | What it means for value |
+|------------------|-------------------------|
+| **8/8 Gold CLI** in rigorous CI | IP floor is **real** — not slideware; auditor dry-run works today |
+| **🟡 Production** on several SKUs | Buyer assumes SOW for Redis, feeds, hospital pilot — not a rewrite |
+| **🔲 GTM everywhere** | Valuation is **IP / replacement cost**, not ARR multiples — until first £50k ARR |
+| **8b spend plane** demo gold but not in CI | Strategic premium is **buyer-specific** — see #8b row below |
+
 ---
 
 ## IP value by product (standalone)
 
-| # | Product | Standalone IP range | Notes |
-|---|---------|---------------------|-------|
-| 1 | Compliance Logger | **£25k–£75k** | ~15% shared spine |
-| 2 | Proxy-Risk | **£30k–£90k** | ~15% shared spine |
-| 3 | Alt-Data | **£20k–£50k** | ~12% shared spine |
-| 4 | AI Kit | **£10k–£30k** | ~10% shared spine |
-| 5 | Webhook Mesh | **£15k–£40k** | ~12% shared spine |
-| 6 | Ad Guard | **£15k–£45k** | ~12% shared spine |
-| 7 | Health Telemetry | **£30k–£80k** | ~12% shared spine |
-| 8a | ModelGovernor (lifecycle CLI) | **£25k–£70k** | ~12% shared spine |
-| 8b | ModelGovernor (LLM spend plane) | **£2M–£7M** strategic exit band | See positioning doc — not lifecycle SKU alone |
-| | **Full portfolio (one spine)** | **£70k–£150k** | $89k–$190k at ~1.27 |
+| # | Product | Completion | Standalone IP range | Notes |
+|---|---------|------------|---------------------|-------|
+| 1 | Compliance Logger | **Gold** | **£25k–£75k** | ~15% shared spine |
+| 2 | Proxy-Risk | **Gold** | **£30k–£90k** | ~15% shared spine |
+| 3 | Alt-Data | **Gold** | **£20k–£50k** | ~12% shared spine |
+| 4 | AI Kit | **Gold** | **£10k–£30k** | ~10% shared spine |
+| 5 | Webhook Mesh | **Gold** | **£15k–£40k** | ~12% shared spine |
+| 6 | Ad Guard | **Gold** | **£15k–£45k** | ~12% shared spine |
+| 7 | Health Telemetry | **Gold** | **£30k–£80k** | ~12% shared spine |
+| 8a | ModelGovernor (lifecycle CLI) | **Gold** | **£25k–£70k** | ~12% shared spine |
+| 8b | ModelGovernor (LLM spend plane) | **Demo gold** | **£2M–£7M** strategic exit band | Not lifecycle SKU alone — see positioning doc |
+| | **Full portfolio (one spine)** | **8/8 CI Gold** | **£70k–£150k** | $89k–$190k at ~1.27 |
 
 ---
 
