@@ -1,4 +1,4 @@
-"""Workflow UI — FastAPI backend for Proof Console (11 SKUs) + Compliance + Proxy."""
+"""Workflow UI — FastAPI backend for Proof Console (12 SKUs) + Compliance + Proxy."""
 
 from __future__ import annotations
 

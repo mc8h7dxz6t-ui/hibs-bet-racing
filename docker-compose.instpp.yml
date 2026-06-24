@@ -1,14 +1,26 @@
-# Optional Institutional++ services — workflow UI only.
-# Primary proof is CLI-native: make demo-all / make demo-gold
+# Optional Institutional++ services — workflow UI + optional Redis for stream delivery.
+# Primary proof is CLI-native: make plug / make demo-all / make demo-gold
 #
 # Usage:
-#   docker compose -f docker-compose.instpp.yml up -d
-#   open http://127.0.0.1:8790
+#   make stack-up                    # workflow UI only
+#   make redis-up                    # workflow + Redis (WEBHOOK_DISPATCH_MODE=redis)
+#   docker compose -f docker-compose.instpp.yml --profile redis up -d
 #
 # Prefer native (no Docker):
 #   make demo-gold-up
 
 services:
+  redis:
+    image: redis:7-alpine
+    profiles: ["redis"]
+    ports:
+      - "${INST_REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   inst-workflow:
     image: python:3.11-slim-bookworm
     working_dir: /app
@@ -22,6 +34,11 @@ services:
       INST_COMPLIANCE_DB: /app/data/demo/portfolio/compliance.sqlite
       INST_PROXY_DB: /app/data/demo/portfolio/proxy.sqlite
       INST_EXPORT_DIR: /app/data/demo/ui_exports
+      INST_REDIS_URL: ${INST_REDIS_URL:-redis://redis:6379/0}
+    depends_on:
+      redis:
+        condition: service_healthy
+        required: false
     command: >
       bash -c "pip install -e '.[dev,instpp]' -q &&
       test -f /app/data/demo/portfolio/compliance.sqlite ||

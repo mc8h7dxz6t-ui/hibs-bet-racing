@@ -20,7 +20,7 @@ def _use_uvloop() -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="inst-workflow",
-        description="Proof Console — 11 SKU picker + Compliance + Proxy-Risk workflows",
+        description="Proof Console — 12 SKU picker + Compliance + Proxy-Risk workflows",
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 

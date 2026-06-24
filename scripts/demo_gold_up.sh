@@ -53,11 +53,28 @@ nohup "$PYTHON" -m inst_workflow.cli serve \
   >"$LOG_FILE" 2>&1 &
 echo $! >"$PID_FILE"
 
-sleep 1
-if kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+READY=0
+for _ in $(seq 1 30); do
+  if ! kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    break
+  fi
+  if "$PYTHON" -c "
+import urllib.request
+urllib.request.urlopen('http://${HOST}:${PORT}/', timeout=2)
+" 2>/dev/null; then
+    READY=1
+    break
+  fi
+  sleep 1
+done
+
+if [[ "$READY" == "1" ]]; then
   echo "[OK] Workflow UI → http://${HOST}:${PORT}"
   echo "     Log: $LOG_FILE"
   echo "     Stop: make demo-gold-down"
+elif kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+  echo "[WARN] Workflow UI process up but HTTP not ready — see $LOG_FILE" >&2
+  exit 1
 else
   echo "[FAIL] Workflow UI failed to start — see $LOG_FILE" >&2
   exit 1

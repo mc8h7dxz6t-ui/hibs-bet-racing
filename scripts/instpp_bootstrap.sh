@@ -47,6 +47,13 @@ instpp_mktemp() {
 }
 
 instpp_bootstrap() {
+  local root
+  root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  if [[ -f "$root/scripts/instpp_env.sh" ]]; then
+    # shellcheck source=instpp_env.sh
+    source "$root/scripts/instpp_env.sh"
+    instpp_load_env
+  fi
   instpp_check_python
   instpp_raise_ulimit
   instpp_prune_pytest_tmp

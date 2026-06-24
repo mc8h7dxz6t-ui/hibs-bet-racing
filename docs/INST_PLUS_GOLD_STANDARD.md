@@ -64,10 +64,12 @@
 
 ```bash
 pip install -e ".[dev,instpp]"
+make plug                               # one-shot: demo-all + offline verify 12/12
 make demo-ready                         # preflight
 make demo-all                           # all 12 demos → data/demo/portfolio/
+make verify-portfolio                   # offline verify-bundle → PORTFOLIO_MANIFEST.json
 make demo-gold                          # spend-plane sales walkthrough
-./scripts/instpp_smoke_test.sh          # 113+ unit tests
+./scripts/instpp_smoke_test.sh          # 134+ unit tests
 ./scripts/instpp_rigorous_test.sh       # 12/12 rigorous E2E → docs/test_logs/
 ./scripts/chaos_instpp.sh               # chaos + integration drills
 ```

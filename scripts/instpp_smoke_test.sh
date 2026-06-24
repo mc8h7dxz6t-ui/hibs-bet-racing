@@ -11,7 +11,7 @@ instpp_bootstrap
 echo "==> Installing institutional dev dependencies"
 pip install -e ".[dev,instpp]" -q
 
-echo "==> Running institutional test suite (all 8 products)"
+echo "==> Running institutional test suite (12 SKUs)"
 "$PYTHON" -m pytest \
   tests/test_inst_spine_core.py \
   tests/test_inst_products.py \
