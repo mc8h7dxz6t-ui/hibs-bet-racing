@@ -67,10 +67,12 @@ class ReplayEngine:
         *,
         handler: HandlerFn | None = None,
         ledger: AppendOnlyLedger | None = None,
+        mesh_ledger_db: Path | None = None,
     ) -> None:
         self.store = store
         self.handler = handler or _default_handler
         self.ledger = ledger
+        self.mesh_ledger_db = mesh_ledger_db
 
     def replay_file(self, path: Path, *, expected_sha256: str | None = None) -> ReplayResult:
         manifest, body = self.store.read(path)
@@ -94,7 +96,10 @@ class ReplayEngine:
 
         handler_result = self.handler(manifest, body)
         idempotent_match = not diffs and handler_result.get("status") != "reject"
-        ok = idempotent_match
+        lamport_ok, lamport_detail = self._verify_ingress_lamport(manifest)
+        ok = idempotent_match and lamport_ok
+        if not lamport_ok:
+            diffs.append(ReplayDiff("lamport_anchor", "ingress<=capture", lamport_detail))
 
         if self.ledger is not None:
             self.ledger.append(
@@ -105,6 +110,8 @@ class ReplayEngine:
                     "provider": manifest.provider,
                     "body_sha256": body_hash,
                     "replay_ok": ok,
+                    "lamport_ok": lamport_ok,
+                    "lamport_detail": lamport_detail,
                     "handler_result": handler_result,
                     "diffs": [d.to_dict() for d in diffs],
                 },
@@ -123,3 +130,25 @@ class ReplayEngine:
 
     def replay_all(self) -> list[ReplayResult]:
         return [self.replay_file(p) for p in self.store.list_captures()]
+
+    def _verify_ingress_lamport(self, manifest: CaptureManifest) -> tuple[bool, str]:
+        if self.mesh_ledger_db is None or not self.mesh_ledger_db.is_file():
+            return True, "mesh_ledger_not_configured"
+        cap_lamport = int(manifest.lamport_seq or manifest.extras.get("lamport") or 0)
+        if cap_lamport <= 0:
+            return True, "capture_lamport_missing"
+        ledger = AppendOnlyLedger(self.mesh_ledger_db)
+        ingress_lamports: list[int] = []
+        for row in ledger.list_entries():
+            if row.get("event_type") not in ("webhook_ingress", "webhook_delivery"):
+                continue
+            payload = row.get("payload") or {}
+            if str(payload.get("manifest_id")) != manifest.capture_id:
+                continue
+            ingress_lamports.append(int(payload.get("lamport") or row.get("lamport_seq") or 0))
+        if not ingress_lamports:
+            return True, "ingress_not_found"
+        ingress_max = max(ingress_lamports)
+        if cap_lamport > ingress_max:
+            return False, f"capture_lamport={cap_lamport} > ingress_max={ingress_max}"
+        return True, f"capture_lamport={cap_lamport} ingress_max={ingress_max}"

@@ -62,15 +62,40 @@ class SpendWallet:
         initial_balance: float = 1000.0,
         drift_threshold_pct: float = 0.5,
         rolling_window: int = 20,
+        ledger_db: Path | None = None,
     ) -> None:
         self.database = Path(database)
         self.wallet_id = wallet_id
         self.drift_threshold_pct = drift_threshold_pct
         self.rolling_window = rolling_window
+        self.ledger_db = Path(ledger_db) if ledger_db else None
         self._lock = threading.Lock()
         self._spend_history: list[float] = []
         self.database.parent.mkdir(parents=True, exist_ok=True)
         self._init_db(initial_balance)
+        if self.ledger_db is not None:
+            self.rebuild_spend_history_from_ledger(self.ledger_db)
+
+    def rebuild_spend_history_from_ledger(self, ledger_db: Path | None = None) -> int:
+        """Rebuild in-memory drift window from durable spend_guard settle events."""
+        from inst_spine.ledger import AppendOnlyLedger
+
+        path = Path(ledger_db or self.ledger_db or "")
+        if not path.is_file():
+            return 0
+        ledger = AppendOnlyLedger(path)
+        amounts: list[float] = []
+        for row in ledger.list_entries():
+            if row.get("event_type") != "spend_guard":
+                continue
+            payload = row.get("payload") or {}
+            if payload.get("phase") != "settle":
+                continue
+            if str(payload.get("decision")) != "approve":
+                continue
+            amounts.append(float(payload.get("estimated_cost") or 0.0))
+        self._spend_history = amounts[-self.rolling_window :]
+        return len(amounts)
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.database, timeout=30.0, isolation_level=None)

@@ -57,6 +57,10 @@ def main(argv: list[str] | None = None) -> int:
 
     p_feeds = sub.add_parser("list-feeds", help="List registered production feeds")
 
+    p_serve = sub.add_parser("serve", help="Secured feed read API")
+    p_serve.add_argument("--host", default=None)
+    p_serve.add_argument("--port", type=int, default=None)
+
     args = parser.parse_args(argv)
 
     if args.cmd == "list-feeds":
@@ -109,6 +113,18 @@ def main(argv: list[str] | None = None) -> int:
         code, body = run_institutional_verify(args.tarball, product=PRODUCT, anchor=args.anchor)
         print_json(body)
         return code
+
+    if args.cmd == "serve":
+        import os
+
+        from altdata.serve import main as serve_main
+
+        if args.host:
+            os.environ["ALTDATA_HOST"] = args.host
+        if args.port:
+            os.environ["ALTDATA_PORT"] = str(args.port)
+        serve_main()
+        return 0
 
     return 1
 

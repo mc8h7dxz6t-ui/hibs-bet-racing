@@ -1,0 +1,417 @@
+================================================================
+INSTITUTIONAL RIGOROUS TEST — All 12 Products
+Started: 2026-06-24T21:29:28Z UTC
+Log: /workspace/docs/test_logs/instpp_rigorous_2026-06-24T212928Z.log
+================================================================
+
+----------------------------------------------------------------
+SECTION: Install dependencies
+----------------------------------------------------------------
+  WARNING: The scripts ad-guard, agent-ledger, ai-kit, altdata, compliance-log, drift-gate, health-telemetry, hibs-racing, hibs-racing-web, inst-spine-export, inst-workflow, model-governor, proxy-risk, spend-guard, webhook-mesh and webhook-replay are installed in '/home/ubuntu/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+Work dir: /tmp/tmp.uYGCpSn0Jz
+
+----------------------------------------------------------------
+SECTION: Unit tests — full institutional suite
+----------------------------------------------------------------
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /workspace
+configfile: pyproject.toml
+plugins: anyio-4.14.0, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collecting ... collected 128 items
+
+tests/test_inst_spine_core.py::test_lamport_monotonic PASSED             [  0%]
+tests/test_inst_spine_core.py::test_vector_clock_causal PASSED           [  1%]
+tests/test_inst_spine_core.py::test_monotonic_never_backward PASSED      [  2%]
+tests/test_inst_spine_core.py::test_chain_hash_links_prev_with_genesis PASSED [  3%]
+tests/test_inst_spine_core.py::test_empty_chain_fails_without_genesis PASSED [  3%]
+tests/test_inst_spine_core.py::test_genesis_anchor_tamper_fails PASSED   [  4%]
+tests/test_inst_spine_core.py::test_chain_detects_tamper PASSED          [  5%]
+tests/test_inst_spine_core.py::test_token_bucket_burst_then_sustain PASSED [  6%]
+tests/test_inst_spine_core.py::test_token_bucket_shared_backend_multi_instance PASSED [  7%]
+tests/test_inst_spine_core.py::test_zscore_triggers_anomaly PASSED       [  7%]
+tests/test_inst_spine_core.py::test_ledger_append_and_verify PASSED      [  8%]
+tests/test_inst_spine_core.py::test_wal_survives_sqlite_lag PASSED       [  9%]
+tests/test_inst_spine_core.py::test_ledger_async_write_behind PASSED     [ 10%]
+tests/test_inst_spine_core.py::test_wiped_sqlite_without_wal_fails_genesis PASSED [ 10%]
+tests/test_inst_spine_core.py::test_idempotency_guard PASSED             [ 11%]
+tests/test_inst_spine_core.py::test_circuit_kill PASSED                  [ 12%]
+tests/test_inst_spine_core.py::test_f_gates_with_ledger PASSED           [ 13%]
+tests/test_inst_export.py::test_export_aborts_on_empty_chain PASSED      [ 14%]
+tests/test_inst_export.py::test_p2_bundle_with_entries PASSED            [ 14%]
+tests/test_inst_export.py::test_f9_reproducible_tarball PASSED           [ 15%]
+tests/test_inst_export.py::test_export_fails_tampered_genesis PASSED     [ 16%]
+tests/test_inst_export.py::test_deterministic_tar_sorted PASSED          [ 17%]
+tests/test_inst_export.py::test_offline_verify_audit_bundle PASSED       [ 17%]
+tests/test_inst_export.py::test_export_aborts_on_institutional_fail PASSED [ 18%]
+tests/test_inst_export.py::test_build_compliance_context_f9 PASSED       [ 19%]
+tests/test_inst_products.py::test_compliance_log_chain PASSED            [ 20%]
+tests/test_inst_products.py::test_compliance_clock_attack_chain_still_valid PASSED [ 21%]
+tests/test_inst_products.py::test_proxy_risk_token_bucket_blocks_burst PASSED [ 21%]
+tests/test_inst_products.py::test_proxy_risk_zscore_kill PASSED          [ 22%]
+tests/test_inst_products.py::test_altdata_structural_rescue PASSED       [ 23%]
+tests/test_inst_products.py::test_altdata_poll_coverage PASSED           [ 24%]
+tests/test_inst_products.py::test_altdata_rescue_rung PASSED             [ 25%]
+tests/test_inst_products.py::test_ai_kit_checkpoint_resume PASSED        [ 25%]
+tests/test_inst_products.py::test_institutional_check_passes_clean_ledger PASSED [ 26%]
+tests/test_proxy_risk.py::test_proxy_risk_idempotency_duplicate PASSED   [ 27%]
+tests/test_proxy_risk.py::test_proxy_risk_circuit_kill_env PASSED        [ 28%]
+tests/test_proxy_risk.py::test_proxy_risk_logs_reject_and_kill PASSED    [ 28%]
+tests/test_proxy_risk.py::test_proxy_risk_upstream_failure_rejects PASSED [ 29%]
+tests/test_proxy_risk.py::test_redis_token_bucket_fail_closed PASSED     [ 30%]
+tests/test_proxy_risk.py::test_proxy_risk_ledger_chain PASSED            [ 31%]
+tests/test_proxy_risk.py::test_proxy_risk_live_upstream_forward PASSED   [ 32%]
+tests/test_proxy_risk.py::test_proxy_risk_live_log_before_forward PASSED [ 32%]
+tests/test_proxy_risk.py::test_proxy_risk_p99_shadow_latency PASSED      [ 33%]
+tests/test_inst_coverage.py::test_compute_snapshot_coverage_partial PASSED [ 34%]
+tests/test_inst_coverage.py::test_f7_fails_on_incomplete_snapshot PASSED [ 35%]
+tests/test_inst_coverage.py::test_export_manifest_includes_product PASSED [ 35%]
+tests/test_compliance_cli.py::test_compliance_ingest_and_check PASSED    [ 36%]
+tests/test_compliance_cli.py::test_compliance_invalid_manifest_errors PASSED [ 37%]
+tests/test_compliance_cli.py::test_compliance_export_verify_bundle PASSED [ 38%]
+tests/test_altdata_cli.py::test_altdata_poll_check_export_verify PASSED  [ 39%]
+tests/test_altdata_cli.py::test_altdata_coverage_error_exit PASSED       [ 39%]
+tests/test_ai_kit_cli.py::test_ai_kit_run_check_export_verify PASSED     [ 40%]
+tests/test_ai_kit_cli.py::test_ai_kit_validate_demo PASSED               [ 41%]
+tests/test_ad_guard_cli.py::test_ad_guard_evaluate_check_export_verify PASSED [ 42%]
+tests/test_webhook_mesh.py::test_memory_idempotency_unique_then_duplicate PASSED [ 42%]
+tests/test_webhook_mesh.py::test_memory_idempotency_expires PASSED       [ 43%]
+tests/test_webhook_mesh.py::test_redis_idempotency_cas_success PASSED    [ 44%]
+tests/test_webhook_mesh.py::test_redis_idempotency_fail_closed_on_error PASSED [ 45%]
+tests/test_webhook_mesh.py::test_hmac_verify_roundtrip PASSED            [ 46%]
+tests/test_webhook_mesh.py::test_shopify_hmac_roundtrip PASSED           [ 46%]
+tests/test_webhook_mesh.py::test_stripe_signature_roundtrip PASSED       [ 47%]
+tests/test_webhook_mesh.py::test_wal_writer_fsync_append PASSED          [ 48%]
+tests/test_webhook_mesh.py::test_dispatch_uses_tiered_httpx_limits PASSED [ 49%]
+tests/test_webhook_mesh.py::test_dispatch_delivery_success PASSED        [ 50%]
+tests/test_webhook_mesh.py::test_dispatch_dead_letter_after_retries PASSED [ 50%]
+tests/test_webhook_mesh.py::test_poison_json_blocks_replay PASSED        [ 51%]
+tests/test_webhook_mesh.py::test_handle_dead_letter_writes_sidecar PASSED [ 52%]
+tests/test_webhook_mesh.py::test_assess_payload_integrity PASSED         [ 53%]
+tests/test_webhook_mesh.py::test_success_status_codes_include_204 PASSED [ 53%]
+tests/test_webhook_mesh.py::test_ingress_accepts_and_dedupes PASSED      [ 54%]
+tests/test_webhook_mesh.py::test_delivery_manifest_stream_roundtrip PASSED [ 55%]
+tests/test_webhook_mesh.py::test_dispatch_mode_from_env_matrix PASSED    [ 56%]
+tests/test_webhook_mesh.py::test_redis_stream_enqueue_xadd PASSED        [ 57%]
+tests/test_webhook_mesh.py::test_redis_stream_worker_acks_on_success PASSED [ 57%]
+tests/test_webhook_mesh.py::test_redis_stream_worker_acks_after_dlq PASSED [ 58%]
+tests/test_webhook_mesh.py::test_redis_stream_worker_no_ack_on_exception PASSED [ 59%]
+tests/test_ad_guard.py::test_extract_google_campaign_and_micros PASSED   [ 60%]
+tests/test_ad_guard.py::test_extract_google_resource_name PASSED         [ 60%]
+tests/test_ad_guard.py::test_extract_meta_campaign PASSED                [ 61%]
+tests/test_ad_guard.py::test_ad_guard_campaign_bucket_blocks_burst PASSED [ 62%]
+tests/test_ad_guard.py::test_ad_guard_spend_zscore_kill PASSED           [ 63%]
+tests/test_ad_guard.py::test_ad_guard_ledger_event PASSED                [ 64%]
+tests/test_ad_guard.py::test_ad_guard_reject_logs_to_ledger PASSED       [ 64%]
+tests/test_ad_guard.py::test_ad_guard_creative_gate_required PASSED      [ 65%]
+tests/test_ad_guard.py::test_ad_guard_serve_approves PASSED              [ 66%]
+tests/test_health_telemetry.py::test_health_telemetry_ingest_and_chain PASSED [ 67%]
+tests/test_health_telemetry.py::test_health_telemetry_cli_export_verify PASSED [ 67%]
+tests/test_model_governor.py::test_model_governor_record_and_chain PASSED [ 68%]
+tests/test_model_governor.py::test_model_governor_requires_fields PASSED [ 69%]
+tests/test_model_governor.py::test_model_governor_invalid_action PASSED  [ 70%]
+tests/test_model_governor.py::test_model_governor_cli_export_verify PASSED [ 71%]
+tests/test_drift_gate.py::test_psi_stable_distribution_near_zero PASSED  [ 71%]
+tests/test_drift_gate.py::test_psi_significant_on_shifted_distribution PASSED [ 72%]
+tests/test_drift_gate.py::test_ks_detects_shift PASSED                   [ 73%]
+tests/test_drift_gate.py::test_drift_gate_shadow_approves_on_drift PASSED [ 74%]
+tests/test_drift_gate.py::test_drift_gate_enforce_rejects_on_drift PASSED [ 75%]
+tests/test_drift_gate.py::test_drift_gate_records_to_ledger PASSED       [ 75%]
+tests/test_webhook_replay.py::test_capture_roundtrip PASSED              [ 76%]
+tests/test_webhook_replay.py::test_replay_detects_tampered_body PASSED   [ 77%]
+tests/test_webhook_replay.py::test_replay_logs_to_ledger PASSED          [ 78%]
+tests/test_webhook_replay.py::test_capture_mmap_readable PASSED          [ 78%]
+tests/test_spend_guard.py::test_reserve_and_settle PASSED                [ 79%]
+tests/test_spend_guard.py::test_duplicate_request_id_rejected PASSED     [ 80%]
+tests/test_spend_guard.py::test_insufficient_balance PASSED              [ 81%]
+tests/test_spend_guard.py::test_drift_lockout PASSED                     [ 82%]
+tests/test_spend_guard.py::test_gateway_logs_to_ledger PASSED            [ 82%]
+tests/test_spend_guard.py::test_estimate_reserve_cost PASSED             [ 83%]
+tests/test_spend_guard.py::test_spend_guard_serve_mock_chat PASSED       [ 84%]
+tests/test_spend_guard.py::test_spend_guard_serve_locked_wallet FAILED   [ 85%]
+tests/test_agent_ledger.py::test_policy_denies_forbidden_sql PASSED      [ 85%]
+tests/test_agent_ledger.py::test_policy_escalates_critical_without_human PASSED [ 86%]
+tests/test_agent_ledger.py::test_policy_permits_critical_with_human PASSED [ 87%]
+tests/test_agent_ledger.py::test_authorize_and_complete_chain PASSED     [ 88%]
+tests/test_agent_ledger.py::test_complete_without_permit_denied PASSED   [ 89%]
+tests/test_agent_ledger.py::test_duplicate_complete_rejected PASSED      [ 89%]
+tests/test_agent_ledger.py::test_idempotent_authorize PASSED             [ 90%]
+tests/test_agent_ledger.py::test_cli_authorize_export_verify PASSED      [ 91%]
+tests/test_industry_gold.py::test_wal_fsync_survives_reopen PASSED       [ 92%]
+tests/test_industry_gold.py::test_rolling_state_persists_across_instances PASSED [ 92%]
+tests/test_industry_gold.py::test_proxy_drift_gate_integration_shadow PASSED [ 93%]
+tests/test_industry_gold.py::test_webhook_mesh_capture_integration PASSED [ 94%]
+tests/test_industry_gold.py::test_spend_wallet_fail_closed_on_duplicate PASSED [ 95%]
+tests/test_industry_gold.py::test_replay_tamper_fails_closed PASSED      [ 96%]
+tests/test_industry_gold.py::test_redis_stream_delivery_integration PASSED [ 96%]
+tests/test_industry_gold.py::test_redis_stream_with_capture_integration PASSED [ 97%]
+tests/test_industry_gold.py::test_spend_guard_http_reserve_settle_path FAILED [ 98%]
+tests/test_industry_gold.py::test_agent_ledger_fail_closed_duplicate_complete PASSED [ 99%]
+tests/test_industry_gold.py::test_proxy_shadow_latency_p99_under_10ms PASSED [100%]
+
+=================================== FAILURES ===================================
+_____________________ test_spend_guard_serve_locked_wallet _____________________
+tests/test_spend_guard.py:147: in test_spend_guard_serve_locked_wallet
+    r = client.post(
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/testclient.py:555: in post
+    return super().post(
+/home/ubuntu/.local/lib/python3.12/site-packages/httpx/_client.py:1144: in post
+    return self.request(
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/testclient.py:454: in request
+    return super().request(
+/home/ubuntu/.local/lib/python3.12/site-packages/httpx/_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/ubuntu/.local/lib/python3.12/site-packages/httpx/_client.py:914: in send
+    response = self._send_handling_auth(
+/home/ubuntu/.local/lib/python3.12/site-packages/httpx/_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+/home/ubuntu/.local/lib/python3.12/site-packages/httpx/_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/ubuntu/.local/lib/python3.12/site-packages/httpx/_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/testclient.py:356: in handle_request
+    raise exc
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/testclient.py:353: in handle_request
+    portal.call(self.app, scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/anyio/from_thread.py:338: in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/concurrent/futures/_base.py:456: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+/home/ubuntu/.local/lib/python3.12/site-packages/anyio/from_thread.py:263: in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/applications.py:1163: in __call__
+    await super().__call__(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/applications.py:90: in __call__
+    await self.middleware_stack(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/middleware/errors.py:186: in __call__
+    raise exc
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/middleware/errors.py:164: in __call__
+    await self.app(scope, receive, _send)
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/middleware/exceptions.py:63: in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/_exception_handler.py:53: in wrapped_app
+    raise exc
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py:18: in __call__
+    await self.app(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/routing.py:660: in __call__
+    await self.middleware_stack(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/routing.py:2531: in app
+    await route.handle(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/routing.py:1241: in handle
+    await super().handle(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/routing.py:276: in handle
+    await self.app(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/routing.py:150: in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/_exception_handler.py:53: in wrapped_app
+    raise exc
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/routing.py:136: in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/routing.py:690: in app
+    raw_response = await run_endpoint_function(
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/routing.py:344: in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/spend_guard/serve.py:167: in chat_completions
+    reserve_resp = gw.reserve(
+src/spend_guard/gateway.py:69: in reserve
+    self._log(req, resp, phase="reserve")
+src/spend_guard/gateway.py:128: in _log
+    self.ledger.append(
+src/inst_spine/ledger.py:255: in append
+    self.wal.append(record)
+src/inst_spine/wal.py:23: in append
+    with open(self.path, "a", encoding="utf-8") as fh:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/pytest-of-ubuntu/pytest-4/test_spend_guard_serve_mock_ch0/ledger.wal'
+__________________ test_spend_guard_http_reserve_settle_path ___________________
+tests/test_industry_gold.py:297: in test_spend_guard_http_reserve_settle_path
+    r = client.post(
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/testclient.py:555: in post
+    return super().post(
+/home/ubuntu/.local/lib/python3.12/site-packages/httpx/_client.py:1144: in post
+    return self.request(
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/testclient.py:454: in request
+    return super().request(
+/home/ubuntu/.local/lib/python3.12/site-packages/httpx/_client.py:825: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/ubuntu/.local/lib/python3.12/site-packages/httpx/_client.py:914: in send
+    response = self._send_handling_auth(
+/home/ubuntu/.local/lib/python3.12/site-packages/httpx/_client.py:942: in _send_handling_auth
+    response = self._send_handling_redirects(
+/home/ubuntu/.local/lib/python3.12/site-packages/httpx/_client.py:979: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/ubuntu/.local/lib/python3.12/site-packages/httpx/_client.py:1014: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/testclient.py:356: in handle_request
+    raise exc
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/testclient.py:353: in handle_request
+    portal.call(self.app, scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/anyio/from_thread.py:338: in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/concurrent/futures/_base.py:456: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/concurrent/futures/_base.py:401: in __get_result
+    raise self._exception
+/home/ubuntu/.local/lib/python3.12/site-packages/anyio/from_thread.py:263: in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/applications.py:1163: in __call__
+    await super().__call__(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/applications.py:90: in __call__
+    await self.middleware_stack(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/middleware/errors.py:186: in __call__
+    raise exc
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/middleware/errors.py:164: in __call__
+    await self.app(scope, receive, _send)
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/middleware/exceptions.py:63: in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/_exception_handler.py:53: in wrapped_app
+    raise exc
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py:18: in __call__
+    await self.app(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/routing.py:660: in __call__
+    await self.middleware_stack(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/routing.py:2531: in app
+    await route.handle(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/routing.py:1241: in handle
+    await super().handle(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/routing.py:276: in handle
+    await self.app(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/routing.py:150: in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/_exception_handler.py:53: in wrapped_app
+    raise exc
+/home/ubuntu/.local/lib/python3.12/site-packages/starlette/_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/routing.py:136: in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/routing.py:690: in app
+    raw_response = await run_endpoint_function(
+/home/ubuntu/.local/lib/python3.12/site-packages/fastapi/routing.py:344: in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/spend_guard/serve.py:167: in chat_completions
+    reserve_resp = gw.reserve(
+src/spend_guard/gateway.py:95: in reserve
+    self._log(req, resp, phase="reserve")
+src/spend_guard/gateway.py:128: in _log
+    self.ledger.append(
+src/inst_spine/ledger.py:255: in append
+    self.wal.append(record)
+src/inst_spine/wal.py:23: in append
+    with open(self.path, "a", encoding="utf-8") as fh:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/pytest-of-ubuntu/pytest-4/test_spend_guard_serve_mock_ch0/ledger.wal'
+=============================== warnings summary ===============================
+tests/test_inst_spine_core.py::test_wiped_sqlite_without_wal_fails_genesis
+  /home/ubuntu/.local/lib/python3.12/site-packages/_pytest/threadexception.py:58: PytestUnhandledThreadExceptionWarning: Exception in thread inst-ledger-writer
+  
+  Traceback (most recent call last):
+    File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+      self.run()
+    File "/usr/lib/python3.12/threading.py", line 1010, in run
+      self._target(*self._args, **self._kwargs)
+    File "/workspace/src/inst_spine/ledger.py", line 185, in _run
+      self._persist(item)
+    File "/workspace/src/inst_spine/ledger.py", line 292, in _persist
+      self._persist_record(
+    File "/workspace/src/inst_spine/ledger.py", line 308, in _persist_record
+      with self._connect() as conn:
+           ^^^^^^^^^^^^^^^
+    File "/workspace/src/inst_spine/ledger.py", line 101, in _connect
+      conn = sqlite3.connect(self.database, timeout=30.0)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  sqlite3.OperationalError: unable to open database file
+  
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnhandledThreadExceptionWarning(msg))
+
+tests/test_webhook_mesh.py::test_ingress_accepts_and_dedupes
+  /home/ubuntu/.local/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_webhook_mesh.py::test_ingress_accepts_and_dedupes
+  /workspace/src/webhook_mesh/serve.py:52: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+tests/test_webhook_mesh.py::test_ingress_accepts_and_dedupes
+  /workspace/src/webhook_mesh/serve.py:74: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("shutdown")
+
+tests/test_ad_guard.py::test_ad_guard_serve_approves
+  /workspace/src/ad_guard/serve.py:35: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+tests/test_ad_guard.py::test_ad_guard_serve_approves
+  /workspace/src/ad_guard/serve.py:48: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("shutdown")
+
+tests/test_spend_guard.py::test_spend_guard_serve_mock_chat
+  /workspace/src/spend_guard/serve.py:64: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+tests/test_spend_guard.py::test_spend_guard_serve_mock_chat
+  /workspace/src/spend_guard/serve.py:76: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("shutdown")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_spend_guard.py::test_spend_guard_serve_locked_wallet - File...
+FAILED tests/test_industry_gold.py::test_spend_guard_http_reserve_settle_path
+================== 2 failed, 126 passed, 8 warnings in 5.17s ===================

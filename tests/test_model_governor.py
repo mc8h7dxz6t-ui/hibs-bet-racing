@@ -53,9 +53,16 @@ def test_model_governor_invalid_action(tmp_path: Path):
 
 def test_model_governor_cli_export_verify(tmp_path: Path):
     db = tmp_path / "mg.sqlite"
+    snap = _snapshot()
+    record_governance_event(
+        action="register",
+        model_snapshot=snap,
+        outcome={"status": "registered"},
+        database=db,
+    )
     record_governance_event(
         action="approve",
-        model_snapshot=_snapshot(),
+        model_snapshot=snap,
         outcome={"status": "approved"},
         database=db,
     )

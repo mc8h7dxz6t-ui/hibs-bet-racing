@@ -9,6 +9,7 @@ from inst_spine.contracts import RunManifest, stable_id
 from inst_spine.coverage import compute_snapshot_coverage
 from inst_spine.errors import IngestValidationError
 from inst_spine.ledger import AppendOnlyLedger
+from model_governor.lifecycle import validate_deploy_drift_gate, validate_lifecycle_transition
 
 GOVERNANCE_ACTIONS = frozenset(
     {"register", "approve", "reject", "deploy", "retire", "drift_alert"}
@@ -55,6 +56,35 @@ def record_governance_event(
     missing = [f for f in REQUIRED_MODEL_FIELDS if not model_snapshot.get(f)]
     if missing:
         raise IngestValidationError(f"model_snapshot missing required fields: {missing}")
+
+    db = database or _default_db()
+    validate_lifecycle_transition(
+        action=act,
+        model_id=str(model_snapshot["model_id"]),
+        version=str(model_snapshot["version"]),
+        database=db,
+    )
+
+    if act == "deploy":
+        import os
+        from pathlib import Path as _Path
+
+        baseline = os.environ.get("MODEL_GOVERNOR_DRIFT_BASELINE", "").strip()
+        deploy_features = model_snapshot.get("deploy_features")
+        if baseline and isinstance(deploy_features, dict):
+            try:
+                features = {k: float(v) for k, v in deploy_features.items()}
+            except (TypeError, ValueError) as exc:
+                raise IngestValidationError("deploy_features must be numeric") from exc
+            mode = os.environ.get("MODEL_GOVERNOR_DRIFT_MODE", "shadow").strip()
+            validate_deploy_drift_gate(
+                model_id=str(model_snapshot["model_id"]),
+                version=str(model_snapshot["version"]),
+                features=features,
+                baseline_path=_Path(baseline),
+                mode=mode,
+                database=db,
+            )
 
     out = outcome if outcome is not None else {}
     if not isinstance(out, dict):

@@ -26,6 +26,33 @@ def append_ingress_event(
     dispatch_mode: str,
 ) -> None:
     """Cold-path genesis ledger append (every accepted ingress)."""
+    append_delivery_event(
+        manifest_id=manifest_id,
+        client_id=client_id,
+        payload_id=payload_id,
+        target_url=target_url,
+        status=status,
+        lamport=lamport,
+        raw_bytes=raw_bytes,
+        dispatch_mode=dispatch_mode,
+        event_type="webhook_ingress",
+    )
+
+
+def append_delivery_event(
+    *,
+    manifest_id: str,
+    client_id: str = "",
+    payload_id: str = "",
+    target_url: str = "",
+    status: str,
+    lamport: int = 0,
+    raw_bytes: bytes | None = None,
+    dispatch_mode: str = "",
+    event_type: str = "webhook_delivery",
+    extra: dict[str, Any] | None = None,
+) -> None:
+    """Lifecycle events: FORWARDING, DELIVERED, DEAD_LETTER (+ ingress)."""
     db = ledger_path()
     ledger = AppendOnlyLedger(db, writer_id="webhook-mesh", async_writes=False)
     payload: dict[str, Any] = {
@@ -36,11 +63,15 @@ def append_ingress_event(
         "status": status,
         "lamport": lamport,
         "dispatch_mode": dispatch_mode,
-        "payload_sha256": hashlib.sha256(raw_bytes).hexdigest(),
-        "payload_bytes": len(raw_bytes),
     }
+    if raw_bytes is not None:
+        payload["payload_sha256"] = hashlib.sha256(raw_bytes).hexdigest()
+        payload["payload_bytes"] = len(raw_bytes)
+    if extra:
+        payload.update(extra)
     ledger.append(
-        event_type="webhook_ingress",
+        event_type=event_type,
         payload=payload,
         manifest_id=manifest_id,
+        metadata={"delivery_status": status},
     )
