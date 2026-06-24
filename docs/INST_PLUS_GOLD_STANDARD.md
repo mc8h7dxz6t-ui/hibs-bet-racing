@@ -40,7 +40,7 @@
 | 10 | Webhook Replay | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Webhook Mesh | **Industry** |
 | 11 | Spend Guard (8b CLI) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Proxy-Risk | **Industry** |
 
-**ModelGovernor 8b compose demo** (`make demo-gold`): documented north star — Postgres stack not in rigorous CI; **Spend Guard** is the shipped CLI for spend-plane proof.
+**ModelGovernor 8b compose demo**: design-partner north star — **Spend Guard CLI** + `make demo-gold` is the shipped spend-plane proof.
 
 ---
 
@@ -62,12 +62,15 @@
 
 ```bash
 pip install -e ".[dev,instpp]"
+make demo-ready                         # preflight
+make demo-all                           # all 11 demos → data/demo/portfolio/
+make demo-gold                          # spend-plane sales walkthrough
 ./scripts/instpp_smoke_test.sh          # 113+ unit tests
 ./scripts/instpp_rigorous_test.sh       # 11/11 rigorous E2E → docs/test_logs/
 ./scripts/chaos_instpp.sh               # chaos + integration drills
-./scripts/demo_portfolio_all.sh         # original 8 demos
-./scripts/demo_phase2_all.sh            # drift-gate + webhook-replay + spend-guard
 ```
+
+See [RUN_DEMO.md](RUN_DEMO.md) for the full plug/demo/run guide.
 
 ---
 

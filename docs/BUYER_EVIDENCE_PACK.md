@@ -34,9 +34,9 @@ pip install -e ".[dev,instpp]"
 ./scripts/chaos_instpp.sh
 cat docs/test_logs/instpp_rigorous_latest_summary.json
 
-# All demos
-./scripts/demo_portfolio_all.sh
-./scripts/demo_phase2_all.sh
+# All demos (11/11)
+make demo-all
+# or: ./scripts/demo_portfolio_all.sh
 ```
 
 **Expected:** smoke tests green; rigorous summary `"status": "PASSED"`; demo bundles verify offline.

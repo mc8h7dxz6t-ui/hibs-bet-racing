@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 PYTHON="${PYTHON:-python3}"
+# shellcheck source=instpp_bootstrap.sh
+source "$(dirname "$0")/instpp_bootstrap.sh"
+instpp_bootstrap
 DB="${1:-./data/demo/model_governor.sqlite}"
 TAR="${2:-./data/demo/model_governor_bundle.tar}"
 MODEL="${ROOT}/docs/demo_model_snapshot.json"
