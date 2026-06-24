@@ -39,5 +39,27 @@ pip install -e ".[dev,instpp]"
 ./scripts/instpp_rigorous_test.sh    # all 8 products
 ```
 
+### macOS setup (required for gold-standard test pass)
+
+Default macOS open-file limit (`ulimit -n` ≈ 256) exhausts during the SQLite-heavy suite. The smoke/rigorous scripts auto-raise the limit and prune stale pytest temp dirs.
+
+**Recommended Python:** 3.10–3.13 (3.14 is experimental).
+
+```bash
+cd /path/to/hibs-bet-racing
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev,instpp]"
+./scripts/instpp_smoke_test.sh
+```
+
+If tests still fail with `Too many open files`:
+
+```bash
+ulimit -n 10240
+rm -rf "${TMPDIR:-/tmp}"/pytest-of-"$(whoami)"/pytest-*
+./scripts/instpp_smoke_test.sh
+```
+
 **Deep dive:** `docs/INST_PLUS_DEEP_DIVE_ALL_7.md`  
 **SOC 2 / VPC diligence:** `docs/SOC2_VPC_DILIGENCE_PACK.md`

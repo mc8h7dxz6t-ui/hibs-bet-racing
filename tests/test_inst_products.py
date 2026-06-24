@@ -47,22 +47,24 @@ async def test_proxy_risk_token_bucket_blocks_burst(tmp_path: Path):
     db = tmp_path / "proxy.sqlite"
     ledger = AppendOnlyLedger(db, async_writes=True)
     ledger.start_async_writer()
-    from inst_spine.rates import MemoryTokenBucketBackend, TokenBucket
+    try:
+        from inst_spine.rates import MemoryTokenBucketBackend, TokenBucket
 
-    backend = MemoryTokenBucketBackend()
-    gw = ProxyRiskGateway(
-        ledger=ledger,
-        bucket=TokenBucket(capacity=2.0, refill_rate=0.01, key="proxy:c1", backend=backend),
-        shadow_mode=True,
-    )
-    req = ProxyRequest(client_id="c1", method="POST", path="/o", body={})
-    r1 = await gw.evaluate(req)
-    r2 = await gw.evaluate(ProxyRequest(client_id="c1", method="POST", path="/o2", body={}))
-    r3 = await gw.evaluate(ProxyRequest(client_id="c1", method="POST", path="/o3", body={}))
-    assert r1.decision.value == "approve"
-    assert r2.decision.value == "approve"
-    assert r3.decision.value == "reject"
-    ledger.stop_async_writer(flush=True)
+        backend = MemoryTokenBucketBackend()
+        gw = ProxyRiskGateway(
+            ledger=ledger,
+            bucket=TokenBucket(capacity=2.0, refill_rate=0.01, key="proxy:c1", backend=backend),
+            shadow_mode=True,
+        )
+        req = ProxyRequest(client_id="c1", method="POST", path="/o", body={})
+        r1 = await gw.evaluate(req)
+        r2 = await gw.evaluate(ProxyRequest(client_id="c1", method="POST", path="/o2", body={}))
+        r3 = await gw.evaluate(ProxyRequest(client_id="c1", method="POST", path="/o3", body={}))
+        assert r1.decision.value == "approve"
+        assert r2.decision.value == "approve"
+        assert r3.decision.value == "reject"
+    finally:
+        ledger.close()
 
 
 @pytest.mark.asyncio
