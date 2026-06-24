@@ -26,8 +26,12 @@ def build_compliance_context(
         "snapshot",
         "telemetry_batch",
         "webhook_ingress",
+        "webhook_replay",
         "ad_spend_request",
         "agent_checkpoint",
+        "model_governance",
+        "drift_gate_evaluation",
+        "spend_guard",
     }
     decisions = sum(1 for e in entries if e.get("event_type") in snapshot_events)
     anchor = read_genesis_anchor(ledger.anchor_path)

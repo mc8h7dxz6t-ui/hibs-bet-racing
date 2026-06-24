@@ -193,6 +193,17 @@ class AppendOnlyLedger:
         self._stop.set()
         if self._worker:
             self._worker.join(timeout=5.0)
+            self._worker = None
+
+    def close(self) -> None:
+        """Stop background workers — call in tests and long-lived servers."""
+        self.stop_async_writer(flush=True)
+
+    def __enter__(self) -> AppendOnlyLedger:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.close()
 
     def flush(self) -> int:
         flushed = 0

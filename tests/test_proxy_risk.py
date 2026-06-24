@@ -48,34 +48,36 @@ async def test_proxy_risk_logs_reject_and_kill(tmp_path: Path):
     db = tmp_path / "audit.sqlite"
     ledger = AppendOnlyLedger(db, async_writes=True)
     ledger.start_async_writer()
-    gw = ProxyRiskGateway(
-        ledger=ledger,
-        shadow_mode=True,
-        idempotency=MemoryIdempotencyBackend(),
-    )
-    await gw.evaluate(
-        ProxyRequest(
-            client_id="c1",
-            method="POST",
-            path="/dup",
-            body={},
-            idempotency_key="same-key",
+    try:
+        gw = ProxyRiskGateway(
+            ledger=ledger,
+            shadow_mode=True,
+            idempotency=MemoryIdempotencyBackend(),
         )
-    )
-    await gw.evaluate(
-        ProxyRequest(
-            client_id="c1",
-            method="POST",
-            path="/dup",
-            body={},
-            idempotency_key="same-key",
+        await gw.evaluate(
+            ProxyRequest(
+                client_id="c1",
+                method="POST",
+                path="/dup",
+                body={},
+                idempotency_key="same-key",
+            )
         )
-    )
-    ledger.stop_async_writer(flush=True)
-    rows = [e for e in ledger.list_entries() if e.get("event_type") == "proxy_request"]
-    decisions = [r.get("payload", {}).get("decision") for r in rows]
-    assert "approve" in decisions
-    assert "reject" in decisions
+        await gw.evaluate(
+            ProxyRequest(
+                client_id="c1",
+                method="POST",
+                path="/dup",
+                body={},
+                idempotency_key="same-key",
+            )
+        )
+        rows = [e for e in ledger.list_entries() if e.get("event_type") == "proxy_request"]
+        decisions = [r.get("payload", {}).get("decision") for r in rows]
+        assert "approve" in decisions
+        assert "reject" in decisions
+    finally:
+        ledger.close()
 
 
 @pytest.mark.asyncio
@@ -122,13 +124,15 @@ async def test_proxy_risk_ledger_chain(tmp_path: Path):
     db = tmp_path / "proxy.sqlite"
     ledger = AppendOnlyLedger(db, async_writes=True)
     ledger.start_async_writer()
-    gw = ProxyRiskGateway(ledger=ledger, shadow_mode=True, idempotency=MemoryIdempotencyBackend())
-    await gw.evaluate(ProxyRequest(client_id="c1", method="POST", path="/a", body={"n": 1}))
-    await gw.evaluate(ProxyRequest(client_id="c1", method="POST", path="/b", body={"n": 2}))
-    ledger.stop_async_writer(flush=True)
-    verify = ledger.verify()
-    assert verify["chain_ok"]
-    assert verify["lamport_monotonic"]
+    try:
+        gw = ProxyRiskGateway(ledger=ledger, shadow_mode=True, idempotency=MemoryIdempotencyBackend())
+        await gw.evaluate(ProxyRequest(client_id="c1", method="POST", path="/a", body={"n": 1}))
+        await gw.evaluate(ProxyRequest(client_id="c1", method="POST", path="/b", body={"n": 2}))
+        verify = ledger.verify()
+        assert verify["chain_ok"]
+        assert verify["lamport_monotonic"]
+    finally:
+        ledger.close()
 
 
 @pytest.mark.asyncio

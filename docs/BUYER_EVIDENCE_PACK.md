@@ -1,8 +1,8 @@
 # Buyer Evidence Pack — Procurement & Auditor Dry-Run
 
 **Purpose:** Hand this to procurement, InfoSec, or an external auditor — run proof **without a vendor call**.  
-**Scope:** All 7 institutional products on shared `inst_spine`  
-**Last rigorous E2E:** 7/7 PASSED (see `docs/test_logs/instpp_rigorous_latest_summary.json`)
+**Scope:** All **11** institutional products on shared `inst_spine` (8 core + 3 Phase 2)  
+**Last rigorous E2E:** **11/11 PASSED** — `industry_gold: true` (see `docs/test_logs/instpp_rigorous_latest_summary.json`)
 
 ---
 
@@ -10,8 +10,9 @@
 
 | Evidence type | What it proves |
 |---------------|----------------|
-| **87 automated tests** | Fail-closed gates, hash chain, export determinism |
-| **Rigorous E2E 7/7** | Each product: ingest → check → export → verify-bundle |
+| **113+ automated tests** | Fail-closed gates, hash chain, export determinism, chaos |
+| **Rigorous E2E 11/11** | Each product: ingest → check → export → verify-bundle |
+| **Chaos suite** | WAL persistence, capture integration, wallet fail-closed |
 | **Offline verify-bundle** | Auditor replays tarball without live DB or vendor API |
 | **Deterministic F9** | Identical ledger → identical bundle SHA256 |
 | **Typed errors** | No silent drops — `InstError` hierarchy + JSON CLI envelope |
@@ -30,10 +31,12 @@ pip install -e ".[dev,instpp]"
 
 # Per-product E2E (logged)
 ./scripts/instpp_rigorous_test.sh
+./scripts/chaos_instpp.sh
 cat docs/test_logs/instpp_rigorous_latest_summary.json
 
 # All demos
-./scripts/demo_instpp.sh
+./scripts/demo_portfolio_all.sh
+./scripts/demo_phase2_all.sh
 ```
 
 **Expected:** smoke tests green; rigorous summary `"status": "PASSED"`; demo bundles verify offline.
@@ -51,6 +54,10 @@ cat docs/test_logs/instpp_rigorous_latest_summary.json
 | 5 | Webhook Mesh | `webhook-mesh verify-bundle --tarball ./webhook_mesh_bundle.tar` |
 | 6 | Ad Guard | `ad-guard verify-bundle --tarball ./ad_guard_bundle.tar` |
 | 7 | Health Telemetry | `health-telemetry verify-bundle --tarball ./health_bundle.tar` |
+| 8 | ModelGovernor 8a | `model-governor verify-bundle --tarball ./model_governor_bundle.tar` |
+| 9 | Drift Gate | `drift-gate verify-bundle --tarball ./drift_gate_bundle.tar` |
+| 10 | Webhook Replay | `webhook-replay verify-bundle --tarball ./webhook_replay_bundle.tar` |
+| 11 | Spend Guard | `spend-guard verify-bundle --tarball ./spend_guard_bundle.tar` |
 
 Demo scripts write bundles to predictable paths — run `./scripts/demo_<product>.sh` first.
 
@@ -93,7 +100,7 @@ Full matrix: `docs/INSTITUTIONAL_STANDARD.md`
 
 | Document | Applies to |
 |----------|------------|
-| [SOC2_VPC_DILIGENCE_PACK.md](SOC2_VPC_DILIGENCE_PACK.md) | All 7 — VPC deploy, CC mapping |
+| [SOC2_VPC_DILIGENCE_PACK.md](SOC2_VPC_DILIGENCE_PACK.md) | All 11 — VPC deploy, CC mapping |
 | [HEALTH_TELEMETRY_HIPAA_PACK.md](HEALTH_TELEMETRY_HIPAA_PACK.md) | #7 — BAA diligence template |
 | [HEALTH_TELEMETRY_HOSPITAL_PILOT.md](HEALTH_TELEMETRY_HOSPITAL_PILOT.md) | #7 — ward pilot playbook |
 
@@ -115,7 +122,8 @@ Full matrix: `docs/INSTITUTIONAL_STANDARD.md`
 
 | Doc | Use when |
 |-----|----------|
-| [PORTFOLIO_SALES_SHEET.md](PORTFOLIO_SALES_SHEET.md) | First meeting — all 7 SKUs + pricing |
+| [PORTFOLIO_SALES_SHEET.md](PORTFOLIO_SALES_SHEET.md) | First meeting — all SKUs + pricing |
+| [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md) | Full tech + license economics |
 | `docs/*_BUYER.md` | 60-second skim per product |
 | `docs/*_SALES_TECH_SPEC.md` | RFP / security questionnaire depth |
 | [INST_PLUS_DEEP_DIVE_ALL_7.md](INST_PLUS_DEEP_DIVE_ALL_7.md) | Technical architecture review |
