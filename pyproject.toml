@@ -7,7 +7,7 @@ name = "hibs-racing"
 version = "0.1.0"
 description = "Offline racing NLP + place/EW research engine (separate from hibs-bet football)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.14"
 dependencies = [
     "pyyaml>=6.0",
     "pandas>=2.0",
@@ -51,3 +51,10 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+tmp_path_retention_count = 2
+tmp_path_retention_policy = "failed"
+filterwarnings = [
+    "ignore::DeprecationWarning:fastapi.*",
+    "ignore::DeprecationWarning:starlette.*",
+]

@@ -6,6 +6,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 PYTHON="${PYTHON:-python3}"
+# shellcheck source=instpp_bootstrap.sh
+source "$(dirname "$0")/instpp_bootstrap.sh"
+instpp_bootstrap
 TS="$(date -u +%Y-%m-%dT%H%M%SZ)"
 LOG_DIR="$ROOT/docs/test_logs"
 LOG_FILE="$LOG_DIR/instpp_rigorous_${TS}.log"

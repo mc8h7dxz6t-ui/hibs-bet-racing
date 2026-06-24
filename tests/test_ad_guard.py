@@ -171,12 +171,14 @@ async def test_ad_guard_serve_approves(tmp_path: Path):
     serve_mod.state.ledger.start_async_writer()
     serve_mod.state.gateway = AdGuardGateway(ledger=serve_mod.state.ledger, shadow_mode=True)
 
-    client = TestClient(serve_mod.app)
-    resp = client.post(
-        "/v1/guard/agency-1",
-        json={"campaignId": "99", "bidMicros": 1_000_000},
-        headers={"X-Ad-Provider": "google"},
-    )
-    assert resp.status_code == 200
-    assert resp.json()["decision"] == "approve"
-    serve_mod.state.ledger.stop_async_writer(flush=True)
+    try:
+        with TestClient(serve_mod.app) as client:
+            resp = client.post(
+                "/v1/guard/agency-1",
+                json={"campaignId": "99", "bidMicros": 1_000_000},
+                headers={"X-Ad-Provider": "google"},
+            )
+            assert resp.status_code == 200
+            assert resp.json()["decision"] == "approve"
+    finally:
+        serve_mod.state.ledger.close()
