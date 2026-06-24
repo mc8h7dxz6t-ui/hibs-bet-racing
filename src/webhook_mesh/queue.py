@@ -81,6 +81,8 @@ class BackgroundDeliveryQueue(DeliveryQueueBackend):
                 lamport=manifest.lamport,
                 dead_letter_dir=manifest.dead_letter_dir,
                 payload_id=manifest.payload_id,
+                client_id=manifest.client_id,
+                dispatch_mode="background",
             ),
             name=f"delivery-{manifest.manifest_id}",
         )
@@ -180,6 +182,8 @@ class RedisStreamDeliveryQueue(DeliveryQueueBackend):
             lamport=manifest.lamport,
             dead_letter_dir=manifest.dead_letter_dir,
             payload_id=manifest.payload_id,
+            client_id=manifest.client_id,
+            dispatch_mode="redis",
         )
 
     async def _handle_message(self, message_id: str, fields: dict[str, str]) -> None:

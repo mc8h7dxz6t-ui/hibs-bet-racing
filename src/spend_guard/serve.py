@@ -11,6 +11,8 @@ from typing import Any
 import httpx
 from fastapi import FastAPI, Request, Response, status
 
+from pathlib import Path
+
 from inst_spine.ledger import AppendOnlyLedger
 from spend_guard.cost import actual_cost_from_usage, estimate_reserve_cost
 from spend_guard.gateway import SpendGuardGateway, SpendRequest
@@ -42,20 +44,30 @@ state = RuntimeState()
 
 
 def _gateway() -> SpendGuardGateway:
-    assert state.gateway is not None
+    if state.gateway is None:
+        if state.ledger is not None:
+            state.ledger.stop_async_writer(flush=True)
+            state.ledger.close()
+            state.ledger = None
+        ledger_path = Path(state.ledger_db)
+        wallet = SpendWallet(
+            Path(state.wallet_db),
+            ledger_db=ledger_path,
+        )
+        if state.ledger is None:
+            state.ledger = AppendOnlyLedger(ledger_path, async_writes=True)
+            state.ledger.start_async_writer()
+        state.gateway = SpendGuardGateway(
+            wallet=wallet,
+            ledger=state.ledger,
+            shadow_mode=state.shadow_mode,
+        )
     return state.gateway
 
 
 @app.on_event("startup")
 async def startup() -> None:
-    wallet = SpendWallet(state.wallet_db)
-    state.ledger = AppendOnlyLedger(state.ledger_db, async_writes=True)
-    state.ledger.start_async_writer()
-    state.gateway = SpendGuardGateway(
-        wallet=wallet,
-        ledger=state.ledger,
-        shadow_mode=state.shadow_mode,
-    )
+    _gateway()
     logger.info(
         "Spend Guard gateway online wallet=%s ledger=%s shadow=%s mock=%s",
         state.wallet_db,

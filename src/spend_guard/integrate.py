@@ -23,7 +23,7 @@ def reserve_api_call(
     # ... call upstream ...
     settle_api_call(hold_id=result['hold_id'], ...)
     """
-    wallet = SpendWallet(wallet_db)
+    wallet = SpendWallet(wallet_db, ledger_db=ledger_db)
     from inst_spine.ledger import AppendOnlyLedger
 
     ledger = AppendOnlyLedger(ledger_db) if ledger_db else None
@@ -41,7 +41,7 @@ def settle_api_call(
     ledger_db: Path | None = None,
     service: str = "llm-api",
 ) -> dict:
-    wallet = SpendWallet(wallet_db)
+    wallet = SpendWallet(wallet_db, ledger_db=ledger_db)
     from inst_spine.ledger import AppendOnlyLedger
 
     ledger = AppendOnlyLedger(ledger_db) if ledger_db else None

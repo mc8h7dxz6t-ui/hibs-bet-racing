@@ -32,6 +32,7 @@ echo "==> Running institutional test suite (12 SKUs)"
   tests/test_webhook_replay.py \
   tests/test_spend_guard.py \
   tests/test_agent_ledger.py \
+  tests/test_forensic_tiers.py \
   tests/test_industry_gold.py \
   -q
 

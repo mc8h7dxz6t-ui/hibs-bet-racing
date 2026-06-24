@@ -65,6 +65,8 @@ class AdGuardGateway:
         idempotency: IdempotencyBackend | None = None,
         upstream_base: str | None = None,
         idempotency_ttl_sec: int = 300,
+        spend_wallet_db: str | None = None,
+        spend_ledger_db: str | None = None,
     ) -> None:
         self.ledger = ledger
         self._rate_backend = rate_backend or token_bucket_backend_from_env()
@@ -81,6 +83,12 @@ class AdGuardGateway:
         self.idempotency = idempotency or idempotency_backend_from_env()
         self.upstream_base = (upstream_base or os.environ.get("AD_GUARD_UPSTREAM_BASE", "")).strip()
         self.idempotency_ttl_sec = idempotency_ttl_sec
+        self._spend_wallet_db = (
+            spend_wallet_db or os.environ.get("AD_GUARD_SPEND_WALLET_DB", "")
+        ).strip()
+        self._spend_ledger_db = (
+            spend_ledger_db or os.environ.get("AD_GUARD_SPEND_LEDGER_DB", "")
+        ).strip()
 
     def _drift_for(self, campaign_id: str) -> ZScoreDriftDetector:
         if campaign_id not in self._drift_by_campaign:
@@ -160,8 +168,26 @@ class AdGuardGateway:
                 spend_signal=spend_signal,
             )
 
+        hold_id: str | None = None
+        spend_request_id = idem_key
+        est_cost = float(spend_signal or 0.0)
+        if self._spend_wallet_db and est_cost > 0:
+            hold_id, spend_err = await asyncio.to_thread(
+                self._reserve_spend, spend_request_id, est_cost
+            )
+            if not hold_id:
+                return await self._finish(
+                    req,
+                    campaign_id,
+                    GateDecision.REJECT,
+                    f"spend_guard: {spend_err}",
+                    spend_signal=spend_signal,
+                )
+
         status, body, detail = await self._forward_upstream(req)
         if status < 200 or status >= 400:
+            if hold_id and self._spend_wallet_db:
+                await asyncio.to_thread(self._release_spend, hold_id)
             return await self._finish(
                 req,
                 campaign_id,
@@ -171,6 +197,9 @@ class AdGuardGateway:
                 upstream_status=status,
                 upstream_body=body,
             )
+        if hold_id and self._spend_wallet_db:
+            actual = est_cost
+            await asyncio.to_thread(self._settle_spend, hold_id, spend_request_id, actual)
         return await self._finish(
             req,
             campaign_id,
@@ -199,6 +228,44 @@ class AdGuardGateway:
             return resp.status_code, body, f"upstream: {resp.status_code}"
         except httpx.HTTPError as exc:
             return 503, {}, f"upstream: {exc}"
+
+    def _reserve_spend(self, request_id: str, amount: float) -> tuple[str | None, str]:
+        from pathlib import Path
+
+        from spend_guard.integrate import reserve_api_call
+
+        result = reserve_api_call(
+            request_id=request_id,
+            estimated_cost=amount,
+            wallet_db=Path(self._spend_wallet_db),
+            ledger_db=Path(self._spend_ledger_db) if self._spend_ledger_db else None,
+            service="ad-guard",
+        )
+        if result.get("decision") != "approve":
+            return None, str(result.get("reason") or "reserve_denied")
+        hid = str(result.get("hold_id") or "")
+        return (hid, "") if hid else (None, "missing_hold_id")
+
+    def _settle_spend(self, hold_id: str, request_id: str, actual: float) -> None:
+        from pathlib import Path
+
+        from spend_guard.integrate import settle_api_call
+
+        settle_api_call(
+            hold_id=hold_id,
+            actual_cost=actual,
+            request_id=request_id,
+            wallet_db=Path(self._spend_wallet_db),
+            ledger_db=Path(self._spend_ledger_db) if self._spend_ledger_db else None,
+            service="ad-guard",
+        )
+
+    def _release_spend(self, hold_id: str) -> None:
+        from pathlib import Path
+
+        from spend_guard.wallet import SpendWallet
+
+        SpendWallet(Path(self._spend_wallet_db)).release(hold_id)
 
     async def _finish(
         self,

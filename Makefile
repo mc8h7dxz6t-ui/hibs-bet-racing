@@ -75,6 +75,12 @@ demo-gold-down:
 spend-gateway:
 	SPEND_GUARD_MOCK_UPSTREAM=1 spend-guard serve --mock-upstream
 
+agent-ledger-serve:
+	agent-ledger serve
+
+altdata-serve:
+	altdata serve
+
 stack-up:
 	$(COMPOSE) up -d inst-workflow
 

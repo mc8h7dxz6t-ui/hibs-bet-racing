@@ -63,6 +63,10 @@ def main(argv: list[str] | None = None) -> int:
     p_bundle = sub.add_parser("verify-bundle", help="Offline auditor replay")
     p_bundle.add_argument("--tarball", type=Path, required=True)
 
+    p_serve = sub.add_parser("serve", help="HTTP authorize/complete API")
+    p_serve.add_argument("--host", default=None)
+    p_serve.add_argument("--port", type=int, default=None)
+
     args = parser.parse_args(argv)
 
     if args.cmd == "authorize":
@@ -123,6 +127,18 @@ def main(argv: list[str] | None = None) -> int:
         code, body = run_institutional_verify(args.tarball, product=PRODUCT)
         print_json(body)
         return code
+
+    if args.cmd == "serve":
+        import os
+
+        from agent_ledger.serve import main as serve_main
+
+        if args.host:
+            os.environ["AGENT_LEDGER_HOST"] = args.host
+        if args.port:
+            os.environ["AGENT_LEDGER_PORT"] = str(args.port)
+        serve_main()
+        return 0
 
     return 1
 

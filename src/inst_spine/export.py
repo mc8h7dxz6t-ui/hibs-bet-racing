@@ -111,6 +111,7 @@ def _write_bundle_files(
     report_dict: dict[str, Any],
     verify_dict: dict[str, Any],
     product: str | None = None,
+    extra_files: dict[str, Path] | None = None,
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     entries = ledger.list_entries()
@@ -142,6 +143,26 @@ def _write_bundle_files(
 
     for name, content in sorted(files.items()):
         (out_dir / name).write_bytes(content)
+
+    if extra_files:
+        extras_dir = out_dir / "extras"
+        extras_dir.mkdir(parents=True, exist_ok=True)
+        manifest_extras: list[dict[str, str]] = []
+        for arc_name, src in sorted(extra_files.items()):
+            if not src.is_file():
+                continue
+            data = src.read_bytes()
+            dest = extras_dir / arc_name
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
+            manifest_extras.append(
+                {
+                    "path": f"extras/{arc_name}",
+                    "sha256": sha256_bytes(data),
+                    "bytes": str(len(data)),
+                }
+            )
+        (out_dir / "bundle_extras.json").write_bytes(_canonical_json_bytes(manifest_extras))
 
     readme = (
         "Inst++ audit bundle (P2 deterministic export)\n"
@@ -292,6 +313,7 @@ def build_audit_bundle(
     anchor_path: Path | None = None,
     repro_run: bool = False,
     product: str | None = None,
+    extra_files: dict[str, Path] | None = None,
 ) -> AuditBundleResult:
     """
     Full P2 pipeline:
@@ -340,6 +362,7 @@ def build_audit_bundle(
             report_dict=report.to_dict(),
             verify_dict=verify_dict,
             product=product,
+            extra_files=extra_files,
         )
 
         tar_bytes = deterministic_tarball(out)

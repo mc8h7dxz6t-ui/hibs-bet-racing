@@ -105,13 +105,44 @@ def main(argv: list[str] | None = None) -> int:
         return code
 
     if args.cmd == "export":
-        code, body = run_institutional_export(
-            args.database,
-            product=PRODUCT,
-            out_dir=args.out_dir,
-            tarball=args.tarball,
-            repro_check=args.repro_check,
-        )
+        import os
+
+        extra: dict[str, Path] = {}
+        capture_dir = os.environ.get("WEBHOOK_REPLAY_CAPTURE_DIR", "")
+        if capture_dir:
+            cap_root = Path(capture_dir)
+            if cap_root.is_dir():
+                for wrcap in sorted(cap_root.glob("*.wrcap")):
+                    extra[f"wrcap/{wrcap.name}"] = wrcap
+        from inst_spine.export import build_audit_bundle
+
+        code = 0
+        body: dict
+        if extra:
+            result = build_audit_bundle(
+                args.database,
+                out_dir=args.out_dir,
+                tarball_path=args.tarball,
+                repro_run=args.repro_check,
+                product=PRODUCT,
+                extra_files=extra,
+            )
+            body = {
+                "ok": result.ok,
+                "product": PRODUCT,
+                "bundle_sha256": result.bundle_sha256,
+                "tarball": str(result.tarball_path) if result.tarball_path else None,
+                "wrcap_files": len(extra),
+            }
+            code = 0 if result.ok else 1
+        else:
+            code, body = run_institutional_export(
+                args.database,
+                product=PRODUCT,
+                out_dir=args.out_dir,
+                tarball=args.tarball,
+                repro_check=args.repro_check,
+            )
         print_json(body)
         return code
 
