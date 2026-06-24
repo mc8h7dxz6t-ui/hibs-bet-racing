@@ -31,8 +31,6 @@ echo "==> Running institutional test suite (all 8 products)"
   -q
 
 echo "==> Compliance export repro-check (ephemeral DB)"
-TMP_DB="$(mktemp --suffix=.sqlite)"
-export TMP_DB
 "$PYTHON" - <<'PY'
 import json
 import tempfile

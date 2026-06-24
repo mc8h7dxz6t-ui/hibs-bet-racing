@@ -36,6 +36,16 @@ instpp_check_python() {
   echo "         Recommend: brew install python@3.12 && python3.12 -m venv .venv" >&2
 }
 
+instpp_mktemp() {
+  # Portable temp file (GNU coreutils + BSD macOS).
+  local suffix="${1:-}"
+  local template="${TMPDIR:-/tmp}/instpp-XXXXXX"
+  if [ -n "$suffix" ]; then
+    template="${template}${suffix}"
+  fi
+  mktemp "$template"
+}
+
 instpp_bootstrap() {
   instpp_check_python
   instpp_raise_ulimit
