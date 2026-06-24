@@ -4,6 +4,8 @@
 
 **Pitch:** *Prove which model version was approved for production on date X — with math, not a spreadsheet.*
 
+> **Strategic north star (roadmap):** LLM spend ledger control plane — reserve-before-dispatch, wallet settlement, multi-provider gateway. That is **not** what ships in #8 today. See [MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md](MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md) for comps, exit framing, and shipped vs roadmap.
+
 ---
 
 ## Buyer
@@ -65,7 +67,8 @@ model-governor verify-bundle --tarball ./model_governor_bundle.tar
 | `verify-bundle` | Offline auditor replay |
 
 See `src/model_governor/README.md` for architecture.  
-**Full spec:** `docs/MODEL_GOVERNOR_SALES_TECH_SPEC.md`
+**Full spec:** `docs/MODEL_GOVERNOR_SALES_TECH_SPEC.md`  
+**Strategic comps & valuation:** `docs/MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md`
 
 ---
 

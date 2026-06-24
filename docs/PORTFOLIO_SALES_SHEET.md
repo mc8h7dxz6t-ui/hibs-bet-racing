@@ -23,7 +23,7 @@
 | 5 | **Webhook Mesh** | Never double-process a billing webhook | £199–£599/mo | SaaS billing, fintech ingress | `demo_webhook_mesh.sh` | [WEBHOOK_MESH_SALES_TECH_SPEC.md](WEBHOOK_MESH_SALES_TECH_SPEC.md) |
 | 6 | **Ad Guard** | Marketing API spend kill + gate audit | £300–£800/mo | Agency, growth, marketing finance | `demo_ad_guard.sh` | [AD_GUARD_SALES_TECH_SPEC.md](AD_GUARD_SALES_TECH_SPEC.md) |
 | 7 | **Health Telemetry** | Device batch tamper evidence (not FDA cert) | £5k–£15k + £500/mo | Digital health, RPM, NHS-adjacent | `demo_health_telemetry.sh` | [HEALTH_TELEMETRY_SALES_TECH_SPEC.md](HEALTH_TELEMETRY_SALES_TECH_SPEC.md) |
-| 8 | **ModelGovernor** | ML model lifecycle governance + deploy proof | £400–£1,000/mo | MLOps, model risk, regulated lending | `demo_model_governor.sh` | [MODEL_GOVERNOR_SALES_TECH_SPEC.md](MODEL_GOVERNOR_SALES_TECH_SPEC.md) |
+| 8 | **ModelGovernor** | ML model lifecycle governance + deploy proof ([north star](MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md): LLM spend plane) | £400–£1,000/mo | MLOps, model risk, regulated lending | `demo_model_governor.sh` | [MODEL_GOVERNOR_SALES_TECH_SPEC.md](MODEL_GOVERNOR_SALES_TECH_SPEC.md) |
 
 **Buyer one-pagers:** `docs/*_BUYER.md` (60-second skim per SKU)
 

@@ -369,6 +369,8 @@ model-governor record --action deploy --model docs/demo_model_snapshot.json \
 
 **Docs:** `docs/MODEL_GOVERNOR_SALES_TECH_SPEC.md`
 
+**Strategic north star (roadmap):** LLM spend ledger control plane — reserve → settle, Postgres wallet, reconciler, multi-provider gateway. Comps (LiteLLM, Portkey, Kubecost) and exit bands (£2M–£7M pre-revenue platform) in `docs/MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md`. **Not shipped in #8 today.**
+
 ---
 
 # Shared spine — the real IP floor
