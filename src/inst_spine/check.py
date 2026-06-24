@@ -32,6 +32,7 @@ def build_compliance_context(
         "model_governance",
         "drift_gate_evaluation",
         "spend_guard",
+        "agent_action",
     }
     decisions = sum(1 for e in entries if e.get("event_type") in snapshot_events)
     anchor = read_genesis_anchor(ledger.anchor_path)

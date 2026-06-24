@@ -65,6 +65,13 @@ def main(argv: list[str] | None = None) -> int:
     p_bundle = sub.add_parser("verify-bundle", help="Offline auditor replay")
     p_bundle.add_argument("--tarball", type=Path, required=True)
 
+    p_serve = sub.add_parser("serve", help="OpenAI-compatible spend gateway (reserve → forward → settle)")
+    p_serve.add_argument("--host", default="127.0.0.1")
+    p_serve.add_argument("--port", type=int, default=8789)
+    p_serve.add_argument("--wallet-db", type=Path, default=Path("data/spend_guard_wallet.sqlite"))
+    p_serve.add_argument("--ledger-db", type=Path, default=Path("data/spend_guard.sqlite"))
+    p_serve.add_argument("--mock-upstream", action="store_true")
+
     args = parser.parse_args(argv)
 
     if args.cmd == "init-wallet":
@@ -141,6 +148,18 @@ def main(argv: list[str] | None = None) -> int:
         code, body = run_institutional_verify(args.tarball, product=PRODUCT)
         print_json(body)
         return code
+
+    if args.cmd == "serve":
+        import os
+
+        os.environ.setdefault("SPEND_GUARD_WALLET_DB", str(args.wallet_db))
+        os.environ.setdefault("SPEND_GUARD_LEDGER_DB", str(args.ledger_db))
+        if args.mock_upstream:
+            os.environ["SPEND_GUARD_MOCK_UPSTREAM"] = "1"
+        from spend_guard.serve import main as serve_main
+
+        serve_main()
+        return 0
 
     return 1
 

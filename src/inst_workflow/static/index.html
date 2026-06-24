@@ -14,6 +14,7 @@
 
   <nav class="tabs" role="tablist" id="workflow-tabs">
     <button type="button" class="active" data-tab="arch" id="tab-arch">Architecture</button>
+    <button type="button" data-tab="proof" id="tab-proof">Proof Console</button>
     <button type="button" data-tab="compliance" id="tab-compliance">Compliance Logger</button>
     <button type="button" data-tab="proxy" id="tab-proxy">Proxy-Risk</button>
   </nav>
@@ -57,6 +58,44 @@
           Shared <code>inst_spine</code> — genesis WAL, Lamport clocks, deterministic audit bundles.
           Not GRC case management — cryptographic proof workflow.
         </p>
+      </div>
+    </section>
+
+    <!-- Proof Console — 11 SKU picker -->
+    <section id="panel-proof" class="panel">
+      <h2>Proof Console — 11 SKU offline verify</h2>
+      <p style="font-size:0.85rem;color:var(--muted);margin:0 0 1rem">
+        Pick any institutional product seeded by <code>make demo-all</code> — ledger → F1–F9 → export → verify-bundle.
+      </p>
+      <div class="workflow-steps" id="proof-steps">
+        <div class="step-card" data-step="1">1 Ledger</div>
+        <div class="step-card" data-step="2">2 F1–F9</div>
+        <div class="step-card" data-step="3">3 Export</div>
+        <div class="step-card" data-step="4">4 Verify</div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <label>Product (11 SKUs)</label>
+          <select id="proof-product-picker" style="width:100%;margin-bottom:0.75rem;padding:0.5rem"></select>
+          <p id="proof-tagline" style="font-size:0.8rem;color:var(--muted);min-height:2.5rem"></p>
+          <p id="proof-db-status" style="font-size:0.75rem;color:var(--muted)"></p>
+          <div class="btn-row">
+            <button type="button" class="action secondary" id="btn-proof-refresh">Refresh ledger</button>
+            <button type="button" class="action" id="btn-proof-check">2 · Run F1–F9</button>
+            <button type="button" class="action" id="btn-proof-export">3 · Export bundle</button>
+            <button type="button" class="action" id="btn-proof-verify">4 · Verify offline</button>
+          </div>
+        </div>
+        <div class="card">
+          <label>Gate matrix</label>
+          <div class="gate-grid" id="proof-gates"></div>
+          <label style="margin-top:1rem">Output</label>
+          <pre class="output" id="proof-output">Select a product — run make demo-all first if DB missing.</pre>
+        </div>
+      </div>
+      <div class="card">
+        <label>Ledger</label>
+        <div id="proof-ledger"></div>
       </div>
     </section>
 
