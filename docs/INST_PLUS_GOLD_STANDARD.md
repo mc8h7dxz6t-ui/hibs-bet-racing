@@ -52,6 +52,7 @@
 | Offline `verify-bundle` (auditor never calls vendor) | All 12 |
 | Genesis anti-wipe + Lamport clocks | All 12 |
 | WAL-before-side-effect + Redis Stream delivery | #5 Webhook Mesh |
+| Per-device sequence gate + ingress WAL-before-ack | #7 Health Telemetry |
 | Authorize → complete attestation (agent tools) | #12 Agent Ledger |
 | Reserve → settle → drift lockout + OpenAI-compat gateway | #11 Spend Guard |
 | PSI/KS enforce at proxy | #9 Drift Gate + #2 Proxy-Risk |
@@ -110,7 +111,11 @@ See [RUN_DEMO.md](RUN_DEMO.md) for the full plug/demo/run guide.
 - Redis idempotency; live upstream fail-closed
 
 ### #7 Health Telemetry
-- Batch schema validation; Lamport per batch; HIPAA pack
+- Packet contract (`ts`, `seq`, profile fields) + F7 coverage at ingest
+- Per-device monotonic sequence gate (gap/backward fail-closed)
+- HTTP `POST /v1/telemetry/batch` — ingress WAL fsync before ack
+- `--observation-lane` export redacts raw packets; summaries + chain retained
+- HIPAA pack (template — not signed BAA)
 
 ### #8 ModelGovernor 8a
 - Model snapshot contract; governance actions on chain
