@@ -13,11 +13,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 PYTHON="${PYTHON:-python3}"
+_GOLD_DIR_OVERRIDE="${GOLD_DEMO_DIR:-}"
 # shellcheck source=instpp_bootstrap.sh
 source "$(dirname "$0")/instpp_bootstrap.sh"
 instpp_bootstrap
 
-GOLD_DIR="${GOLD_DEMO_DIR:-./data/demo/spend_gold}"
+GOLD_DIR="${_GOLD_DIR_OVERRIDE:-${GOLD_DEMO_DIR:-./data/demo/spend_gold}}"
 WALLET_DB="$GOLD_DIR/spend_wallet.sqlite"
 LEDGER_DB="$GOLD_DIR/spend_guard.sqlite"
 TAR="$GOLD_DIR/spend_guard_bundle.tar"

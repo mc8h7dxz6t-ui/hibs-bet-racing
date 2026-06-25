@@ -729,6 +729,17 @@ echo "$SG_HTTP_CHECK"
 echo "$SG_HTTP_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
 pass "Spend Guard OpenAI-compat gateway rigorous E2E"
 
+section "Spend Guard — gold demo walkthrough (11 steps)"
+GOLD_DEMO_DIR="$WORK/spend_gold_walkthrough"
+export GOLD_DEMO_DIR
+rm -rf "$GOLD_DEMO_DIR"
+./scripts/demo_gold.sh
+test -f "$GOLD_DEMO_DIR/spend_guard_bundle.tar"
+GOLD_VERIFY=$("$PYTHON" -m spend_guard.cli verify-bundle --tarball "$GOLD_DEMO_DIR/spend_guard_bundle.tar")
+echo "$GOLD_VERIFY"
+echo "$GOLD_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+pass "Spend Guard gold demo walkthrough (make demo-gold)"
+
 section "Agent Ledger — authorize/complete + check + export + verify"
 AL_DB="$WORK/agent_ledger.sqlite"
 AL_PERMIT="$WORK/agent_ledger_permits.sqlite"
@@ -774,7 +785,7 @@ print(json.dumps({
         'drift_gate', 'webhook_replay', 'spend_guard', 'agent_ledger',
     ],
     'status': 'PASSED',
-    'e2e_sections': 36,
+    'e2e_sections': 37,
     'industry_gold': True,
     'finished_utc': '$ENDED_AT',
     'log_file': '$(basename "$LOG_FILE")',

@@ -31,6 +31,7 @@ make plug
 | **Spend gateway** (OpenAI-compat) | `make spend-gateway` → http://127.0.0.1:8789 | ~10s |
 | **Docker workflow UI** | `make stack-up` | ~60s |
 | **Docker + Redis** (stream delivery) | `make redis-up` | ~60s |
+| **Multi-instance prod profile** | `docs/PRODUCTION_REDIS_PROFILE.md` | 5 min read |
 | **Unit + integration smoke** | `make smoke` | ~2 min |
 | **Rigorous E2E 12/12** | `make rigorous` | ~3 min |
 | **Chaos drills** | `make chaos` | ~1 min |
@@ -85,6 +86,8 @@ Key variables — see `.env.instpp.example` for full list.
 | `WEBHOOK_REPLAY_CAPTURE_DIR` | `.wrcap` capture directory for Mesh ingress |
 | `WEBHOOK_DISPATCH_MODE=redis` | Durable delivery (use with `make redis-up`) |
 | `INST_REDIS_URL` | Redis for drift rolling state + webhook stream |
+
+**Production Redis (multi-instance):** [PRODUCTION_REDIS_PROFILE.md](PRODUCTION_REDIS_PROFILE.md)
 | `PROXY_DRIFT_BASELINE` / `PROXY_DRIFT_MODE` | Proxy-Risk + Drift Gate integration |
 | `OPENAI_API_KEY` | AI Kit live LLM (default: stub mode) |
 

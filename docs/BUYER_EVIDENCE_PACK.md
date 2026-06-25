@@ -11,7 +11,7 @@
 | Evidence type | What it proves |
 |---------------|----------------|
 | **113+ automated tests** | Fail-closed gates, hash chain, export determinism, chaos |
-| **Rigorous E2E 11/11** | Each product: ingest → check → export → verify-bundle |
+| **Rigorous E2E 12/12** | Each product: ingest → check → export → verify-bundle + spend gold demo |
 | **Chaos suite** | WAL persistence, capture integration, wallet fail-closed |
 | **Offline verify-bundle** | Auditor replays tarball without live DB or vendor API |
 | **Deterministic F9** | Identical ledger → identical bundle SHA256 |
@@ -34,9 +34,10 @@ pip install -e ".[dev,instpp]"
 ./scripts/chaos_instpp.sh
 cat docs/test_logs/instpp_rigorous_latest_summary.json
 
-# All demos (11/11)
+# All demos (12/12)
 make demo-all
-# or: ./scripts/demo_portfolio_all.sh
+# Spend-plane sales walkthrough (also in rigorous E2E):
+make demo-gold
 ```
 
 **Expected:** smoke tests green; rigorous summary `"status": "PASSED"`; demo bundles verify offline.
@@ -101,7 +102,8 @@ Full matrix: `docs/INSTITUTIONAL_STANDARD.md`
 
 | Document | Applies to |
 |----------|------------|
-| [SOC2_VPC_DILIGENCE_PACK.md](SOC2_VPC_DILIGENCE_PACK.md) | All 11 — VPC deploy, CC mapping |
+| [PRODUCTION_REDIS_PROFILE.md](PRODUCTION_REDIS_PROFILE.md) | #2, #5, #6, #9 — multi-instance Redis |
+| [SOC2_VPC_DILIGENCE_PACK.md](SOC2_VPC_DILIGENCE_PACK.md) | All 12 — VPC deploy, CC mapping |
 | [HEALTH_TELEMETRY_HIPAA_PACK.md](HEALTH_TELEMETRY_HIPAA_PACK.md) | #7 — BAA diligence template |
 | [HEALTH_TELEMETRY_HOSPITAL_PILOT.md](HEALTH_TELEMETRY_HOSPITAL_PILOT.md) | #7 — ward pilot playbook |
 

@@ -100,6 +100,8 @@ curl -s -X POST "http://127.0.0.1:8787/v1/ingress/demo-tenant" \
 
 ### Production env vars
 
+See **[PRODUCTION_REDIS_PROFILE.md](PRODUCTION_REDIS_PROFILE.md)** for multi-instance checklist (#2, #5, #6, #9).
+
 | Variable | Purpose |
 |----------|---------|
 | `WEBHOOK_PROVIDER_SECRET` | HMAC secret (required) |
