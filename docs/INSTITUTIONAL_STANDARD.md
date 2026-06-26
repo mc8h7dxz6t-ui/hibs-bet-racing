@@ -1,9 +1,9 @@
-# Institutional Standard — Full Portfolio (11 SKUs)
+# Institutional Standard — Full Portfolio (12 SKUs)
 
 **Purpose:** Industry Gold bar — every product meets nine dimensions on `inst_spine`.  
 **Internal spine:** `inst_spine` (genesis WAL, F-gates, deterministic export).
 
-See also: `docs/INST_PLUS_GOLD_STANDARD.md` (full matrix).
+See also: `docs/INST_PLUS_GOLD_STANDARD.md` (full matrix) · `docs/PORTFOLIO_FULL_TECH_SALES_12.md` (SKU index)
 
 ---
 
@@ -35,16 +35,17 @@ See also: `docs/INST_PLUS_GOLD_STANDARD.md` (full matrix).
 | 8 | ModelGovernor 8a | Industry | `demo_model_governor.sh` | `MODEL_GOVERNOR_BUYER.md` |
 | 9 | Drift Gate | Industry | `demo_drift_gate.sh` | `DRIFT_GATE_BUYER.md` |
 | 10 | Webhook Replay | Industry | `demo_webhook_replay.sh` | `WEBHOOK_REPLAY_BUYER.md` |
-| 11 | Spend Guard (8b) | Industry | `demo_spend_guard.sh` | `SPEND_GUARD_BUYER.md` |
+| 11 | Spend Guard (8b) | Industry | `demo_spend_guard.sh` · `make demo-gold` | `SPEND_GUARD_BUYER.md` |
+| 12 | Agent Ledger | Industry | `demo_agent_ledger.sh` | `AGENT_LEDGER_BUYER.md` |
 
 ## Proof commands
 
 ```bash
 pip install -e ".[dev,instpp]"
-./scripts/instpp_smoke_test.sh
-./scripts/instpp_rigorous_test.sh    # 11/11 products + chaos
+make plug                                 # demo-all + verify 12/12
+./scripts/instpp_smoke_test.sh            # 157+ tests
+./scripts/instpp_rigorous_test.sh         # 12/12 products + chaos + demo-gold
 ./scripts/chaos_instpp.sh
-./scripts/demo_phase2_all.sh
 ```
 
 ### macOS setup (required for gold-standard test pass)
@@ -61,6 +62,7 @@ pip install -e ".[dev,instpp]"
 ./scripts/instpp_smoke_test.sh
 ```
 
-**Deep dive:** `docs/INST_PLUS_DEEP_DIVE_ALL_7.md`  
+**Deep dive:** `docs/INST_PLUS_DEEP_DIVE_ALL_7.md` (legacy 8-product doc)  
+**12-SKU index:** `docs/PORTFOLIO_FULL_TECH_SALES_12.md`  
 **SOC 2 / VPC diligence:** `docs/SOC2_VPC_DILIGENCE_PACK.md`  
 **Evidence pack:** `docs/BUYER_EVIDENCE_PACK.md`

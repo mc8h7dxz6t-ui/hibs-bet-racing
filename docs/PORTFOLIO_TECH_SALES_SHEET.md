@@ -2,7 +2,7 @@
 
 **Audience:** Procurement, platform engineering, CFO sponsors, technical evaluators  
 **Posture:** Air-gap VPC audit infrastructure — prove with math, not slides  
-**Proof:** 91 automated tests · rigorous E2E 8/8 · offline `verify-bundle` on every SKU  
+**Proof:** 157+ automated tests · rigorous E2E **12/12** · `industry_gold: true` · offline `verify-bundle` on every SKU  
 **Date:** June 2026
 
 > **Valuation / exit framing is at the bottom** — [Value today](#value-today). Everything above is license economics, competitive positioning, and technical proof only.
@@ -11,7 +11,7 @@
 
 ## Portfolio pitch
 
-*Eight deployable products, one cryptographic audit spine — every gate decision exportable and verifiable without calling the vendor.*
+*Twelve deployable products, one cryptographic audit spine — every gate decision exportable and verifiable without calling the vendor.*
 
 | # | Product | SKU | Demo |
 |---|---------|-----|------|
@@ -22,7 +22,13 @@
 | 5 | Webhook Mesh | `webhook-mesh` | `./scripts/demo_webhook_mesh.sh` |
 | 6 | Ad Guard | `ad-guard` | `./scripts/demo_ad_guard.sh` |
 | 7 | Health Telemetry | `health-telemetry` | `./scripts/demo_health_telemetry.sh` |
-| 8 | ModelGovernor | `model-governor` | `./scripts/demo_model_governor.sh` · `make demo-gold` (LLM spend plane) |
+| 8 | ModelGovernor | `model-governor` | `./scripts/demo_model_governor.sh` |
+| 9 | Drift Gate | `drift-gate` | `./scripts/demo_drift_gate.sh` |
+| 10 | Webhook Replay | `webhook-replay` | `./scripts/demo_webhook_replay.sh` |
+| 11 | Spend Guard | `spend-guard` | `./scripts/demo_spend_guard.sh` · `make demo-gold` |
+| 12 | Agent Ledger | `agent-ledger` | `./scripts/demo_agent_ledger.sh` |
+
+**12-SKU index:** [PORTFOLIO_FULL_TECH_SALES_12.md](PORTFOLIO_FULL_TECH_SALES_12.md)
 
 **Deep specs:** `docs/*_SALES_TECH_SPEC.md` · **Buyer one-pagers:** `docs/*_BUYER.md`
 
@@ -98,7 +104,7 @@ Assumptions for all products below:
 | 7 | Health Telemetry | **Gold** | ✅ | 🟡 | ✅ | 🔲 | No FDA / EMR / clinical UI |
 | 8a | ModelGovernor lifecycle | **Gold** | ✅ | ✅ | ✅ | 🔲 | Not full MLOps platform |
 | 8b | ModelGovernor spend plane | **Demo gold** | 🟡 | 🟡 | ✅ | 🔲 | Not in `instpp_rigorous` CI; no managed SaaS |
-| — | **Shared `inst_spine`** | **Gold** | ✅ | ✅ | ✅ | — | 91 tests · 8/8 rigorous E2E (June 2026) |
+| — | **Shared `inst_spine`** | **Gold** | ✅ | ✅ | ✅ | — | 157+ tests · 12/12 rigorous E2E (June 2026) |
 
 **Portfolio GTM (all SKUs):** 🔲 pre-revenue · 🔲 no signed LOI · 🔲 no SOC 2 Type II certified SaaS (VPC pack only)
 
@@ -648,8 +654,8 @@ make demo-gold-down
 
 ```bash
 pip install -e ".[dev,instpp]"
-./scripts/instpp_smoke_test.sh          # 91 tests
-./scripts/instpp_rigorous_test.sh       # 8/8 E2E
+./scripts/instpp_smoke_test.sh          # 157+ tests
+./scripts/instpp_rigorous_test.sh       # 12/12 E2E
 ./scripts/demo_instpp.sh                # all CLI demos
 make demo-gold-up && make demo-gold       # ModelGovernor spend plane
 ```
@@ -678,7 +684,7 @@ make demo-gold-up && make demo-gold       # ModelGovernor spend plane
 
 | Completion state | What it means for value |
 |------------------|-------------------------|
-| **8/8 Gold CLI** in rigorous CI | IP floor is **real** — not slideware; auditor dry-run works today |
+| **12/12 Gold CLI** in rigorous CI | IP floor is **real** — not slideware; auditor dry-run works today |
 | **🟡 Production** on several SKUs | Buyer assumes SOW for Redis, feeds, hospital pilot — not a rewrite |
 | **🔲 GTM everywhere** | Valuation is **IP / replacement cost**, not ARR multiples — until first £50k ARR |
 | **8b spend plane** demo gold but not in CI | Strategic premium is **buyer-specific** — see #8b row below |
@@ -698,7 +704,7 @@ make demo-gold-up && make demo-gold       # ModelGovernor spend plane
 | 7 | Health Telemetry | **Gold** | **£30k–£80k** | ~12% shared spine |
 | 8a | ModelGovernor (lifecycle CLI) | **Gold** | **£25k–£70k** | ~12% shared spine |
 | 8b | ModelGovernor (LLM spend plane) | **Demo gold** | **£2M–£7M** strategic exit band | Not lifecycle SKU alone — see positioning doc |
-| | **Full portfolio (one spine)** | **8/8 CI Gold** | **£70k–£150k** | $89k–$190k at ~1.27 |
+| | **Full portfolio (one spine)** | **12/12 CI Gold** | **£70k–£150k** | $89k–$190k at ~1.27 |
 
 ---
 
@@ -707,8 +713,8 @@ make demo-gold-up && make demo-gold       # ModelGovernor spend plane
 | Driver (↑) | Dragger (↓) |
 |------------|-------------|
 | Offline `verify-bundle` — rare auditor wedge | No revenue / no LOI — IP multiples only |
-| 91 tests + rigorous E2E 8/8 | Shared monorepo sports adjacency |
-| Sales tech specs + evidence pack (all 8) | No SOC 2 Type II |
+| 157+ tests + rigorous E2E 12/12 | Shared monorepo sports adjacency |
+| Sales tech specs + evidence pack (all 12) | No SOC 2 Type II |
 | Air-gap default for regulated buyers | Single maintainer bus factor |
 | Separate SKUs + clean extract path | Python hot path vs Go/Rust for quant |
 

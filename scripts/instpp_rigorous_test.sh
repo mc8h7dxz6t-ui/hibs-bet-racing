@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rigorous institutional E2E test — all 8 portfolio products.
+# Rigorous institutional E2E test — all 12 portfolio products.
 # Logs full output to docs/test_logs/instpp_rigorous_<timestamp>.log
 set -euo pipefail
 
@@ -610,6 +610,49 @@ echo "$MG_VERIFY"
 echo "$MG_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "ModelGovernor institutional E2E"
 
+section "ModelGovernor — deploy drift gate (shadow)"
+MG_DEPLOY_BASELINE="$WORK/mg_deploy_baseline.json"
+MG_DEPLOY_DB="$WORK/model_governor_deploy.sqlite"
+MG_DEPLOY_MODEL="$WORK/mg_deploy_model.json"
+rm -f "$MG_DEPLOY_DB"
+"$PYTHON" -m drift_gate.cli baseline \
+  --model-id credit-risk-v3 \
+  --features '{"income":50000,"debt_ratio":0.35}' \
+  --out "$MG_DEPLOY_BASELINE" --synthetic --samples 40
+export MODEL_GOVERNOR_DRIFT_BASELINE="$MG_DEPLOY_BASELINE"
+export MODEL_GOVERNOR_DRIFT_MODE=shadow
+"$PYTHON" - <<PY
+import json
+from pathlib import Path
+snap = json.loads(Path("docs/demo_model_snapshot.json").read_text(encoding="utf-8"))
+snap["deploy_features"] = {"income": 50100.0, "debt_ratio": 0.36}
+Path("$MG_DEPLOY_MODEL").write_text(json.dumps(snap, indent=2), encoding="utf-8")
+PY
+"$PYTHON" -m model_governor.cli record \
+  --action register --model "$MG_DEPLOY_MODEL" --database "$MG_DEPLOY_DB"
+"$PYTHON" -m model_governor.cli record \
+  --action approve --model "$MG_DEPLOY_MODEL" \
+  --outcome '{"status":"approved","approver":"rigorous-deploy"}' \
+  --database "$MG_DEPLOY_DB"
+"$PYTHON" -m model_governor.cli record \
+  --action deploy --model "$MG_DEPLOY_MODEL" \
+  --outcome '{"status":"deployed","env":"shadow"}' \
+  --database "$MG_DEPLOY_DB"
+"$PYTHON" - <<PY
+import json
+from inst_spine.ledger import AppendOnlyLedger
+from pathlib import Path
+entries = AppendOnlyLedger(Path("$MG_DEPLOY_DB")).list_entries()
+actions = [
+    (e.get("payload") or {}).get("action")
+    for e in entries
+    if e.get("event_type") == "model_governance"
+]
+assert "deploy" in actions, actions
+print(json.dumps({"model_governor_deploy_drift": "ok", "actions": actions}))
+PY
+pass "ModelGovernor deploy drift gate (shadow)"
+
 section "Drift Gate — baseline + evaluate + check + export + verify"
 "$PYTHON" -m drift_gate.cli baseline \
   --model-id rigorous-credit-v3 \
@@ -773,6 +816,14 @@ section "Industry gold — chaos + integration"
 "$PYTHON" -m pytest tests/test_industry_gold.py -v --tb=short
 pass "Industry gold chaos suite"
 
+section "Production Redis — live profile"
+if [[ -n "${INST_REDIS_URL:-}" ]]; then
+  "$PYTHON" -m pytest tests/test_redis_live.py -v --tb=short
+  pass "Live Redis profile (INST_REDIS_URL)"
+else
+  echo "[SKIP] INST_REDIS_URL unset — single-instance VPC default; see docs/PRODUCTION_REDIS_PROFILE.md"
+fi
+
 section "Summary"
 ENDED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 SUMMARY_JSON=$("$PYTHON" -c "
@@ -785,7 +836,7 @@ print(json.dumps({
         'drift_gate', 'webhook_replay', 'spend_guard', 'agent_ledger',
     ],
     'status': 'PASSED',
-    'e2e_sections': 37,
+    'e2e_sections': 39,
     'industry_gold': True,
     'finished_utc': '$ENDED_AT',
     'log_file': '$(basename "$LOG_FILE")',

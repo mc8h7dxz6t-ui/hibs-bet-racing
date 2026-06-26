@@ -1,8 +1,10 @@
-# Institutional Pre-Revenue Valuation — Full Portfolio (8 Products)
+# Institutional Pre-Revenue Valuation — Full Portfolio (12 SKUs)
 
 **Purpose:** Honest rough value range for the **code + IP + diligence package** before first revenue.  
 **Not:** A formal 409A, investment memo, or guarantee of sale price.  
-**Date:** June 2026 · Gold standard across all 8 products
+**Date:** June 2026 · Gold standard across all 12 SKUs
+
+> **12-SKU index:** [PORTFOLIO_FULL_TECH_SALES_12.md](PORTFOLIO_FULL_TECH_SALES_12.md) — SKUs 9–12 (Drift Gate, Webhook Replay, Spend Guard, Agent Ledger) detailed there.
 
 ---
 
@@ -19,7 +21,7 @@
 | **Health Telemetry (#7)** | `health_telemetry` + HIPAA/hospital packs |
 | **ModelGovernor (#8)** | `model_governor` — model lifecycle governance ledger |
 | **Inst spine** | Genesis WAL, Lamport clocks, F1–F9 gates, deterministic export, verify-bundle |
-| **Diligence pack** | 91 tests, rigorous E2E 8/8, buyer sheets, sales tech specs (all 8), demos |
+| **Diligence pack** | 157+ tests, rigorous E2E 12/12, buyer sheets, sales tech specs (all 12), demos |
 
 **Pre-revenue reality:** Buyers pay for **risk reduction** (auditor-ready proof, fail-closed design, repeatable demo). Revenue multiples do not apply yet — use **cost-to-replicate** and **IP sale / acqui-hire comps**.
 
@@ -110,8 +112,8 @@ Inst++ today sits in the **IP asset / small acqui-hire** band — **not** seed-r
 | Driver | Effect |
 |--------|--------|
 | Offline `verify-bundle` (auditor dry-run) | Rare — strong diligence wedge |
-| 91 tests + logged rigorous E2E 8/8 | Reduces buyer rewrite risk |
-| Sales tech specs + evidence pack (all 8) | Procurement-ready RFP depth |
+| 157+ tests + logged rigorous E2E 12/12 | Reduces buyer rewrite risk |
+| Sales tech specs + evidence pack (all 12) | Procurement-ready RFP depth |
 | Air-gap / on-prem default | Fintech + regulated buyers |
 | Separate SKUs + extraction docs | Clean procurement |
 | Workflow UI per product (`--product`) | Demo without explaining the other SKU |
