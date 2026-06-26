@@ -369,6 +369,8 @@ model-governor record --action deploy --model docs/demo_model_snapshot.json \
 
 **Docs:** `docs/MODEL_GOVERNOR_SALES_TECH_SPEC.md`
 
+**Strategic north star:** LLM spend ledger control plane — **`make demo-gold`** (gateway + sidecar + reconciler; drift lockout step 10). Comps and exit bands in `docs/MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md`. **#8 CLI** below is lifecycle governance on `inst_spine`.
+
 ---
 
 # Shared spine — the real IP floor

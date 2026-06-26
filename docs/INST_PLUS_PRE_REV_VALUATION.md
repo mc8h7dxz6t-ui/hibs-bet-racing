@@ -146,7 +146,8 @@ Inst++ today sits in the **IP asset / small acqui-hire** band — **not** seed-r
 | Question | Answer |
 |----------|--------|
 | **Rough value of full portfolio (pre-rev)?** | **£70k–£150k** ($89k–$190k) |
-| **#8 ModelGovernor alone?** | **£25k–£70k** |
+| **#8 ModelGovernor alone?** | **£25k–£70k** (lifecycle SKU as-built) |
+| **ModelGovernor north star (LLM spend plane, not shipped)?** | **£2M–£7M** exit band — see [MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md](MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md) |
 | **#1 Compliance Logger alone?** | **£25k–£75k** |
 | **#2 Proxy-Risk alone?** | **£30k–£90k** |
 | **With first £50k ARR?** | Re-frame to **£280k–£400k** ecosystem (3–7× ARR) |
@@ -166,11 +167,14 @@ Inst++ today sits in the **IP asset / small acqui-hire** band — **not** seed-r
 
 ## Related documents
 
-- `docs/PORTFOLIO_SALES_SHEET.md` — commercial pricing matrix  
+- `docs/PORTFOLIO_SALES_SHEET.md` — short commercial matrix  
+- `docs/PORTFOLIO_TECH_SALES_SHEET.md` — full tech/sales, revenue capability, value today  
 - `docs/BUYER_EVIDENCE_PACK.md` — procurement dry-run  
 - `docs/COMPLIANCE_LOGGER_SALES_TECH_SPEC.md`  
 - `docs/PROXY_RISK_SALES_TECH_SPEC.md`  
 - `docs/ALTDATA_SALES_TECH_SPEC.md` through `HEALTH_TELEMETRY_SALES_TECH_SPEC.md`  
 - `docs/MODEL_GOVERNOR_SALES_TECH_SPEC.md`  
+- `docs/MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md` — north star comps & exit framing  
+- `docs/DEMO_GOLD.md` — canonical `make demo-gold` sales walkthrough  
 - `docs/INST_PLUS_DEEP_DIVE_ALL_7.md`  
 - `docs/INST_PLUS_GOLD_STANDARD.md`

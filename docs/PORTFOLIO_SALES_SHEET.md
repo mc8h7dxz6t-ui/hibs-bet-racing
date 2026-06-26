@@ -23,7 +23,7 @@
 | 5 | **Webhook Mesh** | Never double-process a billing webhook | £199–£599/mo | SaaS billing, fintech ingress | `demo_webhook_mesh.sh` | [WEBHOOK_MESH_SALES_TECH_SPEC.md](WEBHOOK_MESH_SALES_TECH_SPEC.md) |
 | 6 | **Ad Guard** | Marketing API spend kill + gate audit | £300–£800/mo | Agency, growth, marketing finance | `demo_ad_guard.sh` | [AD_GUARD_SALES_TECH_SPEC.md](AD_GUARD_SALES_TECH_SPEC.md) |
 | 7 | **Health Telemetry** | Device batch tamper evidence (not FDA cert) | £5k–£15k + £500/mo | Digital health, RPM, NHS-adjacent | `demo_health_telemetry.sh` | [HEALTH_TELEMETRY_SALES_TECH_SPEC.md](HEALTH_TELEMETRY_SALES_TECH_SPEC.md) |
-| 8 | **ModelGovernor** | ML model lifecycle governance + deploy proof | £400–£1,000/mo | MLOps, model risk, regulated lending | `demo_model_governor.sh` | [MODEL_GOVERNOR_SALES_TECH_SPEC.md](MODEL_GOVERNOR_SALES_TECH_SPEC.md) |
+| 8 | **ModelGovernor** | ML model lifecycle governance + deploy proof ([north star](MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md): LLM spend plane) | £400–£1,000/mo | MLOps, model risk, regulated lending | `demo_model_governor.sh` | [MODEL_GOVERNOR_SALES_TECH_SPEC.md](MODEL_GOVERNOR_SALES_TECH_SPEC.md) |
 
 **Buyer one-pagers:** `docs/*_BUYER.md` (60-second skim per SKU)
 
@@ -55,7 +55,7 @@
 | **Hospital / enterprise pilot** | HIPAA pack + ward playbook (#7) or SOC VPC pack (all) | Custom SOW |
 | **Maintenance** | Security patches, spine upgrades | 15–20% ARR |
 
-**Pre-revenue IP range (full portfolio):** £70k–£150k · with £50k+ ARR: £280k–£400k ecosystem value. See [INST_PLUS_PRE_REV_VALUATION.md](INST_PLUS_PRE_REV_VALUATION.md).
+**Full tech/sales sheet (per-platform comps + revenue + value):** [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md)
 
 ---
 
@@ -66,6 +66,7 @@ pip install -e ".[dev,instpp]"
 ./scripts/instpp_smoke_test.sh          # 91 tests
 ./scripts/instpp_rigorous_test.sh       # 8/8 E2E → docs/test_logs/
 ./scripts/demo_instpp.sh                # all demos
+./scripts/demo_portfolio_all.sh         # all 8 SKUs → data/demo/portfolio/
 ```
 
 **Evidence artifacts:** [BUYER_EVIDENCE_PACK.md](BUYER_EVIDENCE_PACK.md) · [SOC2_VPC_DILIGENCE_PACK.md](SOC2_VPC_DILIGENCE_PACK.md)
@@ -126,6 +127,7 @@ ML model lifecycle →     ModelGovernor         →      verify-bundle
 
 | Doc | Purpose |
 |-----|---------|
+| [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md) | **Full tech/sales — comps, revenue, completion, value today** |
 | [INST_PLUS_DEEP_DIVE_ALL_7.md](INST_PLUS_DEEP_DIVE_ALL_7.md) | Technical deep dive per product |
 | [INST_PLUS_PRE_REV_VALUATION.md](INST_PLUS_PRE_REV_VALUATION.md) | IP valuation framework |
 | [INSTITUTIONAL_ENTERPRISE_STACK.md](INSTITUTIONAL_ENTERPRISE_STACK.md) | Enterprise positioning |

@@ -89,6 +89,7 @@ pip install -e ".[dev,instpp]"
 ./scripts/instpp_smoke_test.sh
 ./scripts/instpp_rigorous_test.sh          # all 8 products + log
 ./scripts/demo_instpp.sh                   # #1 + #2
+./scripts/demo_portfolio_all.sh            # all 8 products
 ./scripts/demo_altdata.sh                  # #3
 ./scripts/demo_ai_kit.sh                   # #4
 ./scripts/demo_webhook_mesh.sh             # #5

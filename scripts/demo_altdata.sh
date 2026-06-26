@@ -6,7 +6,7 @@ cd "$ROOT"
 PYTHON="${PYTHON:-python3}"
 DB="${1:-./data/demo/altdata.sqlite}"
 TAR="${2:-./data/demo/altdata_bundle.tar}"
-CTX='{"demo_price":42.5,"demo_seats":180,"raw_html":"<td>42.5</td><td>180</td>"}'
+CTX='{"demo_price":42.5,"demo_seats":180,"route_code":"DEMO-01","raw_html":"<td>42.5</td><td>180</td><td>DEMO-01</td>"}'
 SKIP_LIVE="${SKIP_LIVE:-0}"
 mkdir -p "$(dirname "$DB")" "$(dirname "$TAR")"
 echo "── 1/5 Poll stub feed (offline) ──"

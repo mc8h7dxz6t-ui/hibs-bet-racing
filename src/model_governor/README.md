@@ -58,4 +58,6 @@ Required fields: `model_id`, `version`, `artifact_hash`, `risk_tier`
 ```
 
 **Buyer doc:** `docs/MODEL_GOVERNOR_BUYER.md`  
-**Sales spec:** `docs/MODEL_GOVERNOR_SALES_TECH_SPEC.md`
+**Sales spec:** `docs/MODEL_GOVERNOR_SALES_TECH_SPEC.md`  
+**Strategic positioning & valuation:** `docs/MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md`  
+**Gold demo:** `docs/DEMO_GOLD.md` — `make demo-gold`

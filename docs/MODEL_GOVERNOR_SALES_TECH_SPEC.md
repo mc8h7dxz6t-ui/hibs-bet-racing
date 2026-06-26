@@ -13,6 +13,8 @@
 
 **One-line pitch:** *Prove which model version was approved for production on date X — with math, not a spreadsheet.*
 
+> **This spec describes shipped #8 CLI** (model lifecycle governance). For the LLM spend control-plane demo, comps, and exit valuation bands, see [MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md](MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md) and [DEMO_GOLD.md](DEMO_GOLD.md) (`make demo-gold`).
+
 | | |
 |---|---|
 | **Price band** | £400–£1,000/mo per tenant |
