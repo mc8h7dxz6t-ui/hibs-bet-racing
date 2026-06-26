@@ -1,9 +1,11 @@
-# Institutional Deep Dive — All 7 Products
+# Institutional Deep Dive — All 8 Products (legacy)
+
+> **Superseded for GTM:** [PORTFOLIO_FULL_TECH_SALES_12.md](PORTFOLIO_FULL_TECH_SALES_12.md) · [INSTITUTIONAL_STANDARD.md](INSTITUTIONAL_STANDARD.md) — **12 SKUs**, 157+ tests, rigorous **12/12**.
 
 **Audience:** Technical buyers, auditors, procurement, enterprise architects  
 **Standard:** Institutional gold standard — fail-closed, offline verify-bundle, F1–F9 gates, typed errors, one-command demo  
 **Spine:** `inst_spine` — genesis WAL, Lamport clocks, deterministic export, Redis fail-closed backends  
-**Proof:** `./scripts/instpp_smoke_test.sh` · `./scripts/instpp_rigorous_test.sh` (all 7 products) · per-product `demo_*.sh`
+**Proof:** `./scripts/instpp_smoke_test.sh` (157+) · `./scripts/instpp_rigorous_test.sh` (12/12 products) · per-product `demo_*.sh`
 
 ---
 
@@ -30,8 +32,9 @@
 | 5 | Webhook Mesh | **✅ Gold** | WAL-before-ack + genesis ledger | £15k–£40k |
 | 6 | Ad Guard | **✅ Gold** | Spend Z-score kill + full gate log | £15k–£45k |
 | 7 | Health Telemetry | **✅ Gold** | Batch Lamport ingest + export | £30k–£80k |
+| 8 | ModelGovernor | **✅ Gold** | Model lifecycle + deploy proof | £25k–£70k |
 
-**Combined portfolio ecosystem (one spine):** £60k–£130k pre-rev · £250k–£350k with £50k+ ARR
+**Combined portfolio ecosystem (one spine):** £70k–£150k pre-rev · £280k–£400k with £50k+ ARR
 
 ---
 
@@ -331,6 +334,47 @@ POST batch → schema validate → ledger append (telemetry_batch) → F1–F9 �
 
 ---
 
+# Product #8 — ModelGovernor
+
+## One job
+Tamper-proof ML model lifecycle governance — register, approve, deploy, and retire models with cryptographic proof.
+
+## Tech edge vs incumbents
+
+| Edge | MLflow Registry | GRC SaaS | **ModelGovernor** |
+|------|-----------------|----------|-------------------|
+| Model snapshot contract | Tags/params | Custom fields | **First-class ingest** |
+| Approve/deploy audit | Version history | Case workflow | **Genesis chain per event** |
+| Offline verify | Needs server | No | **verify-bundle** |
+| Drift as sealed event | Metrics only | Ticket | **`drift_alert` on chain** |
+| Air-gap deploy | Rare | SaaS | **Default** |
+
+## Architecture
+```
+model_snapshot + action → ledger append (model_governance) → F1–F9 → export
+```
+
+## Gold standard
+- `model-governor record|check|export|verify-bundle`
+- Governance actions: register, approve, reject, deploy, retire, drift_alert
+- Required snapshot fields: model_id, version, artifact_hash, risk_tier
+- `scripts/demo_model_governor.sh`
+
+## Demo
+```bash
+./scripts/demo_model_governor.sh
+model-governor record --action deploy --model docs/demo_model_snapshot.json \
+  --outcome '{"environment":"production"}'
+```
+
+**Price:** £400–£1,000/mo per tenant
+
+**Docs:** `docs/MODEL_GOVERNOR_SALES_TECH_SPEC.md`
+
+**Strategic north star:** LLM spend ledger control plane — **`make demo-gold`** (gateway + sidecar + reconciler; drift lockout step 10). Comps and exit bands in `docs/MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md`. **#8 CLI** below is lifecycle governance on `inst_spine`.
+
+---
+
 # Shared spine — the real IP floor
 
 | Module | Role |
@@ -366,6 +410,7 @@ flowchart TB
     WM[5 Webhook Mesh]
     AG[6 Ad Guard]
     HT[7 Health Telemetry]
+    MG[8 ModelGovernor]
   end
 
   NEMO --> AG
@@ -375,6 +420,7 @@ flowchart TB
   WM --> AUD
   AG --> AUD
   HT --> AUD
+  MG --> AUD
 ```
 
 ---
@@ -385,21 +431,22 @@ flowchart TB
 pip install -e ".[dev,instpp]"
 ./scripts/instpp_smoke_test.sh
 
-# All 7 products
+# All 8 products
 ./scripts/instpp_rigorous_test.sh
 ./scripts/demo_instpp.sh
 
-# Products #3–#7
+# Products #3–#8
 ./scripts/demo_altdata.sh
 ./scripts/demo_ai_kit.sh
 ./scripts/demo_webhook_mesh.sh
 ./scripts/demo_ad_guard.sh
 ./scripts/demo_health_telemetry.sh
+./scripts/demo_model_governor.sh
 ```
 
 ---
 
-# RFP deflection (all 7)
+# RFP deflection (all 8)
 
 | Buyer asks | Product |
 |------------|---------|
@@ -410,6 +457,7 @@ pip install -e ".[dev,instpp]"
 | Webhook double-billing protection | #5 ✅ |
 | Marketing API spend anomaly | #6 ✅ |
 | Device telemetry tamper evidence | #7 ✅ |
+| ML model approve/deploy proof | #8 ✅ |
 | GRC case management UI | ❌ integrate export |
 | SOC 2 Type II SaaS | ❌ buyer VPC deploy — see `SOC2_VPC_DILIGENCE_PACK.md` |
 | Sub-5ms RTB | ❌ |
@@ -425,10 +473,10 @@ pip install -e ".[dev,instpp]"
 |-------|--------|
 | Portfolio sales sheet | `docs/PORTFOLIO_SALES_SHEET.md` — pricing, pilot ladder, RFP matrix |
 | Buyer evidence pack | `docs/BUYER_EVIDENCE_PACK.md` — 15-min procurement dry-run |
-| Buyer one-pagers | `docs/*_BUYER.md` — all 7 with pitch + next step |
-| Sales tech specs | `docs/*_SALES_TECH_SPEC.md` — all 7 (RFP depth) |
+| Buyer one-pagers | `docs/*_BUYER.md` — all 8 with pitch + next step |
+| Sales tech specs | `docs/*_SALES_TECH_SPEC.md` — all 8 (RFP depth) |
 | SOC 2 VPC pack | `docs/SOC2_VPC_DILIGENCE_PACK.md` |
-| Rigorous E2E proof | `docs/test_logs/instpp_rigorous_latest_summary.json` — 7/7 PASSED |
+| Rigorous E2E proof | `docs/test_logs/instpp_rigorous_latest_summary.json` — 12/12 PASSED |
 
 **Sell motion:** Demo (60s) → `verify-bundle` offline → shadow pilot → paid LOI.
 
@@ -438,7 +486,7 @@ pip install -e ".[dev,instpp]"
 
 - `docs/PORTFOLIO_SALES_SHEET.md` — unified commercial sheet (start here for sales)
 - `docs/BUYER_EVIDENCE_PACK.md` — procurement / auditor evidence index
-- `docs/INST_PLUS_GOLD_STANDARD.md` — six-dimension bar (all 7)
+- `docs/INST_PLUS_GOLD_STANDARD.md` — six-dimension bar (all 8)
 - `docs/INST_PLUS_PRE_REV_VALUATION.md` — IP ranges (full portfolio)
 - `docs/INST_PLUS_DEEP_DIVE_COMPLIANCE_PROXY.md` — #1 + #2 extended
 - `docs/INSTITUTIONAL_ENTERPRISE_STACK.md` — enterprise positioning

@@ -10,6 +10,7 @@ from inst_spine.coverage import aggregate_source_coverage
 from inst_spine.gates.engine import GateEngine
 from inst_spine.hash import read_genesis_anchor
 from inst_spine.ledger import AppendOnlyLedger
+from inst_spine.retention import evaluate_retention_policy
 
 
 def build_compliance_context(
@@ -26,11 +27,18 @@ def build_compliance_context(
         "snapshot",
         "telemetry_batch",
         "webhook_ingress",
+        "webhook_delivery",
+        "webhook_replay",
         "ad_spend_request",
         "agent_checkpoint",
+        "model_governance",
+        "drift_gate_evaluation",
+        "spend_guard",
+        "agent_action",
     }
     decisions = sum(1 for e in entries if e.get("event_type") in snapshot_events)
     anchor = read_genesis_anchor(ledger.anchor_path)
+    retention_ok, retention_detail = evaluate_retention_policy(entries)
     ctx: dict[str, Any] = {
         "ledger_entries": entries,
         "expected_count": len(entries),
@@ -38,7 +46,8 @@ def build_compliance_context(
         "expected_snapshots": max(decisions, 1) if entries else 0,
         "actual_snapshots": decisions,
         "source_coverage_pct": aggregate_source_coverage(entries),
-        "retention_policy_ok": True,
+        "retention_policy_ok": retention_ok,
+        "retention_detail": retention_detail,
         "config_hash_drift": False,
     }
     if anchor and entries:

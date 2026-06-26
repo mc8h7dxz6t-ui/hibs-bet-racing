@@ -3,7 +3,7 @@
 **Purpose:** Shared security diligence template for enterprise buyers.  
 **Posture:** We sell **audit infrastructure** deployed in **buyer-controlled VPC** — SOC 2 Type II attestation is a **buyer or shared-processor** responsibility, not a product SKU.
 
-**Applies to:** All 7 portfolio products on `inst_spine`.
+**Applies to:** All 8 portfolio products on `inst_spine`.
 
 ---
 

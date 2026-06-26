@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Rigorous institutional E2E test — all 7 portfolio products.
+# Rigorous institutional E2E test — all 12 portfolio products.
 # Logs full output to docs/test_logs/instpp_rigorous_<timestamp>.log
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 PYTHON="${PYTHON:-python3}"
+# shellcheck source=instpp_bootstrap.sh
+source "$(dirname "$0")/instpp_bootstrap.sh"
+instpp_bootstrap
 TS="$(date -u +%Y-%m-%dT%H%M%SZ)"
 LOG_DIR="$ROOT/docs/test_logs"
 LOG_FILE="$LOG_DIR/instpp_rigorous_${TS}.log"
@@ -15,7 +18,7 @@ mkdir -p "$LOG_DIR"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "================================================================"
-echo "INSTITUTIONAL RIGOROUS TEST — All 7 Products"
+echo "INSTITUTIONAL RIGOROUS TEST — All 12 Products"
 echo "Started: $(date -u +%Y-%m-%dT%H:%M:%SZ) UTC"
 echo "Log: $LOG_FILE"
 echo "================================================================"
@@ -68,6 +71,17 @@ ADGUARD_DB="$WORK/ad_guard.sqlite"
 ADGUARD_TAR="$WORK/ad_guard_bundle.tar"
 HEALTH_DB="$WORK/health.sqlite"
 HEALTH_TAR="$WORK/health_bundle.tar"
+MG_DB="$WORK/model_governor.sqlite"
+MG_TAR="$WORK/model_governor_bundle.tar"
+DG_DB="$WORK/drift_gate.sqlite"
+DG_TAR="$WORK/drift_gate_bundle.tar"
+DG_BASELINE="$WORK/drift_baseline.json"
+WR_DB="$WORK/webhook_replay.sqlite"
+WR_TAR="$WORK/webhook_replay_bundle.tar"
+WR_CAP="$WORK/webhook_captures"
+SG_DB="$WORK/spend_guard.sqlite"
+SG_WALLET="$WORK/spend_guard_wallet.sqlite"
+SG_TAR="$WORK/spend_guard_bundle.tar"
 echo "Work dir: $WORK"
 
 section "Unit tests — full institutional suite"
@@ -84,6 +98,12 @@ section "Unit tests — full institutional suite"
   tests/test_webhook_mesh.py \
   tests/test_ad_guard.py \
   tests/test_health_telemetry.py \
+  tests/test_model_governor.py \
+  tests/test_drift_gate.py \
+  tests/test_webhook_replay.py \
+  tests/test_spend_guard.py \
+  tests/test_agent_ledger.py \
+  tests/test_industry_gold.py \
   -v --tb=short
 pass "Unit test suite"
 
@@ -486,6 +506,59 @@ echo "$WH_VERIFY"
 echo "$WH_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "Webhook Mesh institutional E2E"
 
+section "Webhook Mesh — Redis Stream delivery (mocked)"
+"$PYTHON" - <<PY
+import asyncio
+import hashlib
+import hmac
+import json
+import os
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
+
+from fastapi.testclient import TestClient
+from inst_spine.rates import MemoryIdempotencyBackend
+from inst_spine.wal import WALWriter
+import webhook_mesh.serve as serve_mod
+from webhook_mesh.queue import RedisStreamDeliveryQueue
+
+db = Path("$WEBHOOK_DB")
+wal = Path("$WORK/ingress_stream.wal")
+secret = "rigorous-stream-secret"
+os.environ["WEBHOOK_MESH_LEDGER"] = str(db)
+os.environ["WEBHOOK_DISPATCH_MODE"] = "redis"
+
+redis_client = MagicMock()
+redis_client.xgroup_create = AsyncMock()
+redis_client.xadd = AsyncMock(return_value="1-0")
+
+class _StreamQueue(RedisStreamDeliveryQueue):
+    async def start_worker(self, handler=None):
+        return None
+
+serve_mod.state = serve_mod.RuntimeState()
+serve_mod.state.provider_secret = secret
+serve_mod.state.wal_writer = WALWriter(wal)
+serve_mod.state.idempotency_db = MemoryIdempotencyBackend()
+serve_mod.state.dead_letter_dir = str(Path("$WORK") / "dlq_stream")
+serve_mod.state.delivery_queue = _StreamQueue(redis_client)
+serve_mod.state.dispatch_mode = "redis"
+
+body = b'{"id":"evt-stream-1"}'
+sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+headers = {
+    "X-Provider-Signature": sig,
+    "X-Webhook-Id": "evt-stream-1",
+    "X-Target-Forward-Url": "https://example.com/forward",
+}
+client = TestClient(serve_mod.app)
+r = client.post("/v1/ingress/tenant-stream", content=body, headers=headers)
+assert r.status_code == 200 and r.json()["dispatch_mode"] == "redis", r.text
+redis_client.xadd.assert_awaited_once()
+print(json.dumps({"redis_stream": "ok", "dispatch_mode": "redis"}))
+PY
+pass "Webhook Mesh Redis Stream rigorous E2E"
+
 section "Ad Guard — evaluate + check + export + verify"
 AD_BODY='{"campaignId":"rigorous-99","bidMicros":2500000,"costMicros":10000000}'
 "$PYTHON" -m ad_guard.cli evaluate --provider google --body "$AD_BODY" --database "$ADGUARD_DB" || true
@@ -501,7 +574,7 @@ echo "$AD_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.e
 pass "Ad Guard institutional E2E"
 
 section "Health Telemetry — ingest + check + export + verify"
-HEALTH_PKTS='[{"ts":"2026-06-01T12:00:00Z","hr":72,"spo2":98},{"ts":"2026-06-01T12:00:01Z","hr":73}]'
+HEALTH_PKTS='[{"ts":"2026-06-01T12:00:00Z","seq":1,"hr":72,"spo2":98},{"ts":"2026-06-01T12:00:01Z","seq":2,"hr":73,"spo2":97}]'
 "$PYTHON" -m health_telemetry.cli ingest --device-id rigorous-ward --packets "$HEALTH_PKTS" --database "$HEALTH_DB"
 HT_CHECK=$("$PYTHON" -m health_telemetry.cli check --database "$HEALTH_DB")
 echo "$HT_CHECK"
@@ -514,6 +587,243 @@ echo "$HT_VERIFY"
 echo "$HT_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "Health Telemetry institutional E2E"
 
+section "ModelGovernor — record + check + export + verify"
+"$PYTHON" -m model_governor.cli record \
+  --action register \
+  --model docs/demo_model_snapshot.json \
+  --outcome '{"status":"registered","ref":"rigorous-mg-001"}' \
+  --database "$MG_DB"
+"$PYTHON" -m model_governor.cli record \
+  --action approve \
+  --model docs/demo_model_snapshot.json \
+  --outcome '{"status":"approved","approver":"rigorous-board"}' \
+  --actor rigorous-board \
+  --database "$MG_DB"
+MG_CHECK=$("$PYTHON" -m model_governor.cli check --database "$MG_DB")
+echo "$MG_CHECK"
+echo "$MG_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
+MG_EXPORT=$("$PYTHON" -m model_governor.cli export --database "$MG_DB" --tarball "$MG_TAR")
+echo "$MG_EXPORT"
+echo "$MG_EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+MG_VERIFY=$("$PYTHON" -m model_governor.cli verify-bundle --tarball "$MG_TAR")
+echo "$MG_VERIFY"
+echo "$MG_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+pass "ModelGovernor institutional E2E"
+
+section "ModelGovernor — deploy drift gate (shadow)"
+MG_DEPLOY_BASELINE="$WORK/mg_deploy_baseline.json"
+MG_DEPLOY_DB="$WORK/model_governor_deploy.sqlite"
+MG_DEPLOY_MODEL="$WORK/mg_deploy_model.json"
+rm -f "$MG_DEPLOY_DB"
+"$PYTHON" -m drift_gate.cli baseline \
+  --model-id credit-risk-v3 \
+  --features '{"income":50000,"debt_ratio":0.35}' \
+  --out "$MG_DEPLOY_BASELINE" --synthetic --samples 40
+export MODEL_GOVERNOR_DRIFT_BASELINE="$MG_DEPLOY_BASELINE"
+export MODEL_GOVERNOR_DRIFT_MODE=shadow
+"$PYTHON" - <<PY
+import json
+from pathlib import Path
+snap = json.loads(Path("docs/demo_model_snapshot.json").read_text(encoding="utf-8"))
+snap["deploy_features"] = {"income": 50100.0, "debt_ratio": 0.36}
+Path("$MG_DEPLOY_MODEL").write_text(json.dumps(snap, indent=2), encoding="utf-8")
+PY
+"$PYTHON" -m model_governor.cli record \
+  --action register --model "$MG_DEPLOY_MODEL" --database "$MG_DEPLOY_DB"
+"$PYTHON" -m model_governor.cli record \
+  --action approve --model "$MG_DEPLOY_MODEL" \
+  --outcome '{"status":"approved","approver":"rigorous-deploy"}' \
+  --database "$MG_DEPLOY_DB"
+"$PYTHON" -m model_governor.cli record \
+  --action deploy --model "$MG_DEPLOY_MODEL" \
+  --outcome '{"status":"deployed","env":"shadow"}' \
+  --database "$MG_DEPLOY_DB"
+"$PYTHON" - <<PY
+import json
+from inst_spine.ledger import AppendOnlyLedger
+from pathlib import Path
+entries = AppendOnlyLedger(Path("$MG_DEPLOY_DB")).list_entries()
+actions = [
+    (e.get("payload") or {}).get("action")
+    for e in entries
+    if e.get("event_type") == "model_governance"
+]
+assert "deploy" in actions, actions
+print(json.dumps({"model_governor_deploy_drift": "ok", "actions": actions}))
+PY
+pass "ModelGovernor deploy drift gate (shadow)"
+
+section "Drift Gate — baseline + evaluate + check + export + verify"
+"$PYTHON" -m drift_gate.cli baseline \
+  --model-id rigorous-credit-v3 \
+  --features '{"income":50000,"debt_ratio":0.35}' \
+  --out "$DG_BASELINE" --synthetic --samples 80
+for i in 1 2 3 4 5; do
+  "$PYTHON" -m drift_gate.cli evaluate \
+    --baseline "$DG_BASELINE" \
+    --features '{"income":50100,"debt_ratio":0.36}' \
+    --mode shadow --database "$DG_DB" --request-id "dg-burn-$i" || true
+done
+"$PYTHON" -m drift_gate.cli evaluate \
+  --baseline "$DG_BASELINE" \
+  --features '{"income":200000,"debt_ratio":0.95}' \
+  --mode enforce --database "$DG_DB" --request-id dg-enforce-1 || true
+DG_CHECK=$("$PYTHON" -m drift_gate.cli check --database "$DG_DB")
+echo "$DG_CHECK"
+echo "$DG_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
+DG_EXPORT=$("$PYTHON" -m drift_gate.cli export --database "$DG_DB" --tarball "$DG_TAR")
+echo "$DG_EXPORT"
+echo "$DG_EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+DG_VERIFY=$("$PYTHON" -m drift_gate.cli verify-bundle --tarball "$DG_TAR")
+echo "$DG_VERIFY"
+echo "$DG_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+pass "Drift Gate institutional E2E"
+
+section "Webhook Replay — capture + replay + check + export + verify"
+mkdir -p "$WR_CAP"
+BODY_FILE="$WORK/replay_body.json"
+echo '{"id":"evt-rigorous-replay","amount":99}' > "$BODY_FILE"
+"$PYTHON" -m webhook_replay.cli capture \
+  --capture-id evt-rigorous-replay \
+  --tenant-id tenant-rigorous \
+  --body-file "$BODY_FILE" \
+  --store-dir "$WR_CAP"
+"$PYTHON" -m webhook_replay.cli replay \
+  --capture-id evt-rigorous-replay \
+  --store-dir "$WR_CAP" \
+  --database "$WR_DB"
+WR_CHECK=$("$PYTHON" -m webhook_replay.cli check --database "$WR_DB")
+echo "$WR_CHECK"
+echo "$WR_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
+WR_EXPORT=$("$PYTHON" -m webhook_replay.cli export --database "$WR_DB" --tarball "$WR_TAR")
+echo "$WR_EXPORT"
+echo "$WR_EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+WR_VERIFY=$("$PYTHON" -m webhook_replay.cli verify-bundle --tarball "$WR_TAR")
+echo "$WR_VERIFY"
+echo "$WR_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+pass "Webhook Replay institutional E2E"
+
+section "Spend Guard — reserve/settle + drift lock + check + export + verify"
+"$PYTHON" -m spend_guard.cli init-wallet --wallet-db "$SG_WALLET" --balance 1000
+RESERVE_JSON=$("$PYTHON" -m spend_guard.cli reserve \
+  --request-id sg-rigorous-1 --cost 40 \
+  --wallet-db "$SG_WALLET" --ledger-db "$SG_DB")
+HOLD_ID=$(echo "$RESERVE_JSON" | "$PYTHON" -c "import sys,json; print(json.load(sys.stdin).get('hold_id',''))")
+"$PYTHON" -m spend_guard.cli settle \
+  --hold-id "$HOLD_ID" --request-id sg-rigorous-1 --actual-cost 38 \
+  --wallet-db "$SG_WALLET" --ledger-db "$SG_DB"
+"$PYTHON" -m spend_guard.cli demo-drift-lock \
+  --wallet-db "$SG_WALLET" --ledger-db "$SG_DB" --spend 40 --big-spend 250 --iterations 5 || true
+SG_CHECK=$("$PYTHON" -m spend_guard.cli check --database "$SG_DB")
+echo "$SG_CHECK"
+echo "$SG_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
+SG_EXPORT=$("$PYTHON" -m spend_guard.cli export --database "$SG_DB" --tarball "$SG_TAR")
+echo "$SG_EXPORT"
+echo "$SG_EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+SG_VERIFY=$("$PYTHON" -m spend_guard.cli verify-bundle --tarball "$SG_TAR")
+echo "$SG_VERIFY"
+echo "$SG_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+pass "Spend Guard institutional E2E"
+
+section "Spend Guard — OpenAI-compat gateway (mock upstream)"
+SG_HTTP_WALLET="$WORK/spend_http_wallet.sqlite"
+SG_HTTP_DB="$WORK/spend_http.sqlite"
+rm -f "$SG_HTTP_WALLET" "$SG_HTTP_DB"
+"$PYTHON" -m spend_guard.cli init-wallet --wallet-db "$SG_HTTP_WALLET" --balance 500
+export SPEND_GUARD_WALLET_DB="$SG_HTTP_WALLET"
+export SPEND_GUARD_LEDGER_DB="$SG_HTTP_DB"
+export SPEND_GUARD_MOCK_UPSTREAM=1
+"$PYTHON" - <<PY
+import json
+import os
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+import spend_guard.serve as serve_mod
+
+serve_mod.state.wallet_db = os.environ["SPEND_GUARD_WALLET_DB"]
+serve_mod.state.ledger_db = os.environ["SPEND_GUARD_LEDGER_DB"]
+serve_mod.state.mock_upstream = True
+serve_mod.state.gateway = None
+
+client = TestClient(serve_mod.app)
+r = client.post(
+    "/v1/chat/completions",
+    json={
+        "model": "demo-model",
+        "messages": [{"role": "user", "content": "rigorous spend gateway"}],
+        "max_tokens": 24,
+    },
+    headers={"X-Request-Id": "sg-rigorous-http-1"},
+)
+assert r.status_code == 200, r.text
+body = r.json()
+assert body.get("_spend_guard", {}).get("request_id") == "sg-rigorous-http-1"
+if serve_mod.state.ledger:
+    serve_mod.state.ledger.stop_async_writer(flush=True)
+from inst_spine.ledger import AppendOnlyLedger
+ledger = AppendOnlyLedger(Path(os.environ["SPEND_GUARD_LEDGER_DB"]))
+phases = [e["payload"].get("phase") for e in ledger.list_entries() if e.get("event_type") == "spend_guard"]
+assert "reserve" in phases and "settle" in phases, phases
+print(json.dumps({"spend_gateway_http": "ok", "phases": phases}))
+PY
+SG_HTTP_CHECK=$("$PYTHON" -m spend_guard.cli check --database "$SG_HTTP_DB")
+echo "$SG_HTTP_CHECK"
+echo "$SG_HTTP_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
+pass "Spend Guard OpenAI-compat gateway rigorous E2E"
+
+section "Spend Guard — gold demo walkthrough (11 steps)"
+GOLD_DEMO_DIR="$WORK/spend_gold_walkthrough"
+export GOLD_DEMO_DIR
+rm -rf "$GOLD_DEMO_DIR"
+./scripts/demo_gold.sh
+test -f "$GOLD_DEMO_DIR/spend_guard_bundle.tar"
+GOLD_VERIFY=$("$PYTHON" -m spend_guard.cli verify-bundle --tarball "$GOLD_DEMO_DIR/spend_guard_bundle.tar")
+echo "$GOLD_VERIFY"
+echo "$GOLD_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+pass "Spend Guard gold demo walkthrough (make demo-gold)"
+
+section "Agent Ledger — authorize/complete + check + export + verify"
+AL_DB="$WORK/agent_ledger.sqlite"
+AL_PERMIT="$WORK/agent_ledger_permits.sqlite"
+AL_TAR="$WORK/agent_ledger_bundle.tar"
+AUTH_JSON=$("$PYTHON" -m agent_ledger.cli authorize \
+  --agent-id rigorous-agent --tool read_file \
+  --args '{"path":"docs/demo_snapshot.json"}' \
+  --database "$AL_DB" --permit-db "$AL_PERMIT" \
+  --idempotency-key al-rigorous-1)
+AL_PERMIT_ID=$(echo "$AUTH_JSON" | "$PYTHON" -c "import sys,json; print(json.load(sys.stdin).get('permit_id',''))")
+"$PYTHON" -m agent_ledger.cli complete \
+  --permit-id "$AL_PERMIT_ID" \
+  --result '{"status":"ok"}' \
+  --database "$AL_DB" --permit-db "$AL_PERMIT"
+"$PYTHON" -m agent_ledger.cli authorize \
+  --agent-id rigorous-agent --tool transfer_funds \
+  --args '{"amount":9999}' \
+  --database "$AL_DB" --permit-db "$AL_PERMIT" || true
+AL_CHECK=$("$PYTHON" -m agent_ledger.cli check --database "$AL_DB")
+echo "$AL_CHECK"
+echo "$AL_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
+AL_EXPORT=$("$PYTHON" -m agent_ledger.cli export --database "$AL_DB" --tarball "$AL_TAR")
+echo "$AL_EXPORT"
+echo "$AL_EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+AL_VERIFY=$("$PYTHON" -m agent_ledger.cli verify-bundle --tarball "$AL_TAR")
+echo "$AL_VERIFY"
+echo "$AL_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+pass "Agent Ledger institutional E2E"
+
+section "Industry gold — chaos + integration"
+"$PYTHON" -m pytest tests/test_industry_gold.py -v --tb=short
+pass "Industry gold chaos suite"
+
+section "Production Redis — live profile"
+if [[ -n "${INST_REDIS_URL:-}" ]]; then
+  "$PYTHON" -m pytest tests/test_redis_live.py -v --tb=short
+  pass "Live Redis profile (INST_REDIS_URL)"
+else
+  echo "[SKIP] INST_REDIS_URL unset — single-instance VPC default; see docs/PRODUCTION_REDIS_PROFILE.md"
+fi
+
 section "Summary"
 ENDED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 SUMMARY_JSON=$("$PYTHON" -c "
@@ -522,10 +832,12 @@ print(json.dumps({
     'suite': 'institutional_rigorous',
     'products': [
         'compliance_logger', 'proxy_risk', 'altdata', 'ai_kit',
-        'webhook_mesh', 'ad_guard', 'health_telemetry',
+        'webhook_mesh', 'ad_guard', 'health_telemetry', 'model_governor',
+        'drift_gate', 'webhook_replay', 'spend_guard', 'agent_ledger',
     ],
     'status': 'PASSED',
-    'e2e_sections': 27,
+    'e2e_sections': 39,
+    'industry_gold': True,
     'finished_utc': '$ENDED_AT',
     'log_file': '$(basename "$LOG_FILE")',
 }, indent=2))
@@ -534,7 +846,7 @@ echo ""
 echo "$SUMMARY_JSON" | tee "$LOG_DIR/instpp_rigorous_latest_summary.json"
 echo ""
 echo "================================================================"
-echo "ALL RIGOROUS TESTS PASSED — 7/7 PRODUCTS"
+echo "ALL RIGOROUS TESTS PASSED — 12/12 PRODUCTS (INDUSTRY GOLD)"
 echo "Finished: $ENDED_AT UTC"
 echo "Log: $LOG_FILE"
 echo "Summary: $LOG_DIR/instpp_rigorous_latest_summary.json"

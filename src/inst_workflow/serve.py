@@ -1,4 +1,4 @@
-"""Workflow UI — FastAPI backend for Compliance + Proxy-Risk."""
+"""Workflow UI — FastAPI backend for Proof Console (12 SKUs) + Compliance + Proxy."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from compliance_log.ingest import log_decision
 from inst_spine.check import build_compliance_context, run_institutional_check
 from inst_spine.export import build_audit_bundle, verify_audit_bundle
 from inst_spine.ledger import AppendOnlyLedger
+from inst_workflow.catalog import PRODUCT_CATALOG, catalog_by_id, list_catalog
 from proxy_risk.router import ProxyRequest, ProxyRiskGateway
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -35,9 +36,11 @@ class RuntimeState:
     compliance_db: Path = Path(os.getenv("INST_COMPLIANCE_DB", "data/demo/compliance.sqlite"))
     proxy_db: Path = Path(os.getenv("INST_PROXY_DB", "data/demo/proxy.sqlite"))
     export_dir: Path = Path(os.getenv("INST_EXPORT_DIR", "data/demo/ui_exports"))
+    demo_dir: Path = Path(os.getenv("PORTFOLIO_DEMO_DIR", "data/demo/portfolio"))
     proxy_shadow: bool = os.getenv("INST_PROXY_SHADOW", "1") != "0"
     upstream_base: str = os.getenv("PROXY_RISK_UPSTREAM_BASE", "https://httpbin.org")
     product: str = normalize_product(os.getenv("INST_WORKFLOW_PRODUCT", "both"))
+    active_proof_product: str = os.getenv("INST_PROOF_PRODUCT", "compliance")
 
 
 def _product_enabled(name: str) -> bool:
@@ -123,9 +126,115 @@ async def health() -> dict[str, Any]:
         "ok": True,
         "product": state.product,
         "products": _active_products(),
+        "proof_catalog": len(PRODUCT_CATALOG),
+        "active_proof_product": state.active_proof_product,
         "compliance_db": str(state.compliance_db),
         "proxy_db": str(state.proxy_db),
+        "demo_dir": str(state.demo_dir),
         "proxy_shadow": state.proxy_shadow,
+    }
+
+
+@app.get("/api/products")
+async def products_catalog() -> dict[str, Any]:
+    return {
+        "catalog": list_catalog(demo_dir=state.demo_dir),
+        "active": state.active_proof_product,
+        "demo_dir": str(state.demo_dir),
+    }
+
+
+class ProofSelectBody(BaseModel):
+    product_id: str
+
+
+@app.post("/api/proof/select")
+async def proof_select(body: ProofSelectBody) -> dict[str, Any]:
+    entry = catalog_by_id(body.product_id)
+    if entry is None:
+        raise HTTPException(404, f"unknown product: {body.product_id}")
+    state.active_proof_product = entry.id
+    return {"ok": True, "active": entry.to_dict(demo_dir=state.demo_dir)}
+
+
+def _proof_entry(product_id: str | None = None):
+    pid = product_id or state.active_proof_product
+    entry = catalog_by_id(pid)
+    if entry is None:
+        raise HTTPException(404, f"unknown product: {pid}")
+    return entry
+
+
+def _proof_db(entry) -> Path:
+    db = entry.db_path(state.demo_dir)
+    if entry.id == "compliance":
+        db = state.compliance_db
+    elif entry.id == "proxy":
+        db = state.proxy_db
+    db.parent.mkdir(parents=True, exist_ok=True)
+    return db
+
+
+@app.get("/api/proof/{product_id}/ledger")
+async def proof_ledger(product_id: str) -> dict[str, Any]:
+    entry = _proof_entry(product_id)
+    db = _proof_db(entry)
+    if not db.is_file():
+        return {"entries": [], "verify": {"ok": True}, "count": 0, "database": str(db)}
+    ledger = AppendOnlyLedger(db)
+    entries = ledger.list_entries()
+    return {"entries": entries, "verify": ledger.verify(), "count": len(entries), "database": str(db)}
+
+
+@app.post("/api/proof/{product_id}/check")
+async def proof_check(product_id: str) -> dict[str, Any]:
+    entry = _proof_entry(product_id)
+    db = _proof_db(entry)
+    if not db.is_file():
+        raise HTTPException(404, f"database missing — run: make demo-all ({db})")
+    ledger = AppendOnlyLedger(db)
+    ctx = build_compliance_context(ledger, run_f9=True)
+    report = run_institutional_check(ledger=ledger, context=ctx, run_f9=False)
+    return report.to_dict()
+
+
+@app.post("/api/proof/{product_id}/export")
+async def proof_export(product_id: str) -> dict[str, Any]:
+    entry = _proof_entry(product_id)
+    db = _proof_db(entry)
+    if not db.is_file():
+        raise HTTPException(404, f"database missing — run: make demo-all ({db})")
+    state.export_dir.mkdir(parents=True, exist_ok=True)
+    out = state.export_dir / entry.bundle_name
+    tar = entry.export_tarball(state.export_dir)
+    result = build_audit_bundle(db, out_dir=out, tarball_path=tar, product=entry.sku)
+    if not result.ok:
+        raise HTTPException(400, result.validation.message)
+    return {
+        "ok": True,
+        "product": entry.sku,
+        "bundle_sha256": result.bundle_sha256,
+        "tarball": str(result.tarball_path),
+        "institutional_passed": result.institutional_passed,
+    }
+
+
+@app.post("/api/proof/{product_id}/verify-bundle")
+async def proof_verify(product_id: str) -> dict[str, Any]:
+    entry = _proof_entry(product_id)
+    tar = entry.export_tarball(state.export_dir)
+    if not tar.is_file():
+        raise HTTPException(404, "export bundle first")
+    result = verify_audit_bundle(tar)
+    return {
+        "ok": result.ok,
+        "genesis_ok": result.genesis_ok,
+        "chain_ok": result.chain_ok,
+        "lamport_ok": result.lamport_ok,
+        "bundle_sha256_ok": result.bundle_sha256_ok,
+        "institutional_passed": result.institutional_passed,
+        "message": result.message,
+        "details": result.details,
     }
 
 
@@ -153,8 +262,13 @@ async def workflow_config() -> dict[str, Any]:
         "default_tab": default_tab[state.product],
         "tabs": {
             "arch": state.product == "both",
+            "proof": True,
             "compliance": _product_enabled("compliance"),
             "proxy": _product_enabled("proxy"),
+        },
+        "proof": {
+            "active": state.active_proof_product,
+            "catalog": list_catalog(demo_dir=state.demo_dir),
         },
     }
 

@@ -7,10 +7,16 @@
     "ai_kit",
     "webhook_mesh",
     "ad_guard",
-    "health_telemetry"
+    "health_telemetry",
+    "model_governor",
+    "drift_gate",
+    "webhook_replay",
+    "spend_guard",
+    "agent_ledger"
   ],
   "status": "PASSED",
-  "e2e_sections": 27,
-  "finished_utc": "2026-06-23T07:47:17Z",
-  "log_file": "instpp_rigorous_2026-06-23T074704Z.log"
+  "e2e_sections": 39,
+  "industry_gold": true,
+  "finished_utc": "2026-06-26T22:17:43Z",
+  "log_file": "instpp_rigorous_2026-06-26T221722Z.log"
 }

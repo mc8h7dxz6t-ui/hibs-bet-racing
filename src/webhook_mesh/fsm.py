@@ -34,7 +34,21 @@ async def dispatch_webhook_delivery(
     *,
     dead_letter_dir: str | Path | None = None,
     payload_id: str = "",
+    client_id: str = "",
+    dispatch_mode: str = "",
 ) -> bool:
+    from webhook_mesh.audit import append_delivery_event
+
+    append_delivery_event(
+        manifest_id=manifest_id,
+        client_id=client_id,
+        payload_id=payload_id,
+        target_url=target_url,
+        status="FORWARDING",
+        lamport=lamport,
+        raw_bytes=payload,
+        dispatch_mode=dispatch_mode,
+    )
     last_status_code: int | None = None
     async with httpx.AsyncClient(limits=DELIVERY_LIMITS, timeout=DELIVERY_TIMEOUT) as client:
         backoff = INITIAL_BACKOFF_SECONDS
@@ -58,6 +72,17 @@ async def dispatch_webhook_delivery(
                 last_status_code = response.status_code
                 if response.status_code in SUCCESS_STATUS_CODES:
                     logger.info("DELIVERY_SUCCESS manifest=%s attempt=%s", manifest_id, attempt)
+                    append_delivery_event(
+                        manifest_id=manifest_id,
+                        client_id=client_id,
+                        payload_id=payload_id,
+                        target_url=target_url,
+                        status="DELIVERED",
+                        lamport=lamport,
+                        raw_bytes=payload,
+                        dispatch_mode=dispatch_mode,
+                        extra={"upstream_status": response.status_code, "attempt": attempt},
+                    )
                     return True
                 logger.warning(
                     "DELIVERY_TRANSIENT_FAILURE manifest=%s status=%s",
@@ -88,6 +113,9 @@ async def dispatch_webhook_delivery(
         payload_id=payload_id,
         last_status_code=last_status_code,
         attempts=MAX_RETRIES,
+        client_id=client_id,
+        lamport=lamport,
+        dispatch_mode=dispatch_mode,
     )
     return False
 
@@ -102,7 +130,27 @@ async def handle_dead_letter_allocation(
     last_status_code: int | None = None,
     failure_reason: str = "max_retries_exceeded",
     attempts: int = 0,
+    client_id: str = "",
+    lamport: int = 0,
+    dispatch_mode: str = "",
 ) -> Path | None:
+    from webhook_mesh.audit import append_delivery_event
+
+    append_delivery_event(
+        manifest_id=manifest_id,
+        client_id=client_id,
+        payload_id=payload_id,
+        target_url=target_url,
+        status="DEAD_LETTER",
+        lamport=lamport,
+        raw_bytes=payload,
+        dispatch_mode=dispatch_mode,
+        extra={
+            "last_status_code": last_status_code,
+            "failure_reason": failure_reason,
+            "attempts": attempts,
+        },
+    )
     base = Path(dead_letter_dir or "./data/dead_letter")
     base.mkdir(parents=True, exist_ok=True)
     path = base / f"{manifest_id}.bin"

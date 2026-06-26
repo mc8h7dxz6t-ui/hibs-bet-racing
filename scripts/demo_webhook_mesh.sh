@@ -4,10 +4,13 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 PYTHON="${PYTHON:-python3}"
+# shellcheck source=instpp_bootstrap.sh
+source "$(dirname "$0")/instpp_bootstrap.sh"
+instpp_bootstrap
 SECRET="${WEBHOOK_PROVIDER_SECRET:-demo-secret}"
 DB="${1:-./data/demo/webhook_mesh_ledger.sqlite}"
 TAR="${2:-./data/demo/webhook_mesh_bundle.tar}"
-BODY_FILE="$(mktemp)"
+BODY_FILE="$(instpp_mktemp)"
 echo '{"id":"evt-demo-1","type":"checkout.session.completed"}' > "$BODY_FILE"
 mkdir -p "$(dirname "$DB")" "$(dirname "$TAR")"
 export WEBHOOK_PROVIDER_SECRET="$SECRET"

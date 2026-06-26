@@ -26,6 +26,7 @@
 | HMAC fail-closed | Invalid signature → 401 |
 | Stripe route | `/v1/ingress/stripe/{client_id}` header mapping |
 | Offline proof | `export` + `verify-bundle` on ingress ledger |
+| Replay capture | `WEBHOOK_REPLAY_CAPTURE_DIR` → byte-identical `.wrcap` |
 
 **Auditor dry-run:**
 ```bash

@@ -11,6 +11,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 PYTHON="${PYTHON:-python3}"
+# shellcheck source=instpp_bootstrap.sh
+source "$(dirname "$0")/instpp_bootstrap.sh"
+instpp_bootstrap
 
 banner() {
   echo ""

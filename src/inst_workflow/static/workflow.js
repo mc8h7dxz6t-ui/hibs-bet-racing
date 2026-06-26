@@ -157,6 +157,7 @@
     const tabs = cfg.tabs || {};
     const tabMap = {
       arch: "tab-arch",
+      proof: "tab-proof",
       compliance: "tab-compliance",
       proxy: "tab-proxy",
     };
@@ -176,6 +177,90 @@
     }
 
     activateTab(cfg.default_tab || "arch");
+  }
+
+  let activeProofProduct = "compliance";
+
+  async function loadProofCatalog() {
+    const data = await api("GET", "/api/products");
+    const picker = document.getElementById("proof-product-picker");
+    if (!picker) return data;
+    picker.innerHTML = "";
+    (data.catalog || []).forEach((p) => {
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = `${p.label}${p.database_present ? "" : " (no DB)"}`;
+      picker.appendChild(opt);
+    });
+    activeProofProduct = data.active || (data.catalog[0] && data.catalog[0].id) || "compliance";
+    picker.value = activeProofProduct;
+    updateProofMeta(data.catalog || []);
+    return data;
+  }
+
+  function updateProofMeta(catalog) {
+    const entry = (catalog || []).find((p) => p.id === activeProofProduct);
+    const tag = document.getElementById("proof-tagline");
+    const st = document.getElementById("proof-db-status");
+    if (tag && entry) tag.textContent = entry.tagline || "";
+    if (st && entry) {
+      st.textContent = entry.database_present
+        ? `DB: ${entry.database}`
+        : `Missing DB — run: make demo-all`;
+      st.style.color = entry.database_present ? "var(--muted)" : "#c45c5c";
+    }
+  }
+
+  async function onProofSelect() {
+    const picker = document.getElementById("proof-product-picker");
+    if (!picker) return;
+    activeProofProduct = picker.value;
+    await api("POST", "/api/proof/select", { product_id: activeProofProduct });
+    const cat = await api("GET", "/api/products");
+    updateProofMeta(cat.catalog || []);
+    setOutput("#proof-output", `Selected: ${activeProofProduct}`);
+    await loadProofLedger();
+  }
+
+  async function loadProofLedger() {
+    const data = await api("GET", `/api/proof/${activeProofProduct}/ledger`);
+    renderLedger("proof-ledger", data.entries);
+    if (data.count > 0) markStep("proof-steps", "1", "done");
+    return data;
+  }
+
+  async function onProofCheck() {
+    try {
+      markStep("proof-steps", "2", "active");
+      const data = await api("POST", `/api/proof/${activeProofProduct}/check`);
+      renderGates("proof-gates", data.checks);
+      markStep("proof-steps", "2", data.passed ? "done" : "active");
+      setOutput("#proof-output", data);
+    } catch (e) {
+      setOutput("#proof-output", e.payload || e.message || String(e));
+    }
+  }
+
+  async function onProofExport() {
+    try {
+      markStep("proof-steps", "3", "active");
+      const data = await api("POST", `/api/proof/${activeProofProduct}/export`);
+      markStep("proof-steps", "3", "done");
+      setOutput("#proof-output", data);
+    } catch (e) {
+      setOutput("#proof-output", e.payload || e.message || String(e));
+    }
+  }
+
+  async function onProofVerify() {
+    try {
+      markStep("proof-steps", "4", "active");
+      const data = await api("POST", `/api/proof/${activeProofProduct}/verify-bundle`);
+      markStep("proof-steps", "4", data.ok ? "done" : "active");
+      setOutput("#proof-output", data);
+    } catch (e) {
+      setOutput("#proof-output", e.payload || e.message || String(e));
+    }
   }
 
   async function loadProductConfig() {
@@ -333,6 +418,19 @@
     bind("btn-proxy-check", onProxyCheck);
     bind("btn-proxy-export", onProxyExport);
     bind("btn-proxy-verify", onProxyVerify);
+    const proofPicker = document.getElementById("proof-product-picker");
+    if (proofPicker) {
+      proofPicker.addEventListener("change", () => onProofSelect().catch((e) => setOutput("#proof-output", e.message)));
+    }
+    bind("btn-proof-refresh", () => loadProofLedger().catch((e) => setOutput("#proof-output", e.message)));
+    bind("btn-proof-check", onProofCheck);
+    bind("btn-proof-export", onProofExport);
+    bind("btn-proof-verify", onProofVerify);
+    if (cfg.tabs?.proof !== false) {
+      loadProofCatalog()
+        .then(() => loadProofLedger())
+        .catch(() => {});
+    }
     if (cfg.tabs?.compliance) loadComplianceLedger().catch(() => {});
     if (cfg.tabs?.proxy) loadProxyLedger().catch(() => {});
   });
