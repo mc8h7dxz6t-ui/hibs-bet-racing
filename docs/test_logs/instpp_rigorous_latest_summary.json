@@ -15,8 +15,8 @@
     "agent_ledger"
   ],
   "status": "PASSED",
-  "e2e_sections": 36,
+  "e2e_sections": 37,
   "industry_gold": true,
-  "finished_utc": "2026-06-24T23:05:57Z",
-  "log_file": "instpp_rigorous_2026-06-24T230540Z.log"
+  "finished_utc": "2026-06-25T21:19:17Z",
+  "log_file": "instpp_rigorous_2026-06-25T211856Z.log"
 }
