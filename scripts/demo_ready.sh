@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Preflight — confirm environment is ready to plug / demo / run all 11 SKUs.
+# Preflight — confirm environment is ready to plug / demo / run all 12 SKUs.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -29,7 +29,7 @@ else
   warn "SKIP_INSTALL=1 — not running pip install"
 fi
 
-step "CLI entry points (11 SKUs)"
+step "CLI entry points (12 SKUs)"
 CLIS=(
   compliance-log proxy-risk altdata ai-kit webhook-mesh
   ad-guard health-telemetry model-governor
@@ -92,12 +92,14 @@ fi
 echo ""
 if [[ "$FAIL" -eq 0 ]]; then
   echo "╔══════════════════════════════════════════════════════════════╗"
-  echo "║  DEMO READY — run: make demo-all  or  make demo-gold         ║"
+  echo "║  DEMO READY — run: make plug  or  make demo-all              ║"
   echo "╚══════════════════════════════════════════════════════════════╝"
   echo ""
-  echo "  make demo-all      # all 11 SKUs → data/demo/portfolio/"
-  echo "  make demo-gold     # spend-plane sales walkthrough (11 steps)"
-  echo "  make rigorous      # 11/11 E2E with logged summary"
+  echo "  make plug              # one-shot: demo-all + offline verify 12/12"
+  echo "  make demo-all          # all 12 SKUs → data/demo/portfolio/"
+  echo "  make verify-portfolio  # offline verify-bundle after demo-all"
+  echo "  make demo-gold         # spend-plane sales walkthrough"
+  echo "  make rigorous          # 12/12 E2E with logged summary"
   echo "  docs/RUN_DEMO.md"
   exit 0
 fi

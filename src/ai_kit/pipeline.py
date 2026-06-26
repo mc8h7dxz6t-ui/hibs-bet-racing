@@ -15,6 +15,10 @@ from inst_spine.errors import RateLimitError
 from inst_spine.ledger import AppendOnlyLedger
 
 
+class ToolAuthorizationError(RuntimeError):
+    """Raised when Agent Ledger denies a tool invocation."""
+
+
 @dataclass
 class AgentCheckpoint:
     step: int
@@ -36,12 +40,16 @@ class AgentLoop:
         checkpoint_db: Path | None = None,
         trace_ledger: AppendOnlyLedger | None = None,
         limiter: ProviderRateLimiter | None = None,
+        agent_ledger_db: Path | None = None,
+        agent_permit_db: Path | None = None,
     ) -> None:
         self.agent_id = agent_id
         self.checkpoint_db = checkpoint_db or Path(f"data/ai_kit_{agent_id}.sqlite")
         self.limiter = limiter or ProviderRateLimiter()
         self.clock = LamportClock(agent_id)
         self.trace = trace_ledger
+        self.agent_ledger_db = agent_ledger_db
+        self.agent_permit_db = agent_permit_db
         self._init_checkpoint_db()
 
     def _init_checkpoint_db(self) -> None:
@@ -112,8 +120,14 @@ class AgentLoop:
         provider: str = "openai",
         model: str = "gpt-4o-mini",
         initial_state: dict[str, Any] | None = None,
+        tool_name: str | None = None,
+        tool_arguments: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         state = dict(initial_state or {})
+        if tool_name is None:
+            tool_name = state.pop("__tool_name__", None)
+        if tool_arguments is None:
+            tool_arguments = state.pop("__tool_args__", None)
         cp = self.load_checkpoint()
         if cp and cp.step >= start_step:
             state = cp.state
@@ -127,6 +141,33 @@ class AgentLoop:
                     f"rate limit exceeded for {provider}/{model}",
                     retry_after_sec=wait,
                 )
+            permit_id: str | None = None
+            if tool_name and self.agent_ledger_db is not None:
+                from agent_ledger.integrate import authorize_tool_call, complete_tool_call
+
+                auth = authorize_tool_call(
+                    agent_id=self.agent_id,
+                    tool_name=tool_name,
+                    arguments=tool_arguments or {},
+                    ledger_db=self.agent_ledger_db,
+                    permit_db=self.agent_permit_db,
+                    session_id=f"step-{step}",
+                    idempotency_key=f"{self.agent_id}:{step}:{tool_name}",
+                )
+                if auth.get("decision") != "permit":
+                    raise ToolAuthorizationError(
+                        f"agent ledger denied {tool_name}: {auth.get('reason')}"
+                    )
+                permit_id = str(auth.get("permit_id") or "")
             state = step_fn(step, state)
+            if permit_id and self.agent_ledger_db is not None:
+                from agent_ledger.integrate import complete_tool_call
+
+                complete_tool_call(
+                    permit_id=permit_id,
+                    result={"step": step, "state_keys": sorted(state.keys())},
+                    ledger_db=self.agent_ledger_db,
+                    permit_db=self.agent_permit_db,
+                )
             self.save_checkpoint(step, state)
         return state

@@ -1,4 +1,4 @@
-"""Proof Console catalog — all 11 institutional SKUs."""
+"""Proof Console catalog — all 12 institutional SKUs."""
 
 from __future__ import annotations
 

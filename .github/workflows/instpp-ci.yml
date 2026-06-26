@@ -1,0 +1,134 @@
+name: Institutional++ CI
+
+on:
+  pull_request:
+    paths:
+      - "src/inst_spine/**"
+      - "src/compliance_log/**"
+      - "src/proxy_risk/**"
+      - "src/altdata/**"
+      - "src/ai_kit/**"
+      - "src/webhook_mesh/**"
+      - "src/ad_guard/**"
+      - "src/health_telemetry/**"
+      - "src/model_governor/**"
+      - "src/drift_gate/**"
+      - "src/webhook_replay/**"
+      - "src/spend_guard/**"
+      - "src/agent_ledger/**"
+      - "src/inst_workflow/**"
+      - "tests/test_inst*.py"
+      - "tests/test_compliance*.py"
+      - "tests/test_proxy*.py"
+      - "tests/test_altdata*.py"
+      - "tests/test_ai_kit*.py"
+      - "tests/test_webhook*.py"
+      - "tests/test_ad_guard*.py"
+      - "tests/test_health*.py"
+      - "tests/test_model*.py"
+      - "tests/test_drift*.py"
+      - "tests/test_spend*.py"
+      - "tests/test_agent*.py"
+      - "tests/test_industry_gold.py"
+      - "scripts/instpp_*.sh"
+      - "scripts/demo_*.sh"
+      - "scripts/verify_portfolio.*"
+      - "Makefile"
+      - "pyproject.toml"
+      - ".github/workflows/instpp-ci.yml"
+  push:
+    branches: [main, master, "cursor/**"]
+    paths:
+      - "src/inst_spine/**"
+      - "src/compliance_log/**"
+      - "src/proxy_risk/**"
+      - "src/altdata/**"
+      - "src/ai_kit/**"
+      - "src/webhook_mesh/**"
+      - "src/ad_guard/**"
+      - "src/health_telemetry/**"
+      - "src/model_governor/**"
+      - "src/drift_gate/**"
+      - "src/webhook_replay/**"
+      - "src/spend_guard/**"
+      - "src/agent_ledger/**"
+      - "src/inst_workflow/**"
+      - "tests/**"
+      - "scripts/instpp_*.sh"
+      - "scripts/verify_portfolio.*"
+      - "Makefile"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Institutional++
+        run: pip install -e ".[dev,instpp]"
+
+      - name: Preflight
+        run: SKIP_INSTALL=1 ./scripts/demo_ready.sh
+
+      - name: Institutional smoke (12 SKUs)
+        run: ./scripts/instpp_smoke_test.sh
+
+  rigorous:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 25
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Institutional++
+        run: pip install -e ".[dev,instpp]"
+
+      - name: Rigorous E2E 12/12
+        run: ./scripts/instpp_rigorous_test.sh
+
+      - name: Upload rigorous summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instpp-rigorous-summary
+          path: docs/test_logs/instpp_rigorous_latest_summary.json
+          if-no-files-found: warn
+
+  buyer-pack:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 20
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Institutional++
+        run: pip install -e ".[dev,instpp]"
+
+      - name: Buyer pack (demo-all + offline verify)
+        run: SKIP_SMOKE=1 ./scripts/instpp_buyer_pack.sh
+
+      - name: Upload buyer evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: instpp-buyer-pack
+          path: |
+            data/demo/portfolio/PORTFOLIO_MANIFEST.json
+            data/demo/portfolio/BUYER_PACK_SUMMARY.json
+            data/demo/portfolio/*_bundle.tar

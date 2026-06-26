@@ -149,6 +149,6 @@ def gateway_from_paths(
     initial_balance: float = 1000.0,
     shadow_mode: bool = False,
 ) -> SpendGuardGateway:
-    wallet = SpendWallet(wallet_db, initial_balance=initial_balance)
+    wallet = SpendWallet(wallet_db, initial_balance=initial_balance, ledger_db=ledger_db)
     ledger = AppendOnlyLedger(ledger_db) if ledger_db else None
     return SpendGuardGateway(wallet=wallet, ledger=ledger, shadow_mode=shadow_mode)
