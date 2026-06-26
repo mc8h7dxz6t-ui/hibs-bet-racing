@@ -98,11 +98,20 @@ class BackgroundDeliveryQueue(DeliveryQueueBackend):
 
 
 class RedisStreamDeliveryQueue(DeliveryQueueBackend):
-    """Production — XADD enqueue, XREADGROUP worker."""
+    """Production — XADD enqueue, XREADGROUP worker, XAUTOCLAIM recovery."""
 
-    def __init__(self, redis_client: Any, *, stream_key: str = STREAM_KEY) -> None:
+    def __init__(
+        self,
+        redis_client: Any,
+        *,
+        stream_key: str = STREAM_KEY,
+        claim_idle_ms: int | None = None,
+    ) -> None:
         self.redis = redis_client
         self.stream_key = stream_key
+        self.claim_idle_ms = claim_idle_ms or int(
+            os.getenv("WEBHOOK_STREAM_CLAIM_IDLE_MS", "30000")
+        )
         self._consumer_name = f"worker-{os.getpid()}-{uuid.uuid4().hex[:8]}"
         self._worker_task: asyncio.Task[Any] | None = None
         self._running = False
@@ -138,11 +147,66 @@ class RedisStreamDeliveryQueue(DeliveryQueueBackend):
             pass
         self._worker_task = None
 
-    async def _consume_loop(self) -> None:
+    async def _reclaim_stale(self) -> list[tuple[str, dict[str, str]]]:
+        """Reclaim pending messages from crashed workers (XAUTOCLAIM when available)."""
+        reclaimed: list[tuple[str, dict[str, str]]] = []
+        try:
+            result = await self.redis.xautoclaim(
+                self.stream_key,
+                CONSUMER_GROUP,
+                self._consumer_name,
+                min_idle_time=self.claim_idle_ms,
+                start_id="0-0",
+                count=10,
+            )
+            # redis-py: (next_start_id, messages, deleted_ids)
+            if isinstance(result, (list, tuple)) and len(result) >= 2:
+                messages = result[1]
+                for message_id, fields in messages or []:
+                    reclaimed.append((message_id, fields))
+        except AttributeError:
+            return reclaimed
+        except Exception as exc:
+            logger.warning("DELIVERY_RECLAIM_FAILED: %s", exc)
+        return reclaimed
+
+    async def _deliver_manifest(self, manifest: DeliveryManifest) -> bool:
         from webhook_mesh.fsm import dispatch_webhook_delivery
 
+        return await dispatch_webhook_delivery(
+            manifest_id=manifest.manifest_id,
+            payload=manifest.payload,
+            target_url=manifest.target_url,
+            lamport=manifest.lamport,
+            dead_letter_dir=manifest.dead_letter_dir,
+            payload_id=manifest.payload_id,
+        )
+
+    async def _handle_message(self, message_id: str, fields: dict[str, str]) -> None:
+        manifest = DeliveryManifest.from_stream_fields(fields)
+        try:
+            delivered = await self._deliver_manifest(manifest)
+        except Exception as exc:
+            logger.error(
+                "DELIVERY_WORKER_FAILED manifest=%s err=%s (message left pending)",
+                manifest.manifest_id,
+                exc,
+            )
+            return
+        # ACK after terminal outcome: success or filesystem DLQ (at-most-once stream).
+        await self.redis.xack(self.stream_key, CONSUMER_GROUP, message_id)
+        if not delivered:
+            logger.warning(
+                "DELIVERY_DEAD_LETTERED manifest=%s stream_ack=true",
+                manifest.manifest_id,
+            )
+
+    async def _consume_loop(self) -> None:
         while self._running:
             try:
+                for message_id, fields in await self._reclaim_stale():
+                    await self._handle_message(message_id, fields)
+
                 rows = await self.redis.xreadgroup(
                     CONSUMER_GROUP,
                     self._consumer_name,
@@ -160,23 +224,7 @@ class RedisStreamDeliveryQueue(DeliveryQueueBackend):
                 continue
             for _stream, messages in rows:
                 for message_id, fields in messages:
-                    manifest = DeliveryManifest.from_stream_fields(fields)
-                    try:
-                        await dispatch_webhook_delivery(
-                            manifest_id=manifest.manifest_id,
-                            payload=manifest.payload,
-                            target_url=manifest.target_url,
-                            lamport=manifest.lamport,
-                            dead_letter_dir=manifest.dead_letter_dir,
-                            payload_id=manifest.payload_id,
-                        )
-                        await self.redis.xack(self.stream_key, CONSUMER_GROUP, message_id)
-                    except Exception as exc:
-                        logger.error(
-                            "DELIVERY_WORKER_FAILED manifest=%s err=%s",
-                            manifest.manifest_id,
-                            exc,
-                        )
+                    await self._handle_message(message_id, fields)
 
 
 def dispatch_mode_from_env() -> str:

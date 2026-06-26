@@ -62,14 +62,13 @@
 ## 15-minute diligence (procurement dry-run)
 
 ```bash
-pip install -e ".[dev,instpp]"
-./scripts/instpp_smoke_test.sh          # 91 tests
-./scripts/instpp_rigorous_test.sh       # 8/8 E2E → docs/test_logs/
-./scripts/demo_instpp.sh                # all demos
-./scripts/demo_portfolio_all.sh         # all 8 SKUs → data/demo/portfolio/
+make install
+make demo-ready
+make demo-all                            # all 11 SKUs → data/demo/portfolio/
+make rigorous                            # 11/11 E2E → docs/test_logs/
 ```
 
-**Evidence artifacts:** [BUYER_EVIDENCE_PACK.md](BUYER_EVIDENCE_PACK.md) · [SOC2_VPC_DILIGENCE_PACK.md](SOC2_VPC_DILIGENCE_PACK.md)
+See [RUN_DEMO.md](RUN_DEMO.md) · [BUYER_EVIDENCE_PACK.md](BUYER_EVIDENCE_PACK.md)
 
 | Artifact | Path |
 |----------|------|

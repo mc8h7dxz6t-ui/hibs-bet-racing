@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Portfolio demo — all 8 institutional products in one run.
+# Portfolio demo — all 12 institutional products in one run.
 #
 # Usage:
-#   ./scripts/demo_portfolio_all.sh              # all 8 demos
+#   ./scripts/demo_portfolio_all.sh              # all 12 demos
 #   ./scripts/demo_portfolio_all.sh --clean    # wipe data/demo/portfolio first
 #   SKIP_LIVE=1 ./scripts/demo_portfolio_all.sh   # offline-safe (no httpbin / FX)
 #   PAUSE=1 ./scripts/demo_portfolio_all.sh     # press Enter between products (recording)
@@ -12,9 +12,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 PYTHON="${PYTHON:-python3}"
+# shellcheck source=instpp_bootstrap.sh
+source "$(dirname "$0")/instpp_bootstrap.sh"
+instpp_bootstrap
+
 DEMO_DIR="${PORTFOLIO_DEMO_DIR:-./data/demo/portfolio}"
 SKIP_LIVE="${SKIP_LIVE:-0}"
 PAUSE="${PAUSE:-0}"
+TOTAL=12
 
 export WEBHOOK_PROVIDER_SECRET="${WEBHOOK_PROVIDER_SECRET:-demo-secret}"
 export SKIP_LIVE_LLM="${SKIP_LIVE_LLM:-1}"
@@ -31,7 +36,7 @@ product_pause() {
   local n="$1"
   local title="$2"
   local plain="$3"
-  banner "PRODUCT $n/8 — $title"
+  banner "PRODUCT $n/$TOTAL — $title"
   echo "  $plain"
   echo ""
   if [[ "$PAUSE" == "1" ]]; then
@@ -42,13 +47,14 @@ product_pause() {
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   echo "Usage: ./scripts/demo_portfolio_all.sh [--clean]"
   echo ""
-  echo "  Runs all 8 gold-standard product demos → $DEMO_DIR/"
+  echo "  Runs all 12 gold-standard product demos → $DEMO_DIR/"
   echo ""
   echo "  Environment:"
   echo "    SKIP_LIVE=1          No external HTTP (proxy, alt-data FX)"
   echo "    PAUSE=1              Pause before each product (video recording)"
   echo "    PORTFOLIO_DEMO_DIR=  Output directory (default: data/demo/portfolio)"
   echo ""
+  echo "  Also: make demo-all   make demo-ready   docs/RUN_DEMO.md"
   exit 0
 fi
 
@@ -122,7 +128,39 @@ product_pause "8" "ModelGovernor" \
   "$DEMO_DIR/model_governor.sqlite" \
   "$DEMO_DIR/model_governor_bundle.tar"
 
-banner "PORTFOLIO DEMO COMPLETE — 8/8"
+product_pause "9" "Drift Gate" \
+  "Plain: PSI/KS drift at the proxy — shadow burn-in, then enforce."
+
+./scripts/demo_drift_gate.sh \
+  "$DEMO_DIR/drift_baseline.json" \
+  "$DEMO_DIR/drift_gate.sqlite" \
+  "$DEMO_DIR/drift_gate_bundle.tar"
+
+product_pause "10" "Webhook Replay" \
+  "Plain: Byte-identical webhook replay — air-gapped audit from .wrcap capture."
+
+./scripts/demo_webhook_replay.sh \
+  "$DEMO_DIR/captures" \
+  "$DEMO_DIR/webhook_replay.sqlite" \
+  "$DEMO_DIR/webhook_replay_bundle.tar"
+
+product_pause "11" "Spend Guard" \
+  "Plain: Reserve before dispatch — drift lockout with offline proof."
+
+./scripts/demo_spend_guard.sh \
+  "$DEMO_DIR/spend_wallet.sqlite" \
+  "$DEMO_DIR/spend_guard.sqlite" \
+  "$DEMO_DIR/spend_guard_bundle.tar"
+
+product_pause "12" "Agent Ledger" \
+  "Plain: Permit before agent tools run — prove who allowed what, before execution."
+
+./scripts/demo_agent_ledger.sh \
+  "$DEMO_DIR/agent_ledger.sqlite" \
+  "$DEMO_DIR/agent_ledger_permits.sqlite" \
+  "$DEMO_DIR/agent_ledger_bundle.tar"
+
+banner "PORTFOLIO DEMO COMPLETE — 12/12"
 
 "$PYTHON" - <<PY
 import json
@@ -138,6 +176,10 @@ products = [
     ("ad_guard", demo / "ad_guard_bundle.tar"),
     ("health_telemetry", demo / "health_bundle.tar"),
     ("model_governor", demo / "model_governor_bundle.tar"),
+    ("drift_gate", demo / "drift_gate_bundle.tar"),
+    ("webhook_replay", demo / "webhook_replay_bundle.tar"),
+    ("spend_guard", demo / "spend_guard_bundle.tar"),
+    ("agent_ledger", demo / "agent_ledger_bundle.tar"),
 ]
 artifacts = {}
 for name, tar in products:
@@ -148,14 +190,16 @@ for name, tar in products:
         "sidecar": str(sidecar) if sidecar.is_file() else None,
     }
 passed = all(v["present"] for v in artifacts.values())
-print(json.dumps({"status": "PASSED" if passed else "FAILED", "products": 8, "artifacts": artifacts}, indent=2))
+print(json.dumps({"status": "PASSED" if passed else "FAILED", "products": ${TOTAL}, "artifacts": artifacts}, indent=2))
 PY
 
 echo ""
 echo "Verify any bundle offline, e.g.:"
 echo "  compliance-log verify-bundle --tarball $DEMO_DIR/compliance_bundle.tar"
-echo "  webhook-mesh verify-bundle --tarball $DEMO_DIR/webhook_mesh_bundle.tar"
+echo "  spend-guard verify-bundle --tarball $DEMO_DIR/spend_guard_bundle.tar"
+echo "  agent-ledger verify-bundle --tarball $DEMO_DIR/agent_ledger_bundle.tar"
 echo ""
+echo "Spend-plane sales walkthrough: make demo-gold"
 echo "Video recording: PAUSE=1 ./scripts/demo_portfolio_all.sh"
 echo "  or see docs/DEMO_VIDEO_PORTFOLIO_ALL.md"
 echo ""

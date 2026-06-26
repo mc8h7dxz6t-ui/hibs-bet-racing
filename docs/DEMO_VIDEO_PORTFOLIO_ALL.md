@@ -1,4 +1,4 @@
-# Portfolio Demo Video — All 8 Services
+# Portfolio Demo Video — All 11 Services
 
 **Purpose:** One screen-recording covering **every product** — real terminal, plain-English voiceover.  
 **Length:** ~18–25 minutes (or split into Part 1 / Part 2 at 10 min)  
@@ -20,7 +20,7 @@ pip install -e ".[dev,instpp]"
 SKIP_LIVE=1 ./scripts/demo_portfolio_all.sh --clean
 ```
 
-**Artifacts:** `data/demo/portfolio/*.tar` — eight verify-bundle tarballs.
+**Artifacts:** `data/demo/portfolio/*.tar` — eleven verify-bundle tarballs.
 
 ---
 

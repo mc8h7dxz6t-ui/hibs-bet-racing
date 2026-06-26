@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # Phase 2 portfolio demo — drift-gate, webhook-replay, spend-guard.
+# Prefer: make demo-all (includes these as products 9–11).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+# shellcheck source=instpp_bootstrap.sh
+source "$(dirname "$0")/instpp_bootstrap.sh"
+instpp_bootstrap
 DEMO_DIR="${PHASE2_DEMO_DIR:-./data/demo/phase2}"
 mkdir -p "$DEMO_DIR"
 

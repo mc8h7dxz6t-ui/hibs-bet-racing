@@ -6,6 +6,7 @@ cd "$ROOT"
 PYTHON="${PYTHON:-python3}"
 # shellcheck source=instpp_bootstrap.sh
 source "$(dirname "$0")/instpp_bootstrap.sh"
+instpp_bootstrap
 SECRET="${WEBHOOK_PROVIDER_SECRET:-demo-secret}"
 DB="${1:-./data/demo/webhook_mesh_ledger.sqlite}"
 TAR="${2:-./data/demo/webhook_mesh_bundle.tar}"

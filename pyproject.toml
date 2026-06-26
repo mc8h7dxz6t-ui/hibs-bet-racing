@@ -47,6 +47,7 @@ model-governor = "model_governor.cli:main"
 drift-gate = "drift_gate.cli:main"
 webhook-replay = "webhook_replay.cli:main"
 spend-guard = "spend_guard.cli:main"
+agent-ledger = "agent_ledger.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

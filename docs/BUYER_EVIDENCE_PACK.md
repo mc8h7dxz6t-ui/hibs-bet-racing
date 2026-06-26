@@ -1,8 +1,8 @@
 # Buyer Evidence Pack — Procurement & Auditor Dry-Run
 
 **Purpose:** Hand this to procurement, InfoSec, or an external auditor — run proof **without a vendor call**.  
-**Scope:** All **11** institutional products on shared `inst_spine` (8 core + 3 Phase 2)  
-**Last rigorous E2E:** **11/11 PASSED** — `industry_gold: true` (see `docs/test_logs/instpp_rigorous_latest_summary.json`)
+**Scope:** All **12** institutional products on shared `inst_spine` (8 core + 3 Phase 2 + Agent Ledger)  
+**Last rigorous E2E:** **12/12 PASSED** — `industry_gold: true` (see `docs/test_logs/instpp_rigorous_latest_summary.json`)
 
 ---
 
@@ -34,9 +34,9 @@ pip install -e ".[dev,instpp]"
 ./scripts/chaos_instpp.sh
 cat docs/test_logs/instpp_rigorous_latest_summary.json
 
-# All demos
-./scripts/demo_portfolio_all.sh
-./scripts/demo_phase2_all.sh
+# All demos (11/11)
+make demo-all
+# or: ./scripts/demo_portfolio_all.sh
 ```
 
 **Expected:** smoke tests green; rigorous summary `"status": "PASSED"`; demo bundles verify offline.
@@ -58,6 +58,7 @@ cat docs/test_logs/instpp_rigorous_latest_summary.json
 | 9 | Drift Gate | `drift-gate verify-bundle --tarball ./drift_gate_bundle.tar` |
 | 10 | Webhook Replay | `webhook-replay verify-bundle --tarball ./webhook_replay_bundle.tar` |
 | 11 | Spend Guard | `spend-guard verify-bundle --tarball ./spend_guard_bundle.tar` |
+| 12 | Agent Ledger | `agent-ledger verify-bundle --tarball ./agent_ledger_bundle.tar` |
 
 Demo scripts write bundles to predictable paths — run `./scripts/demo_<product>.sh` first.
 

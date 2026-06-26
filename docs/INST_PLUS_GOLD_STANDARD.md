@@ -1,4 +1,4 @@
-# Institutional Gold Standard — Full Portfolio (11 SKUs)
+# Institutional Gold Standard — Full Portfolio (12 SKUs)
 
 **Purpose:** The bar every infrastructure product in this portfolio meets — CLI Gold plus Industry Gold dimensions.
 
@@ -39,8 +39,9 @@
 | 9 | Drift Gate | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Proxy-Risk | **Industry** |
 | 10 | Webhook Replay | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Webhook Mesh | **Industry** |
 | 11 | Spend Guard (8b CLI) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Proxy-Risk | **Industry** |
+| 12 | Agent Ledger | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | AI Kit + spine | **Industry** |
 
-**ModelGovernor 8b compose demo** (`make demo-gold`): documented north star — Postgres stack not in rigorous CI; **Spend Guard** is the shipped CLI for spend-plane proof.
+**ModelGovernor 8b compose demo**: design-partner north star — **Spend Guard CLI** + `make demo-gold` is the shipped spend-plane proof.
 
 ---
 
@@ -48,10 +49,11 @@
 
 | Edge | SKUs |
 |------|------|
-| Offline `verify-bundle` (auditor never calls vendor) | All 11 |
-| Genesis anti-wipe + Lamport clocks | All 11 |
-| WAL-before-side-effect | #5 Webhook Mesh, ingress capture |
-| Reserve → settle → drift lockout | #11 Spend Guard |
+| Offline `verify-bundle` (auditor never calls vendor) | All 12 |
+| Genesis anti-wipe + Lamport clocks | All 12 |
+| WAL-before-side-effect + Redis Stream delivery | #5 Webhook Mesh |
+| Authorize → complete attestation (agent tools) | #12 Agent Ledger |
+| Reserve → settle → drift lockout + OpenAI-compat gateway | #11 Spend Guard |
 | PSI/KS enforce at proxy | #9 Drift Gate + #2 Proxy-Risk |
 | Byte-identical webhook replay | #10 Webhook Replay |
 | Shadow → live burn-in | #2 Proxy-Risk, #9 Drift Gate |
@@ -62,12 +64,15 @@
 
 ```bash
 pip install -e ".[dev,instpp]"
+make demo-ready                         # preflight
+make demo-all                           # all 12 demos → data/demo/portfolio/
+make demo-gold                          # spend-plane sales walkthrough
 ./scripts/instpp_smoke_test.sh          # 113+ unit tests
-./scripts/instpp_rigorous_test.sh       # 11/11 rigorous E2E → docs/test_logs/
+./scripts/instpp_rigorous_test.sh       # 12/12 rigorous E2E → docs/test_logs/
 ./scripts/chaos_instpp.sh               # chaos + integration drills
-./scripts/demo_portfolio_all.sh         # original 8 demos
-./scripts/demo_phase2_all.sh            # drift-gate + webhook-replay + spend-guard
 ```
+
+See [RUN_DEMO.md](RUN_DEMO.md) for the full plug/demo/run guide.
 
 ---
 
@@ -115,7 +120,13 @@ pip install -e ".[dev,instpp]"
 - WRCAP mmap capture; air-gapped replay; tamper diff
 
 ### #11 Spend Guard
-- Reserve/settle IMMEDIATE; drift lockout; 8b CLI canonical
+- Reserve/settle IMMEDIATE; drift lockout; OpenAI-compat gateway
+
+### #12 Agent Ledger
+- Authorize-before-invoke on agent tool calls
+- Risk-tier policy + argument guards fail-closed
+- Permit → complete attestation chain
+- Offline `verify-bundle`
 
 ---
 

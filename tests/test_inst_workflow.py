@@ -29,6 +29,7 @@ def workflow_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: py
     serve_mod.state.compliance_db = compliance_db
     serve_mod.state.proxy_db = proxy_db
     serve_mod.state.export_dir = export_dir
+    serve_mod.state.demo_dir = export_dir.parent / "portfolio"
     serve_mod.state.proxy_shadow = True
     serve_mod.state.product = product
     serve_mod.reset_proxy_runtime()
@@ -150,3 +151,57 @@ def test_proxy_only_product(workflow_client):
     assert cfg["tabs"]["compliance"] is False
     assert cfg["default_tab"] == "proxy"
     assert client.post("/api/compliance/ingest", json={"snapshot": {}}).status_code == 404
+
+
+def test_proof_catalog_and_spine_workflow(workflow_client, tmp_path: Path):
+    client, serve_mod, _, _, export_dir, _ = workflow_client
+    demo_dir = tmp_path / "portfolio"
+    demo_dir.mkdir()
+    serve_mod.state.demo_dir = demo_dir
+
+    # Seed alt-data ledger via CLI pattern
+    alt_db = demo_dir / "altdata.sqlite"
+    from altdata.cli import main as alt_main
+
+    alt_main(
+        [
+            "poll",
+            "--feed",
+            "demo_feed",
+            "--ctx",
+            '{"demo_price":1,"demo_seats":1,"route_code":"X","raw_html":"<td>1</td>"}',
+            "--database",
+            str(alt_db),
+        ]
+    )
+
+    r = client.get("/api/products")
+    assert r.status_code == 200
+    catalog = r.json()["catalog"]
+    assert len(catalog) == 12
+
+    r = client.post("/api/proof/select", json={"product_id": "altdata"})
+    assert r.status_code == 200
+
+    r = client.get("/api/proof/altdata/ledger")
+    assert r.status_code == 200
+    assert r.json()["count"] >= 1
+
+    r = client.post("/api/proof/altdata/check")
+    assert r.status_code == 200
+    assert "checks" in r.json()
+
+    r = client.post("/api/proof/altdata/export")
+    assert r.status_code == 200
+    assert (export_dir / "altdata_bundle.tar").is_file()
+
+    r = client.post("/api/proof/altdata/verify-bundle")
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+
+
+def test_workflow_config_includes_proof_tab(workflow_client):
+    client, *_ = workflow_client
+    cfg = client.get("/api/config").json()
+    assert cfg["tabs"]["proof"] is True
+    assert len(cfg["proof"]["catalog"]) == 12

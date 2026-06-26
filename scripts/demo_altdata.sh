@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 PYTHON="${PYTHON:-python3}"
+# shellcheck source=instpp_bootstrap.sh
+source "$(dirname "$0")/instpp_bootstrap.sh"
+instpp_bootstrap
 DB="${1:-./data/demo/altdata.sqlite}"
 TAR="${2:-./data/demo/altdata_bundle.tar}"
 CTX='{"demo_price":42.5,"demo_seats":180,"route_code":"DEMO-01","raw_html":"<td>42.5</td><td>180</td><td>DEMO-01</td>"}'
