@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 PYTHON="${PYTHON:-python3}"
+# shellcheck source=instpp_bootstrap.sh
+source "$(dirname "$0")/instpp_bootstrap.sh"
+instpp_bootstrap
 TRACE="${1:-./data/demo/ai_kit_trace.sqlite}"
 TAR="${2:-./data/demo/ai_kit_bundle.tar}"
 CHECKPOINT="${3:-./data/demo/ai_kit_checkpoint.sqlite}"

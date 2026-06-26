@@ -1,0 +1,56 @@
+# Optional Institutional++ services — workflow UI + optional Redis for stream delivery.
+# Primary proof is CLI-native: make plug / make demo-all / make demo-gold
+#
+# Usage:
+#   make stack-up                    # workflow UI only
+#   make redis-up                    # workflow + Redis (WEBHOOK_DISPATCH_MODE=redis)
+#   docker compose -f docker-compose.instpp.yml --profile redis up -d
+#
+# Prefer native (no Docker):
+#   make demo-gold-up
+
+services:
+  redis:
+    image: redis:7-alpine
+    profiles: ["redis"]
+    ports:
+      - "${INST_REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  inst-workflow:
+    image: python:3.11-slim-bookworm
+    working_dir: /app
+    volumes:
+      - .:/app
+      - instpp-demo-data:/app/data/demo
+    ports:
+      - "${INST_WORKFLOW_PORT:-8790}:8790"
+    environment:
+      SKIP_LIVE: "1"
+      INST_COMPLIANCE_DB: /app/data/demo/portfolio/compliance.sqlite
+      INST_PROXY_DB: /app/data/demo/portfolio/proxy.sqlite
+      INST_EXPORT_DIR: /app/data/demo/ui_exports
+      INST_REDIS_URL: ${INST_REDIS_URL:-redis://redis:6379/0}
+    depends_on:
+      redis:
+        condition: service_healthy
+        required: false
+    command: >
+      bash -c "pip install -e '.[dev,instpp]' -q &&
+      test -f /app/data/demo/portfolio/compliance.sqlite ||
+      (./scripts/demo_compliance_logger.sh /app/data/demo/portfolio/compliance.sqlite /app/data/demo/portfolio/compliance_bundle /app/data/demo/portfolio/compliance_bundle.tar &&
+       SKIP_LIVE=1 ./scripts/demo_proxy_risk.sh /app/data/demo/portfolio/proxy.sqlite /app/data/demo/portfolio/proxy_bundle /app/data/demo/portfolio/proxy_bundle.tar) &&
+      inst-workflow serve --host 0.0.0.0 --port 8790"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8790/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+
+volumes:
+  instpp-demo-data:

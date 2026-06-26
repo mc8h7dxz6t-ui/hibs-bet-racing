@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -24,7 +25,14 @@ from webhook_mesh.hmac_verify import (
     verify_shopify_hmac,
     verify_stripe_signature,
 )
-from webhook_mesh.queue import BackgroundDeliveryQueue, DeliveryManifest
+from webhook_mesh.queue import (
+    BackgroundDeliveryQueue,
+    CONSUMER_GROUP,
+    DeliveryManifest,
+    RedisStreamDeliveryQueue,
+    STREAM_KEY,
+    dispatch_mode_from_env,
+)
 from webhook_mesh.replay import assess_payload_integrity, can_replay_dead_letter, load_dead_letter_meta
 
 
@@ -211,6 +219,12 @@ async def test_ingress_accepts_and_dedupes(tmp_path: Path, monkeypatch: pytest.M
         async def enqueue(self, manifest: DeliveryManifest) -> None:
             captured.append(manifest)
 
+    async def _test_startup() -> None:
+        """Skip production startup — test injects RuntimeState directly."""
+        return None
+
+    monkeypatch.setattr(serve_mod, "initialize_spine_dependencies", _test_startup)
+
     serve_mod.state = serve_mod.RuntimeState()
     serve_mod.state.provider_secret = secret
     serve_mod.state.wal_writer = WALWriter(tmp_path / "ingress.wal")
@@ -228,13 +242,174 @@ async def test_ingress_accepts_and_dedupes(tmp_path: Path, monkeypatch: pytest.M
     }
 
     client = TestClient(serve_mod.app)
-    r1 = client.post("/v1/ingress/tenant-a", content=body, headers=headers)
-    r2 = client.post("/v1/ingress/tenant-a", content=body, headers=headers)
+    try:
+        r1 = client.post("/v1/ingress/tenant-a", content=body, headers=headers)
+        r2 = client.post("/v1/ingress/tenant-a", content=body, headers=headers)
 
-    assert r1.status_code == 200
-    assert r1.json()["status"] == "ACCEPTED"
-    assert r1.json()["dispatch_mode"] == "background"
-    assert "manifest_id" in r1.json()
-    assert r2.status_code == 200
-    assert r2.json()["status"] == "ALREADY_PROCESSED"
-    assert len(captured) == 1
+        assert r1.status_code == 200
+        assert r1.json()["status"] == "ACCEPTED"
+        assert r1.json()["dispatch_mode"] == "background"
+        assert "manifest_id" in r1.json()
+        assert r2.status_code == 200
+        assert r2.json()["status"] == "ALREADY_PROCESSED"
+        assert len(captured) == 1
+    finally:
+        client.close()
+
+
+def test_delivery_manifest_stream_roundtrip():
+    manifest = DeliveryManifest(
+        manifest_id="m1",
+        payload=b'{"id":1}',
+        target_url="https://example.com/hook",
+        lamport=7,
+        client_id="t1",
+        payload_id="p1",
+    )
+    fields = manifest.to_stream_fields()
+    restored = DeliveryManifest.from_stream_fields(fields)
+    assert restored.manifest_id == manifest.manifest_id
+    assert restored.payload == manifest.payload
+    assert restored.lamport == 7
+
+
+def test_dispatch_mode_from_env_matrix(monkeypatch):
+    monkeypatch.delenv("INST_REDIS_URL", raising=False)
+    monkeypatch.setenv("WEBHOOK_DISPATCH_MODE", "background")
+    assert dispatch_mode_from_env() == "background"
+    monkeypatch.delenv("WEBHOOK_DISPATCH_MODE", raising=False)
+    monkeypatch.setenv("INST_REDIS_URL", "redis://localhost:6379/0")
+    assert dispatch_mode_from_env() == "redis"
+
+
+@pytest.mark.asyncio
+async def test_redis_stream_enqueue_xadd():
+    redis_client = MagicMock()
+    redis_client.xgroup_create = AsyncMock()
+    redis_client.xadd = AsyncMock(return_value="1-0")
+    queue = RedisStreamDeliveryQueue(redis_client)
+    manifest = DeliveryManifest(
+        manifest_id="m-redis",
+        payload=b"{}",
+        target_url="https://example.com",
+        lamport=1,
+    )
+    await queue.enqueue(manifest)
+    redis_client.xadd.assert_awaited_once()
+    args, _ = redis_client.xadd.call_args
+    assert args[0] == STREAM_KEY
+
+
+@pytest.mark.asyncio
+async def test_redis_stream_worker_acks_on_success(monkeypatch):
+    redis_client = MagicMock()
+    redis_client.xgroup_create = AsyncMock()
+    redis_client.xautoclaim = AsyncMock(return_value=("0-0", [], []))
+    redis_client.xreadgroup = AsyncMock(
+        side_effect=[
+            [
+                (
+                    STREAM_KEY,
+                    [
+                        (
+                            "42-0",
+                            DeliveryManifest(
+                                manifest_id="m-ok",
+                                payload=b"{}",
+                                target_url="https://example.com",
+                                lamport=2,
+                            ).to_stream_fields(),
+                        )
+                    ],
+                )
+            ],
+            asyncio.CancelledError(),
+        ]
+    )
+    redis_client.xack = AsyncMock()
+    queue = RedisStreamDeliveryQueue(redis_client)
+    monkeypatch.setattr(
+        "webhook_mesh.fsm.dispatch_webhook_delivery",
+        AsyncMock(return_value=True),
+    )
+    queue._running = True
+    with pytest.raises(asyncio.CancelledError):
+        await queue._consume_loop()
+    redis_client.xack.assert_awaited_with(STREAM_KEY, CONSUMER_GROUP, "42-0")
+
+
+@pytest.mark.asyncio
+async def test_redis_stream_worker_acks_after_dlq(monkeypatch):
+    redis_client = MagicMock()
+    redis_client.xgroup_create = AsyncMock()
+    redis_client.xautoclaim = AsyncMock(return_value=("0-0", [], []))
+    redis_client.xreadgroup = AsyncMock(
+        side_effect=[
+            [
+                (
+                    STREAM_KEY,
+                    [
+                        (
+                            "99-0",
+                            DeliveryManifest(
+                                manifest_id="m-fail",
+                                payload=b"{}",
+                                target_url="https://example.com",
+                                lamport=3,
+                            ).to_stream_fields(),
+                        )
+                    ],
+                )
+            ],
+            asyncio.CancelledError(),
+        ]
+    )
+    redis_client.xack = AsyncMock()
+    queue = RedisStreamDeliveryQueue(redis_client)
+    monkeypatch.setattr(
+        "webhook_mesh.fsm.dispatch_webhook_delivery",
+        AsyncMock(return_value=False),
+    )
+    queue._running = True
+    with pytest.raises(asyncio.CancelledError):
+        await queue._consume_loop()
+    redis_client.xack.assert_awaited_with(STREAM_KEY, CONSUMER_GROUP, "99-0")
+
+
+@pytest.mark.asyncio
+async def test_redis_stream_worker_no_ack_on_exception(monkeypatch):
+    redis_client = MagicMock()
+    redis_client.xgroup_create = AsyncMock()
+    redis_client.xautoclaim = AsyncMock(return_value=("0-0", [], []))
+    redis_client.xreadgroup = AsyncMock(
+        side_effect=[
+            [
+                (
+                    STREAM_KEY,
+                    [
+                        (
+                            "77-0",
+                            DeliveryManifest(
+                                manifest_id="m-exc",
+                                payload=b"{}",
+                                target_url="https://example.com",
+                                lamport=4,
+                            ).to_stream_fields(),
+                        )
+                    ],
+                )
+            ],
+            asyncio.CancelledError(),
+        ]
+    )
+    redis_client.xack = AsyncMock()
+    queue = RedisStreamDeliveryQueue(redis_client)
+    monkeypatch.setattr(
+        "webhook_mesh.fsm.dispatch_webhook_delivery",
+        AsyncMock(side_effect=RuntimeError("boom")),
+    )
+    queue._running = True
+    with pytest.raises(asyncio.CancelledError):
+        await queue._consume_loop()
+    redis_client.xack.assert_not_awaited()
+

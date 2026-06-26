@@ -7,7 +7,7 @@ name = "hibs-racing"
 version = "0.1.0"
 description = "Offline racing NLP + place/EW research engine (separate from hibs-bet football)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.14"
 dependencies = [
     "pyyaml>=6.0",
     "pandas>=2.0",
@@ -43,6 +43,11 @@ inst-spine-export = "inst_spine.export_cli:main"
 webhook-mesh = "webhook_mesh.cli:main"
 ad-guard = "ad_guard.cli:main"
 health-telemetry = "health_telemetry.cli:main"
+model-governor = "model_governor.cli:main"
+drift-gate = "drift_gate.cli:main"
+webhook-replay = "webhook_replay.cli:main"
+spend-guard = "spend_guard.cli:main"
+agent-ledger = "agent_ledger.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -50,3 +55,10 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+tmp_path_retention_count = 2
+tmp_path_retention_policy = "failed"
+filterwarnings = [
+    "ignore::DeprecationWarning:fastapi.*",
+    "ignore::DeprecationWarning:starlette.*",
+]

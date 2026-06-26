@@ -91,21 +91,23 @@ async def test_ad_guard_ledger_event(tmp_path: Path):
     db = tmp_path / "ad.sqlite"
     ledger = AppendOnlyLedger(db, async_writes=True)
     ledger.start_async_writer()
-    gw = AdGuardGateway(ledger=ledger, shadow_mode=True)
-    await gw.evaluate(AdSpendRequest(
-        client_id="agency",
-        method="POST",
-        path="/mutate",
-        body={"campaign_id": "c9", "bid_amount": 5.0},
-        provider="generic",
-    ))
-    ledger.stop_async_writer(flush=True)
-    entries = ledger.list_entries()
-    spend_events = [e for e in entries if e.get("event_type") == "ad_spend_request"]
-    assert spend_events
-    payload = spend_events[0]["payload"]
-    assert payload["campaign_id"] == "c9"
-    assert ledger.verify()["chain_ok"]
+    try:
+        gw = AdGuardGateway(ledger=ledger, shadow_mode=True)
+        await gw.evaluate(AdSpendRequest(
+            client_id="agency",
+            method="POST",
+            path="/mutate",
+            body={"campaign_id": "c9", "bid_amount": 5.0},
+            provider="generic",
+        ))
+        entries = ledger.list_entries()
+        spend_events = [e for e in entries if e.get("event_type") == "ad_spend_request"]
+        assert spend_events
+        payload = spend_events[0]["payload"]
+        assert payload["campaign_id"] == "c9"
+        assert ledger.verify()["chain_ok"]
+    finally:
+        ledger.close()
 
 
 @pytest.mark.asyncio
@@ -113,27 +115,29 @@ async def test_ad_guard_reject_logs_to_ledger(tmp_path: Path):
     db = tmp_path / "ad.sqlite"
     ledger = AppendOnlyLedger(db, async_writes=True)
     ledger.start_async_writer()
-    from inst_spine.rates import MemoryIdempotencyBackend
+    try:
+        from inst_spine.rates import MemoryIdempotencyBackend
 
-    gw = AdGuardGateway(
-        ledger=ledger,
-        shadow_mode=True,
-        idempotency=MemoryIdempotencyBackend(),
-    )
-    req = AdSpendRequest(
-        client_id="agency",
-        method="POST",
-        path="/mutate",
-        body={"campaign_id": "c1", "bid_amount": 1.0},
-        idempotency_key="dup-key",
-    )
-    await gw.evaluate(req)
-    resp = await gw.evaluate(req)
-    assert resp.decision.value == "reject"
-    ledger.stop_async_writer(flush=True)
-    events = [e for e in ledger.list_entries() if e.get("event_type") == "ad_spend_request"]
-    assert len(events) >= 2
-    assert any(e["payload"]["decision"] == "reject" for e in events)
+        gw = AdGuardGateway(
+            ledger=ledger,
+            shadow_mode=True,
+            idempotency=MemoryIdempotencyBackend(),
+        )
+        req = AdSpendRequest(
+            client_id="agency",
+            method="POST",
+            path="/mutate",
+            body={"campaign_id": "c1", "bid_amount": 1.0},
+            idempotency_key="dup-key",
+        )
+        await gw.evaluate(req)
+        resp = await gw.evaluate(req)
+        assert resp.decision.value == "reject"
+        events = [e for e in ledger.list_entries() if e.get("event_type") == "ad_spend_request"]
+        assert len(events) >= 2
+        assert any(e["payload"]["decision"] == "reject" for e in events)
+    finally:
+        ledger.close()
 
 
 @pytest.mark.asyncio
@@ -171,12 +175,14 @@ async def test_ad_guard_serve_approves(tmp_path: Path):
     serve_mod.state.ledger.start_async_writer()
     serve_mod.state.gateway = AdGuardGateway(ledger=serve_mod.state.ledger, shadow_mode=True)
 
-    client = TestClient(serve_mod.app)
-    resp = client.post(
-        "/v1/guard/agency-1",
-        json={"campaignId": "99", "bidMicros": 1_000_000},
-        headers={"X-Ad-Provider": "google"},
-    )
-    assert resp.status_code == 200
-    assert resp.json()["decision"] == "approve"
-    serve_mod.state.ledger.stop_async_writer(flush=True)
+    try:
+        with TestClient(serve_mod.app) as client:
+            resp = client.post(
+                "/v1/guard/agency-1",
+                json={"campaignId": "99", "bidMicros": 1_000_000},
+                headers={"X-Ad-Provider": "google"},
+            )
+            assert resp.status_code == 200
+            assert resp.json()["decision"] == "approve"
+    finally:
+        serve_mod.state.ledger.close()

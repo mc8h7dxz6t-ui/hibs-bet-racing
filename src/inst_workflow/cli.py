@@ -20,7 +20,7 @@ def _use_uvloop() -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="inst-workflow",
-        description="Guided workflow console — Compliance Logger + Proxy-Risk",
+        description="Proof Console — 12 SKU picker + Compliance + Proxy-Risk workflows",
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -41,6 +41,12 @@ def main(argv: list[str] | None = None) -> int:
         "--export-dir",
         type=Path,
         default=Path(os.getenv("INST_EXPORT_DIR", "data/demo/ui_exports")),
+    )
+    p_serve.add_argument(
+        "--demo-dir",
+        type=Path,
+        default=Path(os.getenv("PORTFOLIO_DEMO_DIR", "data/demo/portfolio")),
+        help="Portfolio demo directory (make demo-all output)",
     )
     p_serve.add_argument(
         "--product",
@@ -66,13 +72,14 @@ def main(argv: list[str] | None = None) -> int:
         serve.state.compliance_db = args.compliance_db
         serve.state.proxy_db = args.proxy_db
         serve.state.export_dir = args.export_dir
+        serve.state.demo_dir = args.demo_dir
         serve.state.proxy_shadow = not args.no_shadow
         serve.state.product = serve.normalize_product(args.product)
 
         label = {
             "compliance": "Compliance Logger",
             "proxy": "Proxy-Risk Gateway",
-            "both": "Compliance Logger + Proxy-Risk",
+            "both": "Proof Console · Compliance · Proxy-Risk",
         }[serve.state.product]
         print(f"{label} Workflow Console → http://{args.host}:{args.port}")
         uvicorn.run(serve.app, host=args.host, port=args.port, log_level="info")

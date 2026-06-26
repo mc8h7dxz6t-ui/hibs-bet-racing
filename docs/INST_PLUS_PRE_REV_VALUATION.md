@@ -1,8 +1,10 @@
-# Institutional Pre-Revenue Valuation — Full Portfolio (7 Products)
+# Institutional Pre-Revenue Valuation — Full Portfolio (12 SKUs)
 
 **Purpose:** Honest rough value range for the **code + IP + diligence package** before first revenue.  
 **Not:** A formal 409A, investment memo, or guarantee of sale price.  
-**Date:** June 2026 · Gold standard across all 7 products
+**Date:** June 2026 · Gold standard across all 12 SKUs
+
+> **12-SKU index:** [PORTFOLIO_FULL_TECH_SALES_12.md](PORTFOLIO_FULL_TECH_SALES_12.md) — SKUs 9–12 (Drift Gate, Webhook Replay, Spend Guard, Agent Ledger) detailed there.
 
 ---
 
@@ -17,8 +19,9 @@
 | **Webhook Mesh (#5)** | `webhook_mesh` + Stripe/Shopify routes |
 | **Ad Guard (#6)** | `ad_guard` + NeMo creative headers |
 | **Health Telemetry (#7)** | `health_telemetry` + HIPAA/hospital packs |
+| **ModelGovernor (#8)** | `model_governor` — model lifecycle governance ledger |
 | **Inst spine** | Genesis WAL, Lamport clocks, F1–F9 gates, deterministic export, verify-bundle |
-| **Diligence pack** | 87 tests, rigorous E2E 7/7, buyer sheets, sales tech specs (all 7), demos |
+| **Diligence pack** | 157+ tests, rigorous E2E 12/12, buyer sheets, sales tech specs (all 12), demos |
 
 **Pre-revenue reality:** Buyers pay for **risk reduction** (auditor-ready proof, fail-closed design, repeatable demo). Revenue multiples do not apply yet — use **cost-to-replicate** and **IP sale / acqui-hire comps**.
 
@@ -71,7 +74,8 @@ Add **40–60%** for tests, docs, demos, institutional hardening → **£34k–�
 | **Webhook Mesh** | ~12% spine | **£15k–£40k** |
 | **Ad Guard** | ~12% spine | **£15k–£45k** |
 | **Health Telemetry** | ~12% spine | **£30k–£80k** |
-| **Combined (one spine, full pack)** | Single spine | **£60k–£130k** |
+| **ModelGovernor** | ~12% spine | **£25k–£70k** |
+| **Combined (one spine, full pack)** | Single spine | **£70k–£150k** |
 
 *USD equivalent at ~1.27: roughly **$32k–$165k** combined.*
 
@@ -97,6 +101,7 @@ Inst++ today sits in the **IP asset / small acqui-hire** band — **not** seed-r
 | Webhook Mesh | £199–599/mo | £24k–72k ARR | £60k–180k ARR |
 | Ad Guard | £300–800/mo | £36k–96k ARR | £90k–240k ARR |
 | Health Telemetry | £5k–15k + £500/mo | £56k–156k ARR | £140k–390k ARR |
+| ModelGovernor | £400–1,000/mo | £48k–120k ARR | £120k–300k ARR |
 
 **Pre-revenue code value ≠ ARR.** First £50k ARR typically moves valuation from IP-sale framing to **3–8× ARR** for niche B2B infra.
 
@@ -107,8 +112,8 @@ Inst++ today sits in the **IP asset / small acqui-hire** band — **not** seed-r
 | Driver | Effect |
 |--------|--------|
 | Offline `verify-bundle` (auditor dry-run) | Rare — strong diligence wedge |
-| 87 tests + logged rigorous E2E 7/7 | Reduces buyer rewrite risk |
-| Sales tech specs + evidence pack (all 7) | Procurement-ready RFP depth |
+| 157+ tests + logged rigorous E2E 12/12 | Reduces buyer rewrite risk |
+| Sales tech specs + evidence pack (all 12) | Procurement-ready RFP depth |
 | Air-gap / on-prem default | Fintech + regulated buyers |
 | Separate SKUs + extraction docs | Clean procurement |
 | Workflow UI per product (`--product`) | Demo without explaining the other SKU |
@@ -142,10 +147,12 @@ Inst++ today sits in the **IP asset / small acqui-hire** band — **not** seed-r
 
 | Question | Answer |
 |----------|--------|
-| **Rough value of full portfolio (pre-rev)?** | **£60k–£130k** ($76k–$165k) |
+| **Rough value of full portfolio (pre-rev)?** | **£70k–£150k** ($89k–$190k) |
+| **#8 ModelGovernor alone?** | **£25k–£70k** (lifecycle SKU as-built) |
+| **ModelGovernor north star (LLM spend plane, not shipped)?** | **£2M–£7M** exit band — see [MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md](MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md) |
 | **#1 Compliance Logger alone?** | **£25k–£75k** |
 | **#2 Proxy-Risk alone?** | **£30k–£90k** |
-| **With first £50k ARR?** | Re-frame to **£250k–£350k** ecosystem (3–7× ARR) |
+| **With first £50k ARR?** | Re-frame to **£280k–£400k** ecosystem (3–7× ARR) |
 | **With pilot LOI from tier-1 fintech?** | Add **£25k–£50k** to IP floor |
 
 ---
@@ -162,10 +169,14 @@ Inst++ today sits in the **IP asset / small acqui-hire** band — **not** seed-r
 
 ## Related documents
 
-- `docs/PORTFOLIO_SALES_SHEET.md` — commercial pricing matrix  
+- `docs/PORTFOLIO_SALES_SHEET.md` — short commercial matrix  
+- `docs/PORTFOLIO_TECH_SALES_SHEET.md` — full tech/sales, revenue capability, value today  
 - `docs/BUYER_EVIDENCE_PACK.md` — procurement dry-run  
 - `docs/COMPLIANCE_LOGGER_SALES_TECH_SPEC.md`  
 - `docs/PROXY_RISK_SALES_TECH_SPEC.md`  
 - `docs/ALTDATA_SALES_TECH_SPEC.md` through `HEALTH_TELEMETRY_SALES_TECH_SPEC.md`  
+- `docs/MODEL_GOVERNOR_SALES_TECH_SPEC.md`  
+- `docs/MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md` — north star comps & exit framing  
+- `docs/DEMO_GOLD.md` — canonical `make demo-gold` sales walkthrough  
 - `docs/INST_PLUS_DEEP_DIVE_ALL_7.md`  
 - `docs/INST_PLUS_GOLD_STANDARD.md`

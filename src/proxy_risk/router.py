@@ -40,6 +40,8 @@ class ProxyRequest:
     body: dict[str, Any] = field(default_factory=dict)
     idempotency_key: str | None = None
     reference_price: float | None = None
+    model_features: dict[str, float] | None = None
+    estimated_cost: float | None = None
 
 
 @dataclass
@@ -73,6 +75,10 @@ class ProxyRiskGateway:
         idempotency: IdempotencyBackend | None = None,
         upstream_base: str | None = None,
         idempotency_ttl_sec: int = 300,
+        drift_baseline_path: str | None = None,
+        drift_mode: str | None = None,
+        spend_wallet_db: str | None = None,
+        spend_ledger_db: str | None = None,
     ) -> None:
         self.ledger = ledger
         self._rate_backend = rate_backend or token_bucket_backend_from_env()
@@ -89,6 +95,34 @@ class ProxyRiskGateway:
         self.idempotency = idempotency or idempotency_backend_from_env()
         self.upstream_base = (upstream_base or os.environ.get("PROXY_RISK_UPSTREAM_BASE", "")).strip()
         self.idempotency_ttl_sec = idempotency_ttl_sec
+        self._drift_gate = None
+        self._drift_rolling = None
+        baseline = (drift_baseline_path or os.environ.get("PROXY_DRIFT_BASELINE", "")).strip()
+        if baseline:
+            from pathlib import Path
+
+            from drift_gate.baseline import FeatureBaseline
+            from drift_gate.gate import DriftGate, DriftGateConfig, DriftGateMode
+            from drift_gate.state import RollingStateStore
+
+            mode = (drift_mode or os.environ.get("PROXY_DRIFT_MODE", "shadow")).strip()
+            bl = FeatureBaseline.load(Path(baseline))
+            self._drift_rolling = RollingStateStore.from_baseline(
+                Path(baseline),
+                redis_key=f"proxy:{bl.model_id}",
+            )
+            self._drift_gate = DriftGate(
+                bl,
+                config=DriftGateConfig(mode=DriftGateMode(mode)),
+                rolling_window=self._drift_rolling.as_dict(),
+            )
+
+        self._spend_wallet_db = (
+            spend_wallet_db or os.environ.get("PROXY_SPEND_WALLET_DB", "")
+        ).strip()
+        self._spend_ledger_db = (
+            spend_ledger_db or os.environ.get("PROXY_SPEND_LEDGER_DB", "")
+        ).strip()
 
     async def evaluate(self, req: ProxyRequest) -> ProxyResponse:
         """Hot-path gate evaluation — every outcome logged when ledger attached."""
@@ -124,12 +158,55 @@ class ProxyRiskGateway:
                 self.circuit.kill(f"z_score drift |Z|>{self.drift.z_max} (z={z:.2f})")
                 return await self._finish(req, GateDecision.KILL, f"drift: z={z:.2f}")
 
+        features = req.model_features
+        if features is None and isinstance(req.body.get("features"), dict):
+            try:
+                features = {k: float(v) for k, v in req.body["features"].items()}
+            except (TypeError, ValueError):
+                features = None
+        if self._drift_gate is not None and features:
+            from drift_gate.gate import DriftGateDecision, DriftGateRequest
+            from drift_gate.record import record_drift_evaluation
+
+            dg_req = DriftGateRequest(
+                model_id=self._drift_gate.baseline.model_id,
+                version=self._drift_gate.baseline.version,
+                feature_vector=features,
+                request_id=idem_key,
+            )
+            dg_resp = self._drift_gate.evaluate(dg_req)
+            if self._drift_rolling is not None:
+                self._drift_rolling._data = self._drift_gate._rolling
+                self._drift_rolling.save()
+            if self.ledger is not None:
+                await asyncio.to_thread(
+                    record_drift_evaluation,
+                    request=dg_req,
+                    response=dg_resp,
+                    database=self.ledger.database,
+                )
+            if dg_resp.decision in (DriftGateDecision.REJECT, DriftGateDecision.KILL):
+                decision = GateDecision.KILL if dg_resp.decision == DriftGateDecision.KILL else GateDecision.REJECT
+                return await self._finish(req, decision, f"drift_gate: {dg_resp.reason}")
+
         if self.shadow_mode:
             return await self._finish(req, GateDecision.APPROVE, "shadow: approved")
+
+        hold_id: str | None = None
+        spend_request_id = idem_key
+        est_cost = self._estimated_cost(req)
+        if self._spend_wallet_db and est_cost > 0:
+            hold_id, spend_err = await asyncio.to_thread(
+                self._reserve_spend, spend_request_id, est_cost
+            )
+            if hold_id is None:
+                return await self._finish(req, GateDecision.REJECT, f"spend_guard: {spend_err}")
 
         await asyncio.to_thread(self._log_sync, req, GateDecision.APPROVE, "forward pending")
         status, body, detail = await self._forward_upstream(req)
         if status < 200 or status >= 400:
+            if hold_id and self._spend_wallet_db:
+                await asyncio.to_thread(self._release_spend, hold_id)
             return await self._finish(
                 req,
                 GateDecision.REJECT,
@@ -137,6 +214,10 @@ class ProxyRiskGateway:
                 upstream_status=status,
                 upstream_body=body,
             )
+
+        if hold_id and self._spend_wallet_db:
+            actual = self._actual_cost(body, est_cost)
+            await asyncio.to_thread(self._settle_spend, hold_id, spend_request_id, actual)
 
         return await self._finish(
             req,
@@ -241,6 +322,63 @@ class ProxyRiskGateway:
                 return resp.status_code, body, f"forwarded status={resp.status_code}"
         except httpx.RequestError as exc:
             return 502, {"error": str(exc)}, f"upstream error: {exc}"
+
+    def _estimated_cost(self, req: ProxyRequest) -> float:
+        if req.estimated_cost is not None:
+            return float(req.estimated_cost)
+        raw = req.body.get("estimated_cost", req.body.get("spend_estimate"))
+        try:
+            return float(raw) if raw is not None else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _actual_cost(self, body: dict[str, Any] | None, fallback: float) -> float:
+        if not body:
+            return fallback
+        for key in ("actual_cost", "cost", "spend"):
+            if key in body:
+                try:
+                    return float(body[key])
+                except (TypeError, ValueError):
+                    pass
+        return fallback
+
+    def _reserve_spend(self, request_id: str, amount: float) -> tuple[str | None, str]:
+        from pathlib import Path
+
+        from spend_guard.integrate import reserve_api_call
+
+        result = reserve_api_call(
+            request_id=request_id,
+            estimated_cost=amount,
+            wallet_db=Path(self._spend_wallet_db),
+            ledger_db=Path(self._spend_ledger_db) if self._spend_ledger_db else None,
+            service="proxy-risk",
+        )
+        if result.get("decision") != "approve":
+            return None, str(result.get("reason") or "reserve_denied")
+        return str(result.get("hold_id") or ""), ""
+
+    def _settle_spend(self, hold_id: str, request_id: str, actual: float) -> None:
+        from pathlib import Path
+
+        from spend_guard.integrate import settle_api_call
+
+        settle_api_call(
+            hold_id=hold_id,
+            actual_cost=actual,
+            request_id=request_id,
+            wallet_db=Path(self._spend_wallet_db),
+            ledger_db=Path(self._spend_ledger_db) if self._spend_ledger_db else None,
+            service="proxy-risk",
+        )
+
+    def _release_spend(self, hold_id: str) -> None:
+        from pathlib import Path
+
+        from spend_guard.wallet import SpendWallet
+
+        SpendWallet(Path(self._spend_wallet_db)).release(hold_id)
 
 
 async def serve_shadow_demo(

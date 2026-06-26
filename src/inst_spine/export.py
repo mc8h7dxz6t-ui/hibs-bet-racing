@@ -111,6 +111,7 @@ def _write_bundle_files(
     report_dict: dict[str, Any],
     verify_dict: dict[str, Any],
     product: str | None = None,
+    extra_files: dict[str, Path] | None = None,
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     entries = ledger.list_entries()
@@ -142,6 +143,26 @@ def _write_bundle_files(
 
     for name, content in sorted(files.items()):
         (out_dir / name).write_bytes(content)
+
+    if extra_files:
+        extras_dir = out_dir / "extras"
+        extras_dir.mkdir(parents=True, exist_ok=True)
+        manifest_extras: list[dict[str, str]] = []
+        for arc_name, src in sorted(extra_files.items()):
+            if not src.is_file():
+                continue
+            data = src.read_bytes()
+            dest = extras_dir / arc_name
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
+            manifest_extras.append(
+                {
+                    "path": f"extras/{arc_name}",
+                    "sha256": sha256_bytes(data),
+                    "bytes": str(len(data)),
+                }
+            )
+        (out_dir / "bundle_extras.json").write_bytes(_canonical_json_bytes(manifest_extras))
 
     readme = (
         "Inst++ audit bundle (P2 deterministic export)\n"
@@ -292,6 +313,7 @@ def build_audit_bundle(
     anchor_path: Path | None = None,
     repro_run: bool = False,
     product: str | None = None,
+    extra_files: dict[str, Path] | None = None,
 ) -> AuditBundleResult:
     """
     Full P2 pipeline:
@@ -302,72 +324,78 @@ def build_audit_bundle(
     tar_path = tarball_path or db.parent / "audit_bundle.tar"
 
     ledger = AppendOnlyLedger(db)
-    if anchor_path is not None and Path(anchor_path).is_file():
-        anchor_data = json.loads(Path(anchor_path).read_text(encoding="utf-8"))
-        ledger.anchor_path.write_text(
-            json.dumps(anchor_data, indent=2, sort_keys=True),
+    try:
+        if anchor_path is not None and Path(anchor_path).is_file():
+            anchor_data = json.loads(Path(anchor_path).read_text(encoding="utf-8"))
+            ledger.anchor_path.write_text(
+                json.dumps(anchor_data, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+        validation = validate_before_export(ledger=ledger, anchor_path=anchor_path)
+        verify_dict = ledger.verify()
+        ctx = build_compliance_context(ledger, run_f9=not repro_run)
+        report = run_institutional_check(ledger=ledger, context=ctx, run_f9=False)
+
+        if abort_on_fail and not validation.ok:
+            return AuditBundleResult(
+                ok=False,
+                out_dir=out,
+                tarball_path=None,
+                bundle_sha256="",
+                validation=validation,
+                institutional_passed=report.passed,
+            )
+        if abort_on_fail and not repro_run and not report.passed:
+            return AuditBundleResult(
+                ok=False,
+                out_dir=out,
+                tarball_path=None,
+                bundle_sha256="",
+                validation=validation,
+                institutional_passed=report.passed,
+            )
+
+        _write_bundle_files(
+            out_dir=out,
+            ledger=ledger,
+            validation=validation,
+            report_dict=report.to_dict(),
+            verify_dict=verify_dict,
+            product=product,
+            extra_files=extra_files,
+        )
+
+        tar_bytes = deterministic_tarball(out)
+        tar_path.write_bytes(tar_bytes)
+        digest = sha256_bytes(tar_bytes)
+        sidecar = {
+            "algorithm": "sha256",
+            "bundle_file": tar_path.name,
+            "bundle_sha256": digest,
+            "entry_count": len(ledger.list_entries()),
+            "instance_uuid": ledger._instance_uuid,
+            "protocol": "inst-spine-audit-bundle-v1",
+        }
+        if product:
+            sidecar["product"] = product
+        (tar_path.with_suffix(tar_path.suffix + ".sha256.json")).write_text(
+            json.dumps(sidecar, indent=2, sort_keys=True),
             encoding="utf-8",
         )
-    validation = validate_before_export(ledger=ledger, anchor_path=anchor_path)
-    verify_dict = ledger.verify()
-    ctx = build_compliance_context(ledger, run_f9=not repro_run)
-    report = run_institutional_check(ledger=ledger, context=ctx, run_f9=False)
+        (tar_path.with_suffix(tar_path.suffix + ".sha256")).write_text(
+            f"{digest}  {tar_path.name}\n", encoding="utf-8"
+        )
 
-    if abort_on_fail and not validation.ok:
         return AuditBundleResult(
-            ok=False,
+            ok=validation.ok,
             out_dir=out,
-            tarball_path=None,
-            bundle_sha256="",
+            tarball_path=tar_path,
+            bundle_sha256=digest,
             validation=validation,
             institutional_passed=report.passed,
         )
-    if abort_on_fail and not repro_run and not report.passed:
-        return AuditBundleResult(
-            ok=False,
-            out_dir=out,
-            tarball_path=None,
-            bundle_sha256="",
-            validation=validation,
-            institutional_passed=report.passed,
-        )
-
-    _write_bundle_files(
-        out_dir=out,
-        ledger=ledger,
-        validation=validation,
-        report_dict=report.to_dict(),
-        verify_dict=verify_dict,
-        product=product,
-    )
-
-    tar_bytes = deterministic_tarball(out)
-    tar_path.write_bytes(tar_bytes)
-    digest = sha256_bytes(tar_bytes)
-    sidecar = {
-        "algorithm": "sha256",
-        "bundle_file": tar_path.name,
-        "bundle_sha256": digest,
-        "entry_count": len(ledger.list_entries()),
-        "instance_uuid": ledger._instance_uuid,
-        "protocol": "inst-spine-audit-bundle-v1",
-    }
-    if product:
-        sidecar["product"] = product
-    (tar_path.with_suffix(tar_path.suffix + ".sha256.json")).write_text(
-        json.dumps(sidecar, indent=2, sort_keys=True),
-        encoding="utf-8",
-    )
-    (tar_path.with_suffix(tar_path.suffix + ".sha256")).write_text(f"{digest}  {tar_path.name}\n", encoding="utf-8")
-
-    return AuditBundleResult(
-        ok=validation.ok,
-        out_dir=out,
-        tarball_path=tar_path,
-        bundle_sha256=digest,
-        validation=validation,
-        institutional_passed=report.passed,
-    )
+    finally:
+        ledger.close()
 
 
 def verify_bundle_reproducible(database: Path, *, runs: int = 2) -> tuple[bool, str]:
