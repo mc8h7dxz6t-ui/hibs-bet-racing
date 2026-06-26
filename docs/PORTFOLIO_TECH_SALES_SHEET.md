@@ -460,7 +460,7 @@ Assumptions for all products below:
 
 ## 7 — Health Telemetry
 
-**One job:** Device batch **tamper evidence** — Lamport per batch, HIPAA diligence pack, not FDA cert.
+**One job:** Device batch **tamper evidence** — schema + sequence gate + optional WAL ingress, HIPAA diligence pack, not FDA cert.
 
 **Pitch:** *Prove telemetry batches weren't altered — without buying an EMR.*
 
@@ -485,7 +485,8 @@ Assumptions for all products below:
 |------------|------------------|------------------|
 | Vendor trust for integrity | “Trust AWS” | Genesis chain, buyer verifies |
 | Spreadsheet exports | Editable CSV | Deterministic tar + SHA256 |
-| Device clock drift | NTP trust | Lamport per batch |
+| Device clock drift / replay | NTP trust only | Lamport per batch + **per-device `seq` gate** |
+| PHI in auditor export | Full payload | **`--observation-lane`** summaries |
 
 ### Competitive comparison
 
@@ -505,7 +506,7 @@ Assumptions for all products below:
 
 | Layer | Status | Detail |
 |-------|--------|--------|
-| **Institutional gold** | ✅ | Batch schema validation; Lamport per batch; export + verify-bundle |
+| **Institutional gold** | ✅ | Schema + `seq` gate + F7 coverage; WAL ingress; observation-lane export; rigorous E2E |
 | **Production deploy** | 🟡 | Air-gap VPC ✅; HIPAA diligence **template** + hospital pilot playbook — not a signed BAA or ward go-live |
 | **Workflow UI** | 🔲 | CLI ingest only — no clinical dashboard |
 | **Commercial pack** | ✅ | `HEALTH_TELEMETRY_HIPAA_PACK.md` · `HEALTH_TELEMETRY_HOSPITAL_PILOT.md` |

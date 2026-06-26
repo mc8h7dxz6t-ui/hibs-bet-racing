@@ -1,6 +1,6 @@
 # Health Telemetry Recorder — Buyer Sheet
 
-**One job:** High-frequency device batches → Lamport-ordered sealed log → auditor export — **audit spine, not FDA certification**.
+**One job:** Device batches → schema + sequence gate → Lamport-sealed log → auditor export — **audit spine, not FDA certification**.
 
 **Pitch:** *Prove your device telemetry wasn't tampered with — deploy in your VPC, verify offline.*
 
@@ -12,9 +12,10 @@
 |---------|------|----------------------|
 | Digital health / RPM vendors | Cloud vendor trust for telemetry integrity | Genesis hash chain + offline `verify-bundle` |
 | Clinical ops (UK NHS adjacent) | Spreadsheet exports are editable | Deterministic tar + SHA256 sidecar |
-| Compliance / legal | Need tamper evidence, not full EMR | Air-gap VPC deploy + HIPAA pack template |
+| Compliance / legal | Replay/gap attacks on device streams | **Per-device `seq` gate (fail-closed)** |
+| Security / privacy | PHI in audit exports | **`--observation-lane`** — summaries only |
 
-**Price band:** £5k–£15k license + £500/mo maintenance.
+**Price band:** £5k–£15k license + £500/mo maintenance · **£12k–£14k sale-now** perpetual VPC.
 
 ---
 
@@ -22,16 +23,24 @@
 
 | Capability | Evidence |
 |------------|----------|
-| Batch ingest | Schema-validated `telemetry_batch` events |
-| Clock drift | Lamport ordering per device batch |
+| Schema + F7 coverage | `ts`, `seq`, profile fields at ingest |
+| Sequence gate | Gap/backward `seq` rejected per `device_id` |
+| HTTP ingress | WAL fsync before ack — `health-telemetry serve` |
+| PHI-light export | `packet_summaries` + observation-lane redaction |
 | F1–F9 | Same institutional gates as portfolio spine |
 | HIPAA diligence | `docs/HEALTH_TELEMETRY_HIPAA_PACK.md` template |
 
 **Auditor dry-run:**
 ```bash
-health-telemetry ingest --device-id ward-7 --packets '[{"hr":72}]'
+health-telemetry ingest --device-id ward-7 \
+  --packets '[{"ts":"2026-06-01T12:00:00Z","seq":1,"hr":72,"spo2":98}]'
 health-telemetry export --database ./health.sqlite --tarball ./health_bundle.tar
 health-telemetry verify-bundle --tarball ./health_bundle.tar
+```
+
+**PHI-safe export:**
+```bash
+health-telemetry export --observation-lane --tarball ./health_obs.tar
 ```
 
 ---
@@ -40,6 +49,7 @@ health-telemetry verify-bundle --tarball ./health_bundle.tar
 
 ```bash
 ./scripts/demo_health_telemetry.sh
+make health-telemetry-serve   # optional HTTP batch ingress
 ```
 
 ---
@@ -49,6 +59,7 @@ health-telemetry verify-bundle --tarball ./health_bundle.tar
 - Not FDA / UKCA / DTAC certified medical device software
 - Not EMR / HL7 FHIR integration in P1
 - Not real-time clinical alerting UI
+- Not signed BAA (template + pilot SOW only)
 
 ---
 
@@ -56,9 +67,10 @@ health-telemetry verify-bundle --tarball ./health_bundle.tar
 
 | Command | Purpose |
 |---------|---------|
-| `ingest` | Batch telemetry JSON |
+| `ingest` | Batch telemetry JSON (`seq` required) |
+| `serve` | HTTP `POST /v1/telemetry/batch` |
 | `check` | F1–F9 institutional check |
-| `export` | Audit bundle |
+| `export` | Audit bundle (`--observation-lane` for PHI-safe) |
 | `verify-bundle` | Offline auditor replay |
 
 See `src/health_telemetry/README.md` and `docs/HEALTH_TELEMETRY_HIPAA_PACK.md`.  
