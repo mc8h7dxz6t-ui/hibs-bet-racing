@@ -349,9 +349,12 @@ def test_health_telemetry_http_batch_wal_before_ack(tmp_path: Path):
 
     db = tmp_path / "health.sqlite"
     ingress_wal = tmp_path / "health_ingress.wal"
+    from inst_spine.rates import MemoryIdempotencyBackend
+
     serve_mod.state.ledger_db = db
     serve_mod.state.wal_writer = WALWriter(ingress_wal)
     serve_mod.state.clock = serve_mod.LamportClock("industry-gold-health")
+    serve_mod.state.idempotency = MemoryIdempotencyBackend()
 
     packets = [
         {"ts": "2026-06-01T12:00:00Z", "seq": 1, "hr": 70, "spo2": 99},

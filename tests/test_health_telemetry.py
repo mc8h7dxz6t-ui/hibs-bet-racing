@@ -14,6 +14,7 @@ from health_telemetry.integrate import ingest_device_batch
 from health_telemetry.schema import validate_batch
 from health_telemetry.sequence import DeviceSequenceStore
 from inst_spine.errors import IngestValidationError
+from inst_spine.rates import MemoryIdempotencyBackend
 
 
 def _packets(start_seq: int = 1) -> list[dict]:
@@ -108,6 +109,7 @@ def test_health_telemetry_http_wal_before_ack(tmp_path: Path):
     serve_mod.state.ledger_db = db
     serve_mod.state.wal_writer = WALWriter(ingress_wal)
     serve_mod.state.clock = serve_mod.LamportClock("test-health")
+    serve_mod.state.idempotency = MemoryIdempotencyBackend()
 
     body = {
         "device_id": "http-ward",
@@ -140,6 +142,7 @@ def test_health_telemetry_http_sequence_reject_after_wal(tmp_path: Path):
     serve_mod.state.ledger_db = db
     serve_mod.state.wal_writer = WALWriter(ingress_wal)
     serve_mod.state.clock = serve_mod.LamportClock("test-health-reject")
+    serve_mod.state.idempotency = MemoryIdempotencyBackend()
 
     with TestClient(serve_mod.app) as client:
         ok_body = {"device_id": "ward-gap", "batch_id": "b1", "packets": _packets(1)}
