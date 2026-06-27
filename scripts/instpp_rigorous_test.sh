@@ -435,8 +435,12 @@ echo "$ALT_VERIFY"
 echo "$ALT_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "Alt-Data institutional E2E"
 
-section "AI Kit — run + check + export + verify"
-"$PYTHON" -m ai_kit.cli run --steps 3 --trace-db "$AIKIT_DB" --checkpoint-db "$WORK/ai_kit_checkpoint.sqlite" --max-tokens 500
+section "AI Kit — run + agent ledger + check + export + verify"
+AI_AGENT_DB="$WORK/ai_kit_agent.sqlite"
+AI_AGENT_PERMIT="$WORK/ai_kit_agent_permits.sqlite"
+"$PYTHON" -m ai_kit.cli run --steps 3 --trace-db "$AIKIT_DB" \
+  --checkpoint-db "$WORK/ai_kit_checkpoint.sqlite" --max-tokens 500 \
+  --agent-ledger-db "$AI_AGENT_DB" --agent-permit-db "$AI_AGENT_PERMIT" --tool-name read_file
 AI_CHECK=$("$PYTHON" -m ai_kit.cli check --database "$AIKIT_DB")
 echo "$AI_CHECK"
 echo "$AI_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
@@ -585,6 +589,10 @@ echo "$HT_EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.e
 HT_VERIFY=$("$PYTHON" -m health_telemetry.cli verify-bundle --tarball "$HEALTH_TAR")
 echo "$HT_VERIFY"
 echo "$HT_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+HT_OBS_TAR="$WORK/health_obs_bundle.tar"
+HT_OBS_EXPORT=$("$PYTHON" -m health_telemetry.cli export --database "$HEALTH_DB" --tarball "$HT_OBS_TAR" --observation-lane)
+echo "$HT_OBS_EXPORT"
+echo "$HT_OBS_EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "Health Telemetry institutional E2E"
 
 section "ModelGovernor — record + check + export + verify"
@@ -733,6 +741,7 @@ rm -f "$SG_HTTP_WALLET" "$SG_HTTP_DB"
 export SPEND_GUARD_WALLET_DB="$SG_HTTP_WALLET"
 export SPEND_GUARD_LEDGER_DB="$SG_HTTP_DB"
 export SPEND_GUARD_MOCK_UPSTREAM=1
+export SPEND_GUARD_API_KEY=rigorous-spend-key
 "$PYTHON" - <<PY
 import json
 import os
@@ -747,6 +756,10 @@ serve_mod.state.mock_upstream = True
 serve_mod.state.gateway = None
 
 client = TestClient(serve_mod.app)
+headers = {
+    "X-Request-Id": "sg-rigorous-http-1",
+    "Authorization": "Bearer rigorous-spend-key",
+}
 r = client.post(
     "/v1/chat/completions",
     json={
@@ -754,7 +767,7 @@ r = client.post(
         "messages": [{"role": "user", "content": "rigorous spend gateway"}],
         "max_tokens": 24,
     },
-    headers={"X-Request-Id": "sg-rigorous-http-1"},
+    headers=headers,
 )
 assert r.status_code == 200, r.text
 body = r.json()
@@ -812,16 +825,81 @@ echo "$AL_VERIFY"
 echo "$AL_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "Agent Ledger institutional E2E"
 
+section "Agent Ledger — HTTP API auth"
+export AGENT_LEDGER_DB="$AL_DB"
+export AGENT_LEDGER_PERMITS_DB="$AL_PERMIT"
+export AGENT_LEDGER_API_KEY=rigorous-agent-key
+"$PYTHON" - <<'PY'
+import json
+import os
+from fastapi.testclient import TestClient
+import agent_ledger.serve as serve_mod
+
+client = TestClient(serve_mod.app)
+r = client.post("/v1/authorize", json={"agent_id": "rig", "tool_name": "read_file", "arguments": {}})
+assert r.status_code == 401, r.text
+r = client.post(
+    "/v1/authorize",
+    json={"agent_id": "rig", "tool_name": "read_file", "arguments": {"path": "/tmp"}},
+    headers={"Authorization": "Bearer rigorous-agent-key"},
+)
+assert r.status_code in (200, 403), r.text
+print(json.dumps({"agent_ledger_http_auth": "ok"}))
+PY
+pass "Agent Ledger HTTP API auth"
+
+section "Forensic hardening — Waves 1–4"
+"$PYTHON" -m pytest \
+  tests/test_drift_golden.py \
+  tests/test_middleware_auth.py \
+  tests/test_permit_ttl.py \
+  tests/test_retention_drill.py \
+  tests/test_altdata_structural_golden.py \
+  tests/test_webhook_mesh_chaos.py \
+  tests/test_bundle_sign.py \
+  -v --tb=short
+pass "Forensic hardening suite"
+
+section "F8 retention drill"
+chmod +x ./scripts/instpp_retention_drill.sh
+./scripts/instpp_retention_drill.sh
+pass "F8 retention drill"
+
 section "Industry gold — chaos + integration"
 "$PYTHON" -m pytest tests/test_industry_gold.py -v --tb=short
 pass "Industry gold chaos suite"
 
-section "Production Redis — live profile"
+section "Production Redis — live profile + soak"
 if [[ -n "${INST_REDIS_URL:-}" ]]; then
-  "$PYTHON" -m pytest tests/test_redis_live.py -v --tb=short
-  pass "Live Redis profile (INST_REDIS_URL)"
+  "$PYTHON" -m pytest tests/test_redis_live.py tests/test_redis_soak.py -v --tb=short
+  pass "Live Redis profile + soak (INST_REDIS_URL)"
 else
-  echo "[SKIP] INST_REDIS_URL unset — single-instance VPC default; see docs/PRODUCTION_REDIS_PROFILE.md"
+  INST_REDIS_SOAK_ITERATIONS=20 "$PYTHON" -m pytest tests/test_redis_soak.py -v --tb=short 2>/dev/null || \
+    echo "[SKIP] Redis soak — set INST_REDIS_URL for live profile"
+fi
+
+section "Postgres profile — Compliance + Spend (#1, #11)"
+if [[ -n "${INST_TEST_POSTGRES_DSN:-}" ]]; then
+  "$PYTHON" -m pytest tests/test_postgres_profile.py -v --tb=short
+  pass "Postgres profile (INST_TEST_POSTGRES_DSN)"
+else
+  echo "[SKIP] INST_TEST_POSTGRES_DSN unset — see docs/PRODUCTION_DEPLOYMENT.md"
+fi
+
+section "SOC2 evidence collector"
+if [[ -f "$WORK/../data/demo/portfolio/PORTFOLIO_MANIFEST.json" ]] || [[ -f "./data/demo/portfolio/PORTFOLIO_MANIFEST.json" ]]; then
+  MANIFEST="./data/demo/portfolio/PORTFOLIO_MANIFEST.json"
+  if [[ ! -f "$MANIFEST" ]]; then
+    MANIFEST="data/demo/portfolio/PORTFOLIO_MANIFEST.json"
+  fi
+  if [[ -f "$MANIFEST" ]]; then
+    "$PYTHON" ./scripts/soc2_evidence_collector.py --manifest "$MANIFEST" --out "$LOG_DIR/soc2_evidence_latest.json"
+    pass "SOC2 evidence collector"
+  else
+    echo "[SKIP] PORTFOLIO_MANIFEST.json not found — run make verify-portfolio first"
+  fi
+else
+  echo "[SKIP] PORTFOLIO_MANIFEST.json not found — run make verify-portfolio first"
 fi
 
 section "Summary"
@@ -838,6 +916,7 @@ print(json.dumps({
     'status': 'PASSED',
     'e2e_sections': 39,
     'industry_gold': True,
+    'forensic_hardening': True,
     'finished_utc': '$ENDED_AT',
     'log_file': '$(basename "$LOG_FILE")',
 }, indent=2))

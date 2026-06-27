@@ -14,6 +14,7 @@ from fastapi import FastAPI, Request, Response, status
 from health_telemetry.ingest import ingest_batch
 from inst_spine.clocks import LamportClock
 from inst_spine.errors import IngestValidationError
+from inst_spine.middleware import install_api_key_middleware, verify_device_token
 from inst_spine.rates import idempotency_backend_from_env
 from inst_spine.wal import WALWriter
 
@@ -24,6 +25,7 @@ logging.basicConfig(
 logger = logging.getLogger("health_telemetry.serve")
 
 app = FastAPI(title="Health Telemetry — WAL-before-ack batch ingress")
+install_api_key_middleware(app, env_var="HEALTH_TELEMETRY_API_KEY")
 
 
 class RuntimeState:
@@ -92,6 +94,9 @@ async def post_telemetry_batch(request: Request) -> dict[str, Any] | Response:
 
     if not device_id:
         return _json_response({"error": "device_id required"}, status.HTTP_400_BAD_REQUEST)
+    device_token = (request.headers.get("X-Device-Token") or "").strip()
+    if not verify_device_token(device_id, device_token):
+        return _json_response({"error": "device authentication failed"}, status.HTTP_401_UNAUTHORIZED)
     if not isinstance(packets, list) or not packets:
         return _json_response({"error": "packets must be a non-empty array"}, status.HTTP_400_BAD_REQUEST)
 

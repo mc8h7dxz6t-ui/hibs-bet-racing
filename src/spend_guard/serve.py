@@ -18,6 +18,8 @@ from spend_guard.cost import actual_cost_from_usage, estimate_reserve_cost
 from spend_guard.gateway import SpendGuardGateway, SpendRequest
 from spend_guard.wallet_factory import open_wallet
 
+from inst_spine.middleware import install_api_key_middleware
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -25,6 +27,7 @@ logging.basicConfig(
 logger = logging.getLogger("spend_guard.serve")
 
 app = FastAPI(title="Spend Guard — OpenAI-compatible gateway")
+install_api_key_middleware(app, env_var="SPEND_GUARD_API_KEY", skip_prefixes=("/static",))
 
 _UPSTREAM_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
 

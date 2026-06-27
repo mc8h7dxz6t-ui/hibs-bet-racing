@@ -4,7 +4,8 @@
 
 **Audience:** Engineering, diligence, design partners  
 **Date:** June 2026  
-**Proof baseline:** `make smoke` (174+) · `make rigorous` (12/12) · `make chaos` · Tier A/B/C/D in `tests/test_forensic_tiers.py`
+**Status:** Waves 1–4 **implemented** on branch `cursor/forensic-waves-1-4-64ab`  
+**Proof baseline:** `make smoke` (191+) · `make rigorous` (12/12 + forensic suite) · `make retention-drill` · `make soc2-evidence`
 
 ---
 

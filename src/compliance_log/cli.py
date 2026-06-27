@@ -93,18 +93,22 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "export":
+        from compliance_log.export_policy import write_policy_file
         from inst_spine.export import build_audit_bundle, verify_bundle_reproducible
 
         if args.repro_check:
             ok, msg = verify_bundle_reproducible(args.database)
             print(json.dumps({"ok": ok, "message": msg, "product": PRODUCT}, indent=2))
             return 0 if ok else 1
+        policy_path = Path(args.database).parent / "export_policy.json"
+        write_policy_file(policy_path)
         result = build_audit_bundle(
             args.database,
             out_dir=args.out_dir,
             tarball_path=args.tarball,
             anchor_path=args.anchor,
             product=PRODUCT,
+            extra_files={"export_policy.json": policy_path},
         )
         print(
             json.dumps(

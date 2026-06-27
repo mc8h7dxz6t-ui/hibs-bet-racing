@@ -11,7 +11,10 @@ from fastapi.responses import JSONResponse
 
 from agent_ledger.gate import AgentActionRequest, gate_from_paths
 
+from inst_spine.middleware import install_api_key_middleware
+
 app = FastAPI(title="Agent Ledger — runtime tool authorization")
+install_api_key_middleware(app, env_var="AGENT_LEDGER_API_KEY")
 
 
 def _ledger_db() -> Path:
