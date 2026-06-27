@@ -34,6 +34,7 @@ echo "==> Running institutional test suite (12 SKUs)"
   tests/test_agent_ledger.py \
   tests/test_forensic_tiers.py \
   tests/test_industry_gold.py \
+  tests/test_inst_workflow.py \
   -q
 
 echo "==> Compliance export repro-check (ephemeral DB)"

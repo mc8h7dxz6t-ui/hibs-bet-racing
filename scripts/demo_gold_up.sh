@@ -41,15 +41,18 @@ if [[ -f "$PID_FILE" ]]; then
   rm -f "$PID_FILE"
 fi
 
+export PORTFOLIO_DEMO_DIR="$DEMO_DIR"
 export INST_COMPLIANCE_DB="$DEMO_DIR/compliance.sqlite"
 export INST_PROXY_DB="$DEMO_DIR/proxy.sqlite"
 export INST_EXPORT_DIR="${ROOT}/data/demo/ui_exports"
+export INST_WORKFLOW_DEFAULT_TAB="${INST_WORKFLOW_DEFAULT_TAB:-proof}"
 
 nohup "$PYTHON" -m inst_workflow.cli serve \
   --host "$HOST" --port "$PORT" \
   --compliance-db "$INST_COMPLIANCE_DB" \
   --proxy-db "$INST_PROXY_DB" \
   --export-dir "$INST_EXPORT_DIR" \
+  --demo-dir "$DEMO_DIR" \
   >"$LOG_FILE" 2>&1 &
 echo $! >"$PID_FILE"
 

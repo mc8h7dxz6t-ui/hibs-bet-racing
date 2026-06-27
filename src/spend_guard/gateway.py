@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from inst_spine.ledger import AppendOnlyLedger
-from spend_guard.wallet import SpendWallet
+from spend_guard.wallet_factory import open_wallet
 
 
 class SpendGuardDecision(str, Enum):
@@ -49,7 +49,7 @@ class SpendGuardGateway:
 
     def __init__(
         self,
-        wallet: SpendWallet,
+        wallet: Any,
         *,
         ledger: AppendOnlyLedger | None = None,
         shadow_mode: bool = False,
@@ -149,6 +149,6 @@ def gateway_from_paths(
     initial_balance: float = 1000.0,
     shadow_mode: bool = False,
 ) -> SpendGuardGateway:
-    wallet = SpendWallet(wallet_db, initial_balance=initial_balance, ledger_db=ledger_db)
+    wallet = open_wallet(wallet_db, initial_balance=initial_balance, ledger_db=ledger_db)
     ledger = AppendOnlyLedger(ledger_db) if ledger_db else None
     return SpendGuardGateway(wallet=wallet, ledger=ledger, shadow_mode=shadow_mode)

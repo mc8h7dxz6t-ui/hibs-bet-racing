@@ -17,6 +17,7 @@ from inst_spine.check import build_compliance_context, run_institutional_check
 from inst_spine.export import build_audit_bundle, verify_audit_bundle
 from inst_spine.ledger import AppendOnlyLedger
 from inst_workflow.catalog import PRODUCT_CATALOG, catalog_by_id, list_catalog
+from inst_workflow.demo_bootstrap import bootstrap_all, bootstrap_product
 from proxy_risk.router import ProxyRequest, ProxyRiskGateway
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -41,6 +42,7 @@ class RuntimeState:
     upstream_base: str = os.getenv("PROXY_RISK_UPSTREAM_BASE", "https://httpbin.org")
     product: str = normalize_product(os.getenv("INST_WORKFLOW_PRODUCT", "both"))
     active_proof_product: str = os.getenv("INST_PROOF_PRODUCT", "compliance")
+    default_tab: str = os.getenv("INST_WORKFLOW_DEFAULT_TAB", "arch")
 
 
 def _product_enabled(name: str) -> bool:
@@ -122,6 +124,8 @@ class ProxyEvaluateBody(BaseModel):
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
+    catalog = list_catalog(demo_dir=state.demo_dir)
+    seeded = sum(1 for c in catalog if c.get("database_present"))
     return {
         "ok": True,
         "product": state.product,
@@ -132,6 +136,24 @@ async def health() -> dict[str, Any]:
         "proxy_db": str(state.proxy_db),
         "demo_dir": str(state.demo_dir),
         "proxy_shadow": state.proxy_shadow,
+        "portfolio_seeded": seeded,
+        "portfolio_total": len(PRODUCT_CATALOG),
+    }
+
+
+@app.get("/ready")
+async def ready() -> dict[str, Any]:
+    """K8s readiness — Proof Console usable when portfolio is seeded."""
+    catalog = list_catalog(demo_dir=state.demo_dir)
+    seeded = sum(1 for c in catalog if c.get("database_present"))
+    ok = seeded >= len(PRODUCT_CATALOG)
+    return {
+        "ok": ok,
+        "ready": ok,
+        "portfolio_seeded": seeded,
+        "portfolio_total": len(PRODUCT_CATALOG),
+        "demo_dir": str(state.demo_dir),
+        "message": "12/12 seeded" if ok else f"run make demo-all or POST /api/proof/bootstrap-all ({seeded}/12)",
     }
 
 
@@ -146,6 +168,67 @@ async def products_catalog() -> dict[str, Any]:
 
 class ProofSelectBody(BaseModel):
     product_id: str
+
+
+@app.post("/api/proof/{product_id}/bootstrap")
+async def proof_bootstrap(product_id: str) -> dict[str, Any]:
+    entry = _proof_entry(product_id)
+    result = bootstrap_product(entry, demo_dir=state.demo_dir, skip_live=True)
+    if not result["ok"]:
+        raise HTTPException(400, detail=result)
+    return result
+
+
+@app.post("/api/proof/bootstrap-all")
+async def proof_bootstrap_all() -> dict[str, Any]:
+    results = bootstrap_all(demo_dir=state.demo_dir, skip_live=True)
+    ok = all(r["ok"] for r in results)
+    return {
+        "ok": ok,
+        "seeded": sum(1 for r in results if r["ok"]),
+        "total": len(results),
+        "results": results,
+    }
+
+
+@app.post("/api/proof/verify-all")
+async def proof_verify_all() -> dict[str, Any]:
+    from inst_spine.export import verify_audit_bundle
+
+    results: list[dict[str, Any]] = []
+    failed = 0
+    for entry in PRODUCT_CATALOG:
+        tar = entry.export_tarball(state.export_dir)
+        if not tar.is_file():
+            tar = state.demo_dir / f"{entry.bundle_name}.tar"
+        row: dict[str, Any] = {
+            "id": entry.id,
+            "sku": entry.sku,
+            "tarball": str(tar),
+            "present": tar.is_file(),
+        }
+        if not tar.is_file():
+            row.update({"ok": False, "message": "tarball missing — export or make demo-all"})
+            failed += 1
+            results.append(row)
+            continue
+        verify = verify_audit_bundle(tar)
+        row.update(
+            {
+                "ok": verify.ok,
+                "institutional_passed": verify.institutional_passed,
+                "message": verify.message,
+            }
+        )
+        if not verify.ok:
+            failed += 1
+        results.append(row)
+    return {
+        "ok": failed == 0,
+        "verified_ok": sum(1 for r in results if r.get("ok")),
+        "total": len(PRODUCT_CATALOG),
+        "results": results,
+    }
 
 
 @app.post("/api/proof/select")
@@ -250,16 +333,15 @@ async def workflow_config() -> dict[str, Any]:
         "proxy": "Proxy-Risk Gateway",
         "both": "Compliance Logger · Proxy-Risk Gateway",
     }
-    default_tab = {
-        "compliance": "compliance",
-        "proxy": "proxy",
-        "both": "arch",
-    }
+    if state.product == "both":
+        default_tab = state.default_tab if state.default_tab in {"arch", "proof"} else "arch"
+    else:
+        default_tab = state.product
     return {
         "product": state.product,
         "title": titles[state.product],
         "badge": badges[state.product],
-        "default_tab": default_tab[state.product],
+        "default_tab": default_tab,
         "tabs": {
             "arch": state.product == "both",
             "proof": True,

@@ -11,7 +11,7 @@ from compliance_log.ingest import log_decision, manifest_from_dict
 from inst_spine.check import build_compliance_context, run_institutional_check
 from inst_spine.cli_util import run_cli
 from inst_spine.errors import IngestValidationError
-from inst_spine.ledger import AppendOnlyLedger
+from inst_spine.ledger_factory import open_ledger
 
 PRODUCT = "compliance-logger"
 
@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "check":
-        ledger = AppendOnlyLedger(args.database)
+        ledger = open_ledger(args.database)
         ctx = build_compliance_context(ledger, run_f9=True)
         report = run_institutional_check(
             ledger=ledger,
@@ -88,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if report.passed else 1
 
     if args.cmd == "verify-chain":
-        ledger = AppendOnlyLedger(args.database)
+        ledger = open_ledger(args.database)
         print(json.dumps(ledger.verify(), indent=2))
         return 0
 

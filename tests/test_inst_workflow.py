@@ -205,3 +205,96 @@ def test_workflow_config_includes_proof_tab(workflow_client):
     cfg = client.get("/api/config").json()
     assert cfg["tabs"]["proof"] is True
     assert len(cfg["proof"]["catalog"]) == 12
+
+
+def test_ready_not_seeded(workflow_client):
+    client, serve_mod, *_ = workflow_client
+    demo_dir = serve_mod.state.demo_dir
+    serve_mod.state.demo_dir = demo_dir.parent / "empty_portfolio"
+    serve_mod.state.demo_dir.mkdir(parents=True, exist_ok=True)
+
+    r = client.get("/ready")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is False
+    assert body["ready"] is False
+    assert body["portfolio_seeded"] == 0
+    assert body["portfolio_total"] == 12
+
+
+def test_health_portfolio_seeded_count(workflow_client):
+    client, serve_mod, *_ = workflow_client
+    r = client.get("/health")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["portfolio_total"] == 12
+    assert "portfolio_seeded" in body
+    assert body["portfolio_seeded"] <= 12
+
+
+def test_proof_bootstrap_compliance(workflow_client):
+    client, serve_mod, _, _, _, _ = workflow_client
+    demo_dir = serve_mod.state.demo_dir
+    demo_dir.mkdir(parents=True, exist_ok=True)
+    compliance_db = demo_dir / "compliance.sqlite"
+
+    r = client.get("/ready")
+    assert r.json()["portfolio_seeded"] < 12
+
+    r = client.post("/api/proof/compliance/bootstrap")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["product_id"] == "compliance"
+    assert compliance_db.is_file()
+
+    r = client.get("/ready")
+    seeded = r.json()["portfolio_seeded"]
+    assert seeded >= 1
+
+
+def test_proof_bootstrap_all_endpoint_shape(workflow_client, monkeypatch):
+    client, serve_mod, *_ = workflow_client
+    demo_dir = serve_mod.state.demo_dir
+    demo_dir.mkdir(parents=True, exist_ok=True)
+
+    from inst_workflow import serve as serve_module
+    from inst_workflow.catalog import PRODUCT_CATALOG
+
+    def _fake_bootstrap_all(*, demo_dir, skip_live=True):
+        return [
+            {"ok": True, "product_id": e.id, "sku": e.sku}
+            for e in PRODUCT_CATALOG
+        ]
+
+    monkeypatch.setattr(serve_module, "bootstrap_all", _fake_bootstrap_all)
+
+    r = client.post("/api/proof/bootstrap-all")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["seeded"] == 12
+    assert body["total"] == 12
+    assert len(body["results"]) == 12
+
+
+def test_proof_verify_all_missing_tarballs(workflow_client):
+    client, serve_mod, *_ = workflow_client
+    serve_mod.state.demo_dir = serve_mod.state.demo_dir.parent / "no_bundles"
+    serve_mod.state.demo_dir.mkdir(parents=True, exist_ok=True)
+
+    r = client.post("/api/proof/verify-all")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is False
+    assert body["verified_ok"] == 0
+    assert body["total"] == 12
+
+
+@pytest.mark.parametrize("workflow_client", ["both"], indirect=True)
+def test_default_tab_proof_env(workflow_client, monkeypatch):
+    monkeypatch.setenv("INST_WORKFLOW_DEFAULT_TAB", "proof")
+    client, serve_mod, *_ = workflow_client
+    serve_mod.state.default_tab = "proof"
+    cfg = client.get("/api/config").json()
+    assert cfg["default_tab"] == "proof"

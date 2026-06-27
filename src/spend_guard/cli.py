@@ -16,7 +16,7 @@ from inst_spine.product_cli import (
 )
 
 from spend_guard.gateway import SpendGuardGateway, SpendRequest
-from spend_guard.wallet import SpendWallet
+from spend_guard.wallet_factory import open_wallet
 
 PRODUCT = "spend-guard"
 
@@ -77,12 +77,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "init-wallet":
         if args.wallet_db.exists():
             args.wallet_db.unlink()
-        wallet = SpendWallet(args.wallet_db, initial_balance=args.balance)
+        wallet = open_wallet(args.wallet_db, initial_balance=args.balance)
         print_json({"ok": True, "wallet": wallet.to_dict()})
         return 0
 
     if args.cmd == "reserve":
-        wallet = SpendWallet(args.wallet_db)
+        wallet = open_wallet(args.wallet_db)
         ledger = AppendOnlyLedger(args.ledger_db)
         gw = SpendGuardGateway(wallet=wallet, ledger=ledger, shadow_mode=args.shadow)
         resp = gw.reserve(SpendRequest(request_id=args.request_id, estimated_cost=args.cost))
@@ -90,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if resp.decision.value == "approve" else 1
 
     if args.cmd == "settle":
-        wallet = SpendWallet(args.wallet_db)
+        wallet = open_wallet(args.wallet_db)
         ledger = AppendOnlyLedger(args.ledger_db)
         gw = SpendGuardGateway(wallet=wallet, ledger=ledger)
         resp = gw.settle(args.hold_id, actual_cost=args.actual_cost, request_id=args.request_id)
@@ -98,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if resp.decision.value != "reject" else 1
 
     if args.cmd == "status":
-        wallet = SpendWallet(args.wallet_db)
+        wallet = open_wallet(args.wallet_db)
         print_json({"ok": True, "wallet": wallet.to_dict()})
         return 0
 
@@ -107,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
             args.wallet_db.unlink()
         if args.ledger_db.exists():
             args.ledger_db.unlink()
-        wallet = SpendWallet(args.wallet_db, initial_balance=1000.0, drift_threshold_pct=0.3)
+        wallet = open_wallet(args.wallet_db, initial_balance=1000.0, drift_threshold_pct=0.3)
         ledger = AppendOnlyLedger(args.ledger_db)
         gw = SpendGuardGateway(wallet=wallet, ledger=ledger)
         events = []
