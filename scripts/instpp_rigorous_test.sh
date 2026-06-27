@@ -916,6 +916,7 @@ print(json.dumps({
     'status': 'PASSED',
     'e2e_sections': 39,
     'industry_gold': True,
+    'demo_gold': True,
     'forensic_hardening': True,
     'finished_utc': '$ENDED_AT',
     'log_file': '$(basename "$LOG_FILE")',

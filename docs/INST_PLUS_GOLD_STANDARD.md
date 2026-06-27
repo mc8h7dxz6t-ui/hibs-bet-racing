@@ -112,10 +112,13 @@ See [RUN_DEMO.md](RUN_DEMO.md) for the full plug/demo/run guide.
 
 ### #7 Health Telemetry
 - Packet contract (`ts`, `seq`, profile fields) + F7 coverage at ingest
-- Per-device monotonic sequence gate (gap/backward fail-closed)
-- HTTP `POST /v1/telemetry/batch` — ingress WAL fsync before ack
-- `--observation-lane` export redacts raw packets; summaries + chain retained
-- HIPAA pack (template — not signed BAA)
+- Per-device monotonic **sequence gate** — gap/backward `seq` fail-closed (SQLite `DeviceSequenceStore`)
+- HTTP `POST /v1/telemetry/batch` — **ingress WAL fsync before ack** (`*_ingress.wal`, separate from ledger WAL)
+- Duplicate batch idempotency via `X-Idempotency-Key` / `X-Batch-Id` (optional Redis when `INST_REDIS_URL` set)
+- `--observation-lane` export redacts raw packets; `packet_summaries` + hash chain retained
+- Optional HTTP hardening: `HEALTH_DEVICE_AUTH_SECRET` + `X-Device-Token` (HMAC per `device_id`)
+- Rigorous E2E: CLI ingest + observation-lane export + HTTP WAL path (`instpp_rigorous_test.sh`)
+- HIPAA pack (template — not signed BAA) · full spec: `docs/HEALTH_TELEMETRY_SALES_TECH_SPEC.md`
 
 ### #8 ModelGovernor 8a
 - Model snapshot contract; governance actions on chain
