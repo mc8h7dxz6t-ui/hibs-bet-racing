@@ -8,15 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse
 
 from agent_ledger.gate import AgentActionRequest, gate_from_paths
-
-from inst_spine.health_probes import readiness_payload, sqlite_db_ready
+from agent_ledger.permits import PermitStore
+from inst_spine.health_probes import ledger_chain_ready, readiness_payload, sqlite_db_ready
+from inst_spine.http_lifecycle import json_response, make_lifespan
 from inst_spine.middleware import install_api_key_middleware
-
-app = FastAPI(title="Agent Ledger — runtime tool authorization")
-install_api_key_middleware(app, env_var="AGENT_LEDGER_API_KEY")
 
 
 def _ledger_db() -> Path:
@@ -28,36 +26,66 @@ def _permit_db() -> Path:
     return Path(raw) if raw else _ledger_db().with_name(_ledger_db().stem + "_permits.sqlite")
 
 
+def _startup() -> None:
+    swept = PermitStore(_permit_db()).sweep_expired()
+    if swept:
+        import logging
+
+        logging.getLogger("agent_ledger.serve").info("swept %s expired permits on startup", swept)
+
+
+def _shutdown() -> None:
+    return None
+
+
+app = FastAPI(
+    title="Agent Ledger — runtime tool authorization",
+    lifespan=make_lifespan(_startup, _shutdown),
+)
+install_api_key_middleware(app, env_var="AGENT_LEDGER_API_KEY")
+
+
 @app.get("/health")
 async def health() -> dict[str, Any]:
-    return {"ok": True, "service": "agent-ledger"}
+    return {
+        "ok": True,
+        "product": "agent-ledger",
+        "auth_required": bool(os.getenv("AGENT_LEDGER_API_KEY", "").strip()),
+    }
 
 
 @app.get("/ready")
-async def ready() -> Response:
+async def ready() -> Any:
     ledger_ok, ledger_detail = sqlite_db_ready(_ledger_db())
     permit_ok, permit_detail = sqlite_db_ready(_permit_db())
+    chain_ok, chain_detail = ledger_chain_ready(_ledger_db())
     body = readiness_payload(
         product="agent-ledger",
         checks={
             "ledger_db": (ledger_ok, ledger_detail),
             "permit_db": (permit_ok, permit_detail),
+            "ledger_chain": (chain_ok, chain_detail),
         },
     )
-    code = status.HTTP_200_OK if body["ready"] else status.HTTP_503_SERVICE_UNAVAILABLE
-    return Response(content=json.dumps(body), status_code=code, media_type="application/json")
+    return json_response(body, status_code=200 if body["ready"] else 503)
 
 
 @app.post("/v1/authorize")
 async def authorize(request: Request) -> JSONResponse:
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "invalid JSON"}, status_code=400)
     if not isinstance(body, dict):
         return JSONResponse({"ok": False, "error": "JSON object required"}, status_code=400)
+    tool_name = str(body.get("tool_name") or "").strip()
+    if not tool_name:
+        return JSONResponse({"ok": False, "error": "tool_name required"}, status_code=400)
     gw = gate_from_paths(ledger_db=_ledger_db(), permit_db=_permit_db())
     resp = gw.authorize(
         AgentActionRequest(
             agent_id=str(body.get("agent_id") or "agent"),
-            tool_name=str(body.get("tool_name") or ""),
+            tool_name=tool_name,
             arguments=body.get("arguments") or {},
             session_id=str(body.get("session_id") or ""),
             idempotency_key=body.get("idempotency_key"),
@@ -69,10 +97,13 @@ async def authorize(request: Request) -> JSONResponse:
 
 @app.post("/v1/complete")
 async def complete(request: Request) -> JSONResponse:
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "invalid JSON"}, status_code=400)
     if not isinstance(body, dict):
         return JSONResponse({"ok": False, "error": "JSON object required"}, status_code=400)
-    permit_id = str(body.get("permit_id") or "")
+    permit_id = str(body.get("permit_id") or "").strip()
     if not permit_id:
         return JSONResponse({"ok": False, "error": "permit_id required"}, status_code=400)
     gw = gate_from_paths(ledger_db=_ledger_db(), permit_db=_permit_db())

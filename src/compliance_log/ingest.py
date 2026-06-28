@@ -35,7 +35,7 @@ def log_decision(
     outcome: dict[str, Any],
     actor: str,
     manifest: RunManifest | None = None,
-    database: Path | None = None,
+    database: Path | str | None = None,
     async_writes: bool = False,
     required_fields: list[str] | None = None,
 ) -> dict[str, Any]:

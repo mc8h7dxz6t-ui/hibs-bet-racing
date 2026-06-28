@@ -35,3 +35,22 @@ def test_readiness_payload_partial_fail():
         checks={"a": (True, "ok"), "b": (False, "down")},
     )
     assert body["ready"] is False
+
+
+def test_wallet_state_ready_operational(tmp_path):
+    from inst_spine.health_probes import wallet_state_ready
+    from spend_guard.wallet import SpendWallet
+
+    path = tmp_path / "wallet.sqlite"
+    SpendWallet(path, initial_balance=100.0)
+    ok, detail = wallet_state_ready(path)
+    assert ok is True
+    assert "balance=" in detail
+
+
+def test_ledger_chain_ready_uninitialized(tmp_path):
+    from inst_spine.health_probes import ledger_chain_ready
+
+    ok, detail = ledger_chain_ready(tmp_path / "fresh.sqlite")
+    assert ok is True
+    assert detail == "ledger_not_initialized"

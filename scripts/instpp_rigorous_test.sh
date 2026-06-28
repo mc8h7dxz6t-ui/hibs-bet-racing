@@ -90,6 +90,7 @@ section "Unit tests — full institutional suite"
   tests/test_inst_export.py \
   tests/test_inst_products.py \
   tests/test_proxy_risk.py \
+  tests/test_compliance_serve.py \
   tests/test_proxy_risk_serve.py \
   tests/test_health_probes.py \
   tests/test_inst_coverage.py \
@@ -234,6 +235,36 @@ else
   echo "[SKIP] INST_TEST_POSTGRES_DSN unset — Postgres HA profile (CI postgres-profile job)"
   pass "Compliance Postgres skipped (offline-safe)"
 fi
+
+section "Compliance Logger — HTTP ingest (/v1/decisions)"
+COMPLIANCE_HTTP_DB="$WORK/compliance_http.sqlite"
+rm -f "$COMPLIANCE_HTTP_DB"
+export COMPLIANCE_LOGGER_DATABASE="$COMPLIANCE_HTTP_DB"
+export COMPLIANCE_LOGGER_API_KEY=rigorous-compliance-key
+"$PYTHON" - <<'PY'
+import json
+import os
+
+from fastapi.testclient import TestClient
+import compliance_log.serve as serve_mod
+
+serve_mod.state.database = os.environ["COMPLIANCE_LOGGER_DATABASE"]
+client = TestClient(serve_mod.app)
+assert client.get("/ready").json()["ready"] is True
+headers = {"Authorization": "Bearer rigorous-compliance-key"}
+r = client.post(
+    "/v1/decisions",
+    json={
+        "snapshot": json.loads(open("docs/demo_snapshot.json").read()),
+        "outcome": {"status": "approved", "ref": "rigorous-http"},
+        "actor": "rigorous-http",
+    },
+    headers=headers,
+)
+assert r.status_code == 200, r.text
+print(json.dumps({"compliance_http_ingest": "ok", "entry_id": r.json()["entry"].get("entry_id")}))
+PY
+pass "Compliance Logger HTTP serve rigorous E2E"
 
 section "Compliance Logger — negative gate (genesis-only abort)"
 GENESIS_ONLY="$WORK/genesis_only.sqlite"
@@ -461,6 +492,7 @@ rm -f "$PROXY_HTTP_DB"
 export PROXY_RISK_DATABASE="$PROXY_HTTP_DB"
 export PROXY_RISK_SHADOW=1
 export PROXY_RISK_API_KEY=rigorous-proxy-key
+export INST_FORCE_MEMORY_BACKENDS=1
 "$PYTHON" - <<'PY'
 import json
 import os
@@ -991,15 +1023,16 @@ print(json.dumps({
         'drift_gate', 'webhook_replay', 'spend_guard', 'agent_ledger',
     ],
     'status': 'PASSED',
-    'e2e_sections': 41,
+    'e2e_sections': 42,
     'industry_gold': True,
     'demo_gold': True,
     'forensic_hardening': True,
     'engineering_completion': {
-        'inst_spine': 96,
-        'proxy_compliance_bundle': 95,
-        'webhook_mesh_replay': 95,
-        'spend_agent_demo_gold': 95,
+        'inst_spine': 98,
+        'proxy_compliance_bundle': 98,
+        'webhook_mesh_replay': 97,
+        'spend_agent_demo_gold': 98,
+        'standard': 'industry_leading_no_corners_cut',
     },
     'finished_utc': '$ENDED_AT',
     'log_file': '$(basename "$LOG_FILE")',
