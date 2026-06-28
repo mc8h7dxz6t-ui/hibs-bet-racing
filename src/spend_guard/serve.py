@@ -18,6 +18,7 @@ from spend_guard.cost import actual_cost_from_usage, estimate_reserve_cost
 from spend_guard.gateway import SpendGuardGateway, SpendRequest
 from spend_guard.wallet_factory import open_wallet
 
+from inst_spine.health_probes import readiness_payload, sqlite_db_ready
 from inst_spine.middleware import install_api_key_middleware
 
 logging.basicConfig(
@@ -96,6 +97,22 @@ async def health() -> dict[str, Any]:
         "mock_upstream": state.mock_upstream,
         "wallet": wallet,
     }
+
+
+@app.get("/ready")
+async def ready() -> Response:
+    wallet_ok, wallet_detail = sqlite_db_ready(state.wallet_db)
+    ledger_ok, ledger_detail = sqlite_db_ready(state.ledger_db)
+    body = readiness_payload(
+        product="spend-guard",
+        checks={
+            "wallet_db": (wallet_ok, wallet_detail),
+            "ledger_db": (ledger_ok, ledger_detail),
+        },
+        extra={"mock_upstream": state.mock_upstream},
+    )
+    code = status.HTTP_200_OK if body["ready"] else status.HTTP_503_SERVICE_UNAVAILABLE
+    return Response(content=json.dumps(body), status_code=code, media_type="application/json")
 
 
 @app.get("/v1/models")

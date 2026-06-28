@@ -17,6 +17,8 @@ echo "==> Running institutional test suite (12 SKUs)"
   tests/test_inst_products.py \
   tests/test_inst_export.py \
   tests/test_proxy_risk.py \
+  tests/test_proxy_risk_serve.py \
+  tests/test_health_probes.py \
   tests/test_inst_coverage.py \
   tests/test_compliance_cli.py \
   tests/test_altdata_cli.py \

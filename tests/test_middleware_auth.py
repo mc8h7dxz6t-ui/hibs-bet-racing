@@ -37,6 +37,7 @@ def test_agent_ledger_requires_api_key(agent_client):
         headers={"Authorization": "Bearer test-agent-key"},
     )
     assert r.status_code in (200, 403)
+    assert agent_client.get("/ready").json()["ready"] is True
 
 
 def test_spend_guard_requires_api_key(tmp_path, monkeypatch):
@@ -66,6 +67,7 @@ def test_spend_guard_requires_api_key(tmp_path, monkeypatch):
             headers={"Authorization": "Bearer spend-test-key", "X-Request-Id": "mw-1"},
         )
         assert r.status_code == 200
+        assert client.get("/ready").json()["ready"] is True
 
 
 def test_health_device_token(monkeypatch):

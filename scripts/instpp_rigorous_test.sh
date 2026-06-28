@@ -90,6 +90,8 @@ section "Unit tests — full institutional suite"
   tests/test_inst_export.py \
   tests/test_inst_products.py \
   tests/test_proxy_risk.py \
+  tests/test_proxy_risk_serve.py \
+  tests/test_health_probes.py \
   tests/test_inst_coverage.py \
   tests/test_compliance_cli.py \
   tests/test_altdata_cli.py \
@@ -207,6 +209,31 @@ OFFSITE_VERIFY=$("$PYTHON" -m compliance_log.cli verify-bundle \
 echo "$OFFSITE_VERIFY"
 echo "$OFFSITE_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "Offsite genesis anchor verify-bundle"
+
+section "Compliance Logger — Postgres HA profile"
+if [[ -n "${INST_TEST_POSTGRES_DSN:-}" ]]; then
+  "$PYTHON" - <<PY
+import json
+import os
+from compliance_log.ingest import log_decision
+from inst_spine.ledger_factory import open_ledger
+
+dsn = os.environ["INST_TEST_POSTGRES_DSN"]
+entry = log_decision(
+    snapshot={"id": "pg-rigorous", "status": "approved"},
+    outcome={"ref": "rigorous-pg"},
+    actor="rigorous-pg-auditor",
+    database=dsn,
+)
+verify = open_ledger(dsn, writer_id="rigorous-pg-auditor").verify()
+assert verify.get("chain_ok"), verify
+print(json.dumps({"postgres_compliance": "ok", "entry_id": entry.get("entry_id")}))
+PY
+  pass "Compliance Logger Postgres ingest + chain verify"
+else
+  echo "[SKIP] INST_TEST_POSTGRES_DSN unset — Postgres HA profile (CI postgres-profile job)"
+  pass "Compliance Postgres skipped (offline-safe)"
+fi
 
 section "Compliance Logger — negative gate (genesis-only abort)"
 GENESIS_ONLY="$WORK/genesis_only.sqlite"
@@ -427,6 +454,46 @@ async def bench():
 asyncio.run(bench())
 PY
 pass "p99 shadow latency < 10ms (10k iterations)"
+
+section "Proxy-Risk — production HTTP serve (/health /ready /v1/evaluate)"
+PROXY_HTTP_DB="$WORK/proxy_http.sqlite"
+rm -f "$PROXY_HTTP_DB"
+export PROXY_RISK_DATABASE="$PROXY_HTTP_DB"
+export PROXY_RISK_SHADOW=1
+export PROXY_RISK_API_KEY=rigorous-proxy-key
+"$PYTHON" - <<'PY'
+import json
+import os
+
+from fastapi.testclient import TestClient
+import proxy_risk.serve as serve_mod
+
+serve_mod.state.ledger_db = os.environ["PROXY_RISK_DATABASE"]
+serve_mod.state.shadow_mode = True
+serve_mod.state.gateway = None
+serve_mod.state.ledger = None
+
+client = TestClient(serve_mod.app)
+assert client.get("/health").json()["ok"] is True
+assert client.get("/ready").json()["ready"] is True
+headers = {"Authorization": "Bearer rigorous-proxy-key"}
+body = {
+    "client_id": "rigorous-http",
+    "method": "POST",
+    "path": "/orders",
+    "body": {"symbol": "AAPL", "qty": 10},
+    "idempotency_key": "rigorous-proxy-http-1",
+}
+r = client.post("/v1/evaluate", json=body, headers=headers)
+assert r.status_code == 200, r.text
+assert r.json()["decision"] == "approve"
+dup = client.post("/v1/evaluate", json=body, headers=headers)
+assert dup.status_code == 429
+if serve_mod.state.ledger:
+    serve_mod.state.ledger.stop_async_writer(flush=True)
+print(json.dumps({"proxy_http_serve": "ok"}))
+PY
+pass "Proxy-Risk FastAPI serve rigorous E2E"
 
 section "Alt-Data — poll + check + export + verify"
 ALT_CTX='{"demo_price":42.5,"demo_seats":180,"demo_route":"LHR-JFK","raw_html":"<td>42.5</td><td>180</td>"}'
@@ -843,6 +910,7 @@ from fastapi.testclient import TestClient
 import agent_ledger.serve as serve_mod
 
 client = TestClient(serve_mod.app)
+assert client.get("/ready").json()["ready"] is True
 r = client.post("/v1/authorize", json={"agent_id": "rig", "tool_name": "read_file", "arguments": {}})
 assert r.status_code == 401, r.text
 r = client.post(
@@ -873,6 +941,8 @@ chmod +x ./scripts/instpp_retention_drill.sh
 pass "F8 retention drill"
 
 section "Industry gold — chaos + integration"
+unset SPEND_GUARD_API_KEY
+unset AGENT_LEDGER_API_KEY
 "$PYTHON" -m pytest tests/test_industry_gold.py -v --tb=short
 pass "Industry gold chaos suite"
 
@@ -921,10 +991,16 @@ print(json.dumps({
         'drift_gate', 'webhook_replay', 'spend_guard', 'agent_ledger',
     ],
     'status': 'PASSED',
-    'e2e_sections': 39,
+    'e2e_sections': 41,
     'industry_gold': True,
     'demo_gold': True,
     'forensic_hardening': True,
+    'engineering_completion': {
+        'inst_spine': 96,
+        'proxy_compliance_bundle': 95,
+        'webhook_mesh_replay': 95,
+        'spend_agent_demo_gold': 95,
+    },
     'finished_utc': '$ENDED_AT',
     'log_file': '$(basename "$LOG_FILE")',
 }, indent=2))

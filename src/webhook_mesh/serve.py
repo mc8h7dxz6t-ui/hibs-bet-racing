@@ -12,6 +12,7 @@ from typing import Any
 from fastapi import FastAPI, Request, Response, status
 
 from inst_spine.clocks import LamportClock
+from inst_spine.health_probes import readiness_payload, redis_ready_from_env
 from inst_spine.rates import IdempotencyBackend, RedisIdempotencyBackend, idempotency_backend_from_env
 from inst_spine.wal import WALWriter
 from webhook_mesh.hmac_verify import verify_webhook_signature
@@ -84,6 +85,24 @@ async def graceful_spine_teardown() -> None:
 @app.get("/health")
 async def health() -> dict[str, Any]:
     return {"ok": True, "product": "webhook-mesh", "dispatch_mode": state.dispatch_mode}
+
+
+@app.get("/ready")
+async def ready() -> Response:
+    wal_ok = state.wal_writer is not None
+    secret_ok = bool(state.provider_secret)
+    redis_ok, redis_detail = redis_ready_from_env()
+    body = readiness_payload(
+        product="webhook-mesh",
+        checks={
+            "provider_secret": (secret_ok, "configured" if secret_ok else "WEBHOOK_PROVIDER_SECRET unset"),
+            "ingress_wal": (wal_ok, "wal_online" if wal_ok else "wal_not_initialized"),
+            "redis_optional": (redis_ok, redis_detail),
+        },
+        extra={"dispatch_mode": state.dispatch_mode},
+    )
+    code = status.HTTP_200_OK if body["ready"] else status.HTTP_503_SERVICE_UNAVAILABLE
+    return Response(content=json.dumps(body), status_code=code, media_type="application/json")
 
 
 def _json_response(body: dict[str, Any], code: int) -> Response:

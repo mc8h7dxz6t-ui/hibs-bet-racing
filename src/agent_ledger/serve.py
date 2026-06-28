@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from agent_ledger.gate import AgentActionRequest, gate_from_paths
 
+from inst_spine.health_probes import readiness_payload, sqlite_db_ready
 from inst_spine.middleware import install_api_key_middleware
 
 app = FastAPI(title="Agent Ledger — runtime tool authorization")
@@ -29,6 +31,21 @@ def _permit_db() -> Path:
 @app.get("/health")
 async def health() -> dict[str, Any]:
     return {"ok": True, "service": "agent-ledger"}
+
+
+@app.get("/ready")
+async def ready() -> Response:
+    ledger_ok, ledger_detail = sqlite_db_ready(_ledger_db())
+    permit_ok, permit_detail = sqlite_db_ready(_permit_db())
+    body = readiness_payload(
+        product="agent-ledger",
+        checks={
+            "ledger_db": (ledger_ok, ledger_detail),
+            "permit_db": (permit_ok, permit_detail),
+        },
+    )
+    code = status.HTTP_200_OK if body["ready"] else status.HTTP_503_SERVICE_UNAVAILABLE
+    return Response(content=json.dumps(body), status_code=code, media_type="application/json")
 
 
 @app.post("/v1/authorize")

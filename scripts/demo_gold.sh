@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Canonical spend-plane sales walkthrough — 11 steps, CLI-native (Spend Guard).
+# Canonical spend-plane sales walkthrough — 12 steps, CLI + HTTP gateway (Spend Guard).
 #
 # Shipped proof for LLM spend governance: reserve-before-dispatch, settle, drift lockout,
 # offline verify-bundle. Postgres compose stack is a design-partner north star — not required here.
@@ -159,9 +159,45 @@ step 11 "Audit surface" \
 "$PYTHON" -m spend_guard.cli export --database "$LEDGER_DB" --tarball "$TAR"
 "$PYTHON" -m spend_guard.cli verify-bundle --tarball "$TAR"
 
+step 12 "HTTP gateway" \
+  "OpenAI-compat serve — reserve/settle on HTTP path (production ingress proof)."
+
+export SPEND_GUARD_WALLET_DB="$WALLET_DB"
+export SPEND_GUARD_LEDGER_DB="$LEDGER_DB"
+export SPEND_GUARD_MOCK_UPSTREAM=1
+unset SPEND_GUARD_API_KEY
+"$PYTHON" - <<'PY'
+import json
+import os
+
+from fastapi.testclient import TestClient
+import spend_guard.serve as serve_mod
+
+serve_mod.state.wallet_db = os.environ["SPEND_GUARD_WALLET_DB"]
+serve_mod.state.ledger_db = os.environ["SPEND_GUARD_LEDGER_DB"]
+serve_mod.state.mock_upstream = True
+serve_mod.state.gateway = None
+
+client = TestClient(serve_mod.app)
+assert client.get("/ready").json()["ready"] is True
+r = client.post(
+    "/v1/chat/completions",
+    json={
+        "model": "demo-model",
+        "messages": [{"role": "user", "content": "gold demo HTTP"}],
+        "max_tokens": 8,
+    },
+    headers={"X-Request-Id": "gold-http-1"},
+)
+assert r.status_code == 200, r.text
+if serve_mod.state.ledger:
+    serve_mod.state.ledger.stop_async_writer(flush=True)
+print(json.dumps({"gold_http_gateway": "ok"}))
+PY
+
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║  GOLD DEMO COMPLETE — 11/11 steps                            ║"
+echo "║  GOLD DEMO COMPLETE — 12/12 steps (CLI + HTTP gateway)       ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 echo "  Bundle:  $TAR"
