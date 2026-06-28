@@ -102,7 +102,7 @@ async def test_proxy_drift_gate_integration_shadow(tmp_path: Path):
         ledger.close()
 
 
-def test_webhook_mesh_capture_integration(tmp_path: Path):
+def test_webhook_mesh_capture_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     capture_dir = tmp_path / "caps"
     os.environ["WEBHOOK_REPLAY_CAPTURE_DIR"] = str(capture_dir)
     try:
@@ -115,6 +115,12 @@ def test_webhook_mesh_capture_integration(tmp_path: Path):
         wal = tmp_path / "ingress.wal"
         secret = "chaos-secret"
         os.environ["WEBHOOK_MESH_LEDGER"] = str(db)
+        monkeypatch.setenv("WEBHOOK_PROVIDER_SECRET", secret)
+
+        async def _noop_startup() -> None:
+            return None
+
+        monkeypatch.setattr(serve_mod, "_startup", _noop_startup)
 
         class _NoQueue:
             async def enqueue(self, manifest):  # noqa: ANN001
@@ -224,7 +230,7 @@ async def test_redis_stream_delivery_integration(monkeypatch, tmp_path: Path):
 
 
 @pytest.mark.asyncio
-async def test_redis_stream_with_capture_integration(tmp_path: Path):
+async def test_redis_stream_with_capture_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Ingress + Redis stream mode + replay capture (industry gold)."""
     capture_dir = tmp_path / "caps"
     os.environ["WEBHOOK_REPLAY_CAPTURE_DIR"] = str(capture_dir)
@@ -242,6 +248,12 @@ async def test_redis_stream_with_capture_integration(tmp_path: Path):
         wal = tmp_path / "ingress.wal"
         secret = "stream-capture-secret"
         os.environ["WEBHOOK_MESH_LEDGER"] = str(db)
+        monkeypatch.setenv("WEBHOOK_PROVIDER_SECRET", secret)
+
+        async def _noop_startup() -> None:
+            return None
+
+        monkeypatch.setattr(serve_mod, "_startup", _noop_startup)
 
         redis_client = MagicMock()
         redis_client.xgroup_create = AsyncMock()
