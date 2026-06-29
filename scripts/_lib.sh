@@ -71,6 +71,16 @@ require_ranker_artifacts() {
     echo "Aborting — set HIBS_RACING_PRODUCTION=0 for dev heuristic mode or train ranker." >&2
     return 1
   fi
+  if [[ -x "${ROOT}/.venv/bin/python" ]]; then
+  PY="${ROOT}/.venv/bin/python"
+  else
+  PY="python3"
+  fi
+  if ! "${PY}" "${ROOT}/scripts/verify_ranker_artifacts.py" >/dev/null; then
+    echo "CRITICAL: ranker preflight failed (manifest/feature parity)" >&2
+    "${PY}" "${ROOT}/scripts/verify_ranker_artifacts.py" >&2 || true
+    return 1
+  fi
 }
 
 lookback_date() {

@@ -86,18 +86,18 @@ def apply_scoring_production_guard(
     """
     if scoring_mode != "ranker":
         return
-    missing: list[str] = []
-    if not model_path.exists() or model_path.stat().st_size == 0:
-        missing.append(str(model_path))
-    if not feature_path.exists() or feature_path.stat().st_size == 0:
-        missing.append(str(feature_path))
-    if missing:
-        raise FileNotFoundError(
-            "CRITICAL: LightGBM ranker artifacts are missing or empty: "
-            + ", ".join(missing)
-            + ". Aborting daily execution loop to prevent uncalibrated heuristic scores. "
-            "Run: hibs-racing build-matrix && hibs-racing train-ranker"
+    from hibs_racing.models.ranker_preflight import RankerPreflightError, verify_ranker_artifacts
+    from hibs_racing.models.ranker_manifest import ranker_manifest_path
+
+    try:
+        verify_ranker_artifacts(
+            model_path=model_path,
+            feature_path=feature_path,
+            manifest_path=ranker_manifest_path(),
+            require_manifest=False,
         )
+    except RankerPreflightError as exc:
+        raise FileNotFoundError(str(exc)) from exc
 
 
 def apply_scoring(
