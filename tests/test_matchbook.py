@@ -204,6 +204,15 @@ def test_fetch_matchbook_odds_aligns_runners():
     assert int(star["matchbook_place_runner_id"]) == 11
 
 
+def test_dates_within_slack_allows_adjacent_day():
+    from hibs_racing.odds.matchbook import _dates_within_slack, _expand_card_dates
+
+    assert _dates_within_slack("2026-06-29", "2026-06-30", 1)
+    assert not _dates_within_slack("2026-06-29", "2026-06-30", 0)
+    expanded = _expand_card_dates({"2026-06-29"}, 1)
+    assert "2026-06-28" in expanded and "2026-06-30" in expanded
+
+
 def test_matchbook_login_mock(monkeypatch):
     class Resp:
         def raise_for_status(self):

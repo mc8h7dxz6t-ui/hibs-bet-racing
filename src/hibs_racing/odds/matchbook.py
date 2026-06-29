@@ -5,7 +5,7 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from datetime import time as dt_time
 from pathlib import Path
 from typing import Any
@@ -76,6 +76,8 @@ class MatchbookFetchReport:
     events_loaded: int = 0
     near_miss_count: int = 0
     exchange_venues_on_card_dates: list[str] = field(default_factory=list)
+    adjacent_day_fallback: bool = False
+    date_slack_days: int = 0
     errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -86,6 +88,8 @@ class MatchbookFetchReport:
             "events_loaded": self.events_loaded,
             "near_miss_count": self.near_miss_count,
             "exchange_venues_on_card_dates": self.exchange_venues_on_card_dates,
+            "adjacent_day_fallback": self.adjacent_day_fallback,
+            "date_slack_days": self.date_slack_days,
             "errors": self.errors,
         }
 
@@ -356,6 +360,36 @@ def _event_off_datetime(event: dict) -> datetime | None:
     return dt.astimezone(LONDON)
 
 
+def _expand_card_dates(card_dates: set[str], slack_days: int) -> set[str]:
+    """Include ±slack_days around each card calendar date (UK-local card_date labels)."""
+    if slack_days <= 0:
+        return set(card_dates)
+    out = set(card_dates)
+    for raw in card_dates:
+        try:
+            base = date.fromisoformat(str(raw)[:10])
+        except ValueError:
+            continue
+        for delta in range(-slack_days, slack_days + 1):
+            out.add((base + timedelta(days=delta)).isoformat())
+    return out
+
+
+def _dates_within_slack(card_date: str | None, ev_date: str | None, slack_days: int) -> bool:
+    if not card_date or not ev_date:
+        return True
+    if str(card_date)[:10] == ev_date:
+        return True
+    if slack_days <= 0:
+        return False
+    try:
+        cd = date.fromisoformat(str(card_date)[:10])
+        ed = date.fromisoformat(str(ev_date)[:10])
+    except ValueError:
+        return False
+    return abs((ed - cd).days) <= slack_days
+
+
 def find_matching_exchange_event(
     exchange_events: list[dict],
     *,
@@ -365,6 +399,7 @@ def find_matching_exchange_event(
     time_tolerance_sec: int = 120,
     near_miss_sec: int = 600,
     near_miss_counter: list[int] | None = None,
+    date_slack_days: int = 0,
 ) -> dict | None:
     """
     Match card race → exchange event via venue aliases and ±time_tolerance_sec off-time.
@@ -375,7 +410,7 @@ def find_matching_exchange_event(
 
     for event in exchange_events:
         ev_date = matchbook_event_local_date(event.get("start"))
-        if card_date and ev_date and str(card_date)[:10] != ev_date:
+        if not _dates_within_slack(card_date, ev_date, date_slack_days):
             continue
         if not _venue_matches(course, event):
             continue
@@ -528,21 +563,34 @@ def _load_gb_ire_events_for_cards(
     cards: pd.DataFrame,
     *,
     mb_cfg: dict,
-) -> tuple[list[dict], list[str]]:
-    """Fetch Matchbook horse events limited to GB/IRE and the card calendar date(s)."""
+) -> tuple[list[dict], list[str], int]:
+    """Fetch Matchbook horse events limited to GB/IRE and the card calendar date(s).
+
+    Returns (events, sorted_card_dates, date_slack_days used for race matching).
+    """
     card_dates = {str(d) for d in cards["card_date"].dropna().astype(str).unique()}
     tag_names = (mb_cfg.get("tag_url_names") or "").strip()
     tag_kw = {"tag_url_names": tag_names} if tag_names else {}
+    slack_days = max(0, int(mb_cfg.get("date_slack_days", 1)))
 
     after_ts, before_ts = _card_day_window(cards)
     window_events = client.fetch_horse_events(after_ts=after_ts, before_ts=before_ts, **tag_kw)
     window_events = _filter_gb_ire_events(window_events)
     events = _events_on_card_dates(window_events, card_dates)
+    date_slack_used = 0
 
     all_uk: list[dict] = []
     if not events:
         all_uk = _filter_gb_ire_events(client.fetch_horse_events(**tag_kw))
         events = _events_on_card_dates(all_uk, card_dates)
+
+    if not events and slack_days > 0:
+        expanded = _expand_card_dates(card_dates, slack_days)
+        if not all_uk:
+            all_uk = _filter_gb_ire_events(client.fetch_horse_events(**tag_kw))
+        events = _events_on_card_dates(all_uk, expanded)
+        if events:
+            date_slack_used = slack_days
 
     if not events:
         if not all_uk:
@@ -555,7 +603,7 @@ def _load_gb_ire_events_for_cards(
             f"API UK/IRE events available on: {available or 'none'}"
         )
 
-    return events, sorted(card_dates)
+    return events, sorted(card_dates), date_slack_used
 
 
 def _card_day_window(cards: pd.DataFrame) -> tuple[int | None, int | None]:
@@ -590,10 +638,13 @@ def fetch_matchbook_odds(
 
     owns_client = client is None
     client = client or MatchbookClient(config_path=config_path)
+    date_slack_days = 0
     try:
         try:
-            events, _card_dates = _load_gb_ire_events_for_cards(client, cards, mb_cfg=mb_cfg)
+            events, _card_dates, date_slack_days = _load_gb_ire_events_for_cards(client, cards, mb_cfg=mb_cfg)
             report.events_loaded = len(events)
+            report.adjacent_day_fallback = date_slack_days > 0
+            report.date_slack_days = date_slack_days
             venues: list[str] = []
             for ev in events:
                 hint = _event_course_hint(ev)
@@ -629,6 +680,7 @@ def fetch_matchbook_odds(
                 time_tolerance_sec=time_tol,
                 near_miss_sec=near_miss_sec,
                 near_miss_counter=near_miss_counter,
+                date_slack_days=date_slack_days,
             )
             if event is None:
                 if len(report.errors) < 5:
