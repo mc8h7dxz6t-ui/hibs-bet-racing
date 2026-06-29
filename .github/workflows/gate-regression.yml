@@ -1,4 +1,4 @@
-name: Gate regression
+name: Production Security Gate
 
 on:
   pull_request:
