@@ -43,8 +43,8 @@ def test_redis_drift_rolling_soak(tmp_path):
     for i in range(SOAK_ITERATIONS):
         store = RollingStateStore.from_baseline(base, redis_key=key)
         assert store is not None
-        store._data = {"features": {"x": [float(i), float(i + 1)]}}
+        store._data = {"x": [float(i), float(i + 1)]}
         store.save()
         store2 = RollingStateStore.from_baseline(base, redis_key=key)
         assert store2 is not None
-        assert (store2._data.get("features") or {}).get("x") == [float(i), float(i + 1)]
+        assert store2._data.get("x") == [float(i), float(i + 1)]

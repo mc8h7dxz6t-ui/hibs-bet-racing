@@ -146,3 +146,19 @@ run_logged() {
   echo "OK: ${name}" | tee -a "${log}"
   return 0
 }
+
+# TIER 2 — housekeeping; never aborts the daily cron.
+run_tier2_logged() {
+  local name="$1"
+  shift
+  if ! run_logged "${name}" "$@"; then
+    echo "WARN: [TIER-2] ${name} failed — continuing" >&2
+  fi
+}
+
+is_production_mode() {
+  case "${HIBS_RACING_PRODUCTION:-0}" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}

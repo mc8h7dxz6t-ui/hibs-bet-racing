@@ -36,8 +36,11 @@ echo "hibs-racing daily refresh — results since ${START_DATE}"
 run_logged "daily-ingest-sync" \
   hibs-racing ingest-raceform "${RFDB}" --since "${START_DATE}" --sync
 
-run_logged "daily-scrape-results" \
-  hibs-racing scrape --days "${LOOKBACK_DAYS}" --region gb --ingest --from-cache || true
+# TIER-2: scrape-from-cache may be empty on quiet days — do not abort refresh-cards.
+if ! run_logged "daily-scrape-results" \
+  hibs-racing scrape --days "${LOOKBACK_DAYS}" --region gb --ingest --from-cache; then
+  echo "WARN: [TIER-2] daily-scrape-results failed — continuing" >&2
+fi
 # Prefer --from-cache on daily cron; live scrape uses rp_scrape_day_pause_sec pacing in config.
 
 export HIBS_POLL_MILESTONE=baseline
@@ -52,21 +55,23 @@ run_logged "daily-refresh-cards" \
     --poll-milestone baseline \
     --paper
 
-run_logged "daily-settle-paper" \
-  hibs-racing settle-paper || true
+run_tier2_logged "daily-settle-paper" \
+  hibs-racing settle-paper
 
-run_logged "daily-join-execution-slippage" \
-  hibs-racing join-execution-slippage --days 14 || true
+run_tier2_logged "daily-join-execution-slippage" \
+  hibs-racing join-execution-slippage --days 14
 
-run_logged "daily-notify" \
-  hibs-racing notify-daily --top "${HIBS_DAILY_PICKS_TOP:-3}" || true
+run_tier2_logged "daily-notify" \
+  hibs-racing notify-daily --top "${HIBS_DAILY_PICKS_TOP:-3}"
 
-run_logged "daily-log-retention" \
-  hibs-racing retain-logs || true
+run_tier2_logged "daily-log-retention" \
+  hibs-racing retain-logs
 
 PRIMARY_DATE="$(date -u +%F)"
-# Backfill any missing snapshot days in the lookback (best-effort; no-op when complete).
-hibs-racing snapshot-backfill --start "${START_DATE}" --end "${PRIMARY_DATE}" >/dev/null 2>&1 || true
+# TIER-2: backfill snapshots best-effort.
+if ! hibs-racing snapshot-backfill --start "${START_DATE}" --end "${PRIMARY_DATE}" >/dev/null 2>&1; then
+  echo "WARN: [TIER-2] snapshot-backfill incomplete" >&2
+fi
 
 OBS_LANE="${HIBS_OBSERVATION_LANE:-1}"
 INST_FLAGS=(--days 14 --card-date "${PRIMARY_DATE}")
@@ -81,6 +86,10 @@ if [[ "${OBS_LANE}" == "1" ]]; then
   INST_RC=$?
   set -e
   if [[ ${INST_RC} -ne 0 ]]; then
+    if is_production_mode; then
+      echo "CRITICAL: institutional-check failed in production mode (${INST_RC})" >&2
+      exit 1
+    fi
     echo "WARN: institutional-check returned ${INST_RC} (observation lane — card refresh is the hard gate)" >&2
   fi
 else
