@@ -50,6 +50,29 @@ raceform_db() {
   printf '%s' "${db}"
 }
 
+require_ranker_artifacts() {
+  local prod="${HIBS_RACING_PRODUCTION:-0}"
+  case "${prod}" in
+    1|true|yes|on) ;;
+    *) return 0 ;;
+  esac
+  local mp="${ROOT}/data/models/lgbm_ranker.txt"
+  local fp="${ROOT}/data/models/lgbm_ranker_features.json"
+  local missing=0
+  if [[ ! -s "${mp}" ]]; then
+    echo "CRITICAL: missing ranker model ${mp}" >&2
+    missing=1
+  fi
+  if [[ ! -s "${fp}" ]]; then
+    echo "CRITICAL: missing ranker features ${fp}" >&2
+    missing=1
+  fi
+  if [[ "${missing}" -ne 0 ]]; then
+    echo "Aborting — set HIBS_RACING_PRODUCTION=0 for dev heuristic mode or train ranker." >&2
+    return 1
+  fi
+}
+
 lookback_date() {
   local days="${1:-7}"
   if date -v-1d >/dev/null 2>&1; then

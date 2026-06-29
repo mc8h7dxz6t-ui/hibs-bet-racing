@@ -36,6 +36,8 @@ ranker:
   combo_alpha: 8.0
   min_rows: 500
   min_races: 50
+  scoring_mode: auto
+  production_scoring_mode: ranker
   model_file: lgbm_ranker.txt
   feature_file: lgbm_ranker_features.json
   enrich_feature_file: lgbm_ranker_features_enrich.json
