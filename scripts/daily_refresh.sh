@@ -17,6 +17,7 @@ fi
 
 activate_venv
 load_env
+require_ranker_artifacts
 
 for arg in "$@"; do
   if [[ "${arg}" == "--dry-run-quotes" ]]; then
