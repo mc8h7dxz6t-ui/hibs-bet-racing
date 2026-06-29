@@ -136,7 +136,12 @@ def create_app() -> Flask:
         ctx["health"] = health_status()
         football_base = os.environ.get("HIBS_FOOTBALL_BASE_URL", "http://127.0.0.1:5000").rstrip("/")
         ctx["hibs_football_base_url"] = football_base
-        ctx["hibs_racing_base_url"] = os.environ.get("HIBS_RACING_PUBLIC_URL", "").rstrip("/") or ""
+        base = (
+            os.environ.get("HIBS_RACING_PUBLIC_URL")
+            or os.environ.get("HIBS_RACING_BASE_URL")
+            or ""
+        ).rstrip("/")
+        ctx["hibs_racing_base_url"] = base
         ctx["hibs_football_home_url"] = football_base + "/"
         ctx["hibs_racing_home_url"] = "/cards"
         ctx["hibs_product_active"] = "racing"
