@@ -37,6 +37,44 @@ def test_value_gate_low_or():
     assert reason == "below_or_floor"
 
 
+def test_value_gate_nan_model_place_prob_blocks_value():
+    reason = value_gate_reason(
+        {
+            "race_name": "Class 4 Handicap",
+            "official_rating": 70,
+            "is_scored": True,
+            "model_score": 0.5,
+            "model_win_prob": 0.12,
+            "model_place_prob": float("nan"),
+            "value_flag": 1,
+        },
+        {"exempt_unrated_races": True, "require_official_rating_for_value": True},
+    )
+    assert reason == "nan_model_place_prob"
+
+
+def test_apply_value_gates_clears_nan_scored_runner():
+    frame = pd.DataFrame(
+        [
+            {
+                "runner_id": "r1",
+                "race_name": "Class 4 Handicap",
+                "official_rating": 70,
+                "is_scored": True,
+                "model_score": 0.5,
+                "model_win_prob": 0.12,
+                "model_place_prob": float("nan"),
+                "value_flag": 1,
+                "field_size": 10,
+            }
+        ]
+    )
+    cfg = {"exempt_unrated_races": True, "require_official_rating_for_value": True, "value_gates_enabled": True}
+    out = apply_value_gates(frame, cfg)
+    assert int(out.loc[0, "value_flag"]) == 0
+    assert out.loc[0, "value_gate_reason"] == "nan_model_place_prob"
+
+
 def test_attach_steam_gates_handles_nan_value_flag(monkeypatch):
     def fake_steam_gate_by_runner(value_ids, cards=None):
         return {rid: "proceed" for rid in (value_ids or [])}
