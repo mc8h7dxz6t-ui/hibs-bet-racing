@@ -3,6 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from hibs_racing.cards.data_quality import is_exempt_unrated_race, runner_data_quality_pct
+from hibs_racing.monitoring.nan_alert import SCORED_REQUIRED_FIELDS
 
 
 def _official_rating(row: pd.Series | dict) -> float | None:
@@ -15,6 +16,38 @@ def _official_rating(row: pd.Series | dict) -> float | None:
         return float(val)
     except (TypeError, ValueError):
         return None
+
+
+def _row_is_scored(row: pd.Series | dict) -> bool:
+    if isinstance(row, dict):
+        row = pd.Series(row)
+    if "is_scored" in row.index:
+        try:
+            return bool(row.get("is_scored"))
+        except (TypeError, ValueError):
+            pass
+    scored_at = row.get("scored_at")
+    if scored_at is not None and not (isinstance(scored_at, float) and pd.isna(scored_at)):
+        return True
+    return _num(row, "model_score") is not None
+
+
+def _nan_integrity_gate_reason(row: pd.Series | dict, paper_cfg: dict) -> str | None:
+    """Block value picks when required scored model fields are missing (fail closed)."""
+    if not paper_cfg.get("nan_integrity_gate_enabled", True):
+        return None
+    if not _row_is_scored(row):
+        return None
+    if isinstance(row, dict):
+        row = pd.Series(row)
+    for col in SCORED_REQUIRED_FIELDS:
+        if col == "value_flag":
+            continue
+        if col not in row.index:
+            return f"nan_missing_{col}"
+        if _num(row, col) is None:
+            return f"nan_{col}"
+    return None
 
 
 def _num(row: pd.Series | dict, key: str) -> float | None:
@@ -241,6 +274,10 @@ def value_gate_reason(row: pd.Series | dict, paper_cfg: dict) -> str | None:
     gate2 = _gate2_reason(row, paper_cfg)
     if gate2:
         return gate2
+
+    nan_block = _nan_integrity_gate_reason(row, paper_cfg)
+    if nan_block:
+        return nan_block
 
     return None
 
