@@ -571,7 +571,7 @@ def _load_gb_ire_events_for_cards(
     card_dates = {str(d) for d in cards["card_date"].dropna().astype(str).unique()}
     tag_names = (mb_cfg.get("tag_url_names") or "").strip()
     tag_kw = {"tag_url_names": tag_names} if tag_names else {}
-    slack_days = max(0, int(mb_cfg.get("date_slack_days", 1)))
+    slack_days = max(0, int(mb_cfg.get("date_slack_days", 0)))
 
     after_ts, before_ts = _card_day_window(cards)
     window_events = client.fetch_horse_events(after_ts=after_ts, before_ts=before_ts, **tag_kw)
