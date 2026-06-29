@@ -16,7 +16,7 @@ from pathlib import Path
 from inst_spine.ledger import AppendOnlyLedger
 from spend_guard.cost import actual_cost_from_usage, estimate_reserve_cost
 from spend_guard.gateway import SpendGuardGateway, SpendRequest
-from spend_guard.wallet import SpendWallet
+from spend_guard.wallet_factory import open_wallet
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,8 +50,8 @@ def _gateway() -> SpendGuardGateway:
             state.ledger.close()
             state.ledger = None
         ledger_path = Path(state.ledger_db)
-        wallet = SpendWallet(
-            Path(state.wallet_db),
+        wallet = open_wallet(
+            state.wallet_db,
             ledger_db=ledger_path,
         )
         if state.ledger is None:

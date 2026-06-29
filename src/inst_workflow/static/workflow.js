@@ -394,6 +394,41 @@
     }
   }
 
+  async function onProofBootstrap() {
+    try {
+      setOutput("#proof-output", "Bootstrapping SKU demo…");
+      const data = await api("POST", `/api/proof/${activeProofProduct}/bootstrap`);
+      setOutput("#proof-output", data);
+      const cat = await api("GET", "/api/products");
+      updateProofMeta(cat.catalog || []);
+      await loadProofLedger();
+    } catch (e) {
+      setOutput("#proof-output", e.payload || e.message || String(e));
+    }
+  }
+
+  async function onProofBootstrapAll() {
+    try {
+      setOutput("#proof-output", "Bootstrapping all 12 SKUs (offline)…");
+      const data = await api("POST", "/api/proof/bootstrap-all");
+      setOutput("#proof-output", data);
+      await loadProofCatalog();
+      await loadProofLedger();
+    } catch (e) {
+      setOutput("#proof-output", e.payload || e.message || String(e));
+    }
+  }
+
+  async function onProofVerifyAll() {
+    try {
+      setOutput("#proof-output", "Verifying all 12 bundles offline…");
+      const data = await api("POST", "/api/proof/verify-all");
+      setOutput("#proof-output", data);
+    } catch (e) {
+      setOutput("#proof-output", e.payload || e.message || String(e));
+    }
+  }
+
   function bind(id, fn) {
     const el = document.getElementById(id);
     if (el) el.addEventListener("click", fn);
@@ -422,10 +457,13 @@
     if (proofPicker) {
       proofPicker.addEventListener("change", () => onProofSelect().catch((e) => setOutput("#proof-output", e.message)));
     }
+    bind("btn-proof-bootstrap", onProofBootstrap);
+    bind("btn-proof-bootstrap-all", onProofBootstrapAll);
     bind("btn-proof-refresh", () => loadProofLedger().catch((e) => setOutput("#proof-output", e.message)));
     bind("btn-proof-check", onProofCheck);
     bind("btn-proof-export", onProofExport);
     bind("btn-proof-verify", onProofVerify);
+    bind("btn-proof-verify-all", onProofVerifyAll);
     if (cfg.tabs?.proof !== false) {
       loadProofCatalog()
         .then(() => loadProofLedger())

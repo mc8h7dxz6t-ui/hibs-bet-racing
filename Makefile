@@ -3,7 +3,7 @@
 
 .PHONY: help install plug buyer-pack demo-ready demo demo-all demo-phase2 demo-gold \
         demo-gold-up demo-gold-down demo-gold-reset smoke rigorous chaos proof \
-        verify-portfolio test instpp-test workflow-up workflow-down stack-up redis-up
+        verify-portfolio redis-soak test instpp-test workflow-up workflow-down stack-up redis-up
 
 PYTHON ?= python3
 DEMO_DIR ?= ./data/demo/portfolio
@@ -22,11 +22,12 @@ help:
 	@echo "  make demo-phase2       drift-gate + webhook-replay + spend-guard only"
 	@echo "  make demo-gold         canonical spend-plane walkthrough"
 	@echo "  make demo-gold-reset   wipe spend-gold wallet after drift lockout"
-	@echo "  make demo-gold-up      seed data + Proof Console UI (http://127.0.0.1:8790)"
+	@echo "  make demo-gold-up      seed data + Proof Console UI (http://127.0.0.1:8790, proof tab)"
+	@echo "  make redis-soak        Redis production profile soak (needs INST_REDIS_URL)"
 	@echo "  make demo-gold-down    stop workflow UI"
 	@echo "  make spend-gateway     OpenAI-compat spend gateway (mock upstream)"
 	@echo "  make stack-up          docker: workflow UI (+ optional redis profile)"
-	@echo "  make smoke             unit + integration smoke (134+ tests)"
+	@echo "  make smoke             unit + integration smoke (174+ tests)"
 	@echo "  make rigorous          12/12 rigorous E2E → docs/test_logs/"
 	@echo "  make proof             smoke + rigorous + verify-portfolio"
 	@echo "  make chaos             chaos + integration drills"
@@ -101,6 +102,9 @@ rigorous:
 	./scripts/instpp_rigorous_test.sh
 
 proof: smoke rigorous verify-portfolio
+
+redis-soak:
+	./scripts/instpp_redis_soak.sh
 
 chaos:
 	./scripts/chaos_instpp.sh

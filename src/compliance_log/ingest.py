@@ -8,7 +8,7 @@ from typing import Any
 from inst_spine.contracts import RunManifest, stable_id
 from inst_spine.coverage import compute_snapshot_coverage
 from inst_spine.errors import IngestValidationError
-from inst_spine.ledger import AppendOnlyLedger
+from inst_spine.ledger_factory import open_ledger
 
 
 def _default_db() -> Path:
@@ -50,7 +50,7 @@ def log_decision(
 
     db = database or _default_db()
     writer = actor or "compliance"
-    ledger = AppendOnlyLedger(db, writer_id=writer, async_writes=async_writes)
+    ledger = open_ledger(db, writer_id=writer, async_writes=async_writes)
     if async_writes:
         ledger.start_async_writer()
 
