@@ -8,8 +8,9 @@ import numpy as np
 import pandas as pd
 
 from hibs_racing.config import load_config, ranker_model_path
+from hibs_racing.features.ranker_matrix import impute_enrich_features, ranker_feature_columns
+from hibs_racing.models.ranker_preflight import is_production_mode
 from hibs_racing.ranker_features import resolve_ranker_feature_path
-from hibs_racing.features.ranker_matrix import ranker_feature_columns
 
 
 def _resolve_paths(
@@ -30,11 +31,30 @@ def _load_feature_cols(feature_json_path: Path) -> list[str]:
     return list(payload.get("features") or ranker_feature_columns())
 
 
+def _impute_column(series: pd.Series, col: str) -> pd.Series:
+    numeric = pd.to_numeric(series, errors="coerce")
+    if "win_rate" in col or "flag" in col or col.endswith("_position"):
+        return numeric.fillna(0.0)
+    if col == "form_trip_change_f":
+        return numeric.fillna(0.0)
+    median = float(numeric.median()) if numeric.notna().any() else 0.0
+    return numeric.fillna(median)
+
+
 def _build_feature_matrix(race_df: pd.DataFrame, feature_cols: list[str]) -> pd.DataFrame:
-    x = pd.DataFrame(index=race_df.index)
+    work = race_df
+    try:
+        from hibs_racing.cards.enrich import ENRICH_RANKER_FEATURES
+
+        if any(col in work.columns for col in ENRICH_RANKER_FEATURES):
+            work = impute_enrich_features(work.copy(), log_warnings=False)
+    except Exception:
+        work = race_df
+
+    x = pd.DataFrame(index=work.index)
     for col in feature_cols:
-        if col in race_df.columns:
-            x[col] = pd.to_numeric(race_df[col], errors="coerce").fillna(0.0)
+        if col in work.columns:
+            x[col] = _impute_column(work[col], col)
         else:
             x[col] = 0.0
     return x
@@ -113,7 +133,7 @@ def apply_scoring(
     """
     cfg = load_config(config_path)
     mode = cfg.get("ranker", {}).get("scoring_mode", "auto")
-    if os.environ.get("HIBS_RACING_PRODUCTION", "").strip() in {"1", "true", "yes"}:
+    if is_production_mode():
         mode = cfg.get("ranker", {}).get("production_scoring_mode", "ranker")
     mp, fp = _resolve_paths(model_path, feature_json_path, config_path)
 

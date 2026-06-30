@@ -147,11 +147,9 @@ def run_institutional_check(
     )
     if profile.get("warning"):
         detail = f"{detail} — {profile['warning']}"
-    production_mode = os.environ.get("HIBS_RACING_PRODUCTION", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+    from hibs_racing.models.ranker_preflight import is_production_mode
+
+    production_mode = is_production_mode()
     checks.append(
         {
             "name": "ranker_profile",

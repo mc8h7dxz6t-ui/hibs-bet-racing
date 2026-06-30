@@ -73,6 +73,13 @@ def verify_ranker_artifacts(
         if sorted(manifest_features) != sorted(features):
             errors.append("feature list mismatch vs ranker_manifest.json")
 
+    if manifest and model_path.is_file():
+        pinned_sha = str(manifest.get("model_sha256") or "").strip().lower()
+        if pinned_sha:
+            actual_sha = file_sha256(model_path)
+            if actual_sha != pinned_sha:
+                errors.append("model_sha256 mismatch vs ranker_manifest.json")
+
     if errors:
         raise RankerPreflightError(
             "CRITICAL: ranker preflight failed — "
@@ -129,3 +136,11 @@ def is_production_mode() -> bool:
         "yes",
         "on",
     )
+
+
+def observation_lane_enabled() -> bool:
+    """Production defaults to strict thresholds (observation lane off unless explicitly set)."""
+    raw = os.environ.get("HIBS_OBSERVATION_LANE")
+    if raw is None or not str(raw).strip():
+        return not is_production_mode()
+    return str(raw).strip().lower() in ("1", "true", "yes", "on")

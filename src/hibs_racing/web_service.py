@@ -206,12 +206,9 @@ def health_status() -> HealthStatus:
     telemetry_balance = None
     if manifest:
         from hibs_racing.institutional.telemetry_balance import evaluate_telemetry_balance
+        from hibs_racing.models.ranker_preflight import observation_lane_enabled
 
-        observation_lane = os.environ.get("HIBS_OBSERVATION_LANE", "1").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-        )
+        observation_lane = observation_lane_enabled()
         telemetry_balance = evaluate_telemetry_balance(
             manifest=manifest,
             observation_lane=observation_lane,
