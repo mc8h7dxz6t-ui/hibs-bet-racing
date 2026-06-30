@@ -20,6 +20,7 @@ RACING_TESTS=(
   tests/test_enrich.py
   tests/test_production_preflight.py
   tests/test_ranker_preflight.py
+  tests/test_racing_engine_scoring.py
   tests/test_snapshot_store.py
   tests/test_slippage_stress.py
   tests/test_gate_regression.py
@@ -30,6 +31,8 @@ RACING_TESTS=(
   tests/test_engine_profile.py
   tests/test_log_retention.py
   tests/test_institutional.py
+  tests/test_observation_lane.py
+  tests/test_institutional_hardening.py
 )
 
 echo "==> pytest (release-critical suite, ${#RACING_TESTS[@]} modules)"

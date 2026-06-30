@@ -295,12 +295,9 @@ def refresh_cards(
         "timings_ms": timings,
     }
     from hibs_racing.institutional.telemetry_balance import record_telemetry_balance
+    from hibs_racing.models.ranker_preflight import observation_lane_enabled
 
-    observation_lane = os.environ.get("HIBS_OBSERVATION_LANE", "1").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+    observation_lane = observation_lane_enabled()
     telemetry = record_telemetry_balance(
         result,
         manifest_id=manifest_id,
