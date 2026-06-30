@@ -19,6 +19,7 @@ RACING_TESTS=(
   tests/test_oddschecker.py
   tests/test_enrich.py
   tests/test_production_preflight.py
+  tests/test_ranker_preflight.py
   tests/test_snapshot_store.py
   tests/test_slippage_stress.py
   tests/test_gate_regression.py
