@@ -26,6 +26,7 @@ from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.config import db_path, load_config
 from hibs_racing.web_format import fmt_num, fmt_pct
 from hibs_racing.web_service import cards_deep_link_context, dashboard_context, health_status, insights_context
+from hibs_racing.middleware.auth import require_api_key, validate_auth_config
 from hibs_racing.utils.ui_settings import (
     apply_saved_ui_env,
     monetization_form_payload,
@@ -122,6 +123,7 @@ def _render_markdown_simple(text: str) -> str:
 def create_app() -> Flask:
     load_dotenv(ROOT / ".env")
     apply_saved_ui_env()
+    validate_auth_config()
     app = Flask(
         __name__,
         template_folder=str(ROOT / "templates"),
@@ -247,6 +249,7 @@ def create_app() -> Flask:
         return resp
 
     @app.route("/api/settle-paper", methods=["POST"])
+    @require_api_key
     def api_settle_paper():
         try:
             result = settle_paper_bets()
@@ -333,6 +336,7 @@ def create_app() -> Flask:
         )
 
     @app.route("/api/settings/monetization", methods=["GET", "POST"])
+    @require_api_key(methods=("POST",))
     def api_settings_monetization():
         if request.method == "GET":
             return jsonify(monetization_form_payload())
@@ -370,6 +374,7 @@ def create_app() -> Flask:
         )
 
     @app.route("/api/tips/paste", methods=["POST"])
+    @require_api_key
     def api_tips_paste():
         from hibs_racing.tips.ingest import ingest_pasted_text
 
@@ -386,6 +391,7 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "error": str(exc)}), 500
 
     @app.route("/api/tips/fetch-imap", methods=["POST"])
+    @require_api_key
     def api_tips_fetch_imap():
         from hibs_racing.tips.imap_fetch import imap_configured
         from hibs_racing.tips.ingest import ingest_from_imap
@@ -488,6 +494,7 @@ def create_app() -> Flask:
         return jsonify(payload)
 
     @app.route("/api/refresh", methods=["POST", "GET"])
+    @require_api_key
     def api_refresh():
         from hibs_racing.scrapers.racing_scrape_api import resolve_cards_source
 

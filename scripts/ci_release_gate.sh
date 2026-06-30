@@ -33,6 +33,7 @@ RACING_TESTS=(
   tests/test_institutional.py
   tests/test_observation_lane.py
   tests/test_institutional_hardening.py
+  tests/test_api_auth.py
 )
 
 echo "==> pytest (release-critical suite, ${#RACING_TESTS[@]} modules)"
