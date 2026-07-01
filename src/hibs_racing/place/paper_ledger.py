@@ -417,6 +417,47 @@ def load_ledger_rows(
     return [dict(zip(cols, row, strict=True)) for row in rows]
 
 
+def paper_bet_status_by_runner(
+    *,
+    card_dates: list[str] | None = None,
+    database: Path | None = None,
+) -> dict[str, dict]:
+    """Map runner_id → paper ledger row for today's card(s) and historical continuity."""
+    db = database or db_path(load_config())
+    init_db(db)
+    clauses = ["pb.backtest = 0"]
+    params: list[object] = []
+    if card_dates:
+        placeholders = ",".join("?" for _ in card_dates)
+        clauses.append(f"(u.card_date IN ({placeholders}) OR pb.created_at >= date('now', '-30 day'))")
+        params.extend(card_dates)
+    where = " AND ".join(clauses)
+    with connect(db) as conn:
+        rows = conn.execute(
+            f"""
+            SELECT pb.runner_id, pb.status, pb.result_pnl, pb.is_value_pick, pb.settled_at, u.card_date
+            FROM paper_bets pb
+            LEFT JOIN upcoming_runners u ON u.runner_id = pb.runner_id
+            WHERE {where}
+            ORDER BY pb.created_at DESC
+            """,
+            params,
+        ).fetchall()
+    out: dict[str, dict] = {}
+    for runner_id, status, pnl, is_val, settled_at, card_date in rows:
+        rid = str(runner_id or "")
+        if not rid or rid in out:
+            continue
+        out[rid] = {
+            "status": str(status or "open"),
+            "result_pnl": float(pnl) if pnl is not None else None,
+            "is_value_pick": bool(int(is_val or 0)),
+            "settled_at": settled_at,
+            "card_date": card_date,
+        }
+    return out
+
+
 def ledger_stats(database: Path | None = None, *, days: int | None = None, backtest: bool | None = False) -> LedgerStats:
     db = database or db_path(load_config())
     init_db(db)

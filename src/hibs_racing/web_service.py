@@ -54,6 +54,7 @@ class HealthStatus:
     reliability: dict | None = None
     latest_card_date: str | None = None
     card_fresh: bool | None = None
+    data_producer: dict | None = None
 
     def to_dict(self) -> dict:
         out = {
@@ -98,6 +99,8 @@ class HealthStatus:
         if self.latest_card_date is not None:
             out["latest_card_date"] = self.latest_card_date
         out["card_fresh"] = self.card_fresh if self.card_fresh is not None else False
+        if self.data_producer is not None:
+            out["data_producer"] = self.data_producer
         try:
             from hibs_racing.live.execution_config import execution_summary
 
@@ -250,6 +253,14 @@ def health_status() -> HealthStatus:
     elif manifest is not None:
         latest_card_date = manifest.card_date
         card_fresh = str(latest_card_date) >= today if latest_card_date else False
+    data_producer = None
+    if not _health_light_mode():
+        try:
+            from hibs_racing.data_producer_slo import build_data_producer_snapshot
+
+            data_producer = build_data_producer_snapshot()
+        except Exception:
+            data_producer = None
     return HealthStatus(
         db_ok=db.exists(),
         runners_loaded=len(runners),
@@ -276,6 +287,7 @@ def health_status() -> HealthStatus:
         reliability=reliability_summary,
         latest_card_date=latest_card_date,
         card_fresh=card_fresh,
+        data_producer=data_producer,
     )
 
 
@@ -297,7 +309,7 @@ def _offered_place_decimal(row: dict | pd.Series, *, default_fraction: float = 0
     return round(1.0 + (win_f - 1.0) * pf, 2)
 
 
-def _enrich_runner(row: dict, peers: pd.DataFrame) -> dict:
+def _enrich_runner(row: dict, peers: pd.DataFrame, *, paper_status: dict | None = None) -> dict:
     explained = explain_pick(row, race_peers=peers)
     row["engine_opinion"] = explained.get("pick_summary")
     row["engine_reasons"] = explained.get("pick_reasons") or []
@@ -308,12 +320,19 @@ def _enrich_runner(row: dict, peers: pd.DataFrame) -> dict:
     comment = raw_comment.strip() if isinstance(raw_comment, str) else ""
     row["rp_comment_short"] = (comment[:120] + "…") if len(comment) > 120 else comment
     row.update(build_enrich_display(row))
+    rid = str(row.get("runner_id") or "")
+    if paper_status and rid in paper_status:
+        row["paper_ledger"] = paper_status[rid]
     return row
 
 
 def group_meetings(frame: pd.DataFrame) -> list[dict]:
     if frame.empty:
         return []
+    from hibs_racing.place.paper_ledger import paper_bet_status_by_runner
+
+    card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if "card_date" in frame.columns else []
+    paper_status = paper_bet_status_by_runner(card_dates=card_dates) if card_dates else {}
     meetings: list[dict] = []
     group_cols = ["card_date", "course"]
     if "region" in frame.columns and frame["region"].notna().any():
@@ -330,7 +349,7 @@ def group_meetings(frame: pd.DataFrame) -> list[dict]:
         for race_id, race_df in course_df.groupby("race_id", sort=False):
             race_df = race_df.sort_values("model_place_prob", ascending=False, na_position="last")
             peers = race_df.copy()
-            runners = [_enrich_runner(rec, peers) for rec in race_df.to_dict(orient="records")]
+            runners = [_enrich_runner(rec, peers, paper_status=paper_status) for rec in race_df.to_dict(orient="records")]
             first = race_df.iloc[0]
             insights = build_race_insights(race_df)
             rp_verdict = race_verdict_from_runners(race_df)

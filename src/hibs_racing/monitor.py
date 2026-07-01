@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pandas as pd
 
 from hibs_racing.config import load_config
-from hibs_racing.place.paper_ledger import ledger_stats, settle_paper_bets
+from hibs_racing.place.paper_ledger import ledger_stats, load_ledger_rows, settle_paper_bets
 from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.cards.query import load_scored_cards
 from hibs_racing.pick_explain import attach_pick_explanations
@@ -88,6 +88,7 @@ def monitor_snapshot(*, refresh: bool = False, settle: bool = True) -> dict:
         "runner_count": len(frame),
         "race_count": int(frame["race_id"].nunique()) if not frame.empty else 0,
         "ledger": ledger_stats().to_dict(),
+        "recent_ledger": load_ledger_rows(limit=12, backtest=False),
         "settle": settle_stats,
         "refresh_error": refresh_error,
         "poll_seconds": int(cfg.get("auto_refresh_seconds", 300)),
