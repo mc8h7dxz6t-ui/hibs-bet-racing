@@ -73,7 +73,14 @@ if ! hibs-racing snapshot-backfill --start "${START_DATE}" --end "${PRIMARY_DATE
   echo "WARN: [TIER-2] snapshot-backfill incomplete" >&2
 fi
 
-OBS_LANE="${HIBS_OBSERVATION_LANE:-1}"
+OBS_LANE="${HIBS_OBSERVATION_LANE:-}"
+if [[ -z "${OBS_LANE}" ]]; then
+  if is_production_mode; then
+    OBS_LANE=0
+  else
+    OBS_LANE=1
+  fi
+fi
 INST_FLAGS=(--days 14 --card-date "${PRIMARY_DATE}")
 if [[ "${OBS_LANE}" == "1" ]]; then
   INST_FLAGS+=(--observation-lane)
