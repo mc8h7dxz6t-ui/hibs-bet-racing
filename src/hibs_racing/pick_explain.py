@@ -4,6 +4,8 @@ import math
 
 import pandas as pd
 
+from hibs_racing.web_format import fmt_prob_phrase, normalize_prob_pct
+
 
 def _f(value: object, default: float = 0.0) -> float:
     if value is None or (isinstance(value, float) and math.isnan(value)):
@@ -23,6 +25,10 @@ def _i(value: object) -> int | None:
         return None
 
 
+def _pct(value: object) -> float:
+    return normalize_prob_pct(value) or 0.0
+
+
 def explain_pick(row: dict | pd.Series, *, race_peers: pd.DataFrame | None = None) -> dict[str, object]:
     """Plain-English bullets for why this runner ranks as a place angle."""
     if isinstance(row, pd.Series):
@@ -30,14 +36,14 @@ def explain_pick(row: dict | pd.Series, *, race_peers: pd.DataFrame | None = Non
 
     jockey = (row.get("jockey") or "Jockey").strip()
     trainer = (row.get("trainer") or "Trainer").strip()
-    combo = _f(row.get("combo_bayes_place"))
-    jockey_place = _f(row.get("jockey_bayes_place"))
-    trainer_place = _f(row.get("trainer_bayes_place"))
-    jockey_90 = _f(row.get("jockey_place_90d"))
-    trainer_90 = _f(row.get("trainer_place_90d"))
+    combo = _pct(row.get("combo_bayes_place"))
+    jockey_place = _pct(row.get("jockey_bayes_place"))
+    trainer_place = _pct(row.get("trainer_bayes_place"))
+    jockey_90 = _pct(row.get("jockey_place_90d"))
+    trainer_90 = _pct(row.get("trainer_place_90d"))
     jockey_vs = _f(row.get("jockey_vs_field"))
     trainer_vs = _f(row.get("trainer_vs_field"))
-    place_p = _f(row.get("model_place_prob"))
+    place_p = _pct(row.get("model_place_prob"))
     hidden = _f(row.get("hidden_potential"), default=float("nan"))
     nlp_rank = _f(row.get("nlp_pace_rank"), default=float("nan"))
     field = _i(row.get("field_size"))
@@ -49,46 +55,39 @@ def explain_pick(row: dict | pd.Series, *, race_peers: pd.DataFrame | None = Non
 
     reasons: list[str] = []
 
-    if combo >= 0.55:
+    if combo >= 55:
         reasons.append(
-            f"{jockey} & {trainer} have a strong place record together "
-            f"({combo * 100:.0f}% Bayesian top-3 rate from your ingested history)."
+            f"{jockey} & {trainer}: strong joint place record ({fmt_prob_phrase(combo)})."
         )
-    elif combo >= 0.40:
+    elif combo >= 40:
         reasons.append(
-            f"Trainer–jockey combo rates above the field norm for places ({combo * 100:.0f}% prior)."
+            f"{jockey} & {trainer}: above-average combo place rate ({fmt_prob_phrase(combo)})."
         )
 
-    if jockey_place >= 0.45 and jockey_vs >= 0.05:
+    if jockey_place >= 45 and jockey_vs >= 0.05:
         reasons.append(
-            f"{jockey} place rate {jockey_place * 100:.0f}% "
-            f"({jockey_90 * 100:.0f}% last 90d) — above rivals in this race."
+            f"{jockey}: {fmt_prob_phrase(jockey_place)} place rate "
+            f"({fmt_prob_phrase(jockey_90)} last 90d) — ahead of this field."
         )
-    elif jockey_place >= 0.40:
-        reasons.append(f"{jockey} carries a {jockey_place * 100:.0f}% historical place profile.")
+    elif jockey_place >= 40:
+        reasons.append(f"{jockey}: {fmt_prob_phrase(jockey_place)} historical place profile.")
 
-    if trainer_place >= 0.45 and trainer_vs >= 0.05:
+    if trainer_place >= 45 and trainer_vs >= 0.05:
         reasons.append(
-            f"{trainer} yard (trainer) place rate {trainer_place * 100:.0f}% "
-            f"({trainer_90 * 100:.0f}% last 90d) — stronger than field median."
+            f"{trainer}: {fmt_prob_phrase(trainer_place)} place rate "
+            f"({fmt_prob_phrase(trainer_90)} last 90d) — stronger than field median."
         )
-    elif trainer_place >= 0.40:
-        reasons.append(f"{trainer} stable profile {trainer_place * 100:.0f}% place prior.")
+    elif trainer_place >= 40:
+        reasons.append(f"{trainer}: {fmt_prob_phrase(trainer_place)} stable place profile.")
 
     if not math.isnan(nlp_rank):
         if nlp_rank <= 1.5:
-            reasons.append(
-                "Top sectional pace score in this race — last-run comments flagged strong late/finish speed."
-            )
+            reasons.append("Top pace figure in the race on recent sectionals.")
         elif nlp_rank <= 3.0:
-            reasons.append(
-                f"Pace profile ranks #{nlp_rank:.0f} in the race on NLP sectional tags."
-            )
+            reasons.append(f"Pace ranks #{nlp_rank:.0f} in this field.")
 
     if not math.isnan(hidden) and hidden > 8:
-        reasons.append(
-            "Hidden-potential signal: running comments suggest more ability than the official rating implies."
-        )
+        reasons.append("Running comments suggest more ability than the official rating.")
 
     if race_peers is not None and not race_peers.empty and or_val is not None:
         peer_or = pd.to_numeric(race_peers["official_rating"], errors="coerce")
@@ -96,53 +95,46 @@ def explain_pick(row: dict | pd.Series, *, race_peers: pd.DataFrame | None = Non
             avg_or = float(peer_or.mean())
             if or_val <= avg_or - 4:
                 reasons.append(
-                    f"OR {or_val} is {avg_or - or_val:.0f}lb below the field average — place chance driven by form, not the mark."
+                    f"OR {or_val} is {avg_or - or_val:.0f}lb below the field average."
                 )
             elif or_val >= avg_or + 4:
-                reasons.append(
-                    f"Top-rated on OR ({or_val}) vs rivals — model still likes the place profile on combo/pace mix."
-                )
+                reasons.append(f"Top OR ({or_val}) in the race.")
 
-    if place_p >= 0.55:
-        reasons.append(
-            f"Harville place model: {place_p * 100:.0f}% chance of top-3 after blending combo, pace and relative ratings."
-        )
-    elif place_p >= 0.45:
+    if place_p >= 55:
+        reasons.append(f"Top-3 chance {fmt_prob_phrase(place_p)} (combo + pace + ratings).")
+    elif place_p >= 45:
         fs = f"{field}-runner" if field else "this"
-        reasons.append(
-            f"Estimated {place_p * 100:.0f}% place probability in a {fs} race — enough to lead today's shortlist."
-        )
+        reasons.append(f"Place chance {fmt_prob_phrase(place_p)} in a {fs} race.")
 
     if value_flag == 1:
-        reasons.append("Passes value gates: positive each-way place expected value at logged odds.")
+        reasons.append("Passes value gates at logged each-way odds.")
     elif ew_ev is not None and not (isinstance(ew_ev, float) and math.isnan(ew_ev)) and _f(ew_ev) > 0.05:
-        reasons.append(f"Each-way EV +{_f(ew_ev):.2f} units vs offered price (if odds loaded).")
+        reasons.append(f"Each-way EV +{_f(ew_ev):.2f} units at offered price.")
 
     if card_comment and len(card_comment) > 20 and math.isnan(nlp_rank):
-        snippet = card_comment[:80] + ("…" if len(card_comment) > 80 else "")
-        reasons.append(f"Card spotlight: \"{snippet}\"")
+        snippet = card_comment[:72] + ("…" if len(card_comment) > 72 else "")
+        reasons.append(f"Card note: \"{snippet}\"")
 
     fit_rows = row.get("enrich_fit_rows") or []
-    for item in fit_rows[:2]:
+    for item in fit_rows[:1]:
         label = item.get("label") or "Record"
         val = item.get("value") or ""
         if val:
-            reasons.append(f"RP {label.lower()}: {val}.")
+            reasons.append(f"{label}: {val}.")
     trip = row.get("enrich_trip_label")
     if trip:
         reasons.append(trip + ".")
-    for flag in row.get("enrich_flags") or []:
+    for flag in (row.get("enrich_flags") or [])[:1]:
         if flag.get("label"):
             reasons.append(str(flag["label"]) + ".")
 
     if not reasons:
-        reasons.append(
-            "Selected as the strongest place blend of trainer–jockey prior and model place probability in this race."
-        )
+        reasons.append("Best place blend of combo prior and model probability in this race.")
 
+    trimmed = reasons[:4]
     return {
-        "pick_summary": reasons[0],
-        "pick_reasons": reasons,
+        "pick_summary": trimmed[0],
+        "pick_reasons": trimmed,
     }
 
 
