@@ -3,7 +3,7 @@
 
 .PHONY: help install plug buyer-pack demo-ready demo demo-all demo-phase2 demo-gold \
         demo-gold-up demo-gold-down demo-gold-reset smoke rigorous chaos proof \
-        verify-portfolio redis-soak test instpp-test workflow-up workflow-down stack-up redis-up
+        verify-portfolio redis-soak retention-drill soc2-evidence test instpp-test workflow-up workflow-down stack-up redis-up
 
 PYTHON ?= python3
 DEMO_DIR ?= ./data/demo/portfolio
@@ -24,10 +24,12 @@ help:
 	@echo "  make demo-gold-reset   wipe spend-gold wallet after drift lockout"
 	@echo "  make demo-gold-up      seed data + Proof Console UI (http://127.0.0.1:8790, proof tab)"
 	@echo "  make redis-soak        Redis production profile soak (needs INST_REDIS_URL)"
+	@echo "  make retention-drill   F8 epoch compaction drill"
+	@echo "  make soc2-evidence     SOC2 VPC evidence from PORTFOLIO_MANIFEST.json"
 	@echo "  make demo-gold-down    stop workflow UI"
 	@echo "  make spend-gateway     OpenAI-compat spend gateway (mock upstream)"
 	@echo "  make stack-up          docker: workflow UI (+ optional redis profile)"
-	@echo "  make smoke             unit + integration smoke (174+ tests)"
+	@echo "  make smoke             unit + integration smoke (191+ tests)"
 	@echo "  make rigorous          12/12 rigorous E2E → docs/test_logs/"
 	@echo "  make proof             smoke + rigorous + verify-portfolio"
 	@echo "  make chaos             chaos + integration drills"
@@ -105,6 +107,14 @@ proof: smoke rigorous verify-portfolio
 
 redis-soak:
 	./scripts/instpp_redis_soak.sh
+
+retention-drill:
+	chmod +x ./scripts/instpp_retention_drill.sh
+	./scripts/instpp_retention_drill.sh
+
+soc2-evidence:
+	chmod +x ./scripts/soc2_evidence_collector.py
+	$(PYTHON) ./scripts/soc2_evidence_collector.py
 
 chaos:
 	./scripts/chaos_instpp.sh

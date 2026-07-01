@@ -10,9 +10,11 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 
 from inst_spine.ledger import AppendOnlyLedger
+from inst_spine.middleware import install_api_key_middleware
 from inst_spine.rates import TokenBucket, token_bucket_backend_from_env
 
 app = FastAPI(title="Alt-Data — secured feed read API")
+install_api_key_middleware(app, env_var="ALTDATA_API_KEY")
 
 
 def _ledger_db() -> Path:

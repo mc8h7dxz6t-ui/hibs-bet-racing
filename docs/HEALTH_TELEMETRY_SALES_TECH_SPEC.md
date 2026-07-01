@@ -158,6 +158,11 @@ pip install -e ".[dev,instpp]"
 | `HEALTH_TELEMETRY_INGRESS_WAL_PATH` | Ingress receipt WAL (default: `{db_stem}_ingress.wal`) |
 | `HEALTH_TELEMETRY_PROFILE` | Default ingest profile |
 | `HEALTH_IDEMPOTENCY_TTL_SECONDS` | Duplicate batch TTL |
+| `HEALTH_DEVICE_AUTH_SECRET` | When set, `X-Device-Token` HMAC required per `device_id` (production ingress) |
+| `HEALTH_TELEMETRY_API_KEY` | When set, `Authorization: Bearer` required on HTTP serve (VPC boundary) |
+| `INST_REDIS_URL` | Optional — shared idempotency backend for multi-instance HTTP ingress |
+
+**Merged capability (PR #27, on `main`):** sequence gate + ingress WAL + observation-lane export are shipped in code and rigorous CI — not a roadmap item.
 
 ---
 

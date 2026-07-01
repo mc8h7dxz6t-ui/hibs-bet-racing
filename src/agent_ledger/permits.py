@@ -6,6 +6,7 @@ import sqlite3
 import threading
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -38,10 +39,21 @@ CREATE TABLE IF NOT EXISTS agent_permits (
     decision TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'open',
     reason TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT ''
+    created_at TEXT NOT NULL DEFAULT '',
+    expires_at TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_agent_permits_agent ON agent_permits(agent_id, status);
 """
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _default_ttl_seconds() -> int:
+    import os
+
+    return int(os.getenv("AGENT_LEDGER_PERMIT_TTL_SECONDS", "3600"))
 
 
 class PermitStore:
@@ -53,6 +65,11 @@ class PermitStore:
         self._lock = threading.Lock()
         with self._connect() as conn:
             conn.executescript(_SCHEMA)
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(agent_permits)")}
+            if "expires_at" not in cols:
+                conn.execute(
+                    "ALTER TABLE agent_permits ADD COLUMN expires_at TEXT NOT NULL DEFAULT ''"
+                )
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.database, timeout=30.0, isolation_level=None)
@@ -69,6 +86,9 @@ class PermitStore:
         permit_id: str | None = None,
     ) -> PermitRecord:
         pid = permit_id or str(uuid.uuid4())
+        created = _utc_now()
+        ttl = _default_ttl_seconds()
+        expires = (datetime.now(timezone.utc) + timedelta(seconds=ttl)).strftime("%Y-%m-%dT%H:%M:%SZ")
         with self._lock:
             with self._connect() as conn:
                 conn.execute("BEGIN IMMEDIATE")
@@ -81,9 +101,10 @@ class PermitStore:
                     raise ValueError(f"duplicate_permit_id:{pid}")
                 status = "open" if decision == "permit" else "closed"
                 conn.execute(
-                    "INSERT INTO agent_permits (permit_id, agent_id, tool_name, decision, status, reason) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (pid, agent_id, tool_name, decision, status, reason),
+                    "INSERT INTO agent_permits "
+                    "(permit_id, agent_id, tool_name, decision, status, reason, created_at, expires_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (pid, agent_id, tool_name, decision, status, reason, created, expires),
                 )
                 conn.execute("COMMIT")
         return PermitRecord(
@@ -95,7 +116,37 @@ class PermitStore:
             reason=reason,
         )
 
+    def _is_expired(self, expires_at: str) -> bool:
+        if not expires_at:
+            return False
+        try:
+            exp = datetime.strptime(expires_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        except ValueError:
+            return False
+        return datetime.now(timezone.utc) >= exp
+
+    def sweep_expired(self) -> int:
+        """Mark open permits past TTL as expired — returns count swept."""
+        now = _utc_now()
+        with self._lock:
+            with self._connect() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                rows = conn.execute(
+                    "SELECT permit_id, expires_at FROM agent_permits WHERE status = 'open'"
+                ).fetchall()
+                swept = 0
+                for permit_id, expires_at in rows:
+                    if self._is_expired(expires_at or ""):
+                        conn.execute(
+                            "UPDATE agent_permits SET status = 'expired' WHERE permit_id = ?",
+                            (permit_id,),
+                        )
+                        swept += 1
+                conn.execute("COMMIT")
+        return swept
+
     def get(self, permit_id: str) -> PermitRecord | None:
+        self.sweep_expired()
         with self._connect() as conn:
             row = conn.execute(
                 "SELECT permit_id, agent_id, tool_name, decision, status, reason "
@@ -114,17 +165,25 @@ class PermitStore:
         )
 
     def complete(self, permit_id: str) -> tuple[bool, str]:
+        self.sweep_expired()
         with self._lock:
             with self._connect() as conn:
                 conn.execute("BEGIN IMMEDIATE")
                 row = conn.execute(
-                    "SELECT decision, status FROM agent_permits WHERE permit_id = ?",
+                    "SELECT decision, status, expires_at FROM agent_permits WHERE permit_id = ?",
                     (permit_id,),
                 ).fetchone()
                 if not row:
                     conn.execute("ROLLBACK")
                     return False, "permit_not_found"
-                decision, status = row[0], row[1]
+                decision, status, expires_at = row[0], row[1], row[2]
+                if self._is_expired(expires_at or ""):
+                    conn.execute(
+                        "UPDATE agent_permits SET status = 'expired' WHERE permit_id = ?",
+                        (permit_id,),
+                    )
+                    conn.execute("COMMIT")
+                    return False, "permit_expired"
                 if decision != "permit":
                     conn.execute("ROLLBACK")
                     return False, f"not_permitted:{decision}"

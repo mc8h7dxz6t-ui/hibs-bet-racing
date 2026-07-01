@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from inst_spine.check import build_compliance_context, run_institutional_check
+from inst_spine.bundle_sign import write_signature_sidecar
 from inst_spine.hash import (
     GENESIS_EVENT,
     read_genesis_anchor,
@@ -19,6 +20,7 @@ from inst_spine.hash import (
     verify_lamport_monotonic,
 )
 from inst_spine.ledger import AppendOnlyLedger
+from inst_spine.retention import merkle_root
 
 
 @dataclass(frozen=True)
@@ -132,6 +134,17 @@ def _write_bundle_files(
     if product:
         manifest["product"] = product
 
+    leaf_hashes = [
+        str(e.get("entry_hash") or e.get("entry_id") or "")
+        for e in entries
+        if e.get("event_type") != GENESIS_EVENT and (e.get("entry_hash") or e.get("entry_id"))
+    ]
+    epoch_roots = {
+        "protocol": "inst-spine-epoch-merkle-v1",
+        "entry_count": len(leaf_hashes),
+        "merkle_root": merkle_root(leaf_hashes),
+    }
+
     files: dict[str, bytes] = {
         "MANIFEST.json": _canonical_json_bytes(manifest),
         "ledger_entries.json": _canonical_json_bytes(entries),
@@ -139,6 +152,7 @@ def _write_bundle_files(
         "institutional_check.json": _canonical_json_bytes(report_dict),
         "genesis_anchor.json": _canonical_json_bytes(read_genesis_anchor(ledger.anchor_path) or {}),
         "wal_full.json": _canonical_json_bytes(wal_all),
+        "epoch_roots.json": _canonical_json_bytes(epoch_roots),
     }
 
     for name, content in sorted(files.items()):
@@ -385,6 +399,7 @@ def build_audit_bundle(
         (tar_path.with_suffix(tar_path.suffix + ".sha256")).write_text(
             f"{digest}  {tar_path.name}\n", encoding="utf-8"
         )
+        write_signature_sidecar(tar_path, bundle_sha256=digest, product=product)
 
         return AuditBundleResult(
             ok=validation.ok,

@@ -40,6 +40,9 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--steps", type=int, default=3)
     p_run.add_argument("--checkpoint-db", type=Path, default=None)
     p_run.add_argument("--trace-db", type=Path, default=Path("data/ai_kit_trace.sqlite"))
+    p_run.add_argument("--agent-ledger-db", type=Path, default=None, help="Agent Ledger integration")
+    p_run.add_argument("--agent-permit-db", type=Path, default=None)
+    p_run.add_argument("--tool-name", default="read_file", help="Tool to authorize via Agent Ledger")
     p_run.add_argument("--max-tokens", type=int, default=1000, help="Token budget hint for limiter")
     p_run.add_argument(
         "--live-llm",
@@ -71,6 +74,8 @@ def main(argv: list[str] | None = None) -> int:
             agent_id=args.agent_id,
             checkpoint_db=args.checkpoint_db,
             trace_ledger=trace,
+            agent_ledger_db=args.agent_ledger_db,
+            agent_permit_db=args.agent_permit_db,
         )
         llm = OpenAICompatibleClient()
 
@@ -106,7 +111,13 @@ def main(argv: list[str] | None = None) -> int:
             state[f"step_{step}"] = value
             return state
 
-        final = loop.run_steps(start_step=0, steps=args.steps, step_fn=_step)
+        final = loop.run_steps(
+            start_step=0,
+            steps=args.steps,
+            step_fn=_step,
+            tool_name=args.tool_name if args.agent_ledger_db else None,
+            tool_arguments={"path": "docs/demo_snapshot.json"} if args.agent_ledger_db else None,
+        )
         print_json(
             {
                 "product": PRODUCT,

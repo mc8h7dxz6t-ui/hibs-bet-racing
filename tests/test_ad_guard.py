@@ -10,7 +10,12 @@ import pytest
 from ad_guard.proxy import AdGuardGateway, AdSpendRequest
 from ad_guard.spend import extract_spend_metrics
 from inst_spine.ledger import AppendOnlyLedger
-from inst_spine.rates import MemoryTokenBucketBackend, TokenBucket, ZScoreDriftDetector
+from inst_spine.rates import (
+    MemoryIdempotencyBackend,
+    MemoryTokenBucketBackend,
+    TokenBucket,
+    ZScoreDriftDetector,
+)
 
 
 def test_extract_google_campaign_and_micros():
@@ -143,7 +148,11 @@ async def test_ad_guard_reject_logs_to_ledger(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_ad_guard_creative_gate_required(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AD_GUARD_REQUIRE_CREATIVE_APPROVAL", "1")
-    gw = AdGuardGateway(shadow_mode=True)
+    gw = AdGuardGateway(
+        shadow_mode=True,
+        rate_backend=MemoryTokenBucketBackend(),
+        idempotency=MemoryIdempotencyBackend(),
+    )
     resp = await gw.evaluate(AdSpendRequest(
         client_id="agency",
         method="POST",

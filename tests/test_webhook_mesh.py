@@ -223,7 +223,7 @@ async def test_ingress_accepts_and_dedupes(tmp_path: Path, monkeypatch: pytest.M
         """Skip production startup — test injects RuntimeState directly."""
         return None
 
-    monkeypatch.setattr(serve_mod, "initialize_spine_dependencies", _test_startup)
+    monkeypatch.setattr(serve_mod, "_startup", _test_startup)
 
     serve_mod.state = serve_mod.RuntimeState()
     serve_mod.state.provider_secret = secret

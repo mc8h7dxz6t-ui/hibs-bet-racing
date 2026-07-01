@@ -16,6 +16,18 @@ client intent → gate chain (memory) → [shadow | live httpx forward]
 pip install -e ".[dev,instpp]"
 ```
 
+## Serve (production HTTP)
+
+```bash
+export PROXY_RISK_DATABASE=data/proxy_risk.sqlite
+export PROXY_RISK_SHADOW=1
+export PROXY_RISK_API_KEY=your-vpc-key   # optional local dev if unset
+python -m proxy_risk.serve
+# GET /health  GET /ready  POST /v1/evaluate
+```
+
+Legacy aiohttp demo: `proxy-risk serve` (uses `PROXY_RISK_API_TOKEN`).
+
 ## CLI
 
 ```bash

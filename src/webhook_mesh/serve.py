@@ -12,6 +12,8 @@ from typing import Any
 from fastapi import FastAPI, Request, Response, status
 
 from inst_spine.clocks import LamportClock
+from inst_spine.health_probes import readiness_payload, redis_ready_from_env
+from inst_spine.http_lifecycle import make_lifespan
 from inst_spine.rates import IdempotencyBackend, RedisIdempotencyBackend, idempotency_backend_from_env
 from inst_spine.wal import WALWriter
 from webhook_mesh.hmac_verify import verify_webhook_signature
@@ -31,8 +33,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("webhook_mesh.ingress")
 
-app = FastAPI(title="Webhook Idempotency Mesh Engine")
-
 
 class RuntimeState:
     def __init__(self) -> None:
@@ -49,8 +49,11 @@ class RuntimeState:
 state = RuntimeState()
 
 
-@app.on_event("startup")
-async def initialize_spine_dependencies() -> None:
+async def _noop_handler(**_kwargs: Any) -> bool:
+    return True
+
+
+async def _startup() -> None:
     if not state.provider_secret:
         logger.critical("WEBHOOK_PROVIDER_SECRET unset.")
         sys.exit(1)
@@ -67,12 +70,7 @@ async def initialize_spine_dependencies() -> None:
         logger.warning("Webhook ingress online wal=%s dispatch=background", wal_path)
 
 
-async def _noop_handler(**_kwargs: Any) -> bool:
-    return True
-
-
-@app.on_event("shutdown")
-async def graceful_spine_teardown() -> None:
+async def _shutdown() -> None:
     if state.delivery_queue:
         await state.delivery_queue.stop_worker()
     if state.wal_writer:
@@ -81,9 +79,38 @@ async def graceful_spine_teardown() -> None:
         await state.redis_client.close()
 
 
+app = FastAPI(
+    title="Webhook Idempotency Mesh Engine",
+    lifespan=make_lifespan(_startup, _shutdown),
+)
+
+
 @app.get("/health")
 async def health() -> dict[str, Any]:
     return {"ok": True, "product": "webhook-mesh", "dispatch_mode": state.dispatch_mode}
+
+
+@app.get("/ready")
+async def ready() -> Response:
+    wal_ok = state.wal_writer is not None
+    secret_ok = bool(state.provider_secret)
+    redis_ok, redis_detail = redis_ready_from_env()
+    redis_required = state.dispatch_mode == "redis"
+    if redis_required and not os.getenv("INST_REDIS_URL", "").strip():
+        redis_ok, redis_detail = False, "INST_REDIS_URL required for redis dispatch"
+    queue_ok = state.delivery_queue is not None
+    body = readiness_payload(
+        product="webhook-mesh",
+        checks={
+            "provider_secret": (secret_ok, "configured" if secret_ok else "WEBHOOK_PROVIDER_SECRET unset"),
+            "ingress_wal": (wal_ok, "wal_online" if wal_ok else "wal_not_initialized"),
+            "delivery_queue": (queue_ok, "queue_online" if queue_ok else "queue_not_initialized"),
+            "redis_profile": (redis_ok, redis_detail),
+        },
+        extra={"dispatch_mode": state.dispatch_mode, "redis_required": redis_required},
+    )
+    code = status.HTTP_200_OK if body["ready"] else status.HTTP_503_SERVICE_UNAVAILABLE
+    return Response(content=json.dumps(body), status_code=code, media_type="application/json")
 
 
 def _json_response(body: dict[str, Any], code: int) -> Response:

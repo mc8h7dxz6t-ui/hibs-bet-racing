@@ -17,6 +17,9 @@ echo "==> Running institutional test suite (12 SKUs)"
   tests/test_inst_products.py \
   tests/test_inst_export.py \
   tests/test_proxy_risk.py \
+  tests/test_compliance_serve.py \
+  tests/test_proxy_risk_serve.py \
+  tests/test_health_probes.py \
   tests/test_inst_coverage.py \
   tests/test_compliance_cli.py \
   tests/test_altdata_cli.py \
@@ -35,6 +38,13 @@ echo "==> Running institutional test suite (12 SKUs)"
   tests/test_forensic_tiers.py \
   tests/test_industry_gold.py \
   tests/test_inst_workflow.py \
+  tests/test_drift_golden.py \
+  tests/test_middleware_auth.py \
+  tests/test_permit_ttl.py \
+  tests/test_retention_drill.py \
+  tests/test_altdata_structural_golden.py \
+  tests/test_webhook_mesh_chaos.py \
+  tests/test_bundle_sign.py \
   -q
 
 echo "==> Compliance export repro-check (ephemeral DB)"

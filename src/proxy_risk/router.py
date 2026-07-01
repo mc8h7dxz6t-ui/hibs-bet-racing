@@ -128,6 +128,7 @@ class ProxyRiskGateway:
         """Hot-path gate evaluation — every outcome logged when ledger attached."""
         allowed, reason = self.circuit.allows_traffic()
         if not allowed:
+            await self._log_circuit_event(req, reason)
             return await self._finish(req, GateDecision.KILL, reason)
 
         if not req.client_id or not req.method or not req.path:
@@ -156,6 +157,7 @@ class ProxyRiskGateway:
             anomaly, z = self.drift.is_anomaly(req.reference_price)
             if anomaly:
                 self.circuit.kill(f"z_score drift |Z|>{self.drift.z_max} (z={z:.2f})")
+                await self._log_circuit_event(req, self.circuit.reason)
                 return await self._finish(req, GateDecision.KILL, f"drift: z={z:.2f}")
 
         features = req.model_features
@@ -264,6 +266,27 @@ class ProxyRiskGateway:
         }
         payload.update(extra)
         return payload
+
+    async def _log_circuit_event(self, req: ProxyRequest, reason: str) -> None:
+        if self.ledger is None:
+            return
+        payload = {
+            "client_id": req.client_id,
+            "circuit_state": self.circuit.state.value,
+            "reason": reason,
+            "method": req.method,
+            "path": req.path,
+        }
+
+        def _append() -> None:
+            self.ledger.append(
+                event_type="circuit_breaker",
+                payload=payload,
+                manifest_id=f"circuit:{req.client_id}",
+                metadata={"product": "proxy-risk"},
+            )
+
+        await asyncio.to_thread(_append)
 
     def _log_sync(self, req: ProxyRequest, decision: GateDecision, detail: str, **extra: Any) -> None:
         if self.ledger is None:

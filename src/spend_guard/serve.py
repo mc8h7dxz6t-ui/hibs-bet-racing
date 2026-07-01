@@ -6,14 +6,22 @@ import json
 import logging
 import os
 import uuid
+from pathlib import Path
 from typing import Any
 
 import httpx
 from fastapi import FastAPI, Request, Response, status
 
-from pathlib import Path
-
+from inst_spine.health_probes import (
+    ledger_chain_ready,
+    readiness_payload,
+    redis_ready_from_env,
+    sqlite_db_ready,
+    wallet_state_ready,
+)
+from inst_spine.http_lifecycle import make_lifespan
 from inst_spine.ledger import AppendOnlyLedger
+from inst_spine.middleware import install_api_key_middleware
 from spend_guard.cost import actual_cost_from_usage, estimate_reserve_cost
 from spend_guard.gateway import SpendGuardGateway, SpendRequest
 from spend_guard.wallet_factory import open_wallet
@@ -23,8 +31,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("spend_guard.serve")
-
-app = FastAPI(title="Spend Guard — OpenAI-compatible gateway")
 
 _UPSTREAM_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
 
@@ -50,13 +56,9 @@ def _gateway() -> SpendGuardGateway:
             state.ledger.close()
             state.ledger = None
         ledger_path = Path(state.ledger_db)
-        wallet = open_wallet(
-            state.wallet_db,
-            ledger_db=ledger_path,
-        )
-        if state.ledger is None:
-            state.ledger = AppendOnlyLedger(ledger_path, async_writes=True)
-            state.ledger.start_async_writer()
+        wallet = open_wallet(state.wallet_db, ledger_db=ledger_path)
+        state.ledger = AppendOnlyLedger(ledger_path, async_writes=True)
+        state.ledger.start_async_writer()
         state.gateway = SpendGuardGateway(
             wallet=wallet,
             ledger=state.ledger,
@@ -65,8 +67,7 @@ def _gateway() -> SpendGuardGateway:
     return state.gateway
 
 
-@app.on_event("startup")
-async def startup() -> None:
+def _startup() -> None:
     _gateway()
     logger.info(
         "Spend Guard gateway online wallet=%s ledger=%s shadow=%s mock=%s",
@@ -77,10 +78,16 @@ async def startup() -> None:
     )
 
 
-@app.on_event("shutdown")
-async def shutdown() -> None:
+def _shutdown() -> None:
     if state.ledger:
         state.ledger.stop_async_writer(flush=True)
+
+
+app = FastAPI(
+    title="Spend Guard — OpenAI-compatible gateway",
+    lifespan=make_lifespan(_startup, _shutdown),
+)
+install_api_key_middleware(app, env_var="SPEND_GUARD_API_KEY", skip_prefixes=("/static",))
 
 
 @app.get("/health")
@@ -92,7 +99,30 @@ async def health() -> dict[str, Any]:
         "shadow": state.shadow_mode,
         "mock_upstream": state.mock_upstream,
         "wallet": wallet,
+        "auth_required": bool(os.getenv("SPEND_GUARD_API_KEY", "").strip()),
     }
+
+
+@app.get("/ready")
+async def ready() -> Response:
+    wallet_file_ok, wallet_file_detail = sqlite_db_ready(state.wallet_db)
+    wallet_ok, wallet_detail = wallet_state_ready(state.wallet_db)
+    ledger_ok, ledger_detail = sqlite_db_ready(state.ledger_db)
+    chain_ok, chain_detail = ledger_chain_ready(state.ledger_db)
+    redis_ok, redis_detail = redis_ready_from_env()
+    body = readiness_payload(
+        product="spend-guard",
+        checks={
+            "wallet_file": (wallet_file_ok, wallet_file_detail),
+            "wallet_state": (wallet_ok, wallet_detail),
+            "ledger_db": (ledger_ok, ledger_detail),
+            "ledger_chain": (chain_ok, chain_detail),
+            "redis_profile": (redis_ok, redis_detail),
+        },
+        extra={"mock_upstream": state.mock_upstream},
+    )
+    code = status.HTTP_200_OK if body["ready"] else status.HTTP_503_SERVICE_UNAVAILABLE
+    return Response(content=json.dumps(body), status_code=code, media_type="application/json")
 
 
 @app.get("/v1/models")
@@ -184,10 +214,7 @@ async def chat_completions(request: Request) -> Response:
             reserve_resp.reason or "wallet locked",
         )
     if decision == "reject":
-        code = status.HTTP_402_PAYMENT_REQUIRED
-        if "insufficient" in (reserve_resp.reason or ""):
-            code = status.HTTP_402_PAYMENT_REQUIRED
-        return _error_response(code, "spend_rejected", reserve_resp.reason or "reserve rejected")
+        return _error_response(status.HTTP_402_PAYMENT_REQUIRED, "spend_rejected", reserve_resp.reason or "reserve rejected")
 
     hold_id = reserve_resp.hold_id or ""
     status_code, upstream, raw = await _forward_upstream(body, request)
