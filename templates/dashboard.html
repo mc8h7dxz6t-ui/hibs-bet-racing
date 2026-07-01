@@ -252,7 +252,7 @@
                 <div class="hero-horse">{{ r.horse_name }}</div>
                 <div class="hero-meta">{{ r.off_time or '—' }} {{ r.course or '' }}<br>{{ r.jockey or '—' }} · {{ r.trainer or '—' }}</div>
                 <div class="hero-prob">{{ (r.model_place_prob or 0)|fmt_pct }}</div>
-                <div class="hero-meta">combo {{ r.combo_bayes_place|fmt_num }} · score {{ r.place_score|fmt_num }}
+                <div class="hero-meta">combo {{ r.combo_bayes_place|fmt_pct }} · score {{ r.place_score|fmt_num }}
                 {% if r.win_decimal and r.monetized_link %}
                 · <a class="odds-affiliate-link" href="{{ r.monetized_link }}" target="_blank" rel="noopener sponsored">win {{ r.win_decimal|fmt_num }}</a>
                 {% elif r.win_decimal %}
@@ -473,7 +473,7 @@
                                     <td class="rp-comment" title="{{ r.card_comment or '' }}">{{ r.rp_comment_short or '—' }}</td>
                                     <td class="engine-opinion" title="{% for reason in r.engine_reasons or [] %}{{ reason }} {% endfor %}">{{ r.engine_opinion or '—' }}</td>
                                     <td class="num">{{ (r.model_place_prob or 0)|fmt_pct }}</td>
-                                    <td class="num">{{ r.combo_bayes_place|fmt_num }}</td>
+                                    <td class="num">{{ r.combo_bayes_place|fmt_pct }}</td>
                                     <td class="num">{{ r.ew_combined_ev|fmt_num }}</td>
                                     <td class="num stake-cell"><span class="stake-units-label">1.0u</span><span class="stake-cash-hint stake-cash-slot"></span></td>
                                 </tr>
