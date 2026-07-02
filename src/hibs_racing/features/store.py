@@ -117,6 +117,12 @@ PAPER_BETS_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("clv_beat", "INTEGER"),
     ("verification_hash", "TEXT"),
     ("backtest", "INTEGER NOT NULL DEFAULT 0"),
+    # Denormalized race context — settlement must not depend on ephemeral upcoming_runners.
+    ("card_date", "TEXT"),
+    ("course", "TEXT"),
+    ("off_time", "TEXT"),
+    ("horse_name", "TEXT"),
+    ("race_natural_key", "TEXT"),
 )
 
 SNAPSHOT_MIGRATIONS: tuple[tuple[str, str], ...] = (

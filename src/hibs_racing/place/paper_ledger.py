@@ -107,6 +107,144 @@ def _normalize_horse(name: str) -> str:
     return re.sub(r"\s+", " ", name.lower().strip())
 
 
+def _runner_slug_from_id(runner_id: str) -> str:
+    return runner_id.split(":", 1)[-1] if ":" in runner_id else runner_id
+
+
+def _upcoming_context(conn, runner_id: str) -> dict[str, str | None]:
+    row = conn.execute(
+        """
+        SELECT card_date, course, off_time, horse_name, race_natural_key
+        FROM upcoming_runners WHERE runner_id = ?
+        """,
+        (runner_id,),
+    ).fetchone()
+    if not row:
+        return {}
+    keys = ("card_date", "course", "off_time", "horse_name", "race_natural_key")
+    return {k: (str(v) if v is not None else None) for k, v in zip(keys, row, strict=True)}
+
+
+def _runners_context(conn, race_id: str, runner_id: str) -> dict[str, str | None]:
+    """Fallback when upcoming_runners row was replaced — use ingested results spine."""
+    slug = _runner_slug_from_id(runner_id)
+    race_row = conn.execute(
+        """
+        SELECT race_date, course, off_time, race_natural_key
+        FROM runners WHERE race_id = ? ORDER BY finish_pos IS NULL, runner_id LIMIT 1
+        """,
+        (race_id,),
+    ).fetchone()
+    horse_name = None
+    for (horse_id,) in conn.execute(
+        "SELECT horse_id FROM runners WHERE race_id = ? AND finish_pos IS NOT NULL",
+        (race_id,),
+    ).fetchall():
+        if horse_id and _horse_slug(str(horse_id)) == slug:
+            horse_name = str(horse_id)
+            break
+    if not horse_name:
+        for (horse_id,) in conn.execute(
+            "SELECT horse_id FROM runners WHERE race_id = ?",
+            (race_id,),
+        ).fetchall():
+            if horse_id and _horse_slug(str(horse_id)) == slug:
+                horse_name = str(horse_id)
+                break
+    if not race_row and not horse_name:
+        return {}
+    race_date, course, off_time, race_natural_key = race_row or (None, None, None, None)
+    return {
+        "card_date": str(race_date) if race_date else None,
+        "course": str(course) if course else None,
+        "off_time": str(off_time) if off_time else None,
+        "horse_name": horse_name,
+        "race_natural_key": str(race_natural_key) if race_natural_key else None,
+    }
+
+
+def _merge_context(*parts: dict[str, str | None]) -> dict[str, str | None]:
+    out: dict[str, str | None] = {}
+    for part in parts:
+        for key, val in part.items():
+            if val and not out.get(key):
+                out[key] = val
+    return out
+
+
+def _resolve_bet_context(
+    conn,
+    *,
+    race_id: str,
+    runner_id: str,
+    card_date: str | None = None,
+    horse_name: str | None = None,
+    course: str | None = None,
+    off_time: str | None = None,
+    race_natural_key: str | None = None,
+) -> dict[str, str | None]:
+    ctx = _merge_context(
+        {
+            "card_date": card_date,
+            "horse_name": horse_name,
+            "course": course,
+            "off_time": off_time,
+            "race_natural_key": race_natural_key,
+        },
+        _upcoming_context(conn, runner_id),
+        _runners_context(conn, race_id, runner_id),
+    )
+    return ctx
+
+
+def _backfill_open_paper_context(conn) -> int:
+    """Persist race context on open forward bets so settlement survives card refresh."""
+    rows = conn.execute(
+        """
+        SELECT bet_id, race_id, runner_id, card_date, course, off_time, horse_name, race_natural_key
+        FROM paper_bets
+        WHERE status = 'open' AND backtest = 0
+        """
+    ).fetchall()
+    updated = 0
+    for bet_id, race_id, runner_id, card_date, course, off_time, horse_name, race_natural_key in rows:
+        if card_date and horse_name:
+            continue
+        ctx = _resolve_bet_context(
+            conn,
+            race_id=race_id,
+            runner_id=runner_id,
+            card_date=card_date,
+            horse_name=horse_name,
+            course=course,
+            off_time=off_time,
+            race_natural_key=race_natural_key,
+        )
+        if not ctx.get("card_date"):
+            continue
+        conn.execute(
+            """
+            UPDATE paper_bets SET
+                card_date = COALESCE(card_date, ?),
+                course = COALESCE(course, ?),
+                off_time = COALESCE(off_time, ?),
+                horse_name = COALESCE(horse_name, ?),
+                race_natural_key = COALESCE(race_natural_key, ?)
+            WHERE bet_id = ?
+            """,
+            (
+                ctx.get("card_date"),
+                ctx.get("course"),
+                ctx.get("off_time"),
+                ctx.get("horse_name"),
+                ctx.get("race_natural_key"),
+                bet_id,
+            ),
+        )
+        updated += 1
+    return updated
+
+
 def _find_finish_pos(
     conn,
     *,
@@ -277,11 +415,16 @@ def settle_paper_bets(database: Path | None = None) -> dict:
 
     init_db(db)
     with connect(db) as conn:
+        _backfill_open_paper_context(conn)
         bets = conn.execute(
             """
             SELECT pb.bet_id, pb.race_id, pb.runner_id, pb.bet_type, pb.stake_units,
-                   pb.offered_win, pb.place_terms, u.card_date, u.horse_name, u.course,
-                   u.off_time, u.race_natural_key
+                   pb.offered_win, pb.place_terms,
+                   COALESCE(pb.card_date, u.card_date) AS card_date,
+                   COALESCE(pb.horse_name, u.horse_name) AS horse_name,
+                   COALESCE(pb.course, u.course) AS course,
+                   COALESCE(pb.off_time, u.off_time) AS off_time,
+                   COALESCE(pb.race_natural_key, u.race_natural_key) AS race_natural_key
             FROM paper_bets pb
             LEFT JOIN upcoming_runners u ON u.runner_id = pb.runner_id
             WHERE pb.status = 'open'
@@ -289,6 +432,21 @@ def settle_paper_bets(database: Path | None = None) -> dict:
         ).fetchall()
         for bet in bets:
             bet_id, race_id, runner_id, bet_type, stake, offered_win, place_terms, card_date, horse_name, course, off_time, race_natural_key = bet
+            ctx = _resolve_bet_context(
+                conn,
+                race_id=race_id,
+                runner_id=runner_id,
+                card_date=card_date,
+                horse_name=horse_name,
+                course=course,
+                off_time=off_time,
+                race_natural_key=race_natural_key,
+            )
+            card_date = ctx.get("card_date")
+            horse_name = ctx.get("horse_name")
+            course = ctx.get("course")
+            off_time = ctx.get("off_time")
+            race_natural_key = ctx.get("race_natural_key")
             if not card_date:
                 still_open += 1
                 continue
@@ -382,7 +540,10 @@ def load_ledger_rows(
                        pb.offered_win, pb.offered_place, pb.place_terms, pb.status, pb.result_pnl,
                        pb.settled_at, pb.created_at, pb.is_value_pick, pb.finish_pos,
                        pb.closing_sp, pb.clv_beat, pb.verification_hash, pb.backtest,
-                       u.horse_name, u.course, u.off_time, u.card_date
+                       COALESCE(u.horse_name, pb.horse_name) AS horse_name,
+                       COALESCE(u.course, pb.course) AS course,
+                       COALESCE(u.off_time, pb.off_time) AS off_time,
+                       COALESCE(u.card_date, pb.card_date) AS card_date
                 FROM paper_bets pb
                 LEFT JOIN upcoming_runners u ON u.runner_id = pb.runner_id
                 WHERE pb.created_at >= ?{bt_clause}
@@ -398,7 +559,10 @@ def load_ledger_rows(
                        pb.offered_win, pb.offered_place, pb.place_terms, pb.status, pb.result_pnl,
                        pb.settled_at, pb.created_at, pb.is_value_pick, pb.finish_pos,
                        pb.closing_sp, pb.clv_beat, pb.verification_hash, pb.backtest,
-                       u.horse_name, u.course, u.off_time, u.card_date
+                       COALESCE(u.horse_name, pb.horse_name) AS horse_name,
+                       COALESCE(u.course, pb.course) AS course,
+                       COALESCE(u.off_time, pb.off_time) AS off_time,
+                       COALESCE(u.card_date, pb.card_date) AS card_date
                 FROM paper_bets pb
                 LEFT JOIN upcoming_runners u ON u.runner_id = pb.runner_id
                 WHERE 1=1{bt_clause}
@@ -732,14 +896,18 @@ def record_paper_bet(
     bet_id = str(uuid.uuid4())
     now = created_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     vhash = bet_verification_hash(bet_id, now, runner_id, offered_win, stake_units)
+    ctx: dict[str, str | None] = {}
+    with connect(db) as conn:
+        ctx = _resolve_bet_context(conn, race_id=race_id, runner_id=runner_id)
     with connect(db) as conn:
         conn.execute(
             """
             INSERT INTO paper_bets (
                 bet_id, race_id, runner_id, bet_type, stake_units,
                 model_ev, offered_win, offered_place, place_terms, is_value_pick,
-                verification_hash, backtest, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                verification_hash, backtest, created_at,
+                card_date, course, off_time, horse_name, race_natural_key
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 bet_id,
@@ -755,6 +923,11 @@ def record_paper_bet(
                 vhash,
                 1 if backtest else 0,
                 now,
+                ctx.get("card_date"),
+                ctx.get("course"),
+                ctx.get("off_time"),
+                ctx.get("horse_name"),
+                ctx.get("race_natural_key"),
             ),
         )
         conn.commit()
