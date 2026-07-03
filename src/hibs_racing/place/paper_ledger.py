@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -646,6 +647,9 @@ def record_paper_bet(
     created_at: str | None = None,
     database: Path | None = None,
     audit_extra: dict | None = None,
+    model_place_prob: float | None = None,
+    place_ev: float | None = None,
+    value_gate_reason: str | None = None,
 ) -> str:
     import uuid
 
@@ -673,6 +677,10 @@ def record_paper_bet(
                         offered_win = COALESCE(?, offered_win),
                         offered_place = COALESCE(?, offered_place),
                         place_terms = COALESCE(?, place_terms),
+                        model_place_prob = COALESCE(?, model_place_prob),
+                        place_ev = COALESCE(?, place_ev),
+                        value_gate_reason = COALESCE(?, value_gate_reason),
+                        evidence_json = COALESCE(?, evidence_json),
                         verification_hash = ?
                     WHERE bet_id = ?
                     """,
@@ -681,6 +689,10 @@ def record_paper_bet(
                         offered_win,
                         offered_place,
                         place_terms,
+                        model_place_prob,
+                        place_ev,
+                        value_gate_reason,
+                        json.dumps(audit_extra, default=str) if audit_extra else None,
                         vhash,
                         bet_id,
                     ),
@@ -697,8 +709,9 @@ def record_paper_bet(
             INSERT INTO paper_bets (
                 bet_id, race_id, runner_id, bet_type, stake_units,
                 model_ev, offered_win, offered_place, place_terms, is_value_pick,
-                verification_hash, backtest, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                verification_hash, backtest, created_at, model_place_prob, place_ev,
+                value_gate_reason, evidence_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 bet_id,
@@ -714,6 +727,10 @@ def record_paper_bet(
                 vhash,
                 1 if backtest else 0,
                 now,
+                model_place_prob,
+                place_ev,
+                value_gate_reason,
+                json.dumps(audit_extra, default=str) if audit_extra else None,
             ),
         )
         conn.commit()
@@ -746,3 +763,56 @@ def record_paper_bet(
                 "bet_placed ledger event failed for %s: %s", bet_id, exc
             )
     return bet_id
+
+
+def paper_bet_status_by_runner(
+    database: Path | None = None,
+    *,
+    card_dates: list[str] | None = None,
+) -> dict[str, dict]:
+    """Latest paper-ledger status keyed by runner_id for the cards UI.
+
+    Compatibility helper for web_service.group_meetings. Read-only: no bet
+    placement, no settlement, and no mutations.
+    """
+    db = database or db_path(load_config())
+    init_db(db)
+    params: list[object] = []
+    date_join = ""
+    date_where = ""
+    if card_dates:
+        clean_dates = [str(d) for d in card_dates if str(d).strip()]
+        if clean_dates:
+            marks = ",".join("?" for _ in clean_dates)
+            date_join = "LEFT JOIN upcoming_runners u ON u.runner_id = pb.runner_id"
+            date_where = f" AND u.card_date IN ({marks})"
+            params.extend(clean_dates)
+    sql = f"""
+        SELECT pb.runner_id, pb.status, pb.bet_type, pb.stake_units, pb.offered_win,
+               pb.offered_place, pb.place_terms, pb.result_pnl, pb.finish_pos,
+               pb.closing_sp, pb.clv_beat, pb.created_at, pb.settled_at,
+               pb.is_value_pick, pb.model_ev
+        FROM paper_bets pb
+        {date_join}
+        WHERE 1=1{date_where}
+        ORDER BY pb.created_at DESC
+    """
+    out: dict[str, dict] = {}
+    with connect(db) as conn:
+        try:
+            rows = conn.execute(sql, params).fetchall()
+        except Exception:
+            return out
+    cols = [
+        "runner_id", "status", "bet_type", "stake_units", "offered_win",
+        "offered_place", "place_terms", "result_pnl", "finish_pos",
+        "closing_sp", "clv_beat", "created_at", "settled_at",
+        "is_value_pick", "model_ev",
+    ]
+    for row in rows:
+        rec = dict(zip(cols, row, strict=True))
+        rid = str(rec.get("runner_id") or "")
+        if rid and rid not in out:
+            out[rid] = rec
+    return out
+
