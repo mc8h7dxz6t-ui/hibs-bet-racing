@@ -24,12 +24,16 @@ def harville_longshot_discount(configured: float) -> float:
 
 def harville_runtime_config(cfg: dict | None = None) -> dict[str, Any]:
     cfg = cfg or load_config()
-    paper = cfg.get("paper", {})
+    from hibs_racing.sale_gates import apply_sale_gate_overrides
+
+    paper = apply_sale_gate_overrides(cfg.get("paper") or {})
     configured = float(paper.get("harville_longshot_discount", 1.0))
     effective = harville_longshot_discount(configured)
     env = os.environ.get("HIBS_HARVILLE_CORRECTION", "").strip() or "default"
+    henery_env = os.environ.get("HIBS_HENERY_CORRECTION", "").strip() or "default"
     return {
         "correction_env": env,
+        "henery_correction_env": henery_env,
         "win_prob_threshold": float(paper.get("harville_longshot_win_prob_threshold", 0.03)),
         "configured_discount": configured,
         "effective_discount": effective,
@@ -37,4 +41,5 @@ def harville_runtime_config(cfg: dict | None = None) -> dict[str, Any]:
         "min_combo_bayes_place": float(paper.get("min_combo_bayes_place", 0.22)),
         "default_place_fraction": float(paper.get("default_place_fraction", 0.25)),
         "default_places": int(paper.get("default_places", 3)),
+        "sale_gates": bool(paper.get("_sale_gates_active")),
     }

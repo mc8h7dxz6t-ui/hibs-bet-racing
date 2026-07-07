@@ -49,6 +49,8 @@ class HealthStatus:
     unscored_runners: int | None = None
     nan_integrity_passed: bool | None = None
     production_value_count: int | None = None
+    place_reliability: dict | None = None
+    sale_gates: dict | None = None
 
     def to_dict(self) -> dict:
         out = {
@@ -83,6 +85,10 @@ class HealthStatus:
             out["nan_integrity_passed"] = self.nan_integrity_passed
         if self.production_value_count is not None:
             out["production_value_count"] = self.production_value_count
+        if self.place_reliability is not None:
+            out["place_reliability"] = self.place_reliability
+        if self.sale_gates is not None:
+            out["sale_gates"] = self.sale_gates
         return out
 
 
@@ -145,6 +151,20 @@ def health_status() -> HealthStatus:
     scored = load_scored_cards()
     prod_n = int(safe_value_mask(scored).sum()) if not scored.empty else 0
     nan_report = run_nan_integrity_check(database=db, strict=False)
+    place_reliability = None
+    try:
+        from hibs_racing.analytics.reliability_bins import place_reliability_from_ledger, place_reliability_from_snapshots
+
+        with connect(db) as conn:
+            place_reliability = place_reliability_from_ledger(conn, days=60, backtest=False)
+            if int(place_reliability.get("n") or 0) < 20:
+                snap = place_reliability_from_snapshots(conn, days=60)
+                if int(snap.get("n") or 0) > int(place_reliability.get("n") or 0):
+                    place_reliability = snap
+    except Exception:
+        place_reliability = None
+    from hibs_racing.sale_gates import sale_gate_status
+
     return HealthStatus(
         db_ok=db.exists(),
         runners_loaded=len(runners),
@@ -166,6 +186,8 @@ def health_status() -> HealthStatus:
         unscored_runners=int(sync.get("unscored_on_card") or 0),
         nan_integrity_passed=nan_report.passed,
         production_value_count=prod_n,
+        place_reliability=place_reliability,
+        sale_gates=sale_gate_status(),
     )
 
 

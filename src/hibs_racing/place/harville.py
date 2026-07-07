@@ -1,4 +1,35 @@
+"""Harville / Henery place probability models."""
+
 from __future__ import annotations
+
+import os
+
+
+def _henery_gamma() -> float:
+    raw = os.environ.get("HIBS_HENERY_CORRECTION", "").strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return 1.0
+    if raw in ("1", "true", "yes", "on"):
+        try:
+            return max(1.0, float(os.environ.get("HIBS_HENERY_GAMMA", "1.10")))
+        except ValueError:
+            return 1.10
+    try:
+        g = float(raw)
+        return g if g > 0 else 1.0
+    except ValueError:
+        return 1.0
+
+
+def _apply_henery_transform(probs: list[float], gamma: float) -> list[float]:
+    """Henery (1981) style denominator correction — gamma>1 trims longshot place mass."""
+    if gamma <= 1.0 + 1e-9:
+        return list(probs)
+    out: list[float] = []
+    for p in probs:
+        denom = max(1e-12, 1.0 - p)
+        out.append(p / (denom ** (gamma - 1.0)))
+    return out
 
 
 def _apply_longshot_discount(
@@ -26,10 +57,11 @@ def harville_place_probs(
     *,
     longshot_win_prob_threshold: float = 0.03,
     longshot_discount: float = 1.0,
+    henery_gamma: float | None = None,
 ) -> list[float]:
     """
     Harville place probabilities (top-k) from win probabilities.
-    Phase B starter — swap for Henery calibration once backtest justifies it.
+    Optional Henery correction via henery_gamma or HIBS_HENERY_CORRECTION env.
     """
     if places < 1:
         raise ValueError("places must be >= 1")
@@ -47,7 +79,15 @@ def harville_place_probs(
     if total <= 0:
         raise ValueError("win_probs must sum to a positive value")
 
-    p = [x / total for x in wp]
+    gamma = henery_gamma if henery_gamma is not None else _henery_gamma()
+    p_raw = [x / total for x in wp]
+    p = _apply_henery_transform(p_raw, gamma)
+    norm = sum(p)
+    if norm <= 0:
+        p = p_raw
+    else:
+        p = [x / norm for x in p]
+
     place_p = [0.0] * n
 
     # 1st
