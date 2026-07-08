@@ -11,9 +11,14 @@ activate_venv() {
   if [[ -n "${HIBS_RACING_SKIP_VENV:-}" ]]; then
     return 0
   fi
+  local py="python3"
+  if command -v python3.13 >/dev/null 2>&1; then py=python3.13
+  elif command -v python3.12 >/dev/null 2>&1; then py=python3.12
+  elif command -v python3.11 >/dev/null 2>&1; then py=python3.11
+  fi
   if [[ ! -d .venv ]]; then
-    echo "Creating .venv..."
-    python3 -m venv .venv
+    echo "Creating .venv with ${py}..."
+    "${py}" -m venv .venv
   fi
   # shellcheck disable=SC1091
   source .venv/bin/activate
