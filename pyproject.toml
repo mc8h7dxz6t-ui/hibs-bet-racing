@@ -7,7 +7,7 @@ name = "hibs-racing"
 version = "0.1.0"
 description = "Offline racing NLP + place/EW research engine (separate from hibs-bet football)"
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10,<3.15"
 dependencies = [
     "pyyaml>=6.0",
     "pandas>=2.0",
