@@ -19,6 +19,14 @@ def test_harville_longshot_discount_reduces_tail_place_prob():
     assert discounted[1] < plain[1]
 
 
+def test_henery_reduces_longshot_place_vs_harville(monkeypatch):
+    wp = [0.02, 0.02, 0.46, 0.50]
+    plain = harville_place_probs(wp, places=3, henery_gamma=1.0)
+    henery = harville_place_probs(wp, places=3, henery_gamma=1.12)
+    assert henery[0] < plain[0]
+    assert henery[1] < plain[1]
+
+
 def test_score_card_smoke(monkeypatch, tmp_path):
     from hibs_racing.config import load_config
     from hibs_racing.features.store import connect, init_db

@@ -183,6 +183,15 @@ def _clv_metrics(rows: list[dict]) -> dict[str, Any]:
     }
 
 
+def _backtest_block() -> dict[str, Any]:
+    try:
+        from hibs_racing.analytics.backtest_results import backtest_results_summary
+
+        return backtest_results_summary()
+    except Exception as exc:
+        return {"error": str(exc)[:120]}
+
+
 def build_public_tracker_dict(
     *,
     history_days: int | None = None,
@@ -202,6 +211,31 @@ def build_public_tracker_dict(
     clv = _clv_metrics(rows)
     curve = _pnl_curve(rows)
 
+    reliability: dict[str, Any] = {"n": 0, "bins": []}
+    try:
+        from hibs_racing.analytics.reliability_bins import place_reliability_from_ledger, place_reliability_from_snapshots
+        from hibs_racing.features.store import connect, init_db
+
+        init_db(db)
+        with connect(db) as conn:
+            reliability = place_reliability_from_ledger(conn, days=days, backtest=backtest)
+            if int(reliability.get("n") or 0) < 20:
+                snap_rel = place_reliability_from_snapshots(conn, days=days)
+                if int(snap_rel.get("n") or 0) > int(reliability.get("n") or 0):
+                    reliability = snap_rel
+    except Exception:
+        pass
+
+    settlement_mix = {"offered": 0, "sp": 0, "unknown": 0}
+    for row in rows:
+        if row.get("status") == "open":
+            continue
+        src = str(row.get("settlement_price_source") or "offered").lower()
+        if src in settlement_mix:
+            settlement_mix[src] += 1
+        else:
+            settlement_mix["unknown"] += 1
+
     return {
         "ok": True,
         "public": True,
@@ -216,6 +250,9 @@ def build_public_tracker_dict(
         "value_pick_count": stats.get("value_pick_count", 0),
         "stats": stats,
         "clv": clv,
+        "place_reliability": reliability,
+        "settlement_price_mix": settlement_mix,
+        "backtest_results": _backtest_block(),
         "pnl_curve": curve,
         "methodology": {
             "lock_rule": (
@@ -224,7 +261,9 @@ def build_public_tracker_dict(
             ),
             "settlement_rule": (
                 "Results auto-joined from ingested raceform via race natural key (date+course+time), "
-                "then horse/course fallbacks. Closing SP stored at settlement for CLV audit."
+                "then horse/course fallbacks. PnL defaults to offered exchange/win price at bet time; "
+                "settlement_price_source records offered vs SP when HIBS_RACING_SETTLE_AT_SP=1. "
+                "Closing SP stored for CLV audit."
             ),
             "verification": (
                 "Each row includes bet_id and SHA-256 verification_hash (bet_id|created_at|runner|odds|stake). "

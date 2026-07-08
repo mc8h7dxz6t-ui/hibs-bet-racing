@@ -52,6 +52,9 @@ class HealthStatus:
     paper: dict | None = None
     cron: dict | None = None
     reliability: dict | None = None
+    place_reliability: dict | None = None
+    sale_gates: dict | None = None
+    backtest_results: dict | None = None
     latest_card_date: str | None = None
     card_fresh: bool | None = None
     data_producer: dict | None = None
@@ -96,6 +99,12 @@ class HealthStatus:
             out["cron"] = self.cron
         if self.reliability is not None:
             out["reliability"] = self.reliability
+        if self.place_reliability is not None:
+            out["place_reliability"] = self.place_reliability
+        if self.sale_gates is not None:
+            out["sale_gates"] = self.sale_gates
+        if self.backtest_results is not None:
+            out["backtest_results"] = self.backtest_results
         if self.latest_card_date is not None:
             out["latest_card_date"] = self.latest_card_date
         out["card_fresh"] = self.card_fresh if self.card_fresh is not None else False
@@ -138,7 +147,12 @@ def _env_ok(*keys: str) -> bool:
 
 
 def _health_light_mode() -> bool:
-    return os.environ.get("HIBS_HEALTH_LIGHT", "0").strip().lower() in ("1", "true", "yes", "on")
+    raw = os.environ.get("HIBS_HEALTH_LIGHT", "").strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return False
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    return os.environ.get("HIBS_PRODUCTION", "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _paper_health_summary(database) -> dict:
@@ -154,8 +168,9 @@ def _paper_health_summary(database) -> dict:
                 SELECT
                     COUNT(*) AS n,
                     SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open_n,
-                    SUM(CASE WHEN status = 'settled' THEN 1 ELSE 0 END) AS settled_n
+                    SUM(CASE WHEN status != 'open' THEN 1 ELSE 0 END) AS settled_n
                 FROM paper_bets
+                WHERE backtest = 0
                 """
             ).fetchone()
             if row:
@@ -226,19 +241,40 @@ def health_status() -> HealthStatus:
     sync = db_ui_sync_report(database=db)
     from hibs_racing.monitoring.nan_alert import run_nan_integrity_check
 
-    scored = load_scored_cards() if not _health_light_mode() else pd.DataFrame()
-    prod_n = int(safe_value_mask(scored).sum()) if not scored.empty else None
-    nan_report = run_nan_integrity_check(database=db, strict=False) if not _health_light_mode() else None
+    light = _health_light_mode()
+    scored = load_scored_cards() if not light else pd.DataFrame()
+    prod_n = int(safe_value_mask(scored).sum()) if not scored.empty else 0
+    nan_report = run_nan_integrity_check(database=db, strict=False) if not light else None
     paper_summary = _paper_health_summary(db)
     cron_summary = _cron_health_summary(db)
     reliability_summary = None
-    if not _health_light_mode():
+    place_reliability = None
+    if not light:
         try:
-            from hibs_racing.analytics.reliability_bins import settled_paper_calibration
+            from hibs_racing.analytics.reliability_bins import (
+                place_reliability_from_ledger,
+                place_reliability_from_snapshots,
+                settled_paper_calibration,
+            )
 
             reliability_summary = settled_paper_calibration(db)
+            with connect(db) as conn:
+                place_reliability = place_reliability_from_ledger(conn, days=60, backtest=False)
+                if int(place_reliability.get("n") or 0) < 20:
+                    snap = place_reliability_from_snapshots(conn, days=60)
+                    if int(snap.get("n") or 0) > int(place_reliability.get("n") or 0):
+                        place_reliability = snap
         except Exception:
             reliability_summary = None
+            place_reliability = None
+    from hibs_racing.sale_gates import sale_gate_status
+
+    try:
+        from hibs_racing.analytics.backtest_results import backtest_results_summary
+
+        backtest_results = backtest_results_summary()
+    except Exception:
+        backtest_results = None
     tel = telemetry_balance if isinstance(telemetry_balance, dict) else {}
     if cov.get("coverage_pct") is not None and "coverage_pct" not in tel:
         tel = {**tel, "coverage_pct": float(cov.get("coverage_pct"))}
@@ -254,7 +290,7 @@ def health_status() -> HealthStatus:
         latest_card_date = manifest.card_date
         card_fresh = str(latest_card_date) >= today if latest_card_date else False
     data_producer = None
-    if not _health_light_mode():
+    if not light:
         try:
             from hibs_racing.data_producer_slo import build_data_producer_snapshot
 
@@ -285,6 +321,9 @@ def health_status() -> HealthStatus:
         paper=paper_summary,
         cron=cron_summary,
         reliability=reliability_summary,
+        place_reliability=place_reliability,
+        sale_gates=sale_gate_status(),
+        backtest_results=backtest_results,
         latest_card_date=latest_card_date,
         card_fresh=card_fresh,
         data_producer=data_producer,

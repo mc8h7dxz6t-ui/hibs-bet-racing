@@ -265,11 +265,14 @@ def _date_cutoff(days: int | None) -> str | None:
 
 def settle_paper_bets(database: Path | None = None) -> dict:
     """Match open paper bets to ingested results and record P&L."""
+    import os
+
     cfg = load_config()
     db = database or db_path(cfg)
     paper_cfg = cfg.get("paper", {})
     default_places = int(paper_cfg.get("default_places", 3))
     default_fraction = float(paper_cfg.get("default_place_fraction", 0.25))
+    settle_at_sp = os.environ.get("HIBS_RACING_SETTLE_AT_SP", "").strip().lower() in ("1", "true", "yes", "on")
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     settled = 0
     still_open = 0
@@ -306,14 +309,6 @@ def settle_paper_bets(database: Path | None = None) -> dict:
                 still_open += 1
                 continue
             places, fraction = _parse_place_terms(place_terms, default_places=default_places, default_fraction=default_fraction)
-            pnl, status = _each_way_pnl(
-                finish_pos=finish_pos,
-                bet_type=bet_type,
-                stake=float(stake),
-                win_decimal=offered_win,
-                place_fraction=fraction,
-                places=places,
-            )
             closing_sp = _closing_sp_for_runner(
                 conn,
                 finish_pos=finish_pos,
@@ -325,6 +320,19 @@ def settle_paper_bets(database: Path | None = None) -> dict:
                 off_time=off_time,
                 race_natural_key=race_natural_key,
             )
+            settlement_source = "offered"
+            settlement_win = float(offered_win) if offered_win else None
+            if settle_at_sp and closing_sp and float(closing_sp) > 1.0:
+                settlement_source = "sp"
+                settlement_win = float(closing_sp)
+            pnl, status = _each_way_pnl(
+                finish_pos=finish_pos,
+                bet_type=bet_type,
+                stake=float(stake),
+                win_decimal=settlement_win,
+                place_fraction=fraction,
+                places=places,
+            )
             clv_beat = None
             if closing_sp and offered_win and float(offered_win) > float(closing_sp):
                 clv_beat = 1
@@ -334,10 +342,21 @@ def settle_paper_bets(database: Path | None = None) -> dict:
                 """
                 UPDATE paper_bets
                 SET status = ?, result_pnl = ?, settled_at = ?, finish_pos = ?,
-                    closing_sp = ?, clv_beat = ?
+                    closing_sp = ?, clv_beat = ?,
+                    settlement_price_source = ?, settlement_win_decimal = ?
                 WHERE bet_id = ?
                 """,
-                (status, pnl, now, finish_pos, closing_sp, clv_beat, bet_id),
+                (
+                    status,
+                    pnl,
+                    now,
+                    finish_pos,
+                    closing_sp,
+                    clv_beat,
+                    settlement_source,
+                    settlement_win,
+                    bet_id,
+                ),
             )
             settled += 1
             details.append(
@@ -382,6 +401,7 @@ def load_ledger_rows(
                        pb.offered_win, pb.offered_place, pb.place_terms, pb.status, pb.result_pnl,
                        pb.settled_at, pb.created_at, pb.is_value_pick, pb.finish_pos,
                        pb.closing_sp, pb.clv_beat, pb.verification_hash, pb.backtest,
+                       pb.settlement_price_source, pb.settlement_win_decimal,
                        u.horse_name, u.course, u.off_time, u.card_date
                 FROM paper_bets pb
                 LEFT JOIN upcoming_runners u ON u.runner_id = pb.runner_id
@@ -398,6 +418,7 @@ def load_ledger_rows(
                        pb.offered_win, pb.offered_place, pb.place_terms, pb.status, pb.result_pnl,
                        pb.settled_at, pb.created_at, pb.is_value_pick, pb.finish_pos,
                        pb.closing_sp, pb.clv_beat, pb.verification_hash, pb.backtest,
+                       pb.settlement_price_source, pb.settlement_win_decimal,
                        u.horse_name, u.course, u.off_time, u.card_date
                 FROM paper_bets pb
                 LEFT JOIN upcoming_runners u ON u.runner_id = pb.runner_id
@@ -412,6 +433,7 @@ def load_ledger_rows(
         "offered_win", "offered_place", "place_terms", "status", "result_pnl",
         "settled_at", "created_at", "is_value_pick", "finish_pos",
         "closing_sp", "clv_beat", "verification_hash", "backtest",
+        "settlement_price_source", "settlement_win_decimal",
         "horse_name", "course", "off_time", "card_date",
     ]
     return [dict(zip(cols, row, strict=True)) for row in rows]

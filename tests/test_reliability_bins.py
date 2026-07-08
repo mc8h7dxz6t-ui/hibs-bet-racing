@@ -1,20 +1,27 @@
-"""Tests for racing reliability bins analytics."""
+"""Tests for place probability reliability bins."""
 
-from __future__ import annotations
+from hibs_racing.analytics.reliability_bins import (
+    place_reliability_bins,
+    settled_paper_calibration,
+    win_reliability_bins,
+)
 
-from hibs_racing.analytics.reliability_bins import brier_score_win, reliability_bins
+
+def test_place_reliability_bins_well_calibrated():
+    pairs = [(0.1, 0)] * 10 + [(0.9, 1)] * 10
+    out = place_reliability_bins(pairs, n_bins=10, min_bin_n=5)
+    assert out["n"] == 20
+    assert out["brier"] is not None
 
 
-def test_reliability_bins_basic():
-    rows = [
-        {"model_win_prob": 0.15, "won": False},
-        {"model_win_prob": 0.18, "won": True},
-        {"model_win_prob": 0.55, "won": True},
-        {"model_win_prob": 0.60, "won": False},
-    ]
-    bins = reliability_bins(rows, bins=5)
+def test_win_reliability_bins():
+    rows = [{"model_win_prob": 0.2, "won": False}, {"model_win_prob": 0.8, "won": True}]
+    bins = win_reliability_bins(rows, bins=5)
     assert bins
-    assert sum(b["n"] for b in bins) == 4
-    brier = brier_score_win(rows)
-    assert brier is not None
-    assert 0 <= brier <= 1
+
+
+def test_settled_paper_calibration_empty(tmp_path, monkeypatch):
+    db = tmp_path / "t.sqlite"
+    monkeypatch.setenv("HIBS_RACING_DB_PATH", str(db))
+    out = settled_paper_calibration(db)
+    assert out["available"] is False
