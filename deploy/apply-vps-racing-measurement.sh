@@ -38,4 +38,5 @@ EOF
 chown www-data:www-data "${ENV_FILE}" 2>/dev/null || true
 chmod 640 "${ENV_FILE}" 2>/dev/null || true
 echo "==> Racing measurement profile written to ${ENV_FILE}"
+echo "    Verify: bash ${APP_ROOT}/scripts/verify_racing_evidence_gates.sh"
 echo "    Restart: systemctl restart hibs-racing"
