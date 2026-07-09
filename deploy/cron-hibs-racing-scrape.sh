@@ -23,7 +23,8 @@ run_cycle() {
       echo "ERROR: missing ${SCRIPT}"
       exit 1
     fi
-    HOME="${RACING}" HIBS_RACING_DEPLOY_PATH="${RACING}" LOG_DIR="${LOG_DIR}" bash "${SCRIPT}"
+    HOME="${RACING}" HIBS_RACING_DEPLOY_PATH="${RACING}" LOG_DIR="${LOG_DIR}" \
+      HIBS_ALWAYS_SCRAPE=1 HIBS_RACING_SCRAPE_FORCE=1 bash "${SCRIPT}"
   } >>"${LOG_FILE}" 2>&1
   chown www-data:www-data "${LOG_FILE}" "${LOG_DIR}/robust-racing-scrape.json" 2>/dev/null || true
 }
@@ -39,10 +40,10 @@ install_cron() {
     printf '%s\n' "${existing}"
     echo ""
     echo "${MARKER}"
-    echo "# Every 2h — cards + odds rescue when API thin"
-    echo "20 */2 * * * cd ${RACING} && HOME=${RACING} HIBS_RACING_DEPLOY_PATH=${RACING} bash ${SCRIPT} >> ${LOG_FILE} 2>&1"
-    echo "# Pre-racing daily refresh"
-    echo "0 5 * * * cd ${RACING} && HOME=${RACING} HIBS_RACING_DEPLOY_PATH=${RACING} bash ${SCRIPT} >> ${LOG_FILE} 2>&1"
+    echo "# Every 2h — max-data cards + odds + thin rescue (always on)"
+    echo "20 */2 * * * cd ${RACING} && HOME=${RACING} HIBS_RACING_DEPLOY_PATH=${RACING} HIBS_ALWAYS_SCRAPE=1 HIBS_RACING_SCRAPE_FORCE=1 bash ${SCRIPT} >> ${LOG_FILE} 2>&1"
+    echo "# Pre-racing morning pass"
+    echo "0 5 * * * cd ${RACING} && HOME=${RACING} HIBS_RACING_DEPLOY_PATH=${RACING} HIBS_ALWAYS_SCRAPE=1 HIBS_RACING_SCRAPE_FORCE=1 bash ${SCRIPT} >> ${LOG_FILE} 2>&1"
   } >"${tmp}"
   crontab -u www-data "${tmp}"
   rm -f "${tmp}"
