@@ -632,6 +632,18 @@ def cmd_weekly_gate_efficacy(args: argparse.Namespace) -> int:
     return 0 if payload.get("ok") else 1
 
 
+def cmd_win_prob_calibration_fit(args: argparse.Namespace) -> int:
+    from hibs_racing.models.win_prob_calibration import fit_from_settled_paper
+
+    days = int(getattr(args, "days", 365) or 365)
+    payload = fit_from_settled_paper(days=days)
+    print(json.dumps(payload, indent=2, default=str))
+    if not payload.get("knots"):
+        print("WARN: insufficient settled paper rows for isotonic fit", file=sys.stderr)
+        return 1
+    return 0
+
+
 def cmd_route_execution(args: argparse.Namespace) -> int:
     from hibs_racing.live.execution_config import EXECUTION_DISABLED_MSG
     from hibs_racing.live.execution_router import route_execution_batch
@@ -1379,6 +1391,13 @@ def main(argv: list[str] | None = None) -> int:
     p_wge.add_argument("--week-ended", help="ISO week end date (default: today)")
     p_wge.add_argument("--no-append", action="store_true", help="Print JSON only; do not append markdown")
     p_wge.set_defaults(func=cmd_weekly_gate_efficacy)
+
+    p_wpc = sub.add_parser(
+        "win-prob-calibration-fit",
+        help="Fit isotonic win-prob calibration from settled forward paper bets",
+    )
+    p_wpc.add_argument("--days", type=int, default=365, help="Lookback days for fit sample")
+    p_wpc.set_defaults(func=cmd_win_prob_calibration_fit)
 
     p_fc = sub.add_parser("fetch-cards", help="Fetch upcoming racecards (rpscrape or Racing API)")
     p_fc.add_argument("--day", type=int, default=1, help="Single day: 1=today, 2=tomorrow")

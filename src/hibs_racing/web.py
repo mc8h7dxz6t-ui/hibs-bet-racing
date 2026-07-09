@@ -351,9 +351,11 @@ def create_app() -> Flask:
 
     @app.route("/status")
     def status_page():
+        hs = health_status()
         return render_template(
             "status.html",
-            health=health_status(),
+            health=hs,
+            evidence_truth=hs.evidence_truth,
             feature_impact=load_feature_impact_report(),
             ranker_attribution=live_ranker_attribution(),
             market_gauges=latest_gauges(limit=40),

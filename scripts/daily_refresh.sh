@@ -36,6 +36,10 @@ echo "hibs-racing daily refresh — results since ${START_DATE}"
 run_logged "daily-ingest-sync" \
   hibs-racing ingest-raceform "${RFDB}" --since "${START_DATE}" --sync
 
+# Recover missing OR / enrich fields on upcoming + cached RP racecards.
+run_tier2_logged "daily-or-enrich-backfill" \
+  hibs-racing backfill-runner-enrich
+
 # TIER-2: scrape-from-cache may be empty on quiet days — do not abort refresh-cards.
 if ! run_logged "daily-scrape-results" \
   hibs-racing scrape --days "${LOOKBACK_DAYS}" --region gb --ingest --from-cache; then

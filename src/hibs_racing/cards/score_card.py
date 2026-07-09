@@ -55,6 +55,10 @@ def score_upcoming_cards(
 
     frame = apply_scoring(frame)
 
+    from hibs_racing.models.win_prob_calibration import apply_win_prob_calibration
+
+    frame = apply_win_prob_calibration(frame)
+
     place_probs: list[float] = []
     for _, group in frame.groupby("race_id", sort=False):
         wp = group["model_win_prob"].tolist()

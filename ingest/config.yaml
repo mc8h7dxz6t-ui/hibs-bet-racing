@@ -38,6 +38,8 @@ ranker:
   min_races: 50
   scoring_mode: auto
   production_scoring_mode: ranker
+  win_prob_calibration: true
+  calibration_file: win_prob_isotonic.json
   model_file: lgbm_ranker.txt
   feature_file: lgbm_ranker_features.json
   enrich_feature_file: lgbm_ranker_features_enrich.json
@@ -98,6 +100,18 @@ paper:
     min_stressed_place_ev: 0.0
     max_value_per_race: 2
     max_value_per_meeting: 6
+paper_lanes:
+  recommended_paper_lane: gate3
+  smart_picks_lane: gate3
+  live_promotion: false
+  gate3_anchor:
+    enabled: true
+    lane: gate3
+    flag_col: flag_gate3
+gate_closure:
+  recommended_paper_lane: gate3
+  live_promotion: false
+  note: Replay-only until slippage sample >= 300 and scoring hash stable
 experimental_replay_lanes:
   promotion_criteria:
     min_picks_per_month_gate5: 15
@@ -176,7 +190,7 @@ rate_limits:
   rp_racecard_region_pause_sec: 5.0
   rp_verdict_race_pause_sec: 1.2
   rp_verdict_workers: 2
-  rp_verdict_max_races: 20
+  rp_verdict_max_races: 40
   oddschecker_pause_sec: 1.5
 monitor:
   top_n: 10
@@ -192,7 +206,7 @@ oddschecker:
   enabled: true
   base_url: https://www.oddschecker.com
   default_source: auto
-  auto_scrape: false
+  auto_scrape: true
   retail_only: true
   default_place_fraction: 0.25
   default_places: 3

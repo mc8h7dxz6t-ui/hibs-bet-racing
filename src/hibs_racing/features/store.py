@@ -124,6 +124,7 @@ PAPER_BETS_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("off_time", "TEXT"),
     ("horse_name", "TEXT"),
     ("race_natural_key", "TEXT"),
+    ("paper_lane", "TEXT NOT NULL DEFAULT 'production'"),
 )
 
 SNAPSHOT_MIGRATIONS: tuple[tuple[str, str], ...] = (

@@ -55,6 +55,7 @@ class HealthStatus:
     place_reliability: dict | None = None
     sale_gates: dict | None = None
     backtest_results: dict | None = None
+    evidence_truth: dict | None = None
     latest_card_date: str | None = None
     card_fresh: bool | None = None
     data_producer: dict | None = None
@@ -105,6 +106,8 @@ class HealthStatus:
             out["sale_gates"] = self.sale_gates
         if self.backtest_results is not None:
             out["backtest_results"] = self.backtest_results
+        if self.evidence_truth is not None:
+            out["evidence_truth"] = self.evidence_truth
         if self.latest_card_date is not None:
             out["latest_card_date"] = self.latest_card_date
         out["card_fresh"] = self.card_fresh if self.card_fresh is not None else False
@@ -275,6 +278,18 @@ def health_status() -> HealthStatus:
         backtest_results = backtest_results_summary()
     except Exception:
         backtest_results = None
+    evidence_truth = None
+    if not light:
+        try:
+            from hibs_racing.analytics.evidence_truth_plane import build_evidence_truth_plane
+
+            partial_health = {
+                "reliability": reliability_summary,
+                "place_reliability": place_reliability,
+            }
+            evidence_truth = build_evidence_truth_plane(health=partial_health, days=90)
+        except Exception:
+            evidence_truth = None
     tel = telemetry_balance if isinstance(telemetry_balance, dict) else {}
     if cov.get("coverage_pct") is not None and "coverage_pct" not in tel:
         tel = {**tel, "coverage_pct": float(cov.get("coverage_pct"))}
@@ -324,6 +339,7 @@ def health_status() -> HealthStatus:
         place_reliability=place_reliability,
         sale_gates=sale_gate_status(),
         backtest_results=backtest_results,
+        evidence_truth=evidence_truth,
         latest_card_date=latest_card_date,
         card_fresh=card_fresh,
         data_producer=data_producer,
