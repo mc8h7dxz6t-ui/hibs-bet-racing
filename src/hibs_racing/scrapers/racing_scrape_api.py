@@ -126,12 +126,14 @@ def run_thin_rescue_pass(*, max_per_cycle: Optional[int] = None) -> Dict[str, An
     rescued = 0
     attempted = 0
     from hibs_racing.cards.runner_field_api import resolve_runner_fields
+    from hibs_racing.data_quality_targets import racing_thin_rescue_dq_pct
 
+    thin_floor = racing_thin_rescue_dq_pct()
     for _, row in frame.iterrows():
         if cap <= 0:
             break
         d = {k: row.get(k) for k in row.index}
-        if runner_data_quality_pct(d) >= 70 and d.get("win_decimal"):
+        if runner_data_quality_pct(d) >= thin_floor and d.get("win_decimal"):
             continue
         cap -= 1
         attempted += 1
