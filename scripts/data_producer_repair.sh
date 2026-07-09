@@ -40,8 +40,23 @@ if [[ "${OK}" == "True" ]]; then
 fi
 
 if [[ ${DRY} -eq 1 ]]; then
-  log "dry-run — would run daily_refresh.sh"
+  log "dry-run — would run warm_racing_scrape.sh then daily_refresh.sh"
   exit 2
+fi
+
+if [[ -f "${APP}/scripts/warm_racing_scrape.sh" ]]; then
+  log "repair: robust targeted scrape (fast path)"
+  HOME="${APP}" HIBS_RACING_DEPLOY_PATH="${APP}" LOG_DIR="${LOG_DIR}" \
+    timeout 900 bash "${APP}/scripts/warm_racing_scrape.sh" \
+    >>"${LOG_DIR}/data-producer-repair.log" 2>&1 || warn "robust scrape failed"
+  OK="$("${PY}" -c "
+from hibs_racing.data_producer_slo import build_data_producer_snapshot
+print(build_data_producer_snapshot().get('ok'))
+" 2>/dev/null || echo False)"
+  if [[ "${OK}" == "True" ]]; then
+    log "GREEN after robust scrape"
+    exit 0
+  fi
 fi
 
 if [[ "$(id -u)" -eq 0 && -f "${APP}/scripts/daily_refresh.sh" ]]; then

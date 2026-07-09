@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from hibs_racing.cards.data_quality import runner_data_quality_pct
+from hibs_racing.cards.dq_persist import merge_runners_preserve_best
 from hibs_racing.cards.query import load_scored_cards
 from hibs_racing.scrapers.multi_scraper_api import FIELD_LADDERS, catalog_summary
 
@@ -125,13 +126,21 @@ def run_thin_rescue_pass(*, max_per_cycle: Optional[int] = None) -> Dict[str, An
         return {"rescued": 0, "attempted": 0, "coverage": odds_coverage_summary(frame)}
     rescued = 0
     attempted = 0
+    persisted = 0
     from hibs_racing.cards.runner_field_api import resolve_runner_fields
+    from hibs_racing.data_quality_targets import racing_data_quality_target_pct, racing_thin_rescue_dq_pct
 
+    thin_floor = racing_thin_rescue_dq_pct()
+    target = racing_data_quality_target_pct()
+    updates: List[Dict[str, Any]] = []
     for _, row in frame.iterrows():
         if cap <= 0:
             break
         d = {k: row.get(k) for k in row.index}
-        if runner_data_quality_pct(d) >= 70 and d.get("win_decimal"):
+        dq_before = runner_data_quality_pct(d)
+        if dq_before >= target and d.get("win_decimal"):
+            continue
+        if dq_before >= thin_floor and d.get("win_decimal"):
             continue
         cap -= 1
         attempted += 1
@@ -139,10 +148,29 @@ def run_thin_rescue_pass(*, max_per_cycle: Optional[int] = None) -> Dict[str, An
         if not rid:
             continue
         payload = resolve_runner_fields(rid, rescue=True)
-        if payload and (payload.get("rescued") or payload.get("fields", {}).get("win_decimal")):
+        if not payload:
+            continue
+        fields = payload.get("fields") or {}
+        merged = dict(d)
+        for key, val in fields.items():
+            if val is not None:
+                merged[key] = val
+        dq_after = runner_data_quality_pct(merged)
+        if dq_after > dq_before or (payload.get("rescued") and dq_after >= dq_before):
             rescued += 1
+            updates.append(merged)
+    if updates:
+        from hibs_racing.cards.store import load_upcoming_runners, store_upcoming_runners
+
+        existing = load_upcoming_runners()
+        if existing.empty:
+            existing = frame
+        patch = pd.DataFrame(updates)
+        merged = merge_runners_preserve_best(existing, patch)
+        persisted = store_upcoming_runners(merged, source="thin_rescue")
     return {
         "rescued": rescued,
         "attempted": attempted,
+        "persisted": persisted,
         "coverage": odds_coverage_summary(),
     }

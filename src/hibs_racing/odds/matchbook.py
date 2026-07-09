@@ -182,6 +182,10 @@ class MatchbookClient:
         self.login()
         url = f"{self._api_base}/{path.lstrip('/')}"
         resp = self._session.get(url, params=params or {}, timeout=45)
+        if resp.status_code == 429:
+            from hibs_racing.matchbook_guard import record_rate_limit
+
+            record_rate_limit(http_status=429, reason=path)
         resp.raise_for_status()
         return resp.json()
 
@@ -627,6 +631,10 @@ def fetch_matchbook_odds(
     client: MatchbookClient | None = None,
 ) -> tuple[pd.DataFrame, MatchbookFetchReport]:
     """Pull exchange back prices from Matchbook and align to card runners."""
+    from hibs_racing.matchbook_guard import matchbook_traffic_allowed, record_poll_success
+
+    if not matchbook_traffic_allowed():
+        return pd.DataFrame(), MatchbookFetchReport(errors=["matchbook poll gated (rate/owner/trip)"])
     cfg = load_config(config_path)
     mb_cfg = cfg.get("matchbook", {})
     if not mb_cfg.get("enabled", True):
@@ -742,6 +750,8 @@ def fetch_matchbook_odds(
 
         report.runners_priced = len(priced)
         report.near_miss_count = near_miss_counter[0]
+        if priced:
+            record_poll_success()
         return pd.DataFrame(priced), report
     finally:
         if owns_client:

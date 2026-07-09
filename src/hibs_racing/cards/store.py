@@ -54,6 +54,12 @@ def _float_val(rec: dict, key: str) -> float | None:
 def store_upcoming_runners(frame: pd.DataFrame, *, source: str, database: Path | None = None) -> int:
     init_db(database or db_path(load_config()))
     db = database or db_path(load_config())
+    from hibs_racing.cards.dq_persist import merge_runners_preserve_best, preserve_best_dq_enabled
+
+    if preserve_best_dq_enabled():
+        existing = load_upcoming_runners(database=db)
+        if not existing.empty:
+            frame = merge_runners_preserve_best(existing, frame)
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     count = 0
     with connect(db) as conn:

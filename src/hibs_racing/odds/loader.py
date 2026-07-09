@@ -39,6 +39,12 @@ def resolve_scoring_odds(
         return odds, meta
 
     if source in ("matchbook", "mb", "exchange"):
+        from hibs_racing.matchbook_guard import matchbook_traffic_allowed
+
+        if not matchbook_traffic_allowed():
+            meta["source"] = "matchbook_gated"
+            meta["report"] = {"errors": ["matchbook poll gated"]}
+            return None, meta
         odds, report = fetch_matchbook_odds(cards, config_path=config_path)
         meta["source"] = "matchbook"
         meta["report"] = report.to_dict()
@@ -60,12 +66,17 @@ def resolve_scoring_odds(
             return odds, meta
         if mb_cfg.get("enabled", True) and _matchbook_configured() and mb_cfg.get("auto_fetch", True):
             try:
-                odds, report = fetch_matchbook_odds(cards, config_path=config_path)
-                if not odds.empty:
-                    meta["source"] = "matchbook"
-                    meta["report"] = report.to_dict()
-                    return odds, meta
-                meta["matchbook_attempt"] = report.to_dict()
+                from hibs_racing.matchbook_guard import matchbook_traffic_allowed
+
+                if matchbook_traffic_allowed():
+                    odds, report = fetch_matchbook_odds(cards, config_path=config_path)
+                    if not odds.empty:
+                        meta["source"] = "matchbook"
+                        meta["report"] = report.to_dict()
+                        return odds, meta
+                    meta["matchbook_attempt"] = report.to_dict()
+                else:
+                    meta["matchbook_attempt"] = {"errors": ["matchbook poll gated"]}
             except Exception as exc:
                 meta["matchbook_attempt"] = {"error": str(exc)[:120]}
         if oc_cfg.get("auto_scrape", False) or os.getenv("HIBS_ODDS_AUTO_SCRAPE", "").strip().lower() in (
