@@ -60,16 +60,23 @@ def build_data_producer_snapshot() -> Dict[str, Any]:
     except Exception:
         resilience = {"ok": True}
     try:
-        from hibs_racing.racing_api_guard import status_payload as guard_status
+        from hibs_racing.racing_api_guard import status_payload as api_guard_status
 
-        api_guard = guard_status()
+        api_guard = api_guard_status()
     except Exception:
         api_guard = {}
+    try:
+        from hibs_racing.matchbook_guard import status_payload as mb_guard_status
+
+        mb_guard = mb_guard_status()
+    except Exception:
+        mb_guard = {}
     producers = {
         "racing_cards": cards,
         "robust_scrape": scrape,
         "resilience": resilience,
         "racing_api_guard": api_guard,
+        "matchbook_guard": mb_guard,
     }
     ok = bool(cards.get("ok")) and scrape.get("ok") is not False
     return {
