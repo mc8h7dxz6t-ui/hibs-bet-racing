@@ -11,6 +11,10 @@ set -euo pipefail
 BET="${DEPLOY_PATH:-/opt/hibs-bet}"
 RACING="${HIBS_RACING_DEPLOY_PATH:-/opt/hibs-racing}"
 OVERLAY="${OVERLAY_ROOT:-${RACING}/deploy/football-inst-overlay}"
+DOMAIN="${HIBS_DOMAIN:-hibs-bet.co.uk}"
+HOST="${DEPLOY_HOST:-$(hostname -s 2>/dev/null || hostname -f 2>/dev/null || echo vps)}"
+STAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+REF="${HIBS_OVERLAY_REVISION:-main@football-inst-overlay}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root: sudo bash $0" >&2
@@ -57,4 +61,51 @@ if [[ -f "${BET}/scripts/evaluate_trading_day15_gate.py" && -d "${TRADING_INSTAL
       "${TRADING_INSTALL_ROOT:-/opt/trading-core}/scripts/evaluate_trading_day15_gate.py"
 fi
 
-echo "==> football overlay applied to ${BET}"
+if [[ -f "${BET}/deploy/hibs-bet.service" ]]; then
+  echo "==> install hibs-bet.service"
+  cp "${BET}/deploy/hibs-bet.service" /etc/systemd/system/hibs-bet.service
+  systemctl daemon-reload
+fi
+
+cat >"${BET}/.deploy-revision" <<EOF
+revision=${REF}
+deployed_at=${STAMP}
+deploy_host=${HOST}
+domain=${DOMAIN}
+service=hibs-bet
+sync_source=football_inst_overlay
+EOF
+chown www-data:www-data "${BET}/.deploy-revision"
+
+if systemctl is-enabled hibs-bet &>/dev/null; then
+  echo "==> restart hibs-bet"
+  systemctl restart hibs-bet.service
+  sleep 4
+  systemctl is-active hibs-bet.service
+else
+  echo "WARN: hibs-bet service not enabled — start manually: systemctl enable --now hibs-bet"
+fi
+
+if [[ "${HIBS_OVERLAY_SKIP_WARM:-0}" != "1" ]]; then
+  echo "==> post-sync fixture warm (set HIBS_OVERLAY_SKIP_WARM=1 to skip)"
+  if [[ -f "${BET}/scripts/warm_low_source_scrape.sh" ]]; then
+    sudo -u www-data env \
+      HOME="${BET}" DEPLOY_PATH="${BET}" PYTHONPATH="${BET}/src" \
+      HIBS_LOW_SOURCE_SCRAPE_FORCE=1 \
+      bash "${BET}/scripts/warm_low_source_scrape.sh" || echo "WARN: low-source scrape warm failed"
+  fi
+  if [[ -f "${BET}/scripts/warm_football_fixtures.sh" ]]; then
+    FOOTBALL_WARM_FORCE="${HIBS_OVERLAY_FORCE_FIXTURE_WARM:-0}"
+    sudo -u www-data env \
+      HOME="${BET}" DEPLOY_PATH="${BET}" PYTHONPATH="${BET}/src" \
+      HIBS_FIXTURE_WARM_FORCE_REFRESH="${FOOTBALL_WARM_FORCE}" \
+      bash "${BET}/scripts/warm_football_fixtures.sh" || echo "WARN: fixture warm failed"
+  fi
+fi
+
+echo ""
+echo "==> verify"
+curl -fsS --max-time 10 "http://127.0.0.1:8000/api/ping" 2>/dev/null | head -c 400 || true
+echo ""
+echo ""
+echo "==> football overlay applied to ${BET} at ${STAMP}"
