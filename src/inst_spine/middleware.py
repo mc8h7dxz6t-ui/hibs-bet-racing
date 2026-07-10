@@ -60,6 +60,54 @@ def verify_device_token(device_id: str, token: str, *, secret_env: str = "HEALTH
     return hmac.compare_digest(expected, token.strip())
 
 
+def verify_proxy_client_auth(request: Request, *, client_id: str) -> tuple[bool, str]:
+    """
+    When PROXY_CLIENT_AUTH_SECRET is set, require HMAC over client_id for ingress.
+    Header: X-Proxy-Client-Signature = HMAC-SHA256(secret, client_id).
+    """
+    secret = os.getenv("PROXY_CLIENT_AUTH_SECRET", "").strip()
+    if not secret:
+        return True, "proxy_client_auth_not_required"
+    sig = (request.headers.get("X-Proxy-Client-Signature") or "").strip()
+    if not sig:
+        return False, "missing_proxy_client_signature"
+    expected = hmac.new(
+        secret.encode("utf-8"),
+        client_id.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        return False, "proxy_client_signature_mismatch"
+    return True, "proxy_client_auth_ok"
+
+
+def install_proxy_client_auth_middleware(app: ASGIApp) -> None:
+    """Validate PROXY_CLIENT_AUTH on /v1/proxy/* and /v1/guard/* routes."""
+
+    @app.middleware("http")  # type: ignore[attr-defined]
+    async def proxy_client_guard(request: Request, call_next: Callable):
+        path = request.url.path
+        client_id = ""
+        if path.startswith("/v1/proxy/"):
+            client_id = path.split("/v1/proxy/", 1)[1].split("/", 1)[0]
+        elif path.startswith("/v1/guard/"):
+            client_id = path.split("/v1/guard/", 1)[1].split("/", 1)[0]
+        elif path == "/v1/evaluate":
+            secret = os.getenv("PROXY_CLIENT_AUTH_SECRET", "").strip()
+            if secret:
+                client_id = (request.headers.get("X-Inst-Client-Id") or "").strip()
+                if not client_id:
+                    return JSONResponse(
+                        {"error": "unauthorized", "reason": "missing_x_inst_client_id"},
+                        status_code=401,
+                    )
+        if client_id:
+            ok, reason = verify_proxy_client_auth(request, client_id=client_id)
+            if not ok:
+                return JSONResponse({"error": "unauthorized", "reason": reason}, status_code=401)
+        return await call_next(request)
+
+
 def install_api_key_middleware(
     app: ASGIApp,
     *,

@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request, status
 from inst_spine.health_probes import ledger_chain_ready, readiness_payload, redis_ready_from_env, sqlite_db_ready
 from inst_spine.http_lifecycle import error_envelope, json_response, make_lifespan
 from inst_spine.ledger import AppendOnlyLedger
-from inst_spine.middleware import install_api_key_middleware
+from inst_spine.middleware import install_api_key_middleware, install_proxy_client_auth_middleware
 from inst_spine.rates import (
     MemoryIdempotencyBackend,
     MemoryTokenBucketBackend,
@@ -88,6 +88,7 @@ app = FastAPI(
     lifespan=make_lifespan(_startup, _shutdown),
 )
 install_api_key_middleware(app, env_var="PROXY_RISK_API_KEY")
+install_proxy_client_auth_middleware(app)
 
 
 @app.get("/health")

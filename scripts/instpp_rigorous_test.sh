@@ -955,17 +955,20 @@ print(json.dumps({"agent_ledger_http_auth": "ok"}))
 PY
 pass "Agent Ledger HTTP API auth"
 
-section "Forensic hardening — Waves 1–4"
+section "Forensic hardening — Waves 1–2"
 "$PYTHON" -m pytest \
   tests/test_drift_golden.py \
+  tests/test_drift_feature_matrix.py \
   tests/test_middleware_auth.py \
   tests/test_permit_ttl.py \
   tests/test_retention_drill.py \
   tests/test_altdata_structural_golden.py \
   tests/test_webhook_mesh_chaos.py \
-  tests/test_bundle_sign.py \
+  tests/test_proxy_circuit_fsm.py \
+  tests/test_redis_soak_memory.py \
+  tests/test_spend_guard.py \
   -v --tb=short
-pass "Forensic hardening suite"
+pass "Forensic hardening suite (Waves 1–2)"
 
 section "F8 retention drill"
 chmod +x ./scripts/instpp_retention_drill.sh
@@ -979,12 +982,13 @@ unset AGENT_LEDGER_API_KEY
 pass "Industry gold chaos suite"
 
 section "Production Redis — live profile + soak"
+INST_REDIS_SOAK_ITERATIONS=20 "$PYTHON" -m pytest tests/test_redis_soak_memory.py -v --tb=short
+pass "Memory Redis soak (rigorous-safe)"
 if [[ -n "${INST_REDIS_URL:-}" ]]; then
   "$PYTHON" -m pytest tests/test_redis_live.py tests/test_redis_soak.py -v --tb=short
   pass "Live Redis profile + soak (INST_REDIS_URL)"
 else
-  INST_REDIS_SOAK_ITERATIONS=20 "$PYTHON" -m pytest tests/test_redis_soak.py -v --tb=short 2>/dev/null || \
-    echo "[SKIP] Redis soak — set INST_REDIS_URL for live profile"
+  echo "[SKIP] Live Redis — set INST_REDIS_URL for production profile soak"
 fi
 
 section "Postgres profile — Compliance + Spend (#1, #11)"
@@ -1015,6 +1019,7 @@ section "Summary"
 ENDED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 SUMMARY_JSON=$("$PYTHON" -c "
 import json
+import os
 print(json.dumps({
     'suite': 'institutional_rigorous',
     'products': [
@@ -1027,6 +1032,27 @@ print(json.dumps({
     'industry_gold': True,
     'demo_gold': True,
     'forensic_hardening': True,
+    'forensic_waves': {
+        'wave_1': {
+            'agent_ledger_http_auth': True,
+            'spend_guard_api_key': True,
+            'spend_wallet_idempotency': True,
+            'drift_golden_psi_ks': True,
+            'drift_feature_null_matrix': True,
+            'redis_soak_memory': True,
+            'postgres_profile': bool(os.environ.get('INST_TEST_POSTGRES_DSN', '').strip()),
+        },
+        'wave_2': {
+            'shared_http_middleware': True,
+            'proxy_client_auth': True,
+            'ad_guard_api_key': True,
+            'webhook_mesh_api_key': True,
+            'circuit_breaker_half_open': True,
+            'webhook_poison_status': True,
+            'f8_retention_per_sku': True,
+            'redis_soak_live': bool(os.environ.get('INST_REDIS_URL', '').strip()),
+        },
+    },
     'engineering_completion': {
         'inst_spine': 98,
         'proxy_compliance_bundle': 98,

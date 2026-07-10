@@ -14,6 +14,7 @@ from fastapi import FastAPI, Request, Response, status
 from inst_spine.clocks import LamportClock
 from inst_spine.health_probes import readiness_payload, redis_ready_from_env
 from inst_spine.http_lifecycle import make_lifespan
+from inst_spine.middleware import install_api_key_middleware
 from inst_spine.rates import IdempotencyBackend, RedisIdempotencyBackend, idempotency_backend_from_env
 from inst_spine.wal import WALWriter
 from webhook_mesh.hmac_verify import verify_webhook_signature
@@ -82,6 +83,11 @@ async def _shutdown() -> None:
 app = FastAPI(
     title="Webhook Idempotency Mesh Engine",
     lifespan=make_lifespan(_startup, _shutdown),
+)
+install_api_key_middleware(
+    app,
+    env_var="WEBHOOK_MESH_API_KEY",
+    skip_prefixes=("/static", "/v1/ingress"),
 )
 
 

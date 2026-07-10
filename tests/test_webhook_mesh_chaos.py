@@ -72,6 +72,33 @@ async def test_redis_stream_enqueue_fields_roundtrip():
 
 
 @pytest.mark.asyncio
+async def test_webhook_poison_fsm_status(tmp_path: Path, monkeypatch):
+    captured: list[dict] = []
+
+    def _capture(**kwargs):
+        captured.append(kwargs)
+
+    import webhook_mesh.audit as audit_mod
+
+    monkeypatch.setattr(audit_mod, "append_delivery_event", _capture)
+
+    import webhook_mesh.fsm as fsm
+
+    path = await fsm.handle_dead_letter_allocation(
+        "poison-fsm-1",
+        b"not-json",
+        "https://example.com/hook",
+        dead_letter_dir=tmp_path / "dlq",
+        client_id="c1",
+        lamport=2,
+        last_status_code=422,
+    )
+    assert path is not None
+    assert captured
+    assert captured[-1]["status"] == "POISON"
+
+
+@pytest.mark.asyncio
 async def test_stream_worker_enqueue_calls_xadd():
     from webhook_mesh.queue import DeliveryManifest, RedisStreamDeliveryQueue
 

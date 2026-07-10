@@ -177,12 +177,27 @@ class SpendWallet:
             with self._connect() as conn:
                 conn.execute("BEGIN IMMEDIATE")
                 existing = conn.execute(
-                    "SELECT hold_id, status FROM spend_holds WHERE wallet_id = ? AND request_id = ?",
+                    "SELECT hold_id, status, amount FROM spend_holds WHERE wallet_id = ? AND request_id = ?",
                     (self.wallet_id, request_id),
                 ).fetchone()
                 if existing:
                     conn.execute("ROLLBACK")
-                    return False, "duplicate_request_id", str(existing[0])
+                    hold_id_existing, status_existing, amount_existing = (
+                        str(existing[0]),
+                        str(existing[1]),
+                        float(existing[2]),
+                    )
+                    if status_existing == "reserved":
+                        if amount_existing != amount:
+                            return (
+                                False,
+                                "duplicate_request_id_amount_mismatch",
+                                hold_id_existing,
+                            )
+                        return True, "already_reserved", hold_id_existing
+                    if status_existing == "settled":
+                        return True, "already_settled", hold_id_existing
+                    return False, f"duplicate_request_id_status:{status_existing}", hold_id_existing
 
                 conn.execute(
                     "UPDATE spend_wallet SET reserved = reserved + ? WHERE wallet_id = ?",
@@ -209,6 +224,9 @@ class SpendWallet:
                     conn.execute("ROLLBACK")
                     return False, "hold_not_found"
                 reserved_amt, status, _req = float(row[0]), row[1], row[2]
+                if status == "settled":
+                    conn.execute("ROLLBACK")
+                    return True, "already_settled"
                 if status != "reserved":
                     conn.execute("ROLLBACK")
                     return False, f"hold_status:{status}"

@@ -12,6 +12,7 @@ from fastapi import FastAPI, Request, Response, status
 from ad_guard.creative import parse_creative_approved
 from ad_guard.proxy import AdGuardGateway, AdSpendRequest
 from inst_spine.ledger import AppendOnlyLedger
+from inst_spine.middleware import install_api_key_middleware, install_proxy_client_auth_middleware
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,6 +21,8 @@ logging.basicConfig(
 logger = logging.getLogger("ad_guard.serve")
 
 app = FastAPI(title="Ad-Tech Budget Guardrail")
+install_api_key_middleware(app, env_var="AD_GUARD_API_KEY")
+install_proxy_client_auth_middleware(app)
 
 
 class RuntimeState:

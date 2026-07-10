@@ -209,6 +209,8 @@ class ProxyRiskGateway:
         if status < 200 or status >= 400:
             if hold_id and self._spend_wallet_db:
                 await asyncio.to_thread(self._release_spend, hold_id)
+            self.circuit.record_failure(detail)
+            await self._log_circuit_event(req, f"upstream_failure:{detail}")
             return await self._finish(
                 req,
                 GateDecision.REJECT,
@@ -216,6 +218,8 @@ class ProxyRiskGateway:
                 upstream_status=status,
                 upstream_body=body,
             )
+
+        self.circuit.record_success()
 
         if hold_id and self._spend_wallet_db:
             actual = self._actual_cost(body, est_cost)
@@ -276,6 +280,7 @@ class ProxyRiskGateway:
             "reason": reason,
             "method": req.method,
             "path": req.path,
+            **self.circuit.transition_snapshot(),
         }
 
         def _append() -> None:
