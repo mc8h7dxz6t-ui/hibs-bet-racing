@@ -146,7 +146,7 @@ def _try_matchbook(
         meta = dict(meta)
         meta["matchbook_attempt"] = {"errors": ["matchbook poll gated"]}
         return None, meta
-    odds, report = fetch_matchbook_odds(cards, config_path=config_path)
+    odds, report = fetch_matchbook_odds(cards, config_path=config_path, force=force)
     meta = dict(meta)
     meta["source"] = "matchbook"
     meta["report"] = report.to_dict()
