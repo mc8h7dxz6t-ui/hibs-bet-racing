@@ -6,6 +6,7 @@ HIBS_CRON_MARKERS=(
   "hibs-bet: daily bundle"
   "hibs-bet: seed forward evidence"
   "hibs-bet: hands-off cycle"
+  "hibs-bet: infra fallback (5m)"
   "hibs-bet: institutional++ watchdog"
   "hibs-bet: nine-ten daily"
   "hibs-bet: calibration drift"

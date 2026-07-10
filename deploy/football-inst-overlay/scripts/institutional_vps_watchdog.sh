@@ -151,6 +151,13 @@ print('yes' if service_restart_allowed('trading-shadow-soak', min_minutes=45) el
       fi
     fi
   fi
+
+  if [[ -f "${APP}/scripts/lib_football_vps_fallback.sh" ]]; then
+    log "repair: football/racing infra fallback cascade"
+    # shellcheck source=lib_football_vps_fallback.sh
+    source "${APP}/scripts/lib_football_vps_fallback.sh"
+    stack_vps_automation_fallback "${APP}" "${RACING}" || warn "infra fallback incomplete"
+  fi
 }
 
 [[ "${REPAIR}" -eq 1 ]] && repair_infra

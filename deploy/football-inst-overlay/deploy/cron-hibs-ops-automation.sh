@@ -68,6 +68,7 @@ install_base_crons() {
   _install_if_present "${APP_ROOT}/deploy/cron-hibs-calibration-drift.sh"
   _install_if_present "${APP_ROOT}/deploy/cron-hibs-institutional-watchdog.sh"
   _install_if_present "${APP_ROOT}/deploy/cron-hibs-hands-off.sh"
+  _install_if_present "${APP_ROOT}/deploy/cron-hibs-infra-fallback.sh"
   _install_if_present "${APP_ROOT}/deploy/cron-hibs-football-fixture-warm.sh"
   if [[ -f "${APP_ROOT}/deploy/cron-hibs-racing-daily.sh" ]]; then
     bash "${APP_ROOT}/deploy/cron-hibs-racing-daily.sh" --install || true

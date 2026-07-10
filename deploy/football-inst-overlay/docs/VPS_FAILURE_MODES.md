@@ -148,6 +148,7 @@ Use this after a green `vps_industry_standard_run.sh --repair`:
 | Practice | Current | Target |
 |----------|---------|--------|
 | Hard recovery scripts in git | Was VPS-only for racing | Both stacks in repo (PR #63) |
+| **Automation fallback cascade** | Manual diagnosis | **L1 soft → L2 hard → L3 nginx** every 5m (`lib_football_vps_fallback.sh`) |
 | Self-healing crontab | Fail-closed | Auto emergency when >200 lines |
 | Bring-up smoke | ping only | ping + login + portfolio summary |
 | Cascade-aware repair | FVE runs when football down | Skip FVE until football GREEN |

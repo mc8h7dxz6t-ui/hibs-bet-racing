@@ -11,6 +11,7 @@ Aligned with trading safety-first: **Reconciliation → Replay → Monitoring �
 | Layer | What | Failsafe behavior |
 |-------|------|-------------------|
 | **L0 Process** | `hibs-bet` systemd unit | `/api/ping` `ok:true`; restart throttled 45m/unit |
+| **L0b Infra fallback** | 5m cron + hands-off | Probe localhost + public → soft restart → hard recovery → nginx `5001→8000`; throttled 30–45m |
 | **L1 Audit** | `prediction_audit.sqlite` | Logging on; pred-log-sync cron; never break predict pipeline |
 | **L1b Settle** | FT + closing fallbacks | `HIBS_AUDIT_SETTLE_SCRAPE_FALLBACK=1` — API-Sports → FDO → FotMob → ESPN backup FT; closing tagged honestly |
 | **L2 Evidence** | F1–F9 gates | `safe_forward_evidence_gates()` — health never 500s on DB errors |

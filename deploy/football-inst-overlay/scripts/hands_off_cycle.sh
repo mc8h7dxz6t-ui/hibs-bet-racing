@@ -47,6 +47,13 @@ fi
     hibs_python_env "${APP}"
   fi
 
+  if [[ "$(id -u)" -eq 0 && -f "${APP}/scripts/lib_football_vps_fallback.sh" ]]; then
+    log "infra fallback (probe → soft → hard → nginx)"
+    # shellcheck source=lib_football_vps_fallback.sh
+    source "${APP}/scripts/lib_football_vps_fallback.sh"
+    stack_vps_automation_fallback "${APP}" "${RACING}" || warn "infra fallback — stack not fully green"
+  fi
+
   if [[ "$(id -u)" -eq 0 && -f "${APP}/scripts/vps_sync_trading_core.sh" ]]; then
     log "sync trading-core"
     bash "${APP}/scripts/vps_sync_trading_core.sh" || warn "trading sync failed"

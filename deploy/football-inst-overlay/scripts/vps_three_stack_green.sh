@@ -71,11 +71,11 @@ repair_all() {
       bash "${APP}/deploy/crontab-emergency-sports-only.sh" || true
     fi
   fi
-  fb_ping_pre="$(probe_http http://127.0.0.1:8000/api/ping 8)"
-  if [[ "${fb_ping_pre}" != "200" && -f "${APP}/scripts/vps_football_hard_recovery.sh" ]]; then
-    log "repair: football hard recovery (502 / stuck :8000)"
-    export DEPLOY_PATH="${APP}" HIBS_RACING_DEPLOY_PATH="${RACING}"
-    bash "${APP}/scripts/vps_football_hard_recovery.sh" || true
+  if [[ -f "${APP}/scripts/lib_football_vps_fallback.sh" ]]; then
+    log "repair: infra fallback cascade (football + racing)"
+    # shellcheck source=lib_football_vps_fallback.sh
+    source "${APP}/scripts/lib_football_vps_fallback.sh"
+    stack_vps_automation_fallback "${APP}" "${RACING}" || true
   fi
   if [[ -f "${APP}/scripts/_vps_automation_remote.sh" ]]; then
     export DEPLOY_PATH="${APP}" HIBS_RACING_DEPLOY_PATH="${RACING}" TRADING_INSTALL_ROOT="${TRADING}"
@@ -136,7 +136,14 @@ sys.exit(0 if service_restart_allowed('hibs-bet', min_minutes=45) else 1)
   fb_ping="$(probe_http http://127.0.0.1:8000/api/ping 15)"
   echo "  ping: ${fb_ping}"
   if [[ "${fb_unit}" == "active" && "${fb_ping}" != "200" && "${REPAIR}" -eq 1 ]]; then
-    if [[ -f "${APP}/scripts/vps_football_hard_recovery.sh" ]]; then
+    if [[ -f "${APP}/scripts/lib_football_vps_fallback.sh" ]]; then
+      warn "football ping not 200 — infra fallback"
+      # shellcheck source=lib_football_vps_fallback.sh
+      source "${APP}/scripts/lib_football_vps_fallback.sh"
+      football_vps_automation_fallback "${APP}" || true
+      fb_ping="$(probe_http http://127.0.0.1:8000/api/ping 20)"
+      echo "  ping after fallback: ${fb_ping}"
+    elif [[ -f "${APP}/scripts/vps_football_hard_recovery.sh" ]]; then
       warn "football ping not 200 — hard recovery"
       export DEPLOY_PATH="${APP}" HIBS_RACING_DEPLOY_PATH="${RACING}"
       bash "${APP}/scripts/vps_football_hard_recovery.sh" || true
@@ -158,6 +165,14 @@ sys.exit(0 if service_restart_allowed('hibs-bet-stuck', min_minutes=60) else 1)
     else
       warn "football stuck repair throttled (60m)"
     fi
+  elif [[ "${fb_ping}" != "200" && "${REPAIR}" -eq 1 && -f "${APP}/scripts/lib_football_vps_fallback.sh" ]]; then
+    warn "football unit ${fb_unit} ping ${fb_ping} — infra fallback"
+    # shellcheck source=lib_football_vps_fallback.sh
+    source "${APP}/scripts/lib_football_vps_fallback.sh"
+    football_vps_automation_fallback "${APP}" || true
+    fb_unit="$(systemctl is-active hibs-bet 2>/dev/null || echo inactive)"
+    fb_ping="$(probe_http http://127.0.0.1:8000/api/ping 20)"
+    echo "  unit after fallback: ${fb_unit} ping: ${fb_ping}"
   elif [[ "${fb_ping}" != "200" && "${REPAIR}" -eq 1 && -f "${APP}/scripts/vps_football_hard_recovery.sh" ]]; then
     warn "football unit ${fb_unit} ping ${fb_ping} — hard recovery"
     export DEPLOY_PATH="${APP}" HIBS_RACING_DEPLOY_PATH="${RACING}"
