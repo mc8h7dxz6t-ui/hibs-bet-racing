@@ -14,7 +14,6 @@ RACING_ROOT="${HIBS_RACING_DEPLOY_PATH:-/opt/hibs-racing}"
 RACING_ENV="${RACING_ROOT}/.env"
 FVE_REMOTE_HOST="${FVE_REMOTE_HOST:-}"
 FVE_DEPLOY_PATH="${FVE_DEPLOY_PATH:-/opt/football-app}"
-SOURCE_ENV="${MATCHBOOK_SOURCE_ENV:-${RACING_ENV}}"
 
 log() { echo "[matchbook-sync] $*"; }
 
@@ -47,12 +46,44 @@ upsert_env() {
   done
 }
 
+SOURCE_ENV="${MATCHBOOK_SOURCE_ENV:-}"
+
+_discover_matchbook_source() {
+  if [[ -n "${SOURCE_ENV}" ]]; then
+    echo "${SOURCE_ENV}"
+    return
+  fi
+  local f
+  for f in \
+    "${RACING_ENV}" \
+    "${FVE_DEPLOY_PATH}/.env" \
+    "/opt/fve/.env" \
+    "/opt/football-app/.env" \
+    "${LIB_ROOT}/.env" \
+    "/etc/trading_secrets"; do
+    if [[ -f "${f}" ]] && \
+       grep -qE '^MATCHBOOK_(USER|USERNAME)=' "${f}" 2>/dev/null && \
+       grep -qE '^MATCHBOOK_PASSWORD=' "${f}" 2>/dev/null; then
+      echo "${f}"
+      return
+    fi
+  done
+  echo "${RACING_ENV}"
+}
+
+SOURCE_ENV="$(_discover_matchbook_source)"
+
 log "load creds from ${SOURCE_ENV}"
 matchbook_load_env "${SOURCE_ENV}"
 if ! matchbook_credentials_ok; then
-  echo "ERROR: MATCHBOOK_USER/PASSWORD missing in ${SOURCE_ENV}" >&2
-  echo "Copy from Mac: scp ~/hibs-racing/.env user@vps:${RACING_ENV} (or set MATCHBOOK_SOURCE_ENV)" >&2
+  echo "ERROR: MATCHBOOK_USER/PASSWORD not found in ${SOURCE_ENV}" >&2
+  echo "Searched: racing, FVE (/opt/fve, /opt/football-app), hibs-bet, /etc/trading_secrets" >&2
+  echo "Find source: for f in /opt/fve/.env /opt/football-app/.env /opt/hibs-bet/.env; do grep MATCHBOOK \"\$f\" 2>/dev/null; done" >&2
+  echo "Then: sudo MATCHBOOK_SOURCE_ENV=/path/to/.env bash $0" >&2
   exit 1
+fi
+if [[ "${SOURCE_ENV}" != "${RACING_ENV}" ]]; then
+  log "using shared feed source: ${SOURCE_ENV}"
 fi
 user="$(matchbook_user_value)"
 
