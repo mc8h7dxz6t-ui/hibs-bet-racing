@@ -47,6 +47,8 @@ _key_ok() {
   local py="${APP_ROOT}/.venv/bin/python3"
   [[ -x "${py}" ]] || py="python3"
   HOME="${APP_ROOT}" PYTHONPATH="${APP_ROOT}/src" "${py}" -c "
+from dotenv import load_dotenv
+load_dotenv('${ENV_FILE}')
 from hibs_predictor.scrape_first import usable_api_sports_key
 k = usable_api_sports_key()
 raise SystemExit(0 if len(k) >= 16 else 1)
