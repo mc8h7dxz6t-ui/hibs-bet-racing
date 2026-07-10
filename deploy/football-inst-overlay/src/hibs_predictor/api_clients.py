@@ -241,6 +241,11 @@ def football_data_requests_allowed() -> bool:
     return RateLimiter().block_reason("football_data_org") is None
 
 
+def football_data_standings_allowed() -> bool:
+    """Alias — older deep_enrich / VPS modules used this name."""
+    return football_data_requests_allowed()
+
+
 def football_data_record_request() -> None:
     """Count one Football-Data.org HTTP call against the shared minute/hour guards."""
     RateLimiter().record_request("football_data_org")

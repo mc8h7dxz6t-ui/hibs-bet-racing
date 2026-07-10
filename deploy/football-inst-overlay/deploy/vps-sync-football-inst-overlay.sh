@@ -42,7 +42,9 @@ rsync -a \
   "${OVERLAY}/" "${BET}/"
 
 chmod +x "${BET}/scripts/"*.sh "${BET}/deploy/"*.sh 2>/dev/null || true
-chown -R www-data:www-data "${BET}/src" "${BET}/scripts" "${BET}/deploy" 2>/dev/null || true
+mkdir -p "${BET}/.cache" "${BET}/logs" "${BET}/data"
+chown -R www-data:www-data "${BET}/src" "${BET}/scripts" "${BET}/deploy" "${BET}/.cache" "${BET}/logs" "${BET}/data" 2>/dev/null || true
+chmod 775 "${BET}/.cache" "${BET}/logs" 2>/dev/null || true
 
 if [[ -f "${BET}/requirements.txt" && -x "${BET}/.venv/bin/pip" ]]; then
   echo "==> pip install (deps refresh)"
