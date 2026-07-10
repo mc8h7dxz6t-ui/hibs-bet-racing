@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -97,6 +98,57 @@ def persist_exchange_quotes(
             rows += 1
         conn.commit()
     return {"rows": rows, "poll_milestone": poll_milestone, "timestamp": ts}
+
+
+def load_cached_exchange_odds(
+    cards: pd.DataFrame,
+    *,
+    database: Path | None = None,
+    max_age_hours: float | None = None,
+) -> pd.DataFrame:
+    """Latest exchange_quotes per runner within max_age_hours (Matchbook poll cache)."""
+    if cards.empty or "runner_id" not in cards.columns:
+        return pd.DataFrame()
+    if max_age_hours is None:
+        try:
+            max_age_hours = float(os.getenv("HIBS_EXCHANGE_QUOTES_MAX_AGE_HOURS", "24"))
+        except ValueError:
+            max_age_hours = 24.0
+    db = database or db_path(load_config())
+    init_db(db)
+    ids = [str(x) for x in cards["runner_id"].dropna().unique()]
+    if not ids:
+        return pd.DataFrame()
+    placeholders = ",".join("?" * len(ids))
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=max_age_hours)).replace(microsecond=0).isoformat()
+    with connect(db) as conn:
+        rows = conn.execute(
+            f"""
+            SELECT eq.runner_id, eq.back_price, eq.odds_source, eq.timestamp
+            FROM exchange_quotes eq
+            INNER JOIN (
+                SELECT runner_id, MAX(timestamp) AS ts
+                FROM exchange_quotes
+                WHERE runner_id IN ({placeholders})
+                GROUP BY runner_id
+            ) latest ON eq.runner_id = latest.runner_id AND eq.timestamp = latest.ts
+            WHERE eq.back_price IS NOT NULL AND eq.back_price > 1.0
+              AND eq.timestamp >= ?
+            """,
+            [*ids, cutoff],
+        ).fetchall()
+    if not rows:
+        return pd.DataFrame()
+    priced = [
+        {
+            "runner_id": rid,
+            "win_decimal": float(back),
+            "odds_source": str(src or "exchange_cache"),
+        }
+        for rid, back, src, _ts in rows
+        if back is not None
+    ]
+    return pd.DataFrame(priced)
 
 
 def quote_coverage_ratio(

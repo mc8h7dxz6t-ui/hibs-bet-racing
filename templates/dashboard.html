@@ -190,6 +190,23 @@
     {% endif %}
 </div>
 
+{% if ui_data_status and ui_data_status.messages %}
+<div class="banner {% if ui_data_status.level == 'error' %}error{% elif ui_data_status.level == 'warn' %}{% endif %}"
+    style="{% if ui_data_status.level == 'warn' %}background:rgba(245,158,11,0.12);border-color:rgba(245,158,11,0.35);{% endif %}">
+    {% for msg in ui_data_status.messages %}
+    <div>{{ msg }}</div>
+    {% endfor %}
+    {% if ui_data_status.odds_coverage and ui_data_status.odds_coverage.priced is not none %}
+    <div style="font-size:0.85em;margin-top:4px;opacity:0.9;">
+        Odds source: {{ ui_data_status.odds_source }} · cards: {{ ui_data_status.cards_source }}
+        {% if ui_data_status.scrape_first and ui_data_status.scrape_first.scrape_first %}
+        · scrape-first ({{ ui_data_status.scrape_first.reason }})
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
 <div class="smart-portfolio-row">
 <section class="smart-picks-hero brand-panel-framed" id="smart-picks-hero" aria-live="polite">
     {% from '_hibs_brand.html' import brand_logo_watermark %}

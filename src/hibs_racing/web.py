@@ -498,7 +498,11 @@ def create_app() -> Flask:
     @app.route("/api/refresh", methods=["POST", "GET"])
     @require_api_key
     def api_refresh():
-        from hibs_racing.scrapers.racing_scrape_api import resolve_cards_source
+        from hibs_racing.scrapers.racing_scrape_api import (
+            odds_coverage_summary,
+            resolve_cards_source,
+            run_thin_rescue_pass,
+        )
 
         source = resolve_cards_source(request.args.get("source", "auto"))
         region = request.args.get("region", "gb")
@@ -506,23 +510,60 @@ def create_app() -> Flask:
         odds_source = os.environ.get("HIBS_ODDS_SOURCE") or request.args.get("odds_source", "auto")
         window = request.args.get("window", "24")
         window_hours = int(window) if window.isdigit() else 24
-        try:
-            paper_on_refresh = bool(load_config().get("paper", {}).get("log_on_refresh", True))
-            stats = refresh_cards(
-                source=source,
+        paper_on_refresh = bool(load_config().get("paper", {}).get("log_on_refresh", True))
+
+        def _do_refresh(src: str) -> dict:
+            return refresh_cards(
+                source=src,
                 region=region,
                 day=day,
                 odds_source=odds_source,
                 window_hours=window_hours if window_hours > 0 else None,
                 paper=paper_on_refresh,
             )
-            monitor = monitor_snapshot(refresh=False, settle=True)
-            payload = {"ok": True, **stats, "monitor": monitor}
-            if paper_on_refresh and not stats.get("paper_recon_clean", True):
-                return jsonify(payload), 503
-            return jsonify(payload)
+
+        stats: dict | None = None
+        err: Exception | None = None
+        try:
+            stats = _do_refresh(source)
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            err = exc
+            if source == "racing_api":
+                from hibs_racing.racing_api_guard import record_forbidden
+
+                record_forbidden(http_status=403, reason=str(exc)[:80])
+                fallback = resolve_cards_source("rpscrape")
+                if fallback != source:
+                    try:
+                        stats = _do_refresh(fallback)
+                        stats["cards_source_fallback"] = fallback
+                        err = None
+                    except Exception as exc2:
+                        err = exc2
+
+        if err is not None or stats is None:
+            return jsonify({"ok": False, "error": str(err)}), 500
+
+        rescue: dict | None = None
+        cov = odds_coverage_summary()
+        if not cov.get("ok") and os.getenv("HIBS_RACING_ROBUST_RESCUE", "1").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        ):
+            try:
+                rescue = run_thin_rescue_pass()
+                stats["thin_rescue"] = rescue
+                cov = rescue.get("coverage") or cov
+            except Exception as exc:
+                stats["thin_rescue_error"] = str(exc)[:120]
+
+        monitor = monitor_snapshot(refresh=False, settle=True)
+        payload = {"ok": True, **stats, "monitor": monitor, "odds_coverage": cov}
+        if paper_on_refresh and not stats.get("paper_recon_clean", True):
+            return jsonify(payload), 503
+        return jsonify(payload)
 
     return app
 

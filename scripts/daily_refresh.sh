@@ -51,11 +51,11 @@ export HIBS_POLL_MILESTONE=baseline
 
 run_logged "daily-refresh-cards" \
   hibs-racing refresh-cards \
-    --source racing_api \
+    --source "${HIBS_RACING_CARD_SOURCE:-auto}" \
     --window 24 \
     --regions gb,ire \
     --workers 1 \
-    --odds-source "${HIBS_ODDS_SOURCE:-matchbook}" \
+    --odds-source "${HIBS_ODDS_SOURCE:-auto}" \
     --poll-milestone baseline \
     --paper
 
