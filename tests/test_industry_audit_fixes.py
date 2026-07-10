@@ -20,6 +20,14 @@ def test_evidence_truth_plane_includes_benchmark_planes():
     assert out.get("reconciliation_note")
 
 
+def test_evidence_truth_plane_win_brier_key():
+    out = build_evidence_truth_plane(
+        health={"reliability": {"brier_score": 0.18, "n": 50}},
+        days=90,
+    )
+    assert out["calibration"]["win_brier"] == 0.18
+
+
 def test_r8_place_brier_gate_pass():
     health = {
         "db_ok": True,

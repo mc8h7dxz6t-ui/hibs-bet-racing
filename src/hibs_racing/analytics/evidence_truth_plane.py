@@ -179,7 +179,8 @@ def build_evidence_truth_plane(
         "settle_at_sp": settle_at_sp,
         "planes": planes,
         "calibration": {
-            "win_brier": reliability.get("brier"),
+            # settled_paper_calibration() exposes brier_score, not brier
+            "win_brier": reliability.get("brier_score", reliability.get("brier")),
             "place_brier": place_rel.get("brier"),
             "place_mce": place_rel.get("mean_calibration_error"),
             "place_n": place_rel.get("n"),

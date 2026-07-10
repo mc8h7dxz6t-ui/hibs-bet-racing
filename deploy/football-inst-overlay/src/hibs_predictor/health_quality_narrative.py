@@ -498,6 +498,12 @@ def augment_health_for_ui(health: Dict[str, Any]) -> Dict[str, Any]:
             },
             "racing_evidence_truth": evidence_truth,
         }
+        try:
+            from hibs_predictor.stack_truth import stack_truth_summary
+
+            out["stack_truth"] = stack_truth_summary()
+        except Exception:
+            pass
     except Exception:
         pass
     try:

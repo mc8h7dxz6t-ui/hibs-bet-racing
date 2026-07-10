@@ -27,7 +27,7 @@ RACING_ROOT="${HIBS_RACING_DEPLOY_PATH:-/opt/hibs-racing}"
 TRADING_ROOT="${TRADING_INSTALL_ROOT:-/opt/trading-core}"
 LOG_DIR="${LOG_DIR:-/var/log/hibs-bet}"
 MAINT_LOG="${LOG_DIR}/cache-maintenance.log"
-FRESH_LOG="${LOG_DIR}/daily-audit-am-fresh.log"
+FRESH_LOG="${LOG_DIR}/daily-audit-am.log"
 SEED_LOG="${LOG_DIR}/seed-forward.log"
 F7_ALERT_LOG="${LOG_DIR}/f7-capture-alert.log"
 MARKER="# hibs-bet: ops automation (fetch + cache)"
@@ -53,10 +53,22 @@ EOF
 }
 
 install_base_crons() {
-  [[ -f "${APP_ROOT}/deploy/cron-hibs-calibration.sh" ]] && \
-    bash "${APP_ROOT}/deploy/cron-hibs-calibration.sh" --install || true
-  [[ -f "${APP_ROOT}/deploy/cron-hibs-nine-ten.sh" ]] && \
-    bash "${APP_ROOT}/deploy/cron-hibs-nine-ten.sh" --install || true
+  local missing=0
+  _install_if_present() {
+    local path="$1"
+    if [[ -f "${path}" ]]; then
+      bash "${path}" --install || true
+    else
+      echo "WARN: missing ${path}" >&2
+      missing=$((missing + 1))
+    fi
+  }
+  _install_if_present "${APP_ROOT}/deploy/cron-hibs-calibration.sh"
+  _install_if_present "${APP_ROOT}/deploy/cron-hibs-nine-ten.sh"
+  _install_if_present "${APP_ROOT}/deploy/cron-hibs-calibration-drift.sh"
+  _install_if_present "${APP_ROOT}/deploy/cron-hibs-institutional-watchdog.sh"
+  _install_if_present "${APP_ROOT}/deploy/cron-hibs-hands-off.sh"
+  _install_if_present "${APP_ROOT}/deploy/cron-hibs-football-fixture-warm.sh"
   if [[ -f "${APP_ROOT}/deploy/cron-hibs-racing-daily.sh" ]]; then
     bash "${APP_ROOT}/deploy/cron-hibs-racing-daily.sh" --install || true
   fi
@@ -69,23 +81,14 @@ install_base_crons() {
   if [[ -f "${APP_ROOT}/deploy/cron-hibs-racing-sqlite-maintenance.sh" ]]; then
     bash "${APP_ROOT}/deploy/cron-hibs-racing-sqlite-maintenance.sh" --install || true
   fi
-  if [[ -f "${APP_ROOT}/deploy/cron-hibs-institutional-watchdog.sh" ]]; then
-    bash "${APP_ROOT}/deploy/cron-hibs-institutional-watchdog.sh" --install || true
-  fi
-  if [[ -f "${APP_ROOT}/deploy/cron-hibs-calibration-drift.sh" ]]; then
-    bash "${APP_ROOT}/deploy/cron-hibs-calibration-drift.sh" --install || true
-  fi
   if [[ -f "${APP_ROOT}/deploy/cron-hibs-inst-pp-weekly.sh" ]]; then
     bash "${APP_ROOT}/deploy/cron-hibs-inst-pp-weekly.sh" --install || true
   fi
-  if [[ -f "${APP_ROOT}/deploy/cron-hibs-football-fixture-warm.sh" ]]; then
-    bash "${APP_ROOT}/deploy/cron-hibs-football-fixture-warm.sh" --install || true
-  fi
-  # hands-off cycle supersedes three-stack-green (includes stack repair every 30m)
-  if [[ -f "${APP_ROOT}/deploy/cron-hibs-hands-off.sh" ]]; then
-    bash "${APP_ROOT}/deploy/cron-hibs-hands-off.sh" --install || true
-  elif [[ -f "${APP_ROOT}/deploy/cron-hibs-three-stack-green.sh" ]]; then
+  if [[ ! -f "${APP_ROOT}/deploy/cron-hibs-hands-off.sh" && -f "${APP_ROOT}/deploy/cron-hibs-three-stack-green.sh" ]]; then
     bash "${APP_ROOT}/deploy/cron-hibs-three-stack-green.sh" --install || true
+  fi
+  if [[ "${missing}" -gt 0 ]]; then
+    echo "WARN: ${missing} base cron installer(s) missing — git pull hibs-bet overlay" >&2
   fi
   ensure_evidence_deploy_date
   ensure_racing_probe_env

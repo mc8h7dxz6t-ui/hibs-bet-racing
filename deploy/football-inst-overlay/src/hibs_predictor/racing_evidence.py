@@ -118,6 +118,9 @@ def _recon_clean(health: Dict[str, Any]) -> Optional[bool]:
 
 def _paper_row_count(health: Dict[str, Any]) -> Optional[int]:
     for path in (
+        ("paper", "settled"),
+        ("paper", "settled_n"),
+        ("paper", "value_pick_settled"),
         ("paper_rows",),
         ("paper", "n_rows"),
         ("ledger", "n_paper_picks"),
@@ -130,6 +133,20 @@ def _paper_row_count(health: Dict[str, Any]) -> Optional[int]:
             except (TypeError, ValueError):
                 continue
     return None
+
+
+def _place_brier_gate(health: Dict[str, Any]) -> tuple[Optional[float], int, bool, bool]:
+    """place_brier, n, pass, insufficient_sample — mirrors hibs_racing.evidence_gates R8."""
+    place_rel = health.get("place_reliability") or {}
+    place_brier = place_rel.get("brier")
+    place_n = int(place_rel.get("n") or 0)
+    min_n = 20
+    max_brier = 0.25
+    insufficient = place_n < min_n
+    if insufficient or place_brier is None:
+        return place_brier, place_n, False, insufficient
+    passed = float(place_brier) <= max_brier
+    return place_brier, place_n, passed, False
 
 
 def _enrich_health_from_aggregator(health: Dict[str, Any]) -> Dict[str, Any]:
@@ -163,7 +180,7 @@ def racing_evidence_gates_from_health(
     cards_code: int = 200,
     health_code: int = 200,
 ) -> Dict[str, Any]:
-    """Build R1–R7 gates from a health dict (after Inst++ aggregator merge)."""
+    """Build R1–R8 gates from a health dict (after Inst++ aggregator merge)."""
     health = _enrich_health_from_aggregator(health)
     coverage = _coverage_pct(health) if health_ok else None
     is_prod = (os.getenv("HIBS_PRODUCTION") or "").strip().lower() in ("1", "true", "yes", "on")
@@ -175,6 +192,10 @@ def racing_evidence_gates_from_health(
 
     paper_n = _paper_row_count(health) if health_ok else None
     paper_pass = paper_n is not None and paper_n >= MIN_PAPER_ROWS
+
+    place_brier, place_n, brier_pass, brier_insufficient = (
+        _place_brier_gate(health) if health_ok else (None, 0, False, True)
+    )
 
     gates: List[Dict[str, Any]] = [
         gate_row(
@@ -245,16 +266,33 @@ def racing_evidence_gates_from_health(
         ),
         gate_row(
             "R7_paper_sample",
-            label="Paper ledger sample",
+            label="Paper ledger sample (settled)",
             passed=paper_pass,
             actual=paper_n,
-            threshold=f">={MIN_PAPER_ROWS} rows",
-            message="Accumulate --paper picks via daily batch",
+            threshold=f">={MIN_PAPER_ROWS} settled rows",
+            message="Accumulate settled --paper picks via daily batch",
             critical=False,
             n=paper_n,
             window="ledger",
         ),
+        gate_row(
+            "R8_place_brier",
+            label="Place probability calibration (Brier)",
+            passed=brier_pass,
+            actual=place_brier,
+            threshold="<=0.25 (n>=20)",
+            message=(
+                f"Accumulate 20+ settled place bins — current n={place_n}"
+                if brier_insufficient
+                else "Tighten isotonic calibration or gate selectivity"
+            ),
+            critical=False,
+            n=place_n,
+            window="calibration_60d",
+        ),
     ]
+    if brier_insufficient:
+        gates[-1]["insufficient_sample"] = True
 
     critical = [g for g in gates if g.get("critical")]
     evidence = [g for g in gates if not g.get("critical")]
@@ -360,6 +398,14 @@ def _next_actions(gates: List[Dict[str, Any]]) -> List[str]:
         actions.append("telemetry_balance.coverage_pct — hibs-racing /api/health?full=1")
     if not by_id.get("R6_recon_clean", {}).get("pass"):
         actions.append("cd ~/hibs-racing && bash scripts/daily_refresh.sh")
+    if not by_id.get("R7_paper_sample", {}).get("pass"):
+        actions.append("Accumulate settled --paper picks via daily batch")
+    r8 = by_id.get("R8_place_brier", {})
+    if r8 and not r8.get("pass"):
+        if r8.get("insufficient_sample"):
+            actions.append("Settle more forward paper picks for place Brier gate (R8)")
+        else:
+            actions.append("Run win-prob-calibration-fit; review place overconfidence")
     if not actions:
         actions.append("./scripts/export_racing_data_room.sh")
     return actions

@@ -209,21 +209,23 @@ def _informational_gate(
     gate_id: str,
     *,
     label: str,
-    passed: bool,
+    metric_pass: Optional[bool],
     actual: Any,
     threshold: str,
     message: str,
 ) -> Dict[str, Any]:
+    """Informational gate — never affects buyer_ready or buyer_readiness_score."""
     row = gate_row(
         gate_id,
         label=label,
-        passed=passed,
+        passed=bool(metric_pass) if metric_pass is not None else False,
         actual=actual,
         threshold=threshold,
         message=message,
         critical=False,
     )
     row["informational"] = True
+    row["buyer_binding"] = False
     return row
 
 
@@ -412,7 +414,7 @@ def forward_evidence_gates() -> Dict[str, Any]:
         _informational_gate(
             "F9b_clv_beat_close_fair_shin",
             label="Fair-Shin CLV beat-close (informational)",
-            passed=f9b_pass,
+            metric_pass=f9b_pass if f9b_n >= F8_MIN_CLV_ROWS else None,
             actual=f9b_pct,
             threshold="informational — not buyer pass/fail",
             message=(
@@ -423,7 +425,7 @@ def forward_evidence_gates() -> Dict[str, Any]:
         _informational_gate(
             "F9c_clv_benchmark_tier",
             label="Pinnacle closing benchmark tier",
-            passed=f9c_pass,
+            metric_pass=f9c_pass if pin_pct is not None else None,
             actual=f9c,
             threshold="informational — not buyer pass/fail",
             message=(

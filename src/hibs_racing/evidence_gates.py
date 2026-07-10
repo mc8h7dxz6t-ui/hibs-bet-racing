@@ -46,8 +46,12 @@ def _coverage_pct(health: dict[str, Any]) -> float | None:
 
 
 def _paper_n(health: dict[str, Any]) -> int | None:
+    """Prefer settled forward paper rows — R7 is an evidence sample, not open-bet count."""
     paper = health.get("paper") or {}
-    for key in ("n_rows", "settled", "settled_n"):
+    for key in ("settled", "settled_n", "value_pick_settled"):
+        if paper.get(key) is not None:
+            return int(paper[key])
+    for key in ("n_rows",):
         if paper.get(key) is not None:
             return int(paper[key])
     if health.get("paper_rows") is not None:

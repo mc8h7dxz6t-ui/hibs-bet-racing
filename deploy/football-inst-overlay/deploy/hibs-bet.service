@@ -1,0 +1,53 @@
+# HIBS Football predictions — gunicorn on :8000
+#
+#   sudo cp deploy/hibs-bet.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now hibs-bet
+#
+# Secrets: /opt/hibs-bet/.env (www-data readable)
+
+[Unit]
+Description=HIBS Football predictions (hibs-bet gunicorn)
+Documentation=file:/opt/hibs-bet/docs/INSTITUTIONAL_FAILSAFE.md
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/hibs-bet
+
+Environment=HOME=/opt/hibs-bet
+Environment=DEPLOY_PATH=/opt/hibs-bet
+Environment=PYTHONPATH=/opt/hibs-bet/src
+Environment=HIBS_CACHE_DIR=/opt/hibs-bet/.cache
+EnvironmentFile=-/opt/hibs-bet/.env
+
+ExecStart=/opt/hibs-bet/.venv/bin/gunicorn \
+  --workers 2 \
+  --bind 0.0.0.0:8000 \
+  --timeout 180 \
+  --graceful-timeout 30 \
+  --access-logfile - \
+  --error-logfile - \
+  hibs_predictor.web:app
+
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=120
+KillMode=mixed
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hibs-bet
+
+NoNewPrivileges=true
+PrivateTmp=true
+ReadWritePaths=/opt/hibs-bet /var/log/hibs-bet /var/run/hibs-bet
+
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
