@@ -1,6 +1,6 @@
 import pandas as pd
 
-from hibs_racing.cards.window import filter_next_hours, off_minutes, runner_off_dt
+from hibs_racing.cards.window import filter_next_hours, off_minutes, primary_card_date, runner_off_dt
 
 
 def test_off_minutes():
@@ -30,3 +30,37 @@ def test_runner_off_dt():
     dt = runner_off_dt("2026-05-30", "15:30")
     assert dt is not None
     assert dt.hour == 15 and dt.minute == 30
+
+
+def test_primary_card_date_rolls_to_tomorrow_when_today_finished():
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    uk = ZoneInfo("Europe/London")
+    now = datetime(2026, 7, 10, 21, 0, tzinfo=uk)
+    today = now.date().isoformat()
+    tomorrow = (now.date() + timedelta(days=1)).isoformat()
+    frame = pd.DataFrame(
+        [
+            {"card_date": today, "off_time": "14:00", "runner_id": "done"},
+            {"card_date": tomorrow, "off_time": "14:30", "runner_id": "next"},
+        ]
+    )
+    assert primary_card_date(frame, now=now) == tomorrow
+
+
+def test_primary_card_date_keeps_today_while_races_remain():
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    uk = ZoneInfo("Europe/London")
+    now = datetime(2026, 7, 10, 16, 0, tzinfo=uk)
+    today = now.date().isoformat()
+    tomorrow = (now.date() + timedelta(days=1)).isoformat()
+    frame = pd.DataFrame(
+        [
+            {"card_date": today, "off_time": "18:00", "runner_id": "today"},
+            {"card_date": tomorrow, "off_time": "14:30", "runner_id": "next"},
+        ]
+    )
+    assert primary_card_date(frame, now=now) == today

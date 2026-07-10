@@ -178,7 +178,7 @@ cards:
   default_region: gb
   fetch_timeout_sec: 120
   parallel_workers: 4
-  include_tomorrow: false
+  include_tomorrow: true
   primary_date_only: true
   dual_source_enrich: true
   enrich_fetch_stats: true

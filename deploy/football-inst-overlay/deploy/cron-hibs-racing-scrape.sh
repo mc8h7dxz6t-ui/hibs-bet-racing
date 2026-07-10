@@ -43,6 +43,8 @@ install_cron() {
     echo "20 */2 * * * cd ${RACING} && HOME=${RACING} HIBS_RACING_DEPLOY_PATH=${RACING} bash ${SCRIPT} >> ${LOG_FILE} 2>&1"
     echo "# Pre-racing daily refresh"
     echo "0 5 * * * cd ${RACING} && HOME=${RACING} HIBS_RACING_DEPLOY_PATH=${RACING} bash ${SCRIPT} >> ${LOG_FILE} 2>&1"
+    echo "# Evening — prime tomorrow card after today's racing"
+    echo "0 20 * * * cd ${RACING} && HOME=${RACING} HIBS_RACING_DEPLOY_PATH=${RACING} HIBS_RACING_INCLUDE_TOMORROW=1 bash ${SCRIPT} >> ${LOG_FILE} 2>&1"
   } >"${tmp}"
   crontab -u www-data "${tmp}"
   rm -f "${tmp}"
