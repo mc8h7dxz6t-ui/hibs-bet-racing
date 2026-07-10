@@ -182,3 +182,27 @@ curl -sS https://hibs-bet.co.uk/line-trader | head -5
 |------|-------|
 | 2026-07-10 | Football 502 after login fix; racing hard recovery GREEN; crontab 214 lines blocked automation; FVE docker fail |
 | 2026-07-10 | PR #63: football hard recovery, racing scripts to git, auto crontab emergency |
+| 2026-07-10 | Infra fallback automation: 5m cron, L1→L2→L3 cascade in hands-off + watchdog |
+
+---
+
+## Automation fallback (industry standard)
+
+**Library:** `scripts/lib_football_vps_fallback.sh`  
+**5m cron:** `deploy/cron-hibs-infra-fallback.sh` → `scripts/vps_infra_fallback_cycle.sh`  
+**Log:** `/var/log/hibs-bet/infra-fallback.log`
+
+| Level | Trigger | Action | Throttle |
+|-------|---------|--------|----------|
+| L0 | Every 5m / hands-off | Probe `ping`, `login`, public `/login` | — |
+| L1 | Unit inactive or ping ≠ 200 | `systemctl restart hibs-bet` | 45m |
+| L2 | Still ping ≠ 200 or port down | `vps_football_hard_recovery.sh` | 45m |
+| L3 | Localhost OK, public 502 | nginx `5001→8000` + reload | 30m |
+| Racing L2 | `:5003` ping ≠ 200 | `vps_racing_hard_recovery.sh` | 45m |
+
+**Install on VPS:**
+```bash
+sudo bash /opt/hibs-bet/deploy/cron-hibs-infra-fallback.sh --install
+# or full ops bundle:
+sudo bash /opt/hibs-bet/deploy/cron-hibs-ops-automation.sh --install
+```
