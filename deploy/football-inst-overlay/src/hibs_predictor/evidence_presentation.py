@@ -126,22 +126,29 @@ def buyer_readiness_bundle(
     evidence_pass: bool,
     vertical: str,
 ) -> dict[str, Any]:
-    """Derived readiness — keeps buyer_ready boolean for compatibility."""
+    """Derived readiness — buyer_ready is an internal gate flag only (see honesty_plane)."""
+    from hibs_predictor.honesty_plane import attach_honesty, evidence_complete_label
+
     gate_score = score_gates(gates)
     football_score = gate_score if vertical == "football" else None
     racing_score = gate_score if vertical == "racing" else None
     trading_score = gate_score if vertical == "trading" else None
     buyer_ready = bool(critical_pass and evidence_pass)
     tier = commercial_tier(gate_score, critical_pass=critical_pass, evidence_pass=evidence_pass)
-    return {
-        "buyer_ready": buyer_ready,
-        "buyer_readiness_score": gate_score,
-        "football_score": football_score,
-        "racing_score": racing_score,
-        "trading_score": trading_score,
-        "commercial_tier": tier,
-        "buyer_ready_derived": buyer_ready,
-    }
+    return attach_honesty(
+        {
+            "buyer_ready": buyer_ready,
+            "evidence_gates_complete": buyer_ready,
+            "evidence_status_label": evidence_complete_label(buyer_ready),
+            "buyer_readiness_score": gate_score,
+            "football_score": football_score,
+            "racing_score": racing_score,
+            "trading_score": trading_score,
+            "commercial_tier": tier,
+            "internal_ops_tier": tier,
+            "buyer_ready_derived": buyer_ready,
+        }
+    )
 
 
 def commercial_tier(
@@ -275,10 +282,11 @@ def build_commercial_readiness(
     )
     return {
         "layer": "commercial_readiness",
-        "title": "Commercial readiness (market truth)",
+        "title": "Internal ops tier (not external product valuation)",
         "disclaimer": (
-            "Deployable in pilot context ≠ proven edge or production ROI. "
-            "License-ready applies only in controlled evaluation with green evidence gates."
+            "Sports betting research stack only. Tiers are internal ops labels — "
+            "not PE/VC product grades, not enterprise fintech SKUs, not proof of edge or ROI. "
+            "Mislabeling this codebase as CyberGovernor/FinanceGovernor/ClaimGate is misrepresentation."
         ),
         "football_tier": fb_tier,
         "racing_tier": rc_tier,

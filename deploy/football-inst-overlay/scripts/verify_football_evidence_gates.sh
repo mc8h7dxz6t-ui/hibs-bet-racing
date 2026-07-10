@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Industry-standard forward evidence gate verify (F1–F3 engineering, F7–F9 buyer, F9b/c informational).
+# Forward evidence gate verify — internal ops checklist (not external product certification).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
@@ -9,12 +9,15 @@ import sys
 from hibs_predictor.forward_evidence import forward_evidence_gates
 
 g = forward_evidence_gates()
+honesty = (g.get("honesty") or {}).get("what_this_is", "")
 print("==> verify_football_evidence_gates")
-print("==> Forward evidence gates (B2B buyer_ready)")
+print("==> Internal evidence gates (sports research — NOT enterprise platform certification)")
+if honesty:
+    print(f"    {honesty}")
 print(f"since_deploy: {g.get('since_deploy') or g.get('since_deploy_iso')}")
 print(f"matchdays_7d: {g.get('matchdays_7d')}")
-print(f"evidence_grade: {g.get('evidence_grade')}")
-print(f"buyer_ready: {g.get('buyer_ready')}")
+print(f"evidence_grade: {g.get('evidence_grade')} (ops letter — not alpha proof)")
+print(f"evidence_gates_complete: {g.get('evidence_gates_complete', g.get('buyer_ready'))}")
 print()
 
 by_id = {row["id"]: row for row in (g.get("gates") or [])}
@@ -46,6 +49,7 @@ print("Next actions:")
 for a in g.get("next_actions") or []:
     print(f"  - {a}")
 
-if not g.get("buyer_ready"):
+complete = g.get("evidence_gates_complete", g.get("buyer_ready"))
+if not complete:
     sys.exit(1)
 PY
