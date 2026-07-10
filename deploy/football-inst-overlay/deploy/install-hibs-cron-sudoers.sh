@@ -13,9 +13,16 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
+# requiretty removed in sudo 1.9+ — omit Defaults line on modern distros (cron works without it).
+SUDO_VER="$(sudo -V 2>/dev/null | awk '/Sudo version/ {print $3; exit}')"
+SUDO_DEFAULTS=""
+if [[ -n "${SUDO_VER}" ]] && dpkg --compare-versions "${SUDO_VER}" lt "1.9" 2>/dev/null; then
+  SUDO_DEFAULTS="Defaults:www-data !requiretty"
+fi
+
 cat >"${DEST}" <<EOF
 ${MARKER}
-Defaults:www-data !requiretty
+${SUDO_DEFAULTS}
 www-data ALL=(root) NOPASSWD: /bin/bash ${APP}/deploy/cron-hibs-hands-off.sh --run
 www-data ALL=(root) NOPASSWD: /bin/bash ${APP}/deploy/cron-hibs-institutional-watchdog.sh --run
 www-data ALL=(root) NOPASSWD: /bin/bash ${APP}/scripts/hands_off_cycle.sh
