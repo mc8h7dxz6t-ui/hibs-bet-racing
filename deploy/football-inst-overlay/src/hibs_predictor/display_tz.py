@@ -65,15 +65,42 @@ def enrich_fixtures_kickoff(fixtures: List[Dict[str, Any]]) -> List[Dict[str, An
     return [attach_kickoff_display(fx) for fx in fixtures if isinstance(fx, dict)]
 
 
-def day_heading_for_local_date(d: date) -> str:
-    today = local_today()
-    if d == today:
+def _day_label_for_ref(target: date, ref: date) -> str:
+    if target == ref:
         return "Today"
-    if d == today - timedelta(days=1):
+    if target == ref - timedelta(days=1):
         return "Yesterday"
-    if d == today + timedelta(days=1):
+    if target == ref + timedelta(days=1):
         return "Tomorrow"
-    return d.strftime("%A %d %B")
+    return target.strftime("%A %d %B")
+
+
+def _coerce_local_date(value: date | str) -> date:
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    text = str(value).strip()[:10]
+    return date.fromisoformat(text)
+
+
+def day_heading_for_local_date(
+    d: date | str,
+    count: int | None = None,
+    today: date | None = None,
+) -> str:
+    """
+    Dashboard day heading.
+
+    Legacy:
+      - ``day_heading_for_local_date(day_iso, fixture_count)``
+      - ``day_heading_for_local_date(day_iso, fixture_count, today_local)``
+    """
+    target = _coerce_local_date(d)
+    ref = today if today is not None else local_today()
+    label = _day_label_for_ref(target, ref)
+    if count is None:
+        return label
+    noun = "fixture" if int(count) == 1 else "fixtures"
+    return f"{label} · {int(count)} {noun}"
 
 
 def fixture_window_start_utc(
