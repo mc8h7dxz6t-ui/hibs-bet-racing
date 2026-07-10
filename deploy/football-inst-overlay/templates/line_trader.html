@@ -30,7 +30,9 @@
 .lt-table td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;}
 .lt-meta{font-size:0.72em;color:var(--muted);margin-top:8px;line-height:1.4;}
 .lt-log{min-height:160px;max-height:320px;overflow:auto;padding:10px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,0.35);font-size:0.72em;color:var(--muted);white-space:pre-wrap;}
-.lt-empty{color:var(--muted);font-size:0.82em;padding:12px 0;}
+.lt-edge-pos{color:#6ee7b7;font-weight:700;}
+.lt-edge-neg{color:#fca5a5;}
+.lt-edge-flat{color:var(--muted);}
 </style>
 {% endblock %}
 {% block content %}
@@ -74,6 +76,7 @@
         <section class="lt-panel">
             <h2>Hibs upstream 1X2</h2>
             <div id="lt-hibs-table"><p class="lt-empty">Select a fixture.</p></div>
+            <div id="lt-edge-table"></div>
             <p class="lt-meta">
                 REST: <code>/api/fve/lines/&lt;fixture&gt;</code> ·
                 <a href="{{ hibs_fve_docs_url }}" target="_blank" rel="noopener">FVE API docs</a>
@@ -95,7 +98,9 @@
   const logEl = document.getElementById('lines-log');
   const linesTable = document.getElementById('lt-lines-table');
   const hibsTable = document.getElementById('lt-hibs-table');
+  const edgeTable = document.getElementById('lt-edge-table');
   const linesMeta = document.getElementById('lt-lines-meta');
+  let lastHibsPayload = null;
   let ws = null;
   let session = null;
   let reconnectTimer = null;
@@ -141,20 +146,82 @@
     linesTable.innerHTML = html;
   }
 
-  function renderHibs(best) {
+  function edgeClass(bps) {
+    const n = Number(bps);
+    if (!Number.isFinite(n)) return 'lt-edge-flat';
+    if (n >= 25) return 'lt-edge-pos';
+    if (n <= -25) return 'lt-edge-neg';
+    return 'lt-edge-flat';
+  }
+
+  function fmtBps(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? (n >= 0 ? '+' : '') + n.toFixed(0) + ' bps' : '—';
+  }
+
+  function bestFveOdds(shopped) {
+    const out = { home: null, draw: null, away: null };
+    if (!shopped || typeof shopped !== 'object') return out;
+    const map = { Home: 'home', Draw: 'draw', Away: 'away' };
+    Object.keys(map).forEach((mkt) => {
+      const row = shopped[mkt];
+      if (!row) return;
+      let best = null;
+      ['all', 'sharp', 'exchange', 'soft'].forEach((ch) => {
+        const o = row[ch] && row[ch].odds != null ? Number(row[ch].odds) : null;
+        if (o != null && o > 1 && (best == null || o > best)) best = o;
+      });
+      out[map[mkt]] = best;
+    });
+    return out;
+  }
+
+  function renderEdgeOverlay(hibsPayload, shopped) {
+    if (!edgeTable) return;
+    const model = (hibsPayload && hibsPayload.model_probabilities_1x2) || {};
+    const serverEdge = (hibsPayload && hibsPayload.hibs_edge_bps) || {};
+    const fveBest = bestFveOdds(shopped);
+    const markets = [
+      ['Home', 'home'],
+      ['Draw', 'draw'],
+      ['Away', 'away'],
+    ];
+    let html = '<table class="lt-table" style="margin-top:10px;"><thead><tr>'
+      + '<th>Edge vs FVE best</th><th>Model</th><th>Hibs best</th><th>FVE best</th><th>Δ bps</th></tr></thead><tbody>';
+    markets.forEach(([label, key]) => {
+      const mp = model[key];
+      const hb = hibsPayload && hibsPayload.best_odds_1x2 ? hibsPayload.best_odds_1x2[key] : null;
+      const fb = fveBest[key];
+      let bps = serverEdge[key];
+      if (bps == null && mp != null && fb != null) {
+        bps = (Number(mp) * Number(fb) - 1) * 10000;
+      }
+      html += '<tr><td>' + label + '</td><td class="num">' + (mp != null ? (Number(mp) * 100).toFixed(1) + '%' : '—') + '</td>'
+        + '<td class="num">' + fmtOdds(hb) + '</td><td class="num">' + fmtOdds(fb) + '</td>'
+        + '<td class="num ' + edgeClass(bps) + '">' + fmtBps(bps) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    edgeTable.innerHTML = html;
+  }
+
+  function renderHibs(best, payload) {
+    lastHibsPayload = payload || lastHibsPayload;
     if (!best || typeof best !== 'object') {
       hibsTable.innerHTML = '<p class="lt-empty">No hibs best odds in cache for this fixture.</p>';
+      renderEdgeOverlay(lastHibsPayload, null);
       return;
     }
     hibsTable.innerHTML = '<table class="lt-table"><thead><tr><th>Home</th><th>Draw</th><th>Away</th></tr></thead><tbody><tr>'
       + '<td class="num">' + fmtOdds(best.home) + '</td>'
       + '<td class="num">' + fmtOdds(best.draw) + '</td>'
       + '<td class="num">' + fmtOdds(best.away) + '</td></tr></tbody></table>';
+    renderEdgeOverlay(lastHibsPayload, null);
   }
 
   function onLinesMessage(msg) {
     const lines = msg.lines || {};
     renderShopped(lines.shopped);
+    renderEdgeOverlay(lastHibsPayload, lines.shopped);
     const parts = [];
     if (msg.type) parts.push('type=' + msg.type);
     if (msg.mode) parts.push('mode=' + msg.mode);
@@ -216,7 +283,7 @@
       const data = await resp.json();
       log({ rest: resp.status, ok: data.ok });
       if (data.ok) {
-        renderHibs(data.best_odds_1x2);
+        renderHibs(data.best_odds_1x2, data);
         if (data.fixture_key) input.value = data.fixture_key;
       } else {
         hibsTable.innerHTML = '<p class="lt-empty">' + (data.error || 'not_found') + '</p>';

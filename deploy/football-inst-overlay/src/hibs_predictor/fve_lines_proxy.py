@@ -31,6 +31,14 @@ def _fixture_packet(row: Dict[str, Any]) -> Dict[str, Any]:
     home = str(row.get("home_team") or row.get("home") or "").strip()
     away = str(row.get("away_team") or row.get("away") or "").strip()
     best = row.get("best_odds_1x2") or {}
+    pred = row.get("prediction") if isinstance(row.get("prediction"), dict) else {}
+    probs = pred.get("probabilities") if isinstance(pred.get("probabilities"), dict) else {}
+    model_probs = {
+        "home": probs.get("home"),
+        "draw": probs.get("draw"),
+        "away": probs.get("away"),
+    }
+    edge_bps = _edge_bps_overlay(model_probs, best)
     return {
         "fixture_key": _norm_label(home, away),
         "fixture_id": row.get("fixture_id") or row.get("id"),
@@ -38,11 +46,28 @@ def _fixture_packet(row: Dict[str, Any]) -> Dict[str, Any]:
         "away_team": away,
         "kickoff_iso": row.get("kickoff_iso") or row.get("date"),
         "best_odds_1x2": best,
+        "model_probabilities_1x2": model_probs,
+        "hibs_edge_bps": edge_bps,
         "best_odds_source": row.get("best_odds_source") or {},
         "home_stats": row.get("home_stats") or {},
         "away_stats": row.get("away_stats") or {},
         "league": row.get("league") or row.get("league_code"),
     }
+
+
+def _edge_bps_overlay(model: Dict[str, Any], best: Dict[str, Any]) -> Dict[str, Optional[float]]:
+    """Model implied vs best available odds — positive bps = hibs edge on that side."""
+    out: Dict[str, Optional[float]] = {"home": None, "draw": None, "away": None}
+    for side in out:
+        try:
+            mp = float(model.get(side) or 0)
+            od = float(best.get(side) or 0)
+        except (TypeError, ValueError):
+            continue
+        if mp <= 0 or od <= 1:
+            continue
+        out[side] = round((mp * od - 1.0) * 10000.0, 1)
+    return out
 
 
 def _find_fixture(bundle: Dict[str, Any], fixture_key: str) -> Optional[Dict[str, Any]]:

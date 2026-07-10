@@ -474,6 +474,33 @@ def augment_health_for_ui(health: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:
         pass
     try:
+        fwd = (out.get("audit_ops") or {}).get("forward_evidence") or {}
+        racing_ops = (out.get("stack_ops") or {}).get("racing") or {}
+        evidence_truth = None
+        if (os.getenv("HIBS_HEALTH_RACING_PROBE") or "").strip().lower() in ("1", "true", "yes", "on"):
+            try:
+                from hibs_predictor.racing_health_aggregator import fetch_upstream_racing_health
+
+                _code, rhealth = fetch_upstream_racing_health(full=True)
+                if _code == 200 and isinstance(rhealth, dict):
+                    evidence_truth = rhealth.get("evidence_truth")
+            except Exception:
+                evidence_truth = None
+        out["unified_evidence"] = {
+            "football": {
+                "buyer_ready": fwd.get("buyer_ready"),
+                "evidence_grade": fwd.get("evidence_grade"),
+                "matchdays_7d": fwd.get("matchdays_7d"),
+            },
+            "racing": {
+                "buyer_ready": racing_ops.get("buyer_ready"),
+                "evidence_grade": racing_ops.get("evidence_grade"),
+            },
+            "racing_evidence_truth": evidence_truth,
+        }
+    except Exception:
+        pass
+    try:
         from hibs_predictor.inst_pp_snapshot import inst_pp_for_health
 
         out["inst_pp"] = inst_pp_for_health()
