@@ -70,8 +70,8 @@ if [[ "${WATCH}" -eq 1 ]]; then
       exit 0
     fi
     attempts=$((attempts + 1))
-    echo "waiting 30m (${attempts}/48)…"
-    sleep 1800
+    echo "Watch round ${attempts}/48 — sleeping 3600s (load dashboard on matchdays)…"
+    sleep 3600
   done
   echo "timeout — evidence not green yet (calendar-bound F7–F9)"
   exit 1

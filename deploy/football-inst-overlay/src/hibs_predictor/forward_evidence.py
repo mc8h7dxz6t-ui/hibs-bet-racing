@@ -1,4 +1,4 @@
-"""Football forward evidence gates F1–F9 (MASTER_OPERATIONS_SCORECARD §1)."""
+"""Football forward evidence gates F1–F9 (+ F9b/F9c informational) — MASTER_OPERATIONS_SCORECARD §1."""
 
 from __future__ import annotations
 
@@ -23,10 +23,81 @@ def evidence_deploy_since_iso() -> Optional[str]:
     load_dotenv()
     explicit = (os.getenv("HIBS_EVIDENCE_DEPLOY_DATE") or "").strip()
     if not explicit:
+        explicit = _deploy_revision_deployed_at()
+    if not explicit:
         return None
     if "T" not in explicit:
         explicit = f"{explicit}T00:00:00+00:00"
     return explicit
+
+
+def deploy_revision_iso() -> Optional[str]:
+    """Alias for since_deploy in verify scripts — env date or .deploy-revision deployed_at."""
+    return evidence_deploy_since_iso()
+
+
+def _deploy_revision_deployed_at() -> str:
+    load_dotenv()
+    root = os.getenv("DEPLOY_PATH") or os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
+    path = os.path.join(root, ".deploy-revision")
+    if not os.path.isfile(path):
+        return ""
+    try:
+        for line in open(path, encoding="utf-8", errors="replace"):
+            if line.strip().startswith("deployed_at="):
+                return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    return ""
+
+
+def ensure_audit_db() -> None:
+    from hibs_predictor.prediction_log import init_db
+
+    init_db()
+
+
+def log_forward_snapshots_from_bundle(*, force_refresh: bool = True) -> int:
+    """Warm fixtures and log prediction snapshots (dashboard-equivalent seed)."""
+    from hibs_predictor.fixture_warm import warm_fixture_bundle
+    from hibs_predictor.prediction_log import (
+        log_predictions_from_fixtures,
+        prediction_log_enabled,
+    )
+
+    ensure_audit_db()
+    if not prediction_log_enabled():
+        return 0
+    warm = warm_fixture_bundle(force_refresh=force_refresh)
+    rows = []
+    try:
+        from hibs_predictor.cache import Cache
+        from hibs_predictor.web import _all_fixtures_cache_key
+
+        include_domestic = (os.getenv("HIBS_FETCH_ALL_DOMESTIC") or "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+        peek = Cache().peek(_all_fixtures_cache_key(include_domestic=include_domestic))
+        if isinstance(peek, dict):
+            rows = peek.get("all") or []
+    except Exception:
+        pass
+    if rows:
+        return int(log_predictions_from_fixtures(rows))
+    return int(warm.get("predictions_logged") or 0)
+
+
+def run_daily_clv_sync() -> Dict[str, Any]:
+    """Post-match settlement sync — same as pred-log-sync cron target."""
+    from hibs_predictor.prediction_log import run_pred_log_sync_for_web
+
+    ensure_audit_db()
+    return run_pred_log_sync_for_web()
 
 
 def _env_truthy(name: str, default: str = "0") -> bool:
@@ -34,10 +105,14 @@ def _env_truthy(name: str, default: str = "0") -> bool:
     return (os.getenv(name, default) or "").strip().lower() in ("1", "true", "yes", "on")
 
 
-def _count_matchdays_7d() -> int:
-    """Distinct display-TZ calendar days with kickoffs in rolling 7d audit window."""
+def _f9_cohort_label(*, trial: bool) -> str:
+    return "trial_domestic_cups" if trial else "all_leagues"
+
+
+def count_matchdays_7d() -> int:
+    """Distinct display-TZ calendar days with kickoffs among snapshots captured in rolling 7d."""
     try:
-        from hibs_predictor.display_tz import display_timezone
+        from hibs_predictor.display_tz import display_timezone, parse_kickoff_utc
         from hibs_predictor.prediction_log import _db_path, init_db, prediction_log_enabled
 
         if not prediction_log_enabled() or not os.path.isfile(_db_path()):
@@ -48,9 +123,10 @@ def _count_matchdays_7d() -> int:
         try:
             rows = conn.execute(
                 """
-                SELECT DISTINCT substr(kickoff_iso, 1, 10) AS ko_day
+                SELECT kickoff_iso
                 FROM prediction_snapshots
-                WHERE kickoff_iso IS NOT NULL AND kickoff_iso >= ?
+                WHERE captured_at >= ?
+                  AND kickoff_iso IS NOT NULL AND kickoff_iso != ''
                 """,
                 (cutoff,),
             ).fetchall()
@@ -58,22 +134,38 @@ def _count_matchdays_7d() -> int:
             conn.close()
         tz = display_timezone()
         days: set[str] = set()
-        for (ko_day,) in rows:
-            if not ko_day:
-                continue
-            try:
-                dt = datetime.fromisoformat(str(ko_day) + "T12:00:00+00:00")
-                local = dt.astimezone(tz).date().isoformat()
-                days.add(local)
-            except ValueError:
-                days.add(str(ko_day))
+        for (ko_raw,) in rows:
+            ko = parse_kickoff_utc(str(ko_raw))
+            if ko is not None:
+                days.add(ko.astimezone(tz).date().isoformat())
         return len(days)
     except Exception:
         return 0
 
 
+def _snapshot_count_7d() -> int:
+    try:
+        from hibs_predictor.prediction_log import _db_path, init_db, prediction_log_enabled
+
+        if not prediction_log_enabled() or not os.path.isfile(_db_path()):
+            return 0
+        init_db()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        conn = sqlite3.connect(_db_path(), timeout=15)
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM prediction_snapshots WHERE captured_at >= ?",
+                (cutoff,),
+            ).fetchone()
+            return int(row[0] if row else 0)
+        finally:
+            conn.close()
+    except Exception:
+        return 0
+
+
 def _pytest_smoke_ok() -> bool:
-    if (os.getenv("HIBS_FORWARD_EVIDENCE_RUN_PYTEST") or "").strip().lower() in ("1", "true", "yes"):
+    if _env_truthy("HIBS_FORWARD_EVIDENCE_RUN_PYTEST"):
         try:
             root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             proc = subprocess.run(
@@ -86,7 +178,6 @@ def _pytest_smoke_ok() -> bool:
             return proc.returncode == 0
         except Exception:
             return False
-    # Production defers full pytest to CI; smoke-import core overlay modules.
     try:
         import hibs_predictor.auth  # noqa: F401
         import hibs_predictor.forward_evidence  # noqa: F401
@@ -114,8 +205,30 @@ def _service_active() -> Optional[bool]:
     return None
 
 
+def _informational_gate(
+    gate_id: str,
+    *,
+    label: str,
+    passed: bool,
+    actual: Any,
+    threshold: str,
+    message: str,
+) -> Dict[str, Any]:
+    row = gate_row(
+        gate_id,
+        label=label,
+        passed=passed,
+        actual=actual,
+        threshold=threshold,
+        message=message,
+        critical=False,
+    )
+    row["informational"] = True
+    return row
+
+
 def forward_evidence_gates() -> Dict[str, Any]:
-    """Build F1–F9 gate bundle for /api/health and Inst++ snapshots."""
+    """Build F1–F9 gate bundle for /api/health, verify scripts, and Inst++ snapshots."""
     load_dotenv()
     from hibs_predictor.institutional_readiness import collect_config_issues
     from hibs_predictor.prediction_log import (
@@ -131,9 +244,11 @@ def forward_evidence_gates() -> Dict[str, Any]:
     cap_7d = audit_odds_capture_stats(days=7)
     since = evidence_deploy_since_iso()
     cap_since = audit_odds_capture_stats(days=28, since_iso=since) if since else {}
-    trial_f9 = _env_truthy("HIBS_F9_TRIAL_LEAGUES_ONLY")
+    trial_f9 = _env_truthy("HIBS_F9_TRIAL_LEAGUES_ONLY", "1")
+    cohort = _f9_cohort_label(trial=trial_f9)
     clv = clv_beat_close_summary(days=28, since_iso=since, trial_leagues_only=trial_f9)
-    matchdays = _count_matchdays_7d()
+    matchdays = count_matchdays_7d()
+    n_snap_7d = _snapshot_count_7d()
     capture_7d = cap_7d.get("capture_rate_pct")
     scored_since = cap_since.get("scored_capture_rate_pct")
     n_clv = int(clv.get("n_clv_rows") or 0)
@@ -141,9 +256,62 @@ def forward_evidence_gates() -> Dict[str, Any]:
     svc = _service_active()
     smoke_ok = _pytest_smoke_ok()
 
+    f7_pass = (
+        matchdays >= F7_MIN_MATCHDAYS
+        and capture_7d is not None
+        and float(capture_7d) >= F7_CAPTURE_PCT
+    )
+    if matchdays < F7_MIN_MATCHDAYS:
+        f7_msg = (
+            f"Need ≥{F7_MIN_MATCHDAYS} matchdays with snapshots in 7d (have {matchdays}). "
+            "Load dashboard while logged in to seed snapshots."
+        )
+    elif capture_7d is None:
+        f7_msg = f"No snapshots in 7d window (n={n_snap_7d}) — run scripts/run_forward_backfill_plan.sh"
+    else:
+        f7_msg = "Dashboard + cron seeds; audit_ops.odds_capture_7d"
+
+    f7b_pass = scored_since is not None and float(scored_since) >= F7B_SCORED_CAPTURE_PCT
+    f7b_msg = (
+        "Historic hole excluded when HIBS_EVIDENCE_DEPLOY_DATE or .deploy-revision set."
+        if since
+        else "Set HIBS_EVIDENCE_DEPLOY_DATE on first production deploy."
+    )
+
+    f8_pass = n_clv >= F8_MIN_CLV_ROWS
+    f8_msg = (
+        f"No settled CLV rows in last 28d — run daily sync after matches; ensure snapshots capture opening 1X2."
+        if n_clv < F8_MIN_CLV_ROWS
+        else "CLV sample sufficient for F9 evaluation."
+    )
+
+    f9_pass = beat_pct is not None and n_clv >= F8_MIN_CLV_ROWS and float(beat_pct) >= F9_BEAT_CLOSE_PCT
+    if n_clv < F8_MIN_CLV_ROWS:
+        f9_msg = f"Pass cohort: {cohort} (HIBS_F9_TRIAL_LEAGUES_ONLY={'1' if trial_f9 else '0'}). Descriptive until F8 passes."
+    else:
+        f9_msg = f"Pass cohort: {cohort}. Raw implied beat-close on settled rows."
+
+    try:
+        from hibs_predictor.price_truth import clv_beat_close_fair_summary, clv_benchmark_tier_summary
+
+        f9b = clv_beat_close_fair_summary(
+            days=28, since_iso=since, method="shin", trial_leagues_only=trial_f9
+        )
+        f9c = clv_benchmark_tier_summary(days=28, since_iso=since)
+    except Exception as exc:
+        f9b = {"n_clv_rows": 0, "beat_close_pct": None, "error": str(exc)[:80]}
+        f9c = {"pinnacle_panel_rate_pct": None, "error": str(exc)[:80]}
+
+    f9b_n = int(f9b.get("n_clv_rows") or 0)
+    f9b_pct = f9b.get("beat_close_pct")
+    f9b_pass = f9b_n >= F8_MIN_CLV_ROWS and f9b_pct is not None and float(f9b_pct) >= F9_BEAT_CLOSE_PCT
+
+    pin_pct = f9c.get("pinnacle_panel_rate_pct")
+    f9c_pass = pin_pct is not None and float(pin_pct) >= 10.0
+
     gates: List[Dict[str, Any]] = [
         gate_row(
-            "F1_prediction_log",
+            "F1_audit",
             label="Prediction audit log",
             passed=prediction_log_enabled(),
             actual=prediction_log_enabled(),
@@ -152,7 +320,7 @@ def forward_evidence_gates() -> Dict[str, Any]:
             critical=True,
         ),
         gate_row(
-            "F2_clv_log",
+            "F2_clv",
             label="CLV logging",
             passed=_clv_enabled(),
             actual=_clv_enabled(),
@@ -161,7 +329,7 @@ def forward_evidence_gates() -> Dict[str, Any]:
             critical=True,
         ),
         gate_row(
-            "F3_pred_log_cron",
+            "F3_cron",
             label="Daily pred-log-sync cron",
             passed=bool(cron.get("scheduled")),
             actual=cron.get("scheduled"),
@@ -197,28 +365,24 @@ def forward_evidence_gates() -> Dict[str, Any]:
             critical=True,
         ),
         gate_row(
-            "F7_capture_7d",
-            label="7d 1X2 odds capture",
-            passed=(
-                matchdays >= F7_MIN_MATCHDAYS
-                and capture_7d is not None
-                and float(capture_7d) >= F7_CAPTURE_PCT
-            ),
+            "F7_forward_capture_7d",
+            label="7d forward 1X2 capture",
+            passed=f7_pass,
             actual=capture_7d,
             threshold=f">={F7_CAPTURE_PCT}% after {F7_MIN_MATCHDAYS} matchdays",
-            message="Dashboard + cron seeds; audit_ops.odds_capture_7d",
+            message=f7_msg,
             critical=False,
             window="7d",
             coverage_pct=float(capture_7d) if capture_7d is not None else None,
             n=matchdays,
         ),
         gate_row(
-            "F7b_scored_since_deploy",
+            "F7b_scored_capture_since_deploy",
             label="Since-deploy scored capture",
-            passed=scored_since is not None and float(scored_since) >= F7B_SCORED_CAPTURE_PCT,
+            passed=f7b_pass,
             actual=scored_since,
-            threshold=f">={F7B_SCORED_CAPTURE_PCT}%",
-            message="HIBS_EVIDENCE_DEPLOY_DATE window — closing join quality",
+            threshold=f">={F7B_SCORED_CAPTURE_PCT}% scored rows",
+            message=f7b_msg,
             critical=False,
             window="since_deploy",
             coverage_pct=float(scored_since) if scored_since is not None else None,
@@ -226,33 +390,57 @@ def forward_evidence_gates() -> Dict[str, Any]:
         gate_row(
             "F8_clv_sample",
             label="CLV sample (28d)",
-            passed=n_clv >= F8_MIN_CLV_ROWS,
+            passed=f8_pass,
             actual=n_clv,
-            threshold=f">={F8_MIN_CLV_ROWS} rows",
-            message="pred-log-sync after FT + closing 1X2",
+            threshold=f">={F8_MIN_CLV_ROWS} rows ({cohort})",
+            message=f8_msg,
             critical=False,
             n=n_clv,
             window="28d",
         ),
         gate_row(
-            "F9_beat_close",
+            "F9_clv_beat_close",
             label="CLV beat-close",
-            passed=beat_pct is not None and n_clv >= F8_MIN_CLV_ROWS and float(beat_pct) >= F9_BEAT_CLOSE_PCT,
+            passed=f9_pass,
             actual=beat_pct,
-            threshold=f">={F9_BEAT_CLOSE_PCT}%",
-            message="trial cohort when HIBS_F9_TRIAL_LEAGUES_ONLY=1",
+            threshold=f">={F9_BEAT_CLOSE_PCT}% on >={F8_MIN_CLV_ROWS} rows ({cohort})",
+            message=f9_msg,
             critical=False,
             n=n_clv,
             window="28d",
         ),
+        _informational_gate(
+            "F9b_clv_beat_close_fair_shin",
+            label="Fair-Shin CLV beat-close (informational)",
+            passed=f9b_pass,
+            actual=f9b_pct,
+            threshold="informational — not buyer pass/fail",
+            message=(
+                "Informational only — Shin fair-line CLV from stored 1X2 triplets (no new API). "
+                "Does not change F9 pass/fail."
+            ),
+        ),
+        _informational_gate(
+            "F9c_clv_benchmark_tier",
+            label="Pinnacle closing benchmark tier",
+            passed=f9c_pass,
+            actual=f9c,
+            threshold="informational — not buyer pass/fail",
+            message=(
+                "Informational — Pinnacle closing line is institutional CLV benchmark. "
+                "API-Football best-price close is not equivalent."
+            ),
+        ),
     ]
 
     critical = [g for g in gates if g.get("critical")]
-    evidence = [g for g in gates if not g.get("critical")]
+    buyer_evidence = [
+        g for g in gates if not g.get("critical") and not g.get("informational")
+    ]
     critical_pass = all(g["pass"] for g in critical)
-    evidence_pass = all(g["pass"] for g in evidence)
-    passed = sum(1 for g in gates if g["pass"])
-    ratio = passed / max(len(gates), 1)
+    evidence_pass = all(g["pass"] for g in buyer_evidence)
+    passed_n = sum(1 for g in buyer_evidence if g["pass"])
+    ratio = passed_n / max(len(buyer_evidence), 1)
 
     if not critical_pass:
         grade = "D"
@@ -275,34 +463,43 @@ def forward_evidence_gates() -> Dict[str, Any]:
     )
 
     return {
+        "since_deploy": since,
         "since_deploy_iso": since,
         "matchdays_7d": matchdays,
-        "trial_f9_cohort": trial_f9,
+        "n_snapshots_7d": n_snap_7d,
+        "trial_f9_cohort": cohort,
+        "f9b_trial_domestic_fair_shin": f9b,
+        "f9c_benchmark": f9c,
         "gates": gates,
         "critical_pass": critical_pass,
         "evidence_pass": evidence_pass,
         "evidence_grade": grade,
-        "next_actions": _next_actions(gates),
+        "next_actions": _next_actions(gates, matchdays=matchdays, n_clv=n_clv),
         **readiness,
     }
 
 
-def _next_actions(gates: List[Dict[str, Any]]) -> List[str]:
+def _next_actions(
+    gates: List[Dict[str, Any]],
+    *,
+    matchdays: int,
+    n_clv: int,
+) -> List[str]:
     by_id = {g["id"]: g for g in gates}
     actions: List[str] = []
-    if not by_id.get("F1_prediction_log", {}).get("pass"):
+    if not by_id.get("F1_audit", {}).get("pass"):
         actions.append("Set HIBS_PREDICTION_LOG_ENABLED=1 in .env")
-    if not by_id.get("F2_clv_log", {}).get("pass"):
+    if not by_id.get("F2_clv", {}).get("pass"):
         actions.append("Set HIBS_CLV_LOG_ENABLED=1")
-    if not by_id.get("F3_pred_log_cron", {}).get("pass"):
+    if not by_id.get("F3_cron", {}).get("pass"):
         actions.append("sudo bash deploy/cron-hibs-calibration.sh --install")
-    if not by_id.get("F5_production_config", {}).get("pass"):
-        actions.append("python3 scripts/validate_institutional_config.py")
-    if not by_id.get("F7_capture_7d", {}).get("pass"):
-        actions.append("./scripts/seed_forward_evidence.sh")
-        actions.append("Load dashboard on matchdays for 1X2 capture")
-    if not by_id.get("F8_clv_sample", {}).get("pass") or not by_id.get("F9_beat_close", {}).get("pass"):
-        actions.append("python -m hibs_predictor.main pred-log-sync --verbose")
+    if not by_id.get("F7_forward_capture_7d", {}).get("pass"):
+        actions.append("bash scripts/run_forward_backfill_plan.sh")
+        actions.append("Load dashboard while logged in during fixture days (seeds snapshots).")
+    if matchdays < 3:
+        actions.append("Wait for matchdays + daily pred-log-sync; do not scale stakes until n≥25.")
+    if not by_id.get("F8_clv_sample", {}).get("pass") or not by_id.get("F9_clv_beat_close", {}).get("pass"):
+        actions.append("bash scripts/run_daily_audit_pipeline.sh")
     if not actions:
         actions.append("./scripts/export_b2b_data_room.sh")
     return actions

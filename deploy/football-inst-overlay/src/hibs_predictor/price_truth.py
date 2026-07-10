@@ -441,6 +441,25 @@ def panel_coverage_summary(*, days: int = 28, since_iso: Optional[str] = None) -
     }
 
 
+def clv_benchmark_tier_summary(*, days: int = 28, since_iso: Optional[str] = None) -> Dict[str, Any]:
+    """F9c — Pinnacle closing subset vs institutional CLV benchmark (informational)."""
+    load_dotenv()
+    panel = panel_coverage_summary(days=days, since_iso=since_iso)
+    pinnacle_api = bool(
+        (os.getenv("PINNACLE_API_KEY") or os.getenv("ODDS_API_PINNACLE") or "").strip()
+        or (os.getenv("THE_ODDS_API_KEY") or "").strip()
+    )
+    return {
+        "window_days": int(days),
+        "since_iso": since_iso,
+        "pinnacle_panel_rate_pct": panel.get("pinnacle_panel_rate_pct"),
+        "panel_rate_pct": panel.get("panel_rate_pct"),
+        "institutional_standard": "pinnacle_close",
+        "pinnacle_api_configured": pinnacle_api,
+        "note": "F9 pass uses best available close; Pinnacle subset reported separately.",
+    }
+
+
 def f9_raw_vs_f9b_variance(
     *,
     days: int = 28,
