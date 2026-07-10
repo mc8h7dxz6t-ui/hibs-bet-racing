@@ -147,6 +147,10 @@ if [[ -f "${BET_ROOT}/deploy/hibs-racing.service" ]]; then
   cp "${BET_ROOT}/deploy/hibs-racing.service" /etc/systemd/system/hibs-racing.service
   systemctl daemon-reload
 fi
+if [[ -f "${BET_ROOT}/deploy/gunicorn-racing.conf.py" ]]; then
+  mkdir -p "${RACING_ROOT}/deploy"
+  cp "${BET_ROOT}/deploy/gunicorn-racing.conf.py" "${RACING_ROOT}/deploy/gunicorn-racing.conf.py"
+fi
 
 chown -R www-data:www-data "${RACING_ROOT}"
 systemctl restart hibs-racing 2>/dev/null || true

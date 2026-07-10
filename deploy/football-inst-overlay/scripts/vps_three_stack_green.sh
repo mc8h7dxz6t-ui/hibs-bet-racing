@@ -61,6 +61,22 @@ probe_http() {
 
 repair_all() {
   log "repair: full VPS automation"
+  if [[ -f "${APP}/deploy/lib_cron_dedupe.sh" ]]; then
+    # shellcheck source=../deploy/lib_cron_dedupe.sh
+    source "${APP}/deploy/lib_cron_dedupe.sh"
+    cron_n="$(hibs_crontab_line_count www-data 2>/dev/null || echo 0)"
+    if [[ "${cron_n}" -gt "${HIBS_CRON_MAX_LINES:-200}" ]] && \
+       [[ -f "${APP}/deploy/crontab-emergency-sports-only.sh" ]]; then
+      warn "www-data crontab bloated (${cron_n} lines) — emergency sports-only"
+      bash "${APP}/deploy/crontab-emergency-sports-only.sh" || true
+    fi
+  fi
+  fb_ping_pre="$(probe_http http://127.0.0.1:8000/api/ping 8)"
+  if [[ "${fb_ping_pre}" != "200" && -f "${APP}/scripts/vps_football_hard_recovery.sh" ]]; then
+    log "repair: football hard recovery (502 / stuck :8000)"
+    export DEPLOY_PATH="${APP}" HIBS_RACING_DEPLOY_PATH="${RACING}"
+    bash "${APP}/scripts/vps_football_hard_recovery.sh" || true
+  fi
   if [[ -f "${APP}/scripts/_vps_automation_remote.sh" ]]; then
     export DEPLOY_PATH="${APP}" HIBS_RACING_DEPLOY_PATH="${RACING}" TRADING_INSTALL_ROOT="${TRADING}"
     bash "${APP}/scripts/_vps_automation_remote.sh" || true
@@ -120,7 +136,14 @@ sys.exit(0 if service_restart_allowed('hibs-bet', min_minutes=45) else 1)
   fb_ping="$(probe_http http://127.0.0.1:8000/api/ping 15)"
   echo "  ping: ${fb_ping}"
   if [[ "${fb_unit}" == "active" && "${fb_ping}" != "200" && "${REPAIR}" -eq 1 ]]; then
-    if HOME="${APP}" PYTHONPATH="${APP}/src" "${PY}" -c "
+    if [[ -f "${APP}/scripts/vps_football_hard_recovery.sh" ]]; then
+      warn "football ping not 200 — hard recovery"
+      export DEPLOY_PATH="${APP}" HIBS_RACING_DEPLOY_PATH="${RACING}"
+      bash "${APP}/scripts/vps_football_hard_recovery.sh" || true
+      sleep 3
+      fb_ping="$(probe_http http://127.0.0.1:8000/api/ping 20)"
+      echo "  ping after hard recovery: ${fb_ping}"
+    elif HOME="${APP}" PYTHONPATH="${APP}/src" "${PY}" -c "
 from hibs_predictor.hands_off_guard import service_restart_allowed
 import sys
 sys.exit(0 if service_restart_allowed('hibs-bet-stuck', min_minutes=60) else 1)
@@ -135,6 +158,13 @@ sys.exit(0 if service_restart_allowed('hibs-bet-stuck', min_minutes=60) else 1)
     else
       warn "football stuck repair throttled (60m)"
     fi
+  elif [[ "${fb_ping}" != "200" && "${REPAIR}" -eq 1 && -f "${APP}/scripts/vps_football_hard_recovery.sh" ]]; then
+    warn "football unit ${fb_unit} ping ${fb_ping} — hard recovery"
+    export DEPLOY_PATH="${APP}" HIBS_RACING_DEPLOY_PATH="${RACING}"
+    bash "${APP}/scripts/vps_football_hard_recovery.sh" || true
+    fb_unit="$(systemctl is-active hibs-bet 2>/dev/null || echo inactive)"
+    fb_ping="$(probe_http http://127.0.0.1:8000/api/ping 20)"
+    echo "  unit after recovery: ${fb_unit} ping: ${fb_ping}"
   fi
   fb_api=0
   fb_api_optional=0
