@@ -31,6 +31,16 @@ fi
 
 mkdir -p "${LOG_DIR}" /var/lib/fve/scrape-lines /var/log/fve
 
+fb_ping="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 8 http://127.0.0.1:8000/api/ping 2>/dev/null || echo 000)"
+if [[ "${fb_ping}" != "200" ]]; then
+  warn "hibs-bet ping failed (${fb_ping}) — FVE needs football upstream (see docs/VPS_FAILURE_MODES.md FM-01)"
+  if [[ "${HIBS_FVE_REPAIR_FORCE:-0}" != "1" ]]; then
+    log "skip docker compose until football is up — run: bash ${APP}/scripts/vps_football_hard_recovery.sh"
+    exit 0
+  fi
+  warn "HIBS_FVE_REPAIR_FORCE=1 — continuing despite football down"
+fi
+
 fve_health_ok() {
   curl -fsS --max-time 8 "http://127.0.0.1:${FVE_PORT}/health" 2>/dev/null | \
     python3 -c "

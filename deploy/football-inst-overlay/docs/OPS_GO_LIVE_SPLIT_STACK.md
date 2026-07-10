@@ -114,6 +114,8 @@ cd /opt/fve && git pull origin main && docker compose up -d --build
 
 ## Troubleshooting
 
+See **`docs/VPS_FAILURE_MODES.md`** for the crash registry (root causes, cascades, automation gaps, update checklist).
+
 | Symptom | Fix |
 |---------|-----|
 | Line-trader 404 | `sudo FVE_REMOTE_HOST=77.68.89.75 bash /opt/hibs-bet/deploy/apply-vps-fve-remote-host.sh` |

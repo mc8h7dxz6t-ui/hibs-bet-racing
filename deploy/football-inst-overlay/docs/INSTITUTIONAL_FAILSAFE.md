@@ -51,6 +51,8 @@ Hands-off: `/var/log/hibs-bet/hands-off-status.json`
 
 ## Kill switches
 
+**Crash registry:** `deploy/football-inst-overlay/docs/VPS_FAILURE_MODES.md` — what keeps failing, cascade order, automation update checklist.
+
 | Situation | Action |
 |-----------|--------|
 | Runaway restarts | `systemctl stop hibs-bet`; fix `.env`; restore prior git revision |
