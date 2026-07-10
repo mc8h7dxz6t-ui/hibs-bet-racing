@@ -63,39 +63,69 @@ if [[ ${DRY} -eq 1 ]]; then
   exit 2
 fi
 
-# 1. Football bundle stale / empty — warm cache + throttled restart if health times out
-if [[ "${FB_OK}" != "True" || "${HL_OK}" != "True" ]]; then
-  log "repair: football fixture cache"
-  if [[ -f "${APP}/scripts/warm_football_fixtures.sh" ]]; then
+# 1. Football — preserve on-disk bundle when fixtures exist (low enrich ≠ cache_miss)
+PRESERVE="$("${PY}" -c "
+from hibs_predictor.cache_preservation_policy import should_preserve_disk_bundle, disk_bundle_snapshot
+snap = disk_bundle_snapshot()
+fc = int(snap.get('fixture_count') or 0)
+print('yes' if should_preserve_disk_bundle(fixture_count=fc) else 'no')
+" 2>/dev/null || echo no)"
+DISK_FC="$("${PY}" -c "
+from hibs_predictor.cache_preservation_policy import disk_bundle_snapshot
+print(int(disk_bundle_snapshot().get('fixture_count') or 0))
+" 2>/dev/null || echo 0)"
+
+if [[ "${PRESERVE}" == "yes" && "${FB_OK}" == "True" && "${HL_OK}" != "True" ]]; then
+  log "repair: health light only — preserve cache (${DISK_FC} fixtures on disk, no bust)"
+  if [[ "$(id -u)" -eq 0 ]]; then
+    allowed="$("${PY}" -c "
+from hibs_predictor.hands_off_guard import service_restart_allowed
+print('yes' if service_restart_allowed('hibs-bet', min_minutes=45) else 'no')
+" 2>/dev/null || echo no)"
+    if [[ "${allowed}" == "yes" ]]; then
+      log "repair: restart hibs-bet (ping/health_light failed; cache preserved)"
+      systemctl restart hibs-bet 2>/dev/null || true
+      sleep 4
+    fi
+  fi
+elif [[ "${FB_OK}" != "True" ]]; then
+  log "repair: football fixture cache empty/stale (disk=${DISK_FC})"
+  if [[ "${PRESERVE}" == "yes" && "${DISK_FC}" -gt 0 ]]; then
+    log "repair: soft warm only (HIBS_PRESERVE_GREEN_CACHE — no bust)"
+    if [[ -f "${APP}/scripts/warm_football_fixtures.sh" ]]; then
+      HOME="${APP}" DEPLOY_PATH="${APP}" HIBS_FIXTURE_WARM_FORCE_REFRESH=0 \
+        bash "${APP}/scripts/warm_football_fixtures.sh" \
+        >>"${LOG_DIR}/fixture-warm.log" 2>&1 || warn "soft fixture warm failed"
+    fi
+  elif [[ -f "${APP}/scripts/warm_football_fixtures.sh" ]]; then
     HOME="${APP}" DEPLOY_PATH="${APP}" \
       HIBS_FIXTURE_WARM_FORCE_REFRESH=1 bash "${APP}/scripts/warm_football_fixtures.sh" \
       >>"${LOG_DIR}/fixture-warm.log" 2>&1 || warn "fixture warm failed"
   elif [[ -f "${APP}/scripts/vps_cache_maintenance.sh" ]]; then
     bash "${APP}/scripts/vps_cache_maintenance.sh" --bust-fixtures 2>/dev/null || true
   fi
-  if [[ -f "${APP}/scripts/warm_low_source_scrape.sh" ]]; then
+  if [[ "${PRESERVE}" != "yes" && -f "${APP}/scripts/warm_low_source_scrape.sh" ]]; then
     log "repair: low-source scrape cycle (FDO/FotMob/ESPN)"
     HOME="${APP}" DEPLOY_PATH="${APP}" LOG_DIR="${LOG_DIR}" \
       bash "${APP}/scripts/warm_low_source_scrape.sh" \
       >>"${LOG_DIR}/low-source-scrape.log" 2>&1 || warn "low-source scrape failed"
   fi
   if [[ ! -f "${APP}/scripts/warm_football_fixtures.sh" ]]; then
-  "${PY}" -c "
+    "${PY}" -c "
 from hibs_predictor.web import fetch_all_fixtures
 fetch_all_fixtures(attach_live=False, include_domestic=False, allow_stale=True, force_refresh=True, reboost=True)
 print('fixture refresh scheduled')
 " 2>/dev/null || warn "fixture force_refresh failed"
   fi
-  if [[ "${HL_OK}" != "True" && "$(id -u)" -eq 0 ]]; then
-    allowed="$("${PY}" -c "
+elif [[ "${HL_OK}" != "True" && "$(id -u)" -eq 0 ]]; then
+  allowed="$("${PY}" -c "
 from hibs_predictor.hands_off_guard import service_restart_allowed
 print('yes' if service_restart_allowed('hibs-bet', min_minutes=45) else 'no')
 " 2>/dev/null || echo no)"
-    if [[ "${allowed}" == "yes" ]]; then
-      log "repair: restart hibs-bet (health light failed)"
-      systemctl restart hibs-bet 2>/dev/null || true
-      sleep 4
-    fi
+  if [[ "${allowed}" == "yes" ]]; then
+    log "repair: restart hibs-bet (health light failed; bundle ok)"
+    systemctl restart hibs-bet 2>/dev/null || true
+    sleep 4
   fi
 fi
 

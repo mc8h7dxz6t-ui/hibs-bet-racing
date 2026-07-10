@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Racing institutional evidence gates (R1–R7) — exit 0 when buyer_ready.
+# Racing institutional evidence gates (R1–R8) — personal research checklist.
 #
 #   bash scripts/verify_racing_evidence_gates.sh
 #   bash scripts/verify_racing_evidence_gates.sh --json
@@ -25,7 +25,7 @@ if [[ "${JSON_ONLY}" -eq 1 ]]; then
   exit $?
 fi
 
-echo "==> Racing evidence gates (local buyer_ready)"
+echo "==> Racing evidence gates (personal research — not PE diligence)"
 echo "${OUT}" | "${PY}" -c "
 import json, sys
 d = json.load(sys.stdin)

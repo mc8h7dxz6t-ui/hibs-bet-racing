@@ -36,6 +36,10 @@ def honesty_disclaimer() -> dict[str, Any]:
             "Not a SKU price, not a VC valuation, not a substitute for settled-edge proof."
         ),
         "evidence_grade_means": "Ops quality letter grade from gate pass ratio — not model alpha proof.",
+        "personal_staking_green_light_means": (
+            "Internal checklist for when YOU may scale stakes on this personal project. "
+            "Requires evidence gates + Brier/CLV cohorts per lane. Not financial advice."
+        ),
         "stack_truth": st,
     }
 

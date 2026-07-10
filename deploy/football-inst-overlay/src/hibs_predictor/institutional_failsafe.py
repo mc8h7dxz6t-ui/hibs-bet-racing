@@ -29,6 +29,30 @@ def safe_forward_evidence_gates() -> Dict[str, Any]:
         }
 
 
+def safe_racing_evidence_gates() -> Dict[str, Any]:
+    """Racing evidence with broad exception guard (local or overlay import)."""
+    try:
+        import importlib
+
+        mod = importlib.import_module("hibs_racing.evidence_gates")
+        return mod.racing_evidence_gates()
+    except Exception:
+        try:
+            from hibs_predictor.racing_evidence import racing_evidence_from_health
+
+            return racing_evidence_from_health()
+        except Exception as exc:
+            return {
+                "buyer_ready": False,
+                "critical_pass": False,
+                "evidence_pass": False,
+                "evidence_grade": "D",
+                "gates": [],
+                "error": str(exc)[:160],
+                "failsafe": True,
+            }
+
+
 def failsafe_report(*, app_root: str | None = None) -> Dict[str, Any]:
     """Aggregate engineering + automation failsafe snapshot."""
     load_dotenv()
@@ -65,6 +89,34 @@ def failsafe_report(*, app_root: str | None = None) -> Dict[str, Any]:
         out["pred_log_cron_scheduled"] = bool(cron.get("scheduled"))
     except Exception as exc:
         out["cron_error"] = str(exc)[:120]
+
+    try:
+        racing = safe_racing_evidence_gates()
+        out["buyer_ready_racing"] = bool(racing.get("buyer_ready"))
+        out["racing_critical_pass"] = bool(racing.get("critical_pass"))
+    except Exception as exc:
+        out["racing_error"] = str(exc)[:120]
+
+    try:
+        from hibs_predictor.personal_staking_gates import personal_staking_report
+
+        out["personal_staking"] = personal_staking_report()
+        out["any_staking_green_light"] = bool(
+            out["personal_staking"].get("any_lane_staking_green_light")
+        )
+    except Exception as exc:
+        out["staking_error"] = str(exc)[:120]
+
+    try:
+        proc = subprocess.run(
+            ["systemctl", "is-active", "hibs-racing"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        out["hibs_racing_active"] = proc.stdout.strip() == "active"
+    except Exception:
+        out["hibs_racing_active"] = None
 
     try:
         proc = subprocess.run(
