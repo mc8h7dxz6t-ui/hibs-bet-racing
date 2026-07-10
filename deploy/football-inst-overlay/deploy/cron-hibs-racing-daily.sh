@@ -24,7 +24,10 @@ run_refresh() {
   {
     echo "===== $(date -u +%Y-%m-%dT%H:%M:%SZ) racing daily ====="
     cd "${RACING}"
-    HIBS_OBSERVATION_LANE="${HIBS_OBSERVATION_LANE:-1}" HOME="${RACING}" \
+    HIBS_OBSERVATION_LANE="${HIBS_OBSERVATION_LANE:-1}" \
+    HIBS_ODDS_SOURCE="${HIBS_ODDS_SOURCE:-auto}" \
+    HIBS_RACING_CARD_SOURCE="${HIBS_RACING_CARD_SOURCE:-auto}" \
+    HOME="${RACING}" \
       bash "${runner}"
     echo "===== exit=$? ====="
   } >>"${LOG_FILE}" 2>&1

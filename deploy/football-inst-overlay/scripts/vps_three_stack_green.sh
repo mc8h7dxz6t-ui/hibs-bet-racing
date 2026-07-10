@@ -181,6 +181,37 @@ sys.exit(0 if service_restart_allowed('hibs-racing', min_minutes=45) else 1)
   fi
   rc_ping="$(probe_http http://127.0.0.1:5003/api/ping 20)"
   echo "  ping: ${rc_ping}"
+  rc_odds_pct="0"
+  rc_odds_ok=0
+  rc_mb_cfg=0
+  if [[ -d "${RACING}" && -x "${RACING}/.venv/bin/python3" ]]; then
+    if grep -qE '^MATCHBOOK_(USERNAME|USER)=' "${RACING}/.env" 2>/dev/null && \
+       grep -qE '^MATCHBOOK_PASSWORD=' "${RACING}/.env" 2>/dev/null; then
+      rc_mb_cfg=1
+      echo "  matchbook: configured"
+    else
+      echo "  matchbook: MISSING in .env"
+    fi
+    read -r rc_odds_pct rc_odds_ok <<<"$(
+      HOME="${RACING}" PYTHONPATH="${RACING}/src" "${RACING}/.venv/bin/python3" -c "
+from hibs_racing.scrapers.racing_scrape_api import odds_coverage_summary
+c = odds_coverage_summary()
+print(c.get('coverage_pct', 0), 1 if c.get('ok') else 0)
+" 2>/dev/null || echo "0 0")"
+    echo "  odds_coverage: ${rc_odds_pct}%"
+    if [[ "${rc_odds_ok}" -eq 0 && "${REPAIR}" -eq 1 && -x "${RACING}/scripts/warm_racing_scrape.sh" ]]; then
+      warn "low odds — warm_racing_scrape"
+      HOME="${RACING}" HIBS_ODDS_SOURCE="${HIBS_ODDS_SOURCE:-auto}" \
+        bash "${RACING}/scripts/warm_racing_scrape.sh" >>/var/log/hibs-racing/three-stack-odds.log 2>&1 || true
+      read -r rc_odds_pct rc_odds_ok <<<"$(
+        HOME="${RACING}" PYTHONPATH="${RACING}/src" "${RACING}/.venv/bin/python3" -c "
+from hibs_racing.scrapers.racing_scrape_api import odds_coverage_summary
+c = odds_coverage_summary()
+print(c.get('coverage_pct', 0), 1 if c.get('ok') else 0)
+" 2>/dev/null || echo "0 0")"
+      echo "  odds_coverage after scrape: ${rc_odds_pct}%"
+    fi
+  fi
   rc_db=0
   if [[ -f "${RACING}/data/feature_store.sqlite" ]]; then
     rc_db=1
@@ -197,7 +228,13 @@ sys.exit(0 if service_restart_allowed('hibs-racing', min_minutes=45) else 1)
   fi
   if [[ "${rc_unit}" == "active" && "${rc_ping}" == "200" ]]; then
     racing_ok=1
-    echo "  RACING: GREEN"
+    if [[ "${rc_mb_cfg}" -eq 0 ]]; then
+      echo "  RACING: AMBER (service up — add MATCHBOOK_* for odds)"
+    elif [[ "${rc_odds_ok}" -eq 0 ]]; then
+      echo "  RACING: AMBER (service up — odds coverage ${rc_odds_pct}% < target)"
+    else
+      echo "  RACING: GREEN"
+    fi
   elif [[ "${rc_unit}" == "active" && "${rc_ping}" != "200" ]]; then
     echo "  RACING: RED (unit active but ping ${rc_ping} — site shows 502)"
     if [[ "${REPAIR}" -eq 1 && -f "${APP}/scripts/vps_racing_hard_recovery.sh" ]]; then
