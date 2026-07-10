@@ -74,12 +74,12 @@ def check_password(password: str) -> bool:
 
 def safe_next_url(raw: Optional[str]) -> str:
     if not raw:
-        return url_for("dashboard")
+        return url_for("index")
     parsed = urlparse(raw)
     if parsed.scheme or parsed.netloc:
-        return url_for("dashboard")
+        return url_for("index")
     if not raw.startswith("/"):
-        return url_for("dashboard")
+        return url_for("index")
     return raw
 
 
