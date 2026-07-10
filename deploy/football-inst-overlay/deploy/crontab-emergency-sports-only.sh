@@ -55,6 +55,8 @@ write_www_data_sports_crontab() {
 35 7,14 * * * cd ${BET} && HOME=${BET} bash ${BET}/scripts/seed_forward_evidence.sh --pipeline-only >> ${LOG_DIR}/seed-forward.log 2>&1
 # Weekly calibration-fit (Sun)
 0 7 * * 0 cd ${BET} && HOME=${BET} PYTHONPATH=src ${BET}/.venv/bin/python -m hibs_predictor.main calibration-fit >> ${LOG_DIR}/calibration-fit.log 2>&1
+# hibs-racing: daily refresh (observation lane)
+5 6 * * * cd ${BET} && HOME=${RACING} HIBS_RACING_DEPLOY_PATH=${RACING} HIBS_OBSERVATION_LANE=1 bash ${BET}/deploy/cron-hibs-racing-daily.sh --run >> /var/log/hibs-racing/daily-refresh.log 2>&1
 EOF
 }
 
@@ -67,6 +69,7 @@ write_root_minimal_crontab() {
     printf '%s\n' "${filtered}"
     echo "# hibs root minimal (${TS})"
     echo "*/30 * * * * sudo HOME=${BET} DEPLOY_PATH=${BET} bash ${BET}/scripts/hands_off_cycle.sh >> ${LOG_DIR}/hands-off-cycle.log 2>&1"
+    echo "*/15 * * * * bash ${BET}/deploy/cron-hibs-racing-watchdog.sh --run >> /var/log/hibs-racing/watchdog.log 2>&1"
   }
 }
 

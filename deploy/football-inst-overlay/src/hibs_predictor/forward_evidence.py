@@ -17,6 +17,8 @@ F7B_SCORED_CAPTURE_PCT = 80.0
 F7_MIN_MATCHDAYS = 3
 F8_MIN_CLV_ROWS = 25
 F9_BEAT_CLOSE_PCT = 50.0
+F10_BRIER_PASS_MAX = 0.22
+F10_BRIER_MIN_N = 30
 
 
 def evidence_deploy_since_iso() -> Optional[str]:
@@ -311,6 +313,31 @@ def forward_evidence_gates() -> Dict[str, Any]:
     pin_pct = f9c.get("pinnacle_panel_rate_pct")
     f9c_pass = pin_pct is not None and float(pin_pct) >= 10.0
 
+    f10_brier: Optional[float] = None
+    f10_n = 0
+    try:
+        from hibs_predictor.prediction_log import monitor_summary_dict
+
+        mon = monitor_summary_dict()
+        f10_brier = mon.get("brier_score_1x2")
+        f10_n = int(mon.get("n_scored") or 0)
+    except Exception:
+        pass
+    f10_pass = (
+        f10_n >= F10_BRIER_MIN_N
+        and f10_brier is not None
+        and float(f10_brier) <= F10_BRIER_PASS_MAX
+    )
+    f10_msg = (
+        f"Need ≥{F10_BRIER_MIN_N} scored rows in monitor window (have {f10_n})."
+        if f10_n < F10_BRIER_MIN_N
+        else (
+            f"Brier {f10_brier} above pass max {F10_BRIER_PASS_MAX} — review calibration-fit."
+            if not f10_pass
+            else "1X2 Brier within personal staking band."
+        )
+    )
+
     gates: List[Dict[str, Any]] = [
         gate_row(
             "F1_audit",
@@ -411,6 +438,17 @@ def forward_evidence_gates() -> Dict[str, Any]:
             n=n_clv,
             window="28d",
         ),
+        gate_row(
+            "F10_brier_1x2",
+            label="1X2 Brier (28d monitor)",
+            passed=f10_pass,
+            actual=f10_brier,
+            threshold=f"<={F10_BRIER_PASS_MAX} on n>={F10_BRIER_MIN_N}",
+            message=f10_msg,
+            critical=False,
+            n=f10_n,
+            window="28d",
+        ),
         _informational_gate(
             "F9b_clv_beat_close_fair_shin",
             label="Fair-Shin CLV beat-close (informational)",
@@ -506,6 +544,8 @@ def _next_actions(
         actions.append("Wait for matchdays + daily pred-log-sync; do not scale stakes until n≥25.")
     if not by_id.get("F8_clv_sample", {}).get("pass") or not by_id.get("F9_clv_beat_close", {}).get("pass"):
         actions.append("bash scripts/run_daily_audit_pipeline.sh")
+    if not by_id.get("F10_brier_1x2", {}).get("pass"):
+        actions.append("Review calibration-fit + league shrink; Brier gate is personal staking band only.")
     if not actions:
-        actions.append("./scripts/export_b2b_data_room.sh")
+        actions.append("bash scripts/verify_personal_staking_greenlights.sh")
     return actions

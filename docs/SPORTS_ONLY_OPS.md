@@ -1,8 +1,7 @@
-# Sports-only operations — football + racing
+# Sports-only operations — see PERSONAL_PROJECT_OPS.md for full personal stack runbook.
 
-**Ignore:** governors, Inst++ nine-ten, Phase D regulatory matrices.
+**Master doc:** [PERSONAL_PROJECT_OPS.md](PERSONAL_PROJECT_OPS.md) — industry benchmarks, personal green lights, 24/7 automation.
 
----
 
 ## Your VPS status (from your paste)
 

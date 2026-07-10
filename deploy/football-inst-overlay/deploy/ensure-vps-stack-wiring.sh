@@ -121,8 +121,22 @@ sys.exit(0 if s.get('ok') else 1)
 fi
 
 if [[ "${REPAIR}" -eq 1 && "${DATA_PROD_OK}" -eq 0 && -f "${APP}/scripts/data_producer_repair.sh" ]]; then
-  log "repair: data producer SLO red"
-  bash "${APP}/scripts/data_producer_repair.sh" || warn "data producer repair issues"
+  SKIP_REPAIR=0
+  if HOME="${APP}" PYTHONPATH="${APP}/src" python3 -c "
+from hibs_predictor.cache_preservation_policy import disk_bundle_snapshot, should_preserve_disk_bundle
+s = disk_bundle_snapshot()
+exit(0 if should_preserve_disk_bundle(fixture_count=int(s.get('fixture_count') or 0)) and int(s.get('fixture_count') or 0) > 0 else 1)
+" 2>/dev/null; then
+    if [[ "${FOOTBALL_PING}" -eq 0 && "${FOOTBALL_HEALTH_LIGHT}" -eq 0 ]]; then
+      log "repair: data producer red but disk bundle preserved — service restart only"
+      systemctl restart hibs-bet 2>/dev/null || true
+      SKIP_REPAIR=1
+    fi
+  fi
+  if [[ "${SKIP_REPAIR}" -eq 0 ]]; then
+    log "repair: data producer SLO red"
+    bash "${APP}/scripts/data_producer_repair.sh" || warn "data producer repair issues"
+  fi
 fi
 
 TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
