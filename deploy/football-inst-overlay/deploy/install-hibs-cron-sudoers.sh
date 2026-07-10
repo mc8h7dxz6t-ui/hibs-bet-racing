@@ -17,6 +17,7 @@ cat >"${DEST}" <<EOF
 ${MARKER}
 Defaults:www-data !requiretty
 www-data ALL=(root) NOPASSWD: /bin/bash ${APP}/deploy/cron-hibs-hands-off.sh --run
+www-data ALL=(root) NOPASSWD: /bin/bash ${APP}/deploy/cron-hibs-institutional-watchdog.sh --run
 www-data ALL=(root) NOPASSWD: /bin/bash ${APP}/scripts/hands_off_cycle.sh
 www-data ALL=(root) NOPASSWD: /bin/systemctl restart hibs-bet.service
 www-data ALL=(root) NOPASSWD: /bin/systemctl restart hibs-racing.service

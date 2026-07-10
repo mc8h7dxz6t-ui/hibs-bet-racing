@@ -114,3 +114,29 @@ bash scripts/verify_racing_evidence_gates.sh
 - **Misrepresentation risk**: Selling this repo as CyberGovernor/ClaimGate/AlgoFreeze without code rename is **due-diligence fatal**.
 
 Use `stack_truth` and this document in every data room.
+
+---
+
+## VPS automation (hibs-bet robustness)
+
+After git sync, arm full automation:
+
+```bash
+cd /opt/hibs-bet
+sudo bash deploy/vps-sync-from-github.sh          # copies hibs-bet.service
+sudo bash deploy/install-hibs-cron-sudoers.sh
+sudo bash deploy/cron-hibs-ops-automation.sh --install
+bash scripts/verify_inst_pp_automation.sh
+bash scripts/institutional_failsafe_verify.sh
+```
+
+| Cron marker | Schedule (UTC) | Script |
+|-------------|----------------|--------|
+| `hibs-bet: daily bundle` | 06:35, 23:05 | `run_daily_audit_pipeline.sh` |
+| `hibs-bet: hands-off cycle` | */30 | `hands_off_cycle.sh` (repair) |
+| `hibs-bet: institutional++ watchdog` | 07:45 | `institutional_vps_watchdog.sh` |
+| `hibs-bet: nine-ten daily` | 07:15 | `score_hibs_nine_ten.sh` |
+| `hibs-bet: seed forward evidence` | 07:35, 14:35 | `seed_forward_evidence.sh` |
+
+**F3 gate** passes when `cron-hibs-calibration.sh --install` has run and `/var/log/hibs-bet/daily-audit-am.log` is fresh (<48h).
+

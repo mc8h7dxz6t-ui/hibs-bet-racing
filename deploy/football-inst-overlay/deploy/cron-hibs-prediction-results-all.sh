@@ -66,11 +66,11 @@ install_cron() {
     echo ""
     echo "${MARKER}"
     echo "# Midday FT catch-up (football + racing paper)"
-    echo "5 12 * * * sudo bash ${SCRIPT} --run >> ${LOG_FILE} 2>&1"
+    echo "5 12 * * * cd ${BET} && HOME=${BET} bash ${SCRIPT} --run >> ${LOG_FILE} 2>&1"
     echo "# Evening results (after last kick-offs)"
-    echo "30 22 * * * sudo bash ${SCRIPT} --run >> ${LOG_FILE} 2>&1"
+    echo "30 22 * * * cd ${BET} && HOME=${BET} bash ${SCRIPT} --run >> ${LOG_FILE} 2>&1"
     echo "# Late settle (UK/Ire cards)"
-    echo "45 23 * * * sudo bash ${SCRIPT} --run >> ${LOG_FILE} 2>&1"
+    echo "45 23 * * * cd ${BET} && HOME=${BET} bash ${SCRIPT} --run >> ${LOG_FILE} 2>&1"
   } >"${tmp}"
   crontab -u www-data "${tmp}"
   rm -f "${tmp}"
@@ -82,9 +82,9 @@ case "${1:---print}" in
   --run) run_all ;;
   --print)
     echo "${MARKER}"
-    echo "5 12 * * * sudo bash ${SCRIPT} --run >> ${LOG_FILE} 2>&1"
-    echo "30 22 * * * sudo bash ${SCRIPT} --run >> ${LOG_FILE} 2>&1"
-    echo "45 23 * * * sudo bash ${SCRIPT} --run >> ${LOG_FILE} 2>&1"
+    echo "5 12 * * * cd ${BET} && HOME=${BET} bash ${SCRIPT} --run >> ${LOG_FILE} 2>&1"
+    echo "30 22 * * * cd ${BET} && HOME=${BET} bash ${SCRIPT} --run >> ${LOG_FILE} 2>&1"
+    echo "45 23 * * * cd ${BET} && HOME=${BET} bash ${SCRIPT} --run >> ${LOG_FILE} 2>&1"
     ;;
   -h|--help) usage ;;
   *) usage; exit 1 ;;

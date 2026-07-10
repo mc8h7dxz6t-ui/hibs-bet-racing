@@ -1604,7 +1604,29 @@ def pred_log_sync_cron_status() -> Dict[str, Any]:
         log_path = legacy_log
     log_exists = os.path.isfile(log_path)
     log_age_hours: Optional[float] = None
-    if log_exists:
+    # Freshest of AM / PM / legacy Sunday fresh logs
+    audit_candidates = [
+        default_log,
+        f"{log_dir}/daily-audit-pm.log",
+        f"{log_dir}/daily-audit-am-fresh.log",
+        legacy_log,
+    ]
+    freshest_path: Optional[str] = None
+    freshest_mtime: Optional[float] = None
+    for candidate in audit_candidates:
+        if not os.path.isfile(candidate):
+            continue
+        mtime = os.path.getmtime(candidate)
+        if freshest_mtime is None or mtime > freshest_mtime:
+            freshest_mtime = mtime
+            freshest_path = candidate
+    if freshest_path:
+        log_path = freshest_path
+        log_exists = True
+        log_age_hours = round(
+            (datetime.now(timezone.utc).timestamp() - freshest_mtime) / 3600.0, 1
+        )
+    elif log_exists:
         log_age_hours = round((datetime.now(timezone.utc).timestamp() - os.path.getmtime(log_path)) / 3600.0, 1)
 
     needs_reminder = prediction_log_enabled() and not scheduled
