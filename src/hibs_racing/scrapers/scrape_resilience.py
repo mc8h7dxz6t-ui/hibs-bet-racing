@@ -50,8 +50,17 @@ class SourceCircuit:
         with self._lock:
             self.consecutive_failures += 1
             self.last_error = error[:200]
-            if self.consecutive_failures >= self.failure_threshold:
-                self.open_until = time.time() + self.open_sec
+            threshold = self.failure_threshold
+            open_sec = self.open_sec
+            err_l = error.lower()
+            if "403" in err_l or "forbidden" in err_l:
+                threshold = 1
+                try:
+                    open_sec = max(open_sec, float(os.getenv("HIBS_ODDSCHECKER_403_OPEN_SEC", "3600")))
+                except ValueError:
+                    open_sec = max(open_sec, 3600.0)
+            if self.consecutive_failures >= threshold:
+                self.open_until = time.time() + open_sec
 
 
 _circuits: Dict[str, SourceCircuit] = {}

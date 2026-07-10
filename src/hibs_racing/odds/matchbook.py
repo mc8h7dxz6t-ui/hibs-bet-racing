@@ -629,11 +629,12 @@ def fetch_matchbook_odds(
     *,
     config_path: Path | None = None,
     client: MatchbookClient | None = None,
+    force: bool = False,
 ) -> tuple[pd.DataFrame, MatchbookFetchReport]:
     """Pull exchange back prices from Matchbook and align to card runners."""
     from hibs_racing.matchbook_guard import matchbook_traffic_allowed, record_poll_success
 
-    if not matchbook_traffic_allowed():
+    if client is None and not matchbook_traffic_allowed(force=force):
         return pd.DataFrame(), MatchbookFetchReport(errors=["matchbook poll gated (rate/owner/trip)"])
     cfg = load_config(config_path)
     mb_cfg = cfg.get("matchbook", {})

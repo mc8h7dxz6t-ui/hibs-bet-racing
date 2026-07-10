@@ -554,8 +554,58 @@ def _base_frame(*, card_date: str | None = None, window_hours: int | None = 24) 
     if card_date and not frame.empty:
         frame = frame[frame["card_date"].astype(str) == card_date]
     if window_hours and not frame.empty:
-        frame = filter_next_hours(frame, hours=window_hours)
+        narrowed = filter_next_hours(frame, hours=window_hours)
+        if narrowed.empty and window_hours < 48:
+            widened = filter_next_hours(frame, hours=48)
+            if not widened.empty:
+                frame = widened
+            else:
+                frame = narrowed
+        else:
+            frame = narrowed
     return frame
+
+
+def _ui_data_status(frame: pd.DataFrame) -> dict:
+    from hibs_racing.matchbook_guard import status_payload as matchbook_status
+    from hibs_racing.scrapers.racing_scrape_api import odds_coverage_summary
+    from hibs_racing.scrapers.scrape_resilience import circuit_status
+    from hibs_racing.scrape_first import scrape_first_status
+
+    cov = odds_coverage_summary(frame)
+    scrape = scrape_first_status()
+    mb = matchbook_status()
+    oc = circuit_status().get("oddschecker") or {}
+
+    messages: list[str] = []
+    level = "ok"
+    if frame.empty:
+        level = "error"
+        messages.append("No runners loaded for this window — click Refresh 24h.")
+    elif not cov.get("ok"):
+        level = "warn"
+        messages.append(
+            f"Odds on {cov.get('priced', 0)}/{cov.get('total', 0)} runners "
+            f"({cov.get('coverage_pct', 0)}%) — target ≥{cov.get('min_pct', 40)}%."
+        )
+        if not mb.get("configured"):
+            messages.append("Matchbook not configured — add MATCHBOOK_USERNAME and MATCHBOOK_PASSWORD to .env.")
+        elif not mb.get("traffic_allowed"):
+            messages.append("Matchbook poll gated (rate limit, Mac quotes fresh, or poll interval).")
+        if oc.get("state") == "open":
+            err = str(oc.get("last_error") or "blocked")[:100]
+            messages.append(f"Oddschecker scrape paused ({err}).")
+
+    return {
+        "level": level,
+        "messages": messages,
+        "odds_coverage": cov,
+        "scrape_first": scrape,
+        "matchbook": mb,
+        "oddschecker_circuit": oc,
+        "odds_source": os.getenv("HIBS_ODDS_SOURCE", "auto"),
+        "cards_source": os.getenv("HIBS_RACING_CARD_SOURCE", "auto"),
+    }
 
 
 def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
@@ -581,6 +631,7 @@ def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
         "scoring_method": scoring_method,
         "feature_impact": feature_impact,
         "window_hours": window_hours,
+        "ui_data_status": _ui_data_status(frame),
     }
 
 
@@ -694,4 +745,5 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
         "gate_summary": gate_summary,
         "market_gauges": latest_gauges(limit=100),
         "parquet_path": str(Path(load_config()["paths"]["parquet_dir"]) / "card_scores.parquet"),
+        "ui_data_status": _ui_data_status(frame),
     }
