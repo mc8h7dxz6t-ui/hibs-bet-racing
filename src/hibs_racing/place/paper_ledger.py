@@ -873,9 +873,11 @@ def record_paper_bet(
     created_at: str | None = None,
     database: Path | None = None,
     audit_extra: dict | None = None,
+    paper_lane: str = "production",
 ) -> str:
     import uuid
 
+    lane = str(paper_lane or "production").strip() or "production"
     db = database or db_path(load_config())
     init_db(db)
     with connect(db) as conn:
@@ -883,9 +885,10 @@ def record_paper_bet(
             """
             SELECT bet_id, is_value_pick FROM paper_bets
             WHERE runner_id = ? AND race_id = ? AND backtest = ?
+              AND COALESCE(paper_lane, 'production') = ?
             LIMIT 1
             """,
-            (runner_id, race_id, 1 if backtest else 0),
+            (runner_id, race_id, 1 if backtest else 0, lane),
         ).fetchone()
         if existing:
             bet_id = str(existing[0])
@@ -928,8 +931,8 @@ def record_paper_bet(
                 bet_id, race_id, runner_id, bet_type, stake_units,
                 model_ev, offered_win, offered_place, place_terms, is_value_pick,
                 verification_hash, backtest, created_at,
-                card_date, course, off_time, horse_name, race_natural_key
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                card_date, course, off_time, horse_name, race_natural_key, paper_lane
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 bet_id,
@@ -950,6 +953,7 @@ def record_paper_bet(
                 ctx.get("off_time"),
                 ctx.get("horse_name"),
                 ctx.get("race_natural_key"),
+                lane,
             ),
         )
         conn.commit()
@@ -964,6 +968,7 @@ def record_paper_bet(
                 "offered_win": offered_win,
                 "model_ev": model_ev,
                 "is_value_pick": True,
+                "paper_lane": lane,
             }
             if audit_extra:
                 payload["audit"] = audit_extra

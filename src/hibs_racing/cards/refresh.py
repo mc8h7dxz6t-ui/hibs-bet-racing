@@ -195,6 +195,10 @@ def refresh_cards(
         )
     )
 
+    from hibs_racing.cards.lane_paper import attach_lane_flags, sync_lane_paper_ledger
+
+    scored = attach_lane_flags(scored)
+
     from hibs_racing.institutional.ledger_events import append_ledger_event
     from hibs_racing.institutional.run_manifest import build_run_manifest, persist_run_manifest
     from hibs_racing.institutional.shadow_execution import log_shadow_intents
@@ -256,6 +260,15 @@ def refresh_cards(
                     "ledger": recon.ledger_value_picks,
                     "clean": recon.is_clean,
                 }
+            )
+            sync_lane_paper_ledger(
+                day_scored,
+                card_date=str(card_date),
+                lane="gate3",
+                flag_col="flag_gate3",
+                manifest_id=manifest_id,
+                odds_source=str(odds_meta.get("source")),
+                engine_profile=engine_profile,
             )
         if milestone in ("baseline", "pre_race_30m"):
             from hibs_racing.odds.exchange_quotes import sync_value_picks_from_scored

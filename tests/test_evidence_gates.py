@@ -1,4 +1,4 @@
-"""Racing evidence gates (R1–R7)."""
+"""Racing evidence gates (R1–R8)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ def test_racing_evidence_gates_all_pass():
         "telemetry_balance": {"coverage_pct": 55.0},
         "paper_recon_clean": True,
         "paper": {"n_rows": 40, "settled": 30},
+        "place_reliability": {"brier": 0.22, "n": 30},
     }
     rep = racing_evidence_gates_from_health(health)
     assert rep["buyer_ready"] is True
@@ -29,6 +30,7 @@ def test_racing_evidence_gates_paper_sample_fail():
         "telemetry_balance": {"coverage_pct": 55.0},
         "paper_recon_clean": True,
         "paper": {"n_rows": 5},
+        "place_reliability": {"brier": 0.22, "n": 30},
     }
     rep = racing_evidence_gates_from_health(health)
     assert rep["buyer_ready"] is False

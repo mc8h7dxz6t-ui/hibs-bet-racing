@@ -72,6 +72,56 @@
     </div>
 </section>
 
+{% set truth = evidence_truth %}
+{% if truth %}
+<section class="card">
+    <div class="card-head"><h2>Evidence truth plane</h2></div>
+    <div class="card-body" style="padding:16px;">
+        <p class="fi-hint">
+            One reconciled view — compare ROI only within the same settlement row.
+            Primary live proof: <strong>{{ truth.primary_settlement_mode }}</strong>
+            {% if truth.headline_forward_roi_pct is not none %}
+            · forward ROI <strong>{{ truth.headline_forward_roi_pct }}%</strong>
+            {% endif %}
+        </p>
+        {% if truth.calibration %}
+        <p class="fi-hint" style="margin-top:8px;">
+            Place Brier: <strong>{{ truth.calibration.place_brier if truth.calibration.place_brier is not none else '—' }}</strong>
+            (n={{ truth.calibration.place_n or 0 }})
+            · Win Brier: <strong>{{ truth.calibration.win_brier if truth.calibration.win_brier is not none else '—' }}</strong>
+        </p>
+        {% endif %}
+        <div class="attr-scroll">
+            <table class="trk-table">
+                <thead>
+                    <tr>
+                        <th>Plane</th>
+                        <th>Settlement</th>
+                        <th>Window</th>
+                        <th>ROI %</th>
+                        <th>Settled</th>
+                        <th>Use</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in truth.planes or [] %}
+                    <tr>
+                        <td>{{ row.label }}</td>
+                        <td>{{ row.settlement }}</td>
+                        <td>{{ row.window }}</td>
+                        <td>{% if row.roi_pct is not none %}{{ '%.1f'|format(row.roi_pct) }}{% else %}—{% endif %}</td>
+                        <td>{{ row.settled or row.hit_rate or '—' }}</td>
+                        <td style="font-size:0.78em;color:var(--muted);">{{ row.use_for }}{% if row.caveat %} — {{ row.caveat }}{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="fi-hint" style="margin-top:10px;">{{ truth.reconciliation_note }}</p>
+    </div>
+</section>
+{% endif %}
+
 <section class="card">
     <div class="card-head"><h2>Automation Status</h2></div>
     <div class="card-body" style="padding:16px;">

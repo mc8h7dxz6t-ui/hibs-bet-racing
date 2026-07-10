@@ -1,4 +1,4 @@
-"""Racing institutional evidence gates (R1–R7) — local health, no football overlay."""
+"""Racing institutional evidence gates (R1–R8) — local health, no football overlay."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ from typing import Any
 COVERAGE_PASS_OBS_PCT = 35.0
 COVERAGE_PASS_PROD_PCT = 50.0
 MIN_PAPER_ROWS = 25
+PLACE_BRIER_PASS_MAX = 0.25
+MIN_PLACE_CALIBRATION_N = 20
 
 
 def _gate(
@@ -54,7 +56,7 @@ def _paper_n(health: dict[str, Any]) -> int | None:
 
 
 def racing_evidence_gates_from_health(health: dict[str, Any]) -> dict[str, Any]:
-    """Build R1–R7 gates from health_status().to_dict() output."""
+    """Build R1–R8 gates from health_status().to_dict() output."""
     is_prod = os.environ.get("HIBS_PRODUCTION", "").strip().lower() in ("1", "true", "yes", "on")
     cov_threshold = COVERAGE_PASS_PROD_PCT if is_prod else COVERAGE_PASS_OBS_PCT
 
@@ -72,6 +74,16 @@ def racing_evidence_gates_from_health(health: dict[str, Any]) -> dict[str, Any]:
 
     paper_n = _paper_n(health)
     paper_pass = paper_n is not None and paper_n >= MIN_PAPER_ROWS
+
+    place_rel = health.get("place_reliability") or {}
+    place_brier = place_rel.get("brier")
+    place_n = int(place_rel.get("n") or 0)
+    brier_pass = (
+        place_n >= MIN_PLACE_CALIBRATION_N
+        and place_brier is not None
+        and float(place_brier) <= PLACE_BRIER_PASS_MAX
+    )
+    brier_insufficient = place_n < MIN_PLACE_CALIBRATION_N
 
     dp = health.get("data_producer") or {}
     dp_ok = dp.get("ok") is not False
@@ -145,6 +157,23 @@ def racing_evidence_gates_from_health(health: dict[str, Any]) -> dict[str, Any]:
             n=paper_n,
             window="ledger",
         ),
+        _gate(
+            "R8_place_brier",
+            label="Place probability calibration (Brier)",
+            passed=brier_pass if not brier_insufficient else False,
+            actual=place_brier,
+            threshold=f"<={PLACE_BRIER_PASS_MAX} (n>={MIN_PLACE_CALIBRATION_N})",
+            message=(
+                f"Accumulate {MIN_PLACE_CALIBRATION_N}+ settled place bins — "
+                f"current n={place_n}"
+                if brier_insufficient
+                else "Tighten isotonic calibration or gate selectivity"
+            ),
+            critical=False,
+            n=place_n,
+            window="calibration_60d",
+            insufficient_sample=brier_insufficient,
+        ),
     ]
 
     critical = [g for g in gates if g.get("critical")]
@@ -212,6 +241,12 @@ def _next_actions(gates: list[dict[str, Any]]) -> list[str]:
         actions.append("bash scripts/daily_refresh.sh --require-recon-clean")
     if not by_id.get("R7_paper_sample", {}).get("pass"):
         actions.append("Accumulate paper ledger via daily batch picks")
+    r8 = by_id.get("R8_place_brier", {})
+    if r8 and not r8.get("pass"):
+        if r8.get("insufficient_sample"):
+            actions.append("Settle more forward paper picks for place Brier gate (R8)")
+        else:
+            actions.append("Run win-prob-calibration-fit; review place overconfidence")
     if not actions:
         actions.append("bash scripts/export_racing_data_room.sh")
     return actions
