@@ -43,6 +43,10 @@ racing_vps_patch_football_auth_dashboard "${BET}"
 chown www-data:www-data "${BET}/.env" 2>/dev/null || true
 
 echo ""
+echo "==> diagnose (import OK but public 502?)"
+football_vps_diagnose_502 "${BET}"
+
+echo ""
 echo "==> hard kill gunicorn + free :8000"
 racing_vps_kill_football_gunicorn 8000
 
@@ -97,6 +101,11 @@ ping_code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 http://127.0.
 echo "    ping=${ping_code} login=${login_code}"
 
 if [[ "${ping_code}" == "200" && "${login_code}" =~ ^(200|302)$ ]]; then
+  echo ""
+  echo "==> nginx upstream (localhost OK, public 502 → wrong port)"
+  football_vps_fix_nginx_upstream || true
+  pub_code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 https://hibs-bet.co.uk/login 2>/dev/null || echo 000)"
+  echo "    public /login: ${pub_code}"
   echo ""
   echo "GREEN: hibs-bet service recovered (ping + login OK)."
   exit 0

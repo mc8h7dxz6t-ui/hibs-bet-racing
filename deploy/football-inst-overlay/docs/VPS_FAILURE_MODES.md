@@ -24,9 +24,10 @@
 |-------|--------|
 | **Symptom** | `curl -sI https://www.hibs-bet.co.uk/login` → `HTTP/1.1 502 Bad Gateway`; localhost `:8000/api/ping` fails |
 | **Not the same as** | Login 500 (app error) — 502 means nginx cannot reach gunicorn |
-| **Root causes seen** | (1) gunicorn not listening / crash loop; (2) `HIBS_AUTH_ENABLED=1` without `HIBS_SECRET_KEY` → `init_auth()` raises at import; (3) stuck workers / accept backlog on :8000; (4) OOM during repair (~122Mi free RAM observed); (5) bad deploy overlay without restart |
+| **Root causes seen** | (1) gunicorn not listening / crash loop; (2) `HIBS_AUTH_ENABLED=1` without `HIBS_SECRET_KEY` → `init_auth()` raises at import; (3) stuck workers / accept backlog on :8000; (4) OOM during repair (~122Mi free RAM observed); (5) bad deploy overlay without restart; **(6) import OK but 502 = gunicorn never started or nginx upstream still :5001** |
 | **Cascade** | FVE `hibs-bet ping failed`, fixture export count=0, line-shopper RED |
 | **Manual fix** | `sudo bash /opt/hibs-bet/scripts/vps_football_hard_recovery.sh` |
+| **Split diagnose** | `sudo bash /opt/hibs-bet/scripts/vps_football_diagnose_502.sh` — import OK + public 502 |
 | **Code fix** | PR #62 `safe_next_url` → `index`; PR #63 hard recovery + auto `HIBS_SECRET_KEY` |
 | **Automation gap** | `vps_three_stack_green.sh` only did soft restart + fixture repair; no hard kill until PR #63 |
 | **Verify green** | `curl -s http://127.0.0.1:8000/api/ping` → 200; `/login` → 200 or 302 |
@@ -147,6 +148,7 @@ Use this after a green `vps_industry_standard_run.sh --repair`:
 | Practice | Current | Target |
 |----------|---------|--------|
 | Hard recovery scripts in git | Was VPS-only for racing | Both stacks in repo (PR #63) |
+| **Automation fallback cascade** | Manual diagnosis | **L1 soft → L2 hard → L3 nginx** every 5m (`lib_football_vps_fallback.sh`) |
 | Self-healing crontab | Fail-closed | Auto emergency when >200 lines |
 | Bring-up smoke | ping only | ping + login + portfolio summary |
 | Cascade-aware repair | FVE runs when football down | Skip FVE until football GREEN |
@@ -180,3 +182,27 @@ curl -sS https://hibs-bet.co.uk/line-trader | head -5
 |------|-------|
 | 2026-07-10 | Football 502 after login fix; racing hard recovery GREEN; crontab 214 lines blocked automation; FVE docker fail |
 | 2026-07-10 | PR #63: football hard recovery, racing scripts to git, auto crontab emergency |
+| 2026-07-10 | Infra fallback automation: 5m cron, L1→L2→L3 cascade in hands-off + watchdog |
+
+---
+
+## Automation fallback (industry standard)
+
+**Library:** `scripts/lib_football_vps_fallback.sh`  
+**5m cron:** `deploy/cron-hibs-infra-fallback.sh` → `scripts/vps_infra_fallback_cycle.sh`  
+**Log:** `/var/log/hibs-bet/infra-fallback.log`
+
+| Level | Trigger | Action | Throttle |
+|-------|---------|--------|----------|
+| L0 | Every 5m / hands-off | Probe `ping`, `login`, public `/login` | — |
+| L1 | Unit inactive or ping ≠ 200 | `systemctl restart hibs-bet` | 45m |
+| L2 | Still ping ≠ 200 or port down | `vps_football_hard_recovery.sh` | 45m |
+| L3 | Localhost OK, public 502 | nginx `5001→8000` + reload | 30m |
+| Racing L2 | `:5003` ping ≠ 200 | `vps_racing_hard_recovery.sh` | 45m |
+
+**Install on VPS:**
+```bash
+sudo bash /opt/hibs-bet/deploy/cron-hibs-infra-fallback.sh --install
+# or full ops bundle:
+sudo bash /opt/hibs-bet/deploy/cron-hibs-ops-automation.sh --install
+```

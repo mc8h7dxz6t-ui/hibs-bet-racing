@@ -57,6 +57,8 @@ write_www_data_sports_crontab() {
 0 7 * * 0 cd ${BET} && HOME=${BET} PYTHONPATH=src ${BET}/.venv/bin/python -m hibs_predictor.main calibration-fit >> ${LOG_DIR}/calibration-fit.log 2>&1
 # hibs-racing: daily refresh (observation lane)
 5 6 * * * cd ${BET} && HOME=${RACING} HIBS_RACING_DEPLOY_PATH=${RACING} HIBS_OBSERVATION_LANE=1 HIBS_ODDS_SOURCE=auto HIBS_RACING_CARD_SOURCE=auto bash ${BET}/deploy/cron-hibs-racing-daily.sh --run >> /var/log/hibs-racing/daily-refresh.log 2>&1
+# hibs-bet: infra fallback (5m probe → soft → hard → nginx)
+*/5 * * * * sudo bash ${BET}/deploy/cron-hibs-infra-fallback.sh --run >> ${LOG_DIR}/infra-fallback.log 2>&1
 EOF
 }
 
