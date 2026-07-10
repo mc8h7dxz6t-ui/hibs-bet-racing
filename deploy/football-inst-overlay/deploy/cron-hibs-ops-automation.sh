@@ -151,10 +151,18 @@ ensure_racing_probe_env() {
 
 install_all() {
   if [[ -f "${APP_ROOT}/deploy/lib_cron_dedupe.sh" ]]; then
-    echo "==> Purge duplicate managed crons (pre-install)"
     # shellcheck source=lib_cron_dedupe.sh
     source "${APP_ROOT}/deploy/lib_cron_dedupe.sh"
-    hibs_crontab_purge_managed
+    echo "==> Crontab stats (before)"
+    hibs_crontab_stats www-data || true
+    if ! hibs_crontab_install_guard www-data 2>/dev/null; then
+      echo "ERROR: www-data crontab bloated — run:" >&2
+      echo "  sudo bash ${APP_ROOT}/deploy/crontab-emergency-sports-only.sh" >&2
+      exit 1
+    fi
+    echo "==> Purge duplicate managed crons (pre-install)"
+    hibs_crontab_purge_hibs_paths www-data
+    hibs_crontab_dedupe_identical www-data
   fi
   echo "==> Base crons (football audit, calibration, nine-ten, racing)"
   install_base_crons
