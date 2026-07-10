@@ -156,9 +156,18 @@ install_all() {
     echo "==> Crontab stats (before)"
     hibs_crontab_stats www-data || true
     if ! hibs_crontab_install_guard www-data 2>/dev/null; then
-      echo "ERROR: www-data crontab bloated — run:" >&2
-      echo "  sudo bash ${APP_ROOT}/deploy/crontab-emergency-sports-only.sh" >&2
-      exit 1
+      if [[ -f "${APP_ROOT}/deploy/crontab-emergency-sports-only.sh" ]]; then
+        echo "WARN: www-data crontab bloated — running emergency sports-only" >&2
+        bash "${APP_ROOT}/deploy/crontab-emergency-sports-only.sh" || {
+          echo "ERROR: crontab emergency failed — run manually:" >&2
+          echo "  sudo bash ${APP_ROOT}/deploy/crontab-emergency-sports-only.sh" >&2
+          exit 1
+        }
+      else
+        echo "ERROR: www-data crontab bloated — run:" >&2
+        echo "  sudo bash ${APP_ROOT}/deploy/crontab-emergency-sports-only.sh" >&2
+        exit 1
+      fi
     fi
     echo "==> Purge duplicate managed crons (pre-install)"
     hibs_crontab_purge_hibs_paths www-data
