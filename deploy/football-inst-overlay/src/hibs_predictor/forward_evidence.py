@@ -457,6 +457,8 @@ def forward_evidence_gates() -> Dict[str, Any]:
     else:
         grade = "C"
 
+    from hibs_predictor.honesty_plane import attach_honesty
+
     readiness = buyer_readiness_bundle(
         gates=gates,
         critical_pass=critical_pass,
@@ -464,21 +466,23 @@ def forward_evidence_gates() -> Dict[str, Any]:
         vertical="football",
     )
 
-    return {
-        "since_deploy": since,
-        "since_deploy_iso": since,
-        "matchdays_7d": matchdays,
-        "n_snapshots_7d": n_snap_7d,
-        "trial_f9_cohort": cohort,
-        "f9b_trial_domestic_fair_shin": f9b,
-        "f9c_benchmark": f9c,
-        "gates": gates,
-        "critical_pass": critical_pass,
-        "evidence_pass": evidence_pass,
-        "evidence_grade": grade,
-        "next_actions": _next_actions(gates, matchdays=matchdays, n_clv=n_clv),
-        **readiness,
-    }
+    return attach_honesty(
+        {
+            "since_deploy": since,
+            "since_deploy_iso": since,
+            "matchdays_7d": matchdays,
+            "n_snapshots_7d": n_snap_7d,
+            "trial_f9_cohort": cohort,
+            "f9b_trial_domestic_fair_shin": f9b,
+            "f9c_benchmark": f9c,
+            "gates": gates,
+            "critical_pass": critical_pass,
+            "evidence_pass": evidence_pass,
+            "evidence_grade": grade,
+            "next_actions": _next_actions(gates, matchdays=matchdays, n_clv=n_clv),
+            **readiness,
+        }
+    )
 
 
 def _next_actions(

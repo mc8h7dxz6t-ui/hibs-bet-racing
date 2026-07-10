@@ -1,5 +1,10 @@
 # hibs-racing
 
+**What this is:** Horse racing research — cards, paper ledger, backtest, evidence gates.  
+**What this is not:** Enterprise fintech/cyber platform, SOC2-certified SaaS, or proven profitable betting product.
+
+See [docs/FORENSIC_ARCHITECTURE_TRUTH.md](docs/FORENSIC_ARCHITECTURE_TRUTH.md) before any external diligence or sale conversation.
+
 Separate offline racing engine under the hibs banner. **Does not import or modify hibs-bet football.**
 
 ## Phases

@@ -43,6 +43,18 @@ def test_ensure_audit_db_and_log_helpers(monkeypatch, tmp_path):
     assert sync.get("enabled") is False
 
 
+def test_forward_evidence_includes_honesty(monkeypatch):
+    monkeypatch.setenv("HIBS_PREDICTION_LOG_ENABLED", "1")
+    monkeypatch.setenv("HIBS_CLV_LOG_ENABLED", "1")
+    from hibs_predictor.forward_evidence import forward_evidence_gates
+
+    rep = forward_evidence_gates()
+    assert "honesty" in rep
+    assert rep["illusion_safe"] is False
+    assert "CyberGovernor" in rep["honesty"]["fabricated_external_names"]
+    assert "evidence_gates_complete" in rep
+
+
 def test_safe_forward_evidence_never_raises():
     from hibs_predictor.institutional_failsafe import safe_forward_evidence_gates
 

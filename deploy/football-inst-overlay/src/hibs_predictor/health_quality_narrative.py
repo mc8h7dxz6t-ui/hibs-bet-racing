@@ -438,8 +438,12 @@ def augment_health_for_ui(health: Dict[str, Any]) -> Dict[str, Any]:
             out["stack_ops"] = out.get("stack_ops") or {}
             out["stack_ops"]["racing"] = racing_evidence_gates()
             rr = out["stack_ops"]["racing"]
-            if rr.get("buyer_ready"):
-                bullets.append("Racing evidence: buyer_ready — see stack_ops.racing on /api/health.")
+            if rr.get("evidence_gates_complete") or rr.get("buyer_ready"):
+                grade = rr.get("evidence_grade", "?")
+                bullets.append(
+                    f"Racing: internal evidence gates complete (grade {grade}) — "
+                    "paper ledger ops only, not proven edge."
+                )
             elif rr.get("critical_pass"):
                 bullets.append(
                     f"Racing link OK (grade {rr.get('evidence_grade', '?')}); evidence gates open — "
@@ -455,8 +459,10 @@ def augment_health_for_ui(health: Dict[str, Any]) -> Dict[str, Any]:
             out["stack_ops"] = out.get("stack_ops") or {}
             out["stack_ops"]["inplay"] = inplay_evidence_gates()
             ip = out["stack_ops"]["inplay"]
-            if ip.get("buyer_ready"):
-                bullets.append("In-play evidence: buyer_ready — see stack_ops.inplay on /api/health.")
+            if ip.get("evidence_gates_complete") or ip.get("buyer_ready"):
+                bullets.append(
+                    "In-play FVE: internal gates complete on FVE host — in-play research lane only."
+                )
             elif ip.get("critical_pass"):
                 bullets.append(
                     f"In-play FVE link OK (grade {ip.get('evidence_grade', '?')}); "
@@ -488,15 +494,16 @@ def augment_health_for_ui(health: Dict[str, Any]) -> Dict[str, Any]:
                 evidence_truth = None
         out["unified_evidence"] = {
             "football": {
-                "buyer_ready": fwd.get("buyer_ready"),
+                "evidence_gates_complete": fwd.get("evidence_gates_complete", fwd.get("buyer_ready")),
                 "evidence_grade": fwd.get("evidence_grade"),
                 "matchdays_7d": fwd.get("matchdays_7d"),
             },
             "racing": {
-                "buyer_ready": racing_ops.get("buyer_ready"),
+                "evidence_gates_complete": racing_ops.get("evidence_gates_complete", racing_ops.get("buyer_ready")),
                 "evidence_grade": racing_ops.get("evidence_grade"),
             },
             "racing_evidence_truth": evidence_truth,
+            "honesty": (fwd.get("honesty") or {}),
         }
         try:
             from hibs_predictor.stack_truth import stack_truth_summary

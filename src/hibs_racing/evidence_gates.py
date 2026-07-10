@@ -211,16 +211,28 @@ def racing_evidence_gates_from_health(health: dict[str, Any]) -> dict[str, Any]:
     else:
         tier = "pilot_deployable"
 
-    return {
+    payload = {
         "gates": gates,
         "critical_pass": critical_pass,
         "evidence_pass": evidence_pass,
         "evidence_grade": grade,
         "buyer_ready": buyer_ready,
+        "evidence_gates_complete": buyer_ready,
         "buyer_readiness_score": gate_score,
         "commercial_tier": tier,
+        "internal_ops_tier": tier,
         "next_actions": _next_actions(gates),
     }
+    try:
+        from hibs_predictor.honesty_plane import attach_honesty, evidence_complete_label
+
+        payload["evidence_status_label"] = evidence_complete_label(buyer_ready)
+        return attach_honesty(payload)
+    except ImportError:
+        payload["evidence_status_label"] = (
+            "evidence_gates_complete" if buyer_ready else "evidence_gates_incomplete"
+        )
+        return payload
 
 
 def racing_evidence_gates() -> dict[str, Any]:
