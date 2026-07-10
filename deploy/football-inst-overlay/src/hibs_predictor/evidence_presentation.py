@@ -110,6 +110,8 @@ def score_gates(gates: list[dict[str, Any]]) -> int:
     weight = 0.0
     earned = 0.0
     for g in gates:
+        if g.get("informational"):
+            continue
         w = 2.0 if g.get("critical") else 1.0
         weight += w
         if g.get("pass"):
