@@ -24,9 +24,10 @@
 |-------|--------|
 | **Symptom** | `curl -sI https://www.hibs-bet.co.uk/login` → `HTTP/1.1 502 Bad Gateway`; localhost `:8000/api/ping` fails |
 | **Not the same as** | Login 500 (app error) — 502 means nginx cannot reach gunicorn |
-| **Root causes seen** | (1) gunicorn not listening / crash loop; (2) `HIBS_AUTH_ENABLED=1` without `HIBS_SECRET_KEY` → `init_auth()` raises at import; (3) stuck workers / accept backlog on :8000; (4) OOM during repair (~122Mi free RAM observed); (5) bad deploy overlay without restart |
+| **Root causes seen** | (1) gunicorn not listening / crash loop; (2) `HIBS_AUTH_ENABLED=1` without `HIBS_SECRET_KEY` → `init_auth()` raises at import; (3) stuck workers / accept backlog on :8000; (4) OOM during repair (~122Mi free RAM observed); (5) bad deploy overlay without restart; **(6) import OK but 502 = gunicorn never started or nginx upstream still :5001** |
 | **Cascade** | FVE `hibs-bet ping failed`, fixture export count=0, line-shopper RED |
 | **Manual fix** | `sudo bash /opt/hibs-bet/scripts/vps_football_hard_recovery.sh` |
+| **Split diagnose** | `sudo bash /opt/hibs-bet/scripts/vps_football_diagnose_502.sh` — import OK + public 502 |
 | **Code fix** | PR #62 `safe_next_url` → `index`; PR #63 hard recovery + auto `HIBS_SECRET_KEY` |
 | **Automation gap** | `vps_three_stack_green.sh` only did soft restart + fixture repair; no hard kill until PR #63 |
 | **Verify green** | `curl -s http://127.0.0.1:8000/api/ping` → 200; `/login` → 200 or 302 |

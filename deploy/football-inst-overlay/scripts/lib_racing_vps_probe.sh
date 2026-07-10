@@ -194,3 +194,50 @@ racing_vps_patch_football_auth_dashboard() {
     echo "patched auth.py: dashboard -> index"
   fi
 }
+
+football_vps_diagnose_502() {
+  local bet="${1:-/opt/hibs-bet}"
+  local unit port local_login nginx_login
+  unit="$(systemctl is-active hibs-bet 2>/dev/null || echo inactive)"
+  if ss -ltn 2>/dev/null | grep -q ':8000 '; then
+    port=up
+  else
+    port=down
+  fi
+  local_login="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 6 http://127.0.0.1:8000/login 2>/dev/null || echo 000)"
+  nginx_login="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 -k https://127.0.0.1/login -H 'Host: hibs-bet.co.uk' 2>/dev/null || echo 000)"
+  echo "hibs-bet unit: ${unit}"
+  echo ":8000 listen: ${port}"
+  echo "localhost /login: ${local_login}"
+  echo "nginx /login (loopback): ${nginx_login}"
+  if [[ -d /etc/nginx/sites-enabled ]]; then
+    echo "nginx football upstreams:"
+    grep -RhnE 'proxy_pass|upstream hibs_football|127\.0\.0\.1:(5001|8000)' /etc/nginx/sites-enabled/ 2>/dev/null | head -20 || true
+  fi
+  if [[ "${unit}" == "active" && "${port}" == "down" ]]; then
+    echo "DIAGNOSIS: systemd active but :8000 down — gunicorn crashed (journalctl -u hibs-bet)"
+  elif [[ "${port}" == "up" && "${local_login}" =~ ^(200|302)$ && "${nginx_login}" == "502" ]]; then
+    echo "DIAGNOSIS: app OK locally, nginx 502 — wrong upstream (often :5001 not :8000)"
+  elif [[ "${port}" == "down" && "${local_login}" == "000" ]]; then
+    echo "DIAGNOSIS: gunicorn not running — import test alone does not start the service"
+  fi
+}
+
+football_vps_fix_nginx_upstream() {
+  local fixed=0
+  local f
+  for f in /etc/nginx/sites-available/* /etc/nginx/sites-enabled/*; do
+    [[ -f "${f}" ]] || continue
+    if grep -qE '127\.0\.0\.1:5001|server 127\.0\.0\.1:5001' "${f}" 2>/dev/null; then
+      sed -i 's|127\.0\.0\.1:5001|127.0.0.1:8000|g' "${f}"
+      sed -i 's|server 127\.0\.0\.1:5001|server 127.0.0.1:8000|g' "${f}"
+      echo "patched nginx upstream 5001→8000: ${f}"
+      fixed=1
+    fi
+  done
+  if [[ "${fixed}" -eq 1 ]] && command -v nginx >/dev/null 2>&1; then
+    nginx -t && systemctl reload nginx
+    echo "nginx reloaded"
+  fi
+  return 0
+}
