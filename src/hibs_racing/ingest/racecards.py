@@ -32,7 +32,7 @@ def _sync_rpscrape_dotenv() -> dict[str, str]:
 
 def fetch_racecards(
     *,
-    day: int | None = 1,
+    day: int | None = None,
     days: int | None = None,
     region: str = "gb",
     timeout_sec: int = 120,
@@ -113,7 +113,7 @@ def fetch_racecards_on_date(
     )
 
 
-def load_racecard_frames(*, day: int | None = 1, days: int | None = None, region: str = "gb") -> pd.DataFrame:
+def load_racecard_frames(*, day: int | None = None, days: int | None = None, region: str = "gb") -> pd.DataFrame:
     """Fetch + parse racecard JSON into a single runner-level frame."""
     json_paths = fetch_racecards(day=day, days=days, region=region)
     frames = [parse_racecard_json(path) for path in json_paths]
