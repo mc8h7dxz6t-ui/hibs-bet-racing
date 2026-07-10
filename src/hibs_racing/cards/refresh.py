@@ -10,7 +10,7 @@ from hibs_racing.cards.refresh_parallel import parallel_map, timed_ms
 from hibs_racing.cards.enrich import dual_source_enrich
 from hibs_racing.cards.score_card import score_upcoming_cards
 from hibs_racing.cards.store import store_upcoming_runners
-from hibs_racing.cards.window import filter_next_hours
+from hibs_racing.cards.window import filter_next_hours, primary_card_date
 from hibs_racing.config import load_config
 from hibs_racing.ingest.rate_limit import (
     racing_api_pause,
@@ -25,7 +25,18 @@ from hibs_racing.odds.loader import resolve_scoring_odds
 
 
 def _cards_cfg() -> dict:
-    return load_config().get("cards", {})
+    cfg = dict(load_config().get("cards", {}))
+    inc = (os.getenv("HIBS_RACING_INCLUDE_TOMORROW") or "").strip().lower()
+    if inc in ("1", "true", "yes", "on"):
+        cfg["include_tomorrow"] = True
+    elif inc in ("0", "false", "no", "off"):
+        cfg["include_tomorrow"] = False
+    pdo = (os.getenv("HIBS_RACING_PRIMARY_DATE_ONLY") or "").strip().lower()
+    if pdo in ("1", "true", "yes", "on"):
+        cfg["primary_date_only"] = True
+    elif pdo in ("0", "false", "no", "off"):
+        cfg["primary_date_only"] = False
+    return cfg
 
 
 def _parallel_workers() -> int:
@@ -87,9 +98,8 @@ def _trim_card_window(frame: pd.DataFrame, *, hours: int) -> pd.DataFrame:
     cfg = _cards_cfg()
     combined = filter_next_hours(frame, hours=hours)
     if cfg.get("primary_date_only", True) and not combined.empty:
-        dates = pd.to_datetime(combined["card_date"].astype(str), errors="coerce").dropna()
-        if not dates.empty:
-            primary = dates.min().date().isoformat()
+        primary = primary_card_date(combined)
+        if primary:
             combined = combined[combined["card_date"].astype(str).str[:10] == primary].copy()
     return combined
 
