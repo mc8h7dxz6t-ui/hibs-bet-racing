@@ -76,15 +76,46 @@ def day_heading_for_local_date(d: date) -> str:
     return d.strftime("%A %d %B")
 
 
-def fixture_window_start_utc(*, days_ahead: int = 0) -> datetime:
+def fixture_window_start_utc(
+    now: datetime | None = None,
+    /,
+    *,
+    days_ahead: int | None = None,
+) -> datetime:
+    """UTC start of a local calendar day in display TZ (``now`` ignored — legacy compat)."""
+    ahead = 0 if days_ahead is None else int(days_ahead)
     tz = display_timezone()
-    target = local_today() + timedelta(days=int(days_ahead))
+    target = local_today() + timedelta(days=ahead)
     start_local = datetime.combine(target, time.min, tzinfo=tz)
     return start_local.astimezone(timezone.utc)
 
 
-def fixture_window_end_utc(*, days_ahead: int = 0) -> datetime:
+def fixture_window_end_utc(
+    now: datetime | None = None,
+    window_days: int | None = None,
+    /,
+    *,
+    days_ahead: int | None = None,
+    days: int | None = None,
+) -> datetime:
+    """
+    UTC end of a local calendar day in display TZ.
+
+    Legacy callers:
+      - ``fixture_window_end_utc(now, N)`` — inclusive N-day window from today
+      - ``fixture_window_end_utc(days=N)`` — same (``days`` = window length)
+
+    Preferred: ``days_ahead=k`` — end of ``local_today() + k`` days.
+    """
+    if days_ahead is not None:
+        ahead = int(days_ahead)
+    else:
+        span = window_days if window_days is not None else days
+        if span is None:
+            ahead = 0
+        else:
+            ahead = max(0, int(span) - 1)
     tz = display_timezone()
-    target = local_today() + timedelta(days=int(days_ahead))
+    target = local_today() + timedelta(days=ahead)
     end_local = datetime.combine(target, time.max.replace(microsecond=0), tzinfo=tz)
     return end_local.astimezone(timezone.utc)
