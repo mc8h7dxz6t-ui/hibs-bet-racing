@@ -21,7 +21,7 @@ WorkingDirectory=/opt/hibs-bet
 
 Environment=HOME=/opt/hibs-bet
 Environment=DEPLOY_PATH=/opt/hibs-bet
-Environment=PYTHONPATH=/opt/hibs-bet/src
+Environment=PYTHONPATH=/opt/hibs-bet/src:/opt/hibs-racing/src
 Environment=HIBS_CACHE_DIR=/opt/hibs-bet/.cache
 EnvironmentFile=-/opt/hibs-bet/.env
 
