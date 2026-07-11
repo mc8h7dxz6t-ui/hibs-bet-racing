@@ -10,3 +10,6 @@ data:
   INST_EXPORT_DIR: "/data/demo/ui_exports"
   INST_REDIS_URL: "redis://redis:6379/0"
   WEBHOOK_DISPATCH_MODE: "redis"
+  INST_PRODUCTION_PROFILE: "1"
+  INST_REQUIRE_POSTGRES: "1"
+  INST_POSTGRES_DSN: "postgresql://instpp:instpp@postgres:5432/instpp"

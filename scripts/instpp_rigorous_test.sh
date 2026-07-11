@@ -25,6 +25,13 @@ echo "================================================================"
 
 pass() { echo "[PASS] $*"; }
 fail() { echo "[FAIL] $*"; exit 1; }
+SKIPPED_SECTIONS=()
+skip_section() {
+  local id="$1"
+  shift
+  echo "[SKIP] $id — $*"
+  SKIPPED_SECTIONS+=("$id")
+}
 
 parse_json_objects() {
   "$PYTHON" -c "
@@ -107,6 +114,8 @@ section "Unit tests — full institutional suite"
   tests/test_spend_guard.py \
   tests/test_agent_ledger.py \
   tests/test_industry_gold.py \
+  tests/test_production_profile.py \
+  tests/test_sku_layer_hardening.py \
   -v --tb=short
 pass "Unit test suite"
 
@@ -232,8 +241,7 @@ print(json.dumps({"postgres_compliance": "ok", "entry_id": entry.get("entry_id")
 PY
   pass "Compliance Logger Postgres ingest + chain verify"
 else
-  echo "[SKIP] INST_TEST_POSTGRES_DSN unset — Postgres HA profile (CI postgres-profile job)"
-  pass "Compliance Postgres skipped (offline-safe)"
+  skip_section "postgres_compliance" "INST_TEST_POSTGRES_DSN unset"
 fi
 
 section "Compliance Logger — HTTP ingest (/v1/decisions)"
@@ -414,12 +422,10 @@ assert body.get('json', {}).get('rigorous') == 'live-forward', body
 "
     pass "Live upstream forward to httpbin.org/post"
   else
-    echo "[SKIP] live forward failed (rc=$LIVE_RC) — offline-safe"
-    pass "Live forward skipped (upstream unavailable)"
+    skip_section "proxy_live_forward" "upstream returned rc=$LIVE_RC"
   fi
 else
-  echo "[SKIP] httpbin.org unreachable — live forward skipped (offline-safe)"
-  pass "Live forward skipped (offline environment)"
+  skip_section "proxy_live_forward" "httpbin.org unreachable"
 fi
 
 section "Proxy-Risk — log-before-forward WAL evidence"
@@ -671,7 +677,16 @@ pass "Webhook Mesh Redis Stream rigorous E2E"
 
 section "Ad Guard — evaluate + check + export + verify"
 AD_BODY='{"campaignId":"rigorous-99","bidMicros":2500000,"costMicros":10000000}'
-"$PYTHON" -m ad_guard.cli evaluate --provider google --body "$AD_BODY" --database "$ADGUARD_DB" || true
+set +e
+AD_EVAL=$("$PYTHON" -m ad_guard.cli evaluate --provider google --body "$AD_BODY" --database "$ADGUARD_DB" 2>&1)
+AD_EVAL_RC=$?
+set -e
+echo "$AD_EVAL"
+echo "$AD_EVAL" | parse_json_objects | "$PYTHON" -c "
+import sys, json
+resp = json.load(sys.stdin)[0]
+assert resp.get('decision') in ('approve', 'reject'), resp
+"
 AD_CHECK=$("$PYTHON" -m ad_guard.cli check --database "$ADGUARD_DB")
 echo "$AD_CHECK"
 echo "$AD_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
@@ -776,12 +791,16 @@ for i in 1 2 3 4 5; do
   "$PYTHON" -m drift_gate.cli evaluate \
     --baseline "$DG_BASELINE" \
     --features '{"income":50100,"debt_ratio":0.36}' \
-    --mode shadow --database "$DG_DB" --request-id "dg-burn-$i" || true
+    --mode shadow --database "$DG_DB" --request-id "dg-burn-$i"
 done
+set +e
 "$PYTHON" -m drift_gate.cli evaluate \
   --baseline "$DG_BASELINE" \
   --features '{"income":200000,"debt_ratio":0.95}' \
-  --mode enforce --database "$DG_DB" --request-id dg-enforce-1 || true
+  --mode enforce --database "$DG_DB" --request-id dg-enforce-1
+DG_ENFORCE_RC=$?
+set -e
+[[ "$DG_ENFORCE_RC" -eq 1 ]] || fail "drift_gate enforce must reject severe drift (rc=$DG_ENFORCE_RC)"
 DG_CHECK=$("$PYTHON" -m drift_gate.cli check --database "$DG_DB")
 echo "$DG_CHECK"
 echo "$DG_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
@@ -826,8 +845,10 @@ HOLD_ID=$(echo "$RESERVE_JSON" | "$PYTHON" -c "import sys,json; print(json.load(
 "$PYTHON" -m spend_guard.cli settle \
   --hold-id "$HOLD_ID" --request-id sg-rigorous-1 --actual-cost 38 \
   --wallet-db "$SG_WALLET" --ledger-db "$SG_DB"
-"$PYTHON" -m spend_guard.cli demo-drift-lock \
-  --wallet-db "$SG_WALLET" --ledger-db "$SG_DB" --spend 40 --big-spend 250 --iterations 5 || true
+SG_DEMO=$("$PYTHON" -m spend_guard.cli demo-drift-lock \
+  --wallet-db "$SG_WALLET" --ledger-db "$SG_DB" --spend 40 --big-spend 250 --iterations 5)
+echo "$SG_DEMO"
+echo "$SG_DEMO" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('locked') else 1)"
 SG_CHECK=$("$PYTHON" -m spend_guard.cli check --database "$SG_DB")
 echo "$SG_CHECK"
 echo "$SG_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
@@ -906,6 +927,7 @@ section "ModelGovernor — gold demo walkthrough (7 steps)"
 MG_GOLD_DIR="$WORK/mg_gold_walkthrough"
 export MG_GOLD_DIR
 rm -rf "$MG_GOLD_DIR"
+chmod +x ./scripts/demo_mg_gold.sh
 ./scripts/demo_mg_gold.sh
 test -f "$MG_GOLD_DIR/model_governor_bundle.tar"
 MG_VERIFY=$("$PYTHON" -m model_governor.cli verify-bundle --tarball "$MG_GOLD_DIR/model_governor_bundle.tar")
@@ -927,10 +949,14 @@ AL_PERMIT_ID=$(echo "$AUTH_JSON" | "$PYTHON" -c "import sys,json; print(json.loa
   --permit-id "$AL_PERMIT_ID" \
   --result '{"status":"ok"}' \
   --database "$AL_DB" --permit-db "$AL_PERMIT"
+set +e
 "$PYTHON" -m agent_ledger.cli authorize \
   --agent-id rigorous-agent --tool transfer_funds \
   --args '{"amount":9999}' \
-  --database "$AL_DB" --permit-db "$AL_PERMIT" || true
+  --database "$AL_DB" --permit-db "$AL_PERMIT"
+AL_DENY_RC=$?
+set -e
+[[ "$AL_DENY_RC" -eq 1 ]] || fail "agent_ledger must deny transfer_funds (rc=$AL_DENY_RC)"
 AL_CHECK=$("$PYTHON" -m agent_ledger.cli check --database "$AL_DB")
 echo "$AL_CHECK"
 echo "$AL_CHECK" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('passed') else 1)"
@@ -993,6 +1019,33 @@ unset AGENT_LEDGER_API_KEY
 "$PYTHON" -m pytest tests/test_industry_gold.py -v --tb=short
 pass "Industry gold chaos suite"
 
+section "Production profile — serve /ready fail-closed"
+INST_PRODUCTION_PROFILE=1 "$PYTHON" -m pytest tests/test_production_profile_serve_ready.py -v --tb=short
+pass "Production profile serve readiness gates"
+
+section "Bundle signing — export + verify (INST_BUNDLE_SIGNING_KEY)"
+"$PYTHON" -m pytest tests/test_bundle_sign.py -v --tb=short
+export INST_BUNDLE_SIGNING_KEY=rigorous-bundle-signing-key
+BUNDLE_SIGN_DB="$WORK/bundle_sign.sqlite"
+"$PYTHON" - <<PY
+import json
+import os
+from pathlib import Path
+from inst_spine.export import build_audit_bundle, verify_audit_bundle
+from inst_spine.ledger import AppendOnlyLedger
+
+db = Path("$BUNDLE_SIGN_DB")
+ledger = AppendOnlyLedger(db, writer_id="rigorous-sign")
+ledger.append(event_type="decision", payload={"rigorous": "bundle-sign"}, manifest_id="sign-1")
+tar = Path("$WORK/bundle_sign.tar")
+result = build_audit_bundle(db, tarball_path=tar, product="rigorous-sign")
+assert result.ok, result
+verify = verify_audit_bundle(tar)
+assert verify.ok, verify.message
+print(json.dumps({"bundle_sign_rigorous": "ok", "tarball": str(tar)}))
+PY
+pass "Bundle signing rigorous export + verify"
+
 section "Production Redis — live profile + soak"
 INST_REDIS_SOAK_ITERATIONS=20 "$PYTHON" -m pytest tests/test_redis_soak_memory.py -v --tb=short
 pass "Memory Redis soak (rigorous-safe)"
@@ -1000,15 +1053,49 @@ if [[ -n "${INST_REDIS_URL:-}" ]]; then
   "$PYTHON" -m pytest tests/test_redis_live.py tests/test_redis_soak.py -v --tb=short
   pass "Live Redis profile + soak (INST_REDIS_URL)"
 else
-  echo "[SKIP] Live Redis — set INST_REDIS_URL for production profile soak"
+  skip_section "redis_live" "INST_REDIS_URL unset"
 fi
 
 section "Postgres profile — Compliance + Spend (#1, #11)"
 if [[ -n "${INST_TEST_POSTGRES_DSN:-}" ]]; then
   "$PYTHON" -m pytest tests/test_postgres_profile.py -v --tb=short
+  SG_PG_LEDGER="$WORK/spend_pg_ledger.sqlite"
+  export SPEND_GUARD_WALLET_DB="$INST_TEST_POSTGRES_DSN"
+  export SPEND_GUARD_LEDGER_DB="$SG_PG_LEDGER"
+  export SPEND_GUARD_POSTGRES_DSN="$INST_TEST_POSTGRES_DSN"
+  export SPEND_GUARD_MOCK_UPSTREAM=1
+  export SPEND_GUARD_API_KEY=rigorous-pg-spend-key
+  "$PYTHON" - <<'PY'
+import json
+import os
+from pathlib import Path
+from fastapi.testclient import TestClient
+import spend_guard.serve as serve_mod
+
+serve_mod.state.wallet_db = os.environ["SPEND_GUARD_WALLET_DB"]
+serve_mod.state.ledger_db = os.environ["SPEND_GUARD_LEDGER_DB"]
+serve_mod.state.mock_upstream = True
+serve_mod.state.gateway = None
+serve_mod.state.ledger = None
+
+client = TestClient(serve_mod.app)
+headers = {
+    "X-Request-Id": "pg-rigorous-http-1",
+    "Authorization": "Bearer rigorous-pg-spend-key",
+}
+r = client.post(
+    "/v1/chat/completions",
+    json={"model": "demo-model", "messages": [{"role": "user", "content": "pg rigorous"}]},
+    headers=headers,
+)
+assert r.status_code == 200, r.text
+if serve_mod.state.ledger:
+    serve_mod.state.ledger.stop_async_writer(flush=True)
+print(json.dumps({"postgres_spend_http": "ok", "ledger": str(Path(os.environ["SPEND_GUARD_LEDGER_DB"]))}))
+PY
   pass "Postgres profile (INST_TEST_POSTGRES_DSN)"
 else
-  echo "[SKIP] INST_TEST_POSTGRES_DSN unset — see docs/PRODUCTION_DEPLOYMENT.md"
+  skip_section "postgres_profile" "INST_TEST_POSTGRES_DSN unset"
 fi
 
 section "SOC2 evidence collector"
@@ -1021,17 +1108,46 @@ if [[ -f "$WORK/../data/demo/portfolio/PORTFOLIO_MANIFEST.json" ]] || [[ -f "./d
     "$PYTHON" ./scripts/soc2_evidence_collector.py --manifest "$MANIFEST" --out "$LOG_DIR/soc2_evidence_latest.json"
     pass "SOC2 evidence collector"
   else
-    echo "[SKIP] PORTFOLIO_MANIFEST.json not found — run make verify-portfolio first"
+    skip_section "soc2_evidence" "PORTFOLIO_MANIFEST.json not found"
   fi
 else
-  echo "[SKIP] PORTFOLIO_MANIFEST.json not found — run make verify-portfolio first"
+  skip_section "soc2_evidence" "PORTFOLIO_MANIFEST.json not found"
 fi
 
 section "Summary"
+FAIL_ON_SKIP=0
+if [[ "${INST_RIGOROUS_FAIL_ON_SKIP:-}" == "1" ]]; then
+  FAIL_ON_SKIP=1
+fi
+if [[ "${GITHUB_REF:-}" == "refs/heads/main" ]] || [[ "${GITHUB_REF:-}" == "refs/heads/master" ]]; then
+  FAIL_ON_SKIP=1
+fi
+if [[ "$FAIL_ON_SKIP" == "1" ]]; then
+  if [[ -n "${INST_TEST_POSTGRES_DSN:-}" ]]; then
+    for crit in postgres_compliance postgres_profile; do
+      if printf '%s\n' "${SKIPPED_SECTIONS[@]:-}" | grep -qx "$crit"; then
+        fail "critical section $crit skipped while INST_TEST_POSTGRES_DSN is set"
+      fi
+    done
+  fi
+  if [[ -n "${INST_REDIS_URL:-}" ]]; then
+    if printf '%s\n' "${SKIPPED_SECTIONS[@]:-}" | grep -qx "redis_live"; then
+      fail "critical section redis_live skipped while INST_REDIS_URL is set"
+    fi
+  fi
+fi
+SKIPPED_JSON=$(
+  if ((${#SKIPPED_SECTIONS[@]})); then
+    printf '%s\n' "${SKIPPED_SECTIONS[@]}" | "$PYTHON" -c "import sys,json; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))"
+  else
+    echo "[]"
+  fi
+)
 ENDED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 SUMMARY_JSON=$("$PYTHON" -c "
 import json
 import os
+skipped = json.loads('''$SKIPPED_JSON''')
 print(json.dumps({
     'suite': 'institutional_rigorous',
     'products': [
@@ -1040,10 +1156,14 @@ print(json.dumps({
         'drift_gate', 'webhook_replay', 'spend_guard', 'agent_ledger',
     ],
     'status': 'PASSED',
-    'e2e_sections': 42,
+    'skipped_sections': skipped,
+    'skip_honesty': True,
+    'e2e_sections': 45,
     'industry_gold': True,
     'demo_gold': True,
     'forensic_hardening': True,
+    'production_profile': True,
+    'bundle_signing': True,
     'forensic_waves': {
         'wave_1': {
             'agent_ledger_http_auth': True,

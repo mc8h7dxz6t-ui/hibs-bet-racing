@@ -37,4 +37,10 @@ def pytest_configure(config: pytest.Config) -> None:
 @pytest.fixture(autouse=True)
 def _institutional_test_hygiene():
     yield
+    try:
+        from inst_spine.ledger_registry import clear_ledger_registry
+
+        clear_ledger_registry()
+    except Exception:
+        pass
     gc.collect()

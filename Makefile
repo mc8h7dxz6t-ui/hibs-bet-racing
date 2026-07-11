@@ -2,7 +2,7 @@
 # Sports (hibs-racing) targets are unchanged; inst++ targets are prefixed or grouped below.
 
 .PHONY: help install plug buyer-pack demo-ready demo demo-all demo-phase2 demo-gold demo-mg-gold \
-        demo-gold-up demo-gold-down demo-gold-reset smoke rigorous chaos proof \
+        demo-gold-up demo-gold-down demo-gold-reset smoke rigorous chaos proof proof-lite \
         verify-portfolio redis-soak retention-drill soc2-evidence test instpp-test workflow-up workflow-down stack-up redis-up
 
 PYTHON ?= python3
@@ -33,6 +33,7 @@ help:
 	@echo "  make smoke             unit + integration smoke (191+ tests)"
 	@echo "  make rigorous          12/12 rigorous E2E → docs/test_logs/"
 	@echo "  make proof             smoke + rigorous + verify-portfolio"
+	@echo "  make proof-lite        PR diligence: profile gates + demo-all + verify"
 	@echo "  make chaos             chaos + integration drills"
 	@echo "  make test              full pytest suite"
 	@echo ""
@@ -109,6 +110,10 @@ rigorous:
 	./scripts/instpp_rigorous_test.sh
 
 proof: smoke rigorous verify-portfolio
+
+proof-lite:
+	chmod +x ./scripts/instpp_proof_lite.sh
+	./scripts/instpp_proof_lite.sh
 
 redis-soak:
 	./scripts/instpp_redis_soak.sh

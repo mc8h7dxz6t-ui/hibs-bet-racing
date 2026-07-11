@@ -29,6 +29,8 @@ on:
       - "tests/test_drift*.py"
       - "tests/test_spend*.py"
       - "tests/test_agent*.py"
+      - "tests/test_production_profile*.py"
+      - "tests/test_sku_layer_hardening.py"
       - "tests/test_redis_live.py"
       - "tests/test_redis_soak.py"
       - "tests/test_postgres_profile.py"
@@ -37,6 +39,7 @@ on:
       - "scripts/instpp_*.sh"
       - "scripts/demo_*.sh"
       - "scripts/verify_portfolio.*"
+      - "docker-compose.instpp.yml"
       - "Makefile"
       - "pyproject.toml"
       - ".github/workflows/instpp-ci.yml"
@@ -60,8 +63,11 @@ on:
       - "tests/**"
       - "scripts/instpp_*.sh"
       - "scripts/verify_portfolio.*"
+      - "docker-compose.instpp.yml"
       - "Makefile"
       - "pyproject.toml"
+  schedule:
+    - cron: "0 6 * * 1"
   workflow_dispatch:
 
 jobs:
@@ -84,11 +90,36 @@ jobs:
       - name: Institutional smoke (12 SKUs)
         run: ./scripts/instpp_smoke_test.sh
 
+  proof-lite:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 25
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Institutional++
+        run: pip install -e ".[dev,instpp]"
+
+      - name: Proof-lite (production profile + portfolio verify)
+        run: chmod +x ./scripts/instpp_proof_lite.sh && ./scripts/instpp_proof_lite.sh
+
+      - name: Upload portfolio manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: instpp-proof-lite-manifest
+          path: data/demo/portfolio/PORTFOLIO_MANIFEST.json
+          if-no-files-found: warn
+
   rigorous:
     runs-on: ubuntu-latest
     needs: smoke
     timeout-minutes: 30
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     services:
       redis:
         image: redis:7-alpine
@@ -99,8 +130,23 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 5
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: instpp
+          POSTGRES_PASSWORD: instpp
+          POSTGRES_DB: instpp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U instpp -d instpp_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
     env:
       INST_REDIS_URL: redis://localhost:6379/0
+      INST_TEST_POSTGRES_DSN: postgresql://instpp:instpp@localhost:5432/instpp_test
+      INST_RIGOROUS_FAIL_ON_SKIP: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -121,6 +167,53 @@ jobs:
           name: instpp-rigorous-summary
           path: docs/test_logs/instpp_rigorous_latest_summary.json
           if-no-files-found: warn
+
+  proof:
+    runs-on: ubuntu-latest
+    needs: rigorous
+    timeout-minutes: 45
+    if: |
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'))
+      || github.event_name == 'schedule'
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: instpp
+          POSTGRES_PASSWORD: instpp
+          POSTGRES_DB: instpp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U instpp -d instpp_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    env:
+      INST_REDIS_URL: redis://localhost:6379/0
+      INST_TEST_POSTGRES_DSN: postgresql://instpp:instpp@localhost:5432/instpp_test
+      INST_RIGOROUS_FAIL_ON_SKIP: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Institutional++
+        run: pip install -e ".[dev,instpp]"
+
+      - name: Full proof (smoke + rigorous + verify-portfolio)
+        run: make proof
 
   buyer-pack:
     runs-on: ubuntu-latest
@@ -153,7 +246,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: smoke
     timeout-minutes: 15
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     services:
       redis:
         image: redis:7-alpine
@@ -184,7 +277,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: smoke
     timeout-minutes: 10
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     services:
       postgres:
         image: postgres:16-alpine
@@ -213,3 +306,31 @@ jobs:
 
       - name: Postgres profile (#1 ledger + #11 wallet)
         run: python -m pytest tests/test_postgres_profile.py -v --tb=short
+
+  compose-redis:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 20
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compose stack with Redis profile
+        run: |
+          docker compose -f docker-compose.instpp.yml --profile redis up -d --wait
+          docker compose -f docker-compose.instpp.yml ps
+
+      - name: Workflow UI health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8790/health; then
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose -f docker-compose.instpp.yml logs inst-workflow
+          exit 1
+
+      - name: Tear down compose stack
+        if: always()
+        run: docker compose -f docker-compose.instpp.yml --profile redis down -v

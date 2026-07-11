@@ -19,14 +19,23 @@ CC_MAP = {
 
 def collect(manifest_path: Path) -> dict:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    skus = manifest.get("products") or manifest.get("skus") or []
-    verified = sum(1 for s in skus if (s.get("verify_ok") if isinstance(s, dict) else False))
+    skus = manifest.get("results") or manifest.get("skus") or []
+    if not isinstance(skus, list):
+        products = manifest.get("products")
+        skus = products if isinstance(products, list) else []
+    verified = sum(1 for s in skus if isinstance(s, dict) and s.get("ok"))
+    if skus:
+        total = len(skus)
+    elif isinstance(manifest.get("products"), int):
+        total = int(manifest["products"])
+    else:
+        total = int(manifest.get("verified_ok") or manifest.get("total") or 12)
     return {
         "suite": "soc2_vpc_evidence_collector",
         "generated_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "manifest_path": str(manifest_path),
         "portfolio_verified_count": verified,
-        "portfolio_total": len(skus) if isinstance(skus, list) else manifest.get("total", 12),
+        "portfolio_total": total,
         "controls": CC_MAP,
         "evidence": {
             "offline_verify_bundle": True,

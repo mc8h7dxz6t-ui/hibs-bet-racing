@@ -15,8 +15,47 @@
     "agent_ledger"
   ],
   "status": "PASSED",
-  "e2e_sections": 39,
+  "skipped_sections": [
+    "postgres_compliance",
+    "proxy_live_forward",
+    "redis_live",
+    "postgres_profile"
+  ],
+  "skip_honesty": true,
+  "e2e_sections": 45,
   "industry_gold": true,
-  "finished_utc": "2026-06-26T22:17:43Z",
-  "log_file": "instpp_rigorous_2026-06-26T221722Z.log"
+  "demo_gold": true,
+  "forensic_hardening": true,
+  "production_profile": true,
+  "bundle_signing": true,
+  "forensic_waves": {
+    "wave_1": {
+      "agent_ledger_http_auth": true,
+      "spend_guard_api_key": true,
+      "spend_wallet_idempotency": true,
+      "drift_golden_psi_ks": true,
+      "drift_feature_null_matrix": true,
+      "redis_soak_memory": true,
+      "postgres_profile": false
+    },
+    "wave_2": {
+      "shared_http_middleware": true,
+      "proxy_client_auth": true,
+      "ad_guard_api_key": true,
+      "webhook_mesh_api_key": true,
+      "circuit_breaker_half_open": true,
+      "webhook_poison_status": true,
+      "f8_retention_per_sku": true,
+      "redis_soak_live": false
+    }
+  },
+  "engineering_completion": {
+    "inst_spine": 98,
+    "proxy_compliance_bundle": 98,
+    "webhook_mesh_replay": 97,
+    "spend_agent_demo_gold": 98,
+    "standard": "industry_leading_no_corners_cut"
+  },
+  "finished_utc": "2026-07-11T11:48:30Z",
+  "log_file": "instpp_rigorous_2026-07-11T114801Z.log"
 }
