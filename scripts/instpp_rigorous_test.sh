@@ -1198,6 +1198,11 @@ print(json.dumps({
 ")
 echo ""
 echo "$SUMMARY_JSON" | tee "$LOG_DIR/instpp_rigorous_latest_summary.json"
+"$PYTHON" ./scripts/instpp_ci_autonomy_log.py \
+  --suite rigorous \
+  --status PASSED \
+  --skipped-sections "$SKIPPED_JSON" \
+  --log-file "$(basename "$LOG_FILE")"
 echo ""
 echo "================================================================"
 echo "ALL RIGOROUS TESTS PASSED — 12/12 PRODUCTS (INDUSTRY GOLD)"

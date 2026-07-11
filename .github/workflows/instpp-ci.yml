@@ -115,6 +115,15 @@ jobs:
           path: data/demo/portfolio/PORTFOLIO_MANIFEST.json
           if-no-files-found: warn
 
+      - name: Upload proof-lite evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: instpp-proof-lite-evidence
+          path: |
+            docs/test_logs/instpp_proof_lite_latest_summary.json
+            docs/test_logs/instpp_ci_autonomy_phases.json
+          if-no-files-found: warn
+
   rigorous:
     runs-on: ubuntu-latest
     needs: smoke
@@ -165,7 +174,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: instpp-rigorous-summary
-          path: docs/test_logs/instpp_rigorous_latest_summary.json
+          path: |
+            docs/test_logs/instpp_rigorous_latest_summary.json
+            docs/test_logs/instpp_ci_autonomy_phases.json
           if-no-files-found: warn
 
   proof:

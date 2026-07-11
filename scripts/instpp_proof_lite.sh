@@ -24,5 +24,9 @@ SKIP_LIVE=1 ./scripts/demo_portfolio_all.sh
 echo "==> Offline verify-bundle 12/12"
 ./scripts/verify_portfolio.sh
 
+"$PYTHON" ./scripts/instpp_ci_autonomy_log.py --suite proof-lite --status PASSED
+
 echo ""
 echo "INSTITUTIONAL PROOF-LITE PASSED"
+echo "Phase log: docs/test_logs/instpp_ci_autonomy_phases.json"
+echo "Summary:   docs/test_logs/instpp_proof_lite_latest_summary.json"

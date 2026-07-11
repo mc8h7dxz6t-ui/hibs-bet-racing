@@ -1,0 +1,23 @@
+{
+  "suite": "institutional_proof_lite",
+  "status": "PASSED",
+  "finished_utc": "2026-07-11T12:09:35Z",
+  "commit": "891eab4",
+  "branch": "cursor/sku-forensic-layer-fixes-b511",
+  "steps": [
+    "pytest: test_production_profile",
+    "pytest: test_sku_layer_hardening",
+    "pytest: test_production_profile_serve_ready",
+    "demo_portfolio_all (SKIP_LIVE=1)",
+    "verify_portfolio 12/12"
+  ],
+  "portfolio_verified_ok": 12,
+  "portfolio_total": 12,
+  "manifest_path": "/workspace/data/demo/portfolio/PORTFOLIO_MANIFEST.json",
+  "phase_coverage": [
+    "1.1",
+    "1.2",
+    "2.1",
+    "2.5"
+  ]
+}
