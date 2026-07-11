@@ -255,14 +255,14 @@ Production: `deploy/hibs-bet.nginx.conf` only.
 ./scripts/link_production.sh
 # or scp embedded:
 scp deploy/football-inst-overlay/scripts/vps_football_apply_embedded_overlay.sh \
-    root@77.68.89.73:/opt/hibs-bet/scripts/
+    root@87.106.100.52:/opt/hibs-bet/scripts/
 
 # Racing
 ./scripts/deploy_racing_to_vps.sh
 
 # Post-sync on VPS:
-ssh root@77.68.89.73 'sudo bash /opt/hibs-bet/scripts/vps_post_overlay_sync.sh'
-ssh root@77.68.89.73 'sudo bash /opt/hibs-bet/scripts/vps_full_stack_recovery.sh'
+ssh root@87.106.100.52 'sudo bash /opt/hibs-bet/scripts/vps_post_overlay_sync.sh'
+ssh root@87.106.100.52 'sudo bash /opt/hibs-bet/scripts/vps_full_stack_recovery.sh'
 ```
 
 ---
