@@ -14,8 +14,18 @@ from hibs_racing.cards.query import load_scored_cards
 from hibs_racing.cards.store import load_upcoming_runners
 from hibs_racing.config import data_dir, load_config
 from hibs_racing.odds.matchbook import fetch_matchbook_odds
+from hibs_racing.redis_guardrail_client import RedisGuardrailClient
 
 LONDON = ZoneInfo("Europe/London")
+
+_guardrail_client: RedisGuardrailClient | None = None
+
+
+def _redis_guardrail() -> RedisGuardrailClient:
+    global _guardrail_client
+    if _guardrail_client is None:
+        _guardrail_client = RedisGuardrailClient()
+    return _guardrail_client
 
 
 @dataclass
@@ -409,6 +419,34 @@ def detect_steam_drift(
         current[runner_id] = price
         drift = drift_direction_index(runner_id, history=history)
         delta = drift.get("delta")
+
+        try:
+            gr = _redis_guardrail().record_odds(
+                runner_id,
+                feed="matchbook",
+                odds=price,
+                steam_threshold_pct=thresholds["steam_pct"],
+                drift_threshold_pct=thresholds["drift_pct"],
+            )
+            if gr.get("gate") == "abort" and gr.get("direction") == "drift" and old is not None:
+                triggers.append(
+                    SteamTrigger(
+                        runner_id=runner_id,
+                        race_id=str(m.get("race_id") or row.get("race_id") or ""),
+                        horse_name=str(m.get("horse_name") or row.get("horse_name") or ""),
+                        course=m.get("course"),
+                        off_time=m.get("off_time"),
+                        previous_odds=old,
+                        current_odds=price,
+                        change_pct=float(gr.get("change_pct") or 0.0),
+                        trigger="drift",
+                        detected_at=now,
+                        drift_delta=delta,
+                    )
+                )
+                continue
+        except Exception:
+            pass
 
         if old is not None and old > 1.0:
             change_pct = 100.0 * (price - old) / old

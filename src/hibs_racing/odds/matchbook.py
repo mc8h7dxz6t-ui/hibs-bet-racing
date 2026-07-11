@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -187,7 +188,14 @@ class MatchbookClient:
 
             record_rate_limit(http_status=429, reason=path)
         resp.raise_for_status()
-        return resp.json()
+        raw = resp.content
+        try:
+            from inst_spine.webhook_wal import capture_before_parse
+
+            capture_before_parse("matchbook", raw, source=path)
+        except Exception:
+            pass
+        return json.loads(raw)
 
     def fetch_horse_events(
         self,

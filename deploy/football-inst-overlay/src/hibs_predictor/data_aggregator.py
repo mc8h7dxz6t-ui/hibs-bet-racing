@@ -117,9 +117,16 @@ def _football_data_position_from_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _effective_skip_odds_api(clients: Dict[str, Any]) -> bool:
-    """Use The Odds API when the client is configured unless HIBS_SKIP_ODDS_API opts out."""
+    """Use The Odds API when configured unless sharp ingress or HIBS_SKIP_ODDS_API opts out."""
     if "odds_api" not in clients:
         return True
+    try:
+        from hibs_predictor.ingress.oddspapi_client import oddspapi_enabled
+
+        if oddspapi_enabled() and "oddspapi" in clients:
+            return True
+    except Exception:
+        pass
     return _env_flag_truthy("HIBS_SKIP_ODDS_API")
 
 
@@ -958,6 +965,17 @@ class DataAggregator:
         odds_key = _env_first_usable("ODDS_API_KEY")
         if odds_key:
             clients["odds_api"] = OddsApiClient(odds_key)
+
+        oddsp_key = _env_first_usable("ODDSPAPI_API_KEY")
+        if oddsp_key:
+            try:
+                from hibs_predictor.ingress.oddspapi_client import OddsPapiClient, oddspapi_enabled
+
+                ingress = (os.getenv("HIBS_ODDS_INGRESS") or "").strip().lower()
+                if oddspapi_enabled() or ingress in ("oddspapi", "sharp", "oddspapi_sharp"):
+                    clients["oddspapi"] = OddsPapiClient(oddsp_key)
+            except ImportError:
+                pass
 
         stats_key = _env_first_usable("STATS_API_KEY")
         if stats_key:
@@ -2077,10 +2095,51 @@ class DataAggregator:
             return cached
 
         oa_home = oa_draw = oa_away = None
+        op_home = op_draw = op_away = None
         as_home = as_draw = as_away = None
         all_bookmakers: List = []
         api_odds_raw: List[Dict[str, Any]] = []
         oa_side: Dict[str, Any] = {}
+        oddspapi_panel: List[Dict[str, Any]] = []
+
+        if "oddspapi" in self.clients:
+            try:
+                from hibs_predictor.ingress.oddspapi_client import oddspapi_enabled
+
+                if oddspapi_enabled():
+                    events = self.clients["oddspapi"].fetch_odds_for_league(league_code)
+                    home_display = fixture_team_name(fixture, "home")
+                    away_display = fixture_team_name(fixture, "away")
+                    for event in events or []:
+                        if not _odds_event_matches_fixture(
+                            event, fixture, home_display, away_display
+                        ):
+                            continue
+                        swapped = _odds_teams_swapped(
+                            home_display,
+                            away_display,
+                            str(event.get("home_team") or ""),
+                            str(event.get("away_team") or ""),
+                        )
+                        for row in event.get("_oddspapi_panel") or []:
+                            bm_odds = dict(row)
+                            if swapped and bm_odds.get("home") and bm_odds.get("away"):
+                                bm_odds["home"], bm_odds["away"] = bm_odds["away"], bm_odds["home"]
+                            oddspapi_panel.append(bm_odds)
+                            all_bookmakers.append(bm_odds)
+                        homes = [float(r["home"]) for r in oddspapi_panel if r.get("home")]
+                        draws = [float(r["draw"]) for r in oddspapi_panel if r.get("draw")]
+                        aways = [float(r["away"]) for r in oddspapi_panel if r.get("away")]
+                        if homes:
+                            op_home = max(homes)
+                        if draws:
+                            op_draw = max(draws)
+                        if aways:
+                            op_away = max(aways)
+                        if op_home and op_draw and op_away:
+                            break
+            except Exception:
+                pass
 
         if "odds_api" in self.clients and not _effective_skip_odds_api(self.clients):
             try:
@@ -2186,8 +2245,18 @@ class DataAggregator:
 
         as_ok = bool(as_home and as_draw and as_away and as_home > 1 and as_draw > 1 and as_away > 1)
         oa_ok = bool(oa_home and oa_draw and oa_away and oa_home > 1 and oa_draw > 1 and oa_away > 1)
+        op_ok = bool(op_home and op_draw and op_away and op_home > 1 and op_draw > 1 and op_away > 1)
         cross = 0.0
-        if as_ok and oa_ok:
+        if op_ok:
+            ph, pd, pa = op_home, op_draw, op_away
+            sh, sd, sa = as_home or oa_home, as_draw or oa_draw, as_away or oa_away
+            primary_src = "oddspapi"
+            if as_ok:
+                cross = max(
+                    cross,
+                    _max_implied_delta_pct(as_home, as_draw, as_away, op_home, op_draw, op_away),
+                )
+        elif as_ok and oa_ok:
             cross = _max_implied_delta_pct(as_home, as_draw, as_away, oa_home, oa_draw, oa_away)
             ph, pd, pa = max(as_home, oa_home), max(as_draw, oa_draw), max(as_away, oa_away)
             sh, sd, sa = oa_home, oa_draw, oa_away
@@ -2238,6 +2307,13 @@ class DataAggregator:
             "best_odds_source": line_shop.get("best_odds_source"),
             "sharp_anchor_implied": line_shop.get("sharp_anchor_implied") or {},
         }
+        if oddspapi_panel:
+            try:
+                from hibs_predictor.ingress.price_truth_ingress import panel_to_price_truth_seed
+
+                bundle.update(panel_to_price_truth_seed(oddspapi_panel))
+            except Exception:
+                pass
         try:
             from hibs_predictor.scrapers.odds_thin_rescue import apply_odds_thin_rescue
 
