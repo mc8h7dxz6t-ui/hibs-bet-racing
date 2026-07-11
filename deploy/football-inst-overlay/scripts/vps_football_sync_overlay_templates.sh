@@ -79,8 +79,15 @@ for tpl in "${TEMPLATES[@]}"; do
   if [[ -n "${OVERLAY}" && -f "${OVERLAY}/templates/${tpl}" ]]; then
     install -m 0644 "${OVERLAY}/templates/${tpl}" "${dest}"
     log "installed ${tpl} (local)"
+  elif [[ -f "${BET}/scripts/vps_football_apply_embedded_overlay.sh" ]]; then
+    log "GitHub raw unavailable — run vps_football_apply_embedded_overlay.sh instead"
+    bash "${BET}/scripts/vps_football_apply_embedded_overlay.sh"
+    exit $?
   else
-    curl -fsSL "${GITHUB_BASE}/templates/${tpl}" -o "${dest}.tmp"
+    if ! curl -fsSL "${GITHUB_BASE}/templates/${tpl}" -o "${dest}.tmp"; then
+      echo "ERROR: curl 404 — repo is private. Copy scripts/vps_football_apply_embedded_overlay.sh to VPS." >&2
+      exit 1
+    fi
     mv "${dest}.tmp" "${dest}"
     chmod 0644 "${dest}"
     log "installed ${tpl} (github)"
