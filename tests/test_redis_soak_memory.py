@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from inst_spine.idempotency import IdempotencyOutcome
 from inst_spine.rates import MemoryIdempotencyBackend, MemoryTokenBucketBackend
 
 
@@ -15,8 +16,8 @@ async def test_memory_idempotency_soak():
         first = await backend.consume_idempotency_token(key, ttl_seconds=120)
         second = await backend.consume_idempotency_token(key, ttl_seconds=120)
         if i < 40:
-            assert first is True
-        assert second is False
+            assert first is IdempotencyOutcome.UNIQUE
+        assert second is IdempotencyOutcome.DUPLICATE
 
 
 def test_memory_token_bucket_soak():

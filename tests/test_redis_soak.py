@@ -18,6 +18,7 @@ SOAK_ITERATIONS = int(os.environ.get("INST_REDIS_SOAK_ITERATIONS", "200"))
 async def test_redis_idempotency_soak():
     import redis.asyncio as aioredis
 
+    from inst_spine.idempotency import IdempotencyOutcome
     from inst_spine.rates import RedisIdempotencyBackend
 
     client = aioredis.from_url(os.environ["INST_REDIS_URL"], decode_responses=True)
@@ -28,8 +29,8 @@ async def test_redis_idempotency_soak():
             first = await backend.consume_idempotency_token(key, ttl_seconds=120)
             second = await backend.consume_idempotency_token(key, ttl_seconds=120)
             if i < 50:
-                assert first is True
-            assert second is False
+                assert first is IdempotencyOutcome.UNIQUE
+            assert second is IdempotencyOutcome.DUPLICATE
     finally:
         await client.aclose()
 

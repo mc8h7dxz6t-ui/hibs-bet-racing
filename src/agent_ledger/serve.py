@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from pathlib import Path
@@ -14,7 +15,18 @@ from agent_ledger.gate import AgentActionRequest, gate_from_paths
 from agent_ledger.permits import PermitStore
 from inst_spine.health_probes import ledger_chain_ready, readiness_payload, sqlite_db_ready
 from inst_spine.http_lifecycle import json_response, make_lifespan
+from inst_spine.ingress_guard import install_body_size_limit_middleware
 from inst_spine.middleware import install_api_key_middleware
+
+_permit_sweep_task: asyncio.Task[None] | None = None
+
+
+def _permit_sweep_interval_seconds() -> int:
+    raw = os.getenv("AGENT_LEDGER_PERMIT_SWEEP_SECONDS", "300").strip()
+    try:
+        return max(30, int(raw))
+    except ValueError:
+        return 300
 
 
 def _ledger_db() -> Path:
@@ -27,11 +39,44 @@ def _permit_db() -> Path:
 
 
 def _startup() -> None:
+    global _permit_sweep_task
     swept = PermitStore(_permit_db()).sweep_expired()
     if swept:
         import logging
 
         logging.getLogger("agent_ledger.serve").info("swept %s expired permits on startup", swept)
+
+
+async def _async_startup() -> None:
+    _startup()
+    global _permit_sweep_task
+    interval = _permit_sweep_interval_seconds()
+
+    async def _loop() -> None:
+        import logging
+
+        log = logging.getLogger("agent_ledger.serve")
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                swept = PermitStore(_permit_db()).sweep_expired()
+                if swept:
+                    log.info("periodic permit sweep released %s expired permits", swept)
+            except Exception as exc:
+                log.error("PERMIT_SWEEP_FAILED: %s", exc)
+
+    _permit_sweep_task = asyncio.create_task(_loop(), name="agent-ledger-permit-sweep")
+
+
+async def _async_shutdown() -> None:
+    global _permit_sweep_task
+    if _permit_sweep_task is not None:
+        _permit_sweep_task.cancel()
+        try:
+            await _permit_sweep_task
+        except asyncio.CancelledError:
+            pass
+        _permit_sweep_task = None
 
 
 def _shutdown() -> None:
@@ -40,9 +85,10 @@ def _shutdown() -> None:
 
 app = FastAPI(
     title="Agent Ledger — runtime tool authorization",
-    lifespan=make_lifespan(_startup, _shutdown),
+    lifespan=make_lifespan(_async_startup, _async_shutdown),
 )
 install_api_key_middleware(app, env_var="AGENT_LEDGER_API_KEY")
+install_body_size_limit_middleware(app)
 
 
 @app.get("/health")

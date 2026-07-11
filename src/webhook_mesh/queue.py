@@ -13,6 +13,19 @@ from typing import Any, Awaitable, Callable
 
 logger = logging.getLogger("webhook_mesh.queue")
 
+
+class DeliveryQueueFull(RuntimeError):
+    """Raised when in-process delivery queue exceeds bounded in-flight capacity."""
+
+
+def _max_background_inflight() -> int:
+    raw = os.getenv("WEBHOOK_BG_MAX_INFLIGHT", "100").strip()
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 100
+
+
 DeliveryHandler = Callable[..., Awaitable[bool]]
 STREAM_KEY = "inst:webhook:delivery"
 CONSUMER_GROUP = "webhook-workers"
@@ -67,14 +80,17 @@ class DeliveryQueueBackend(ABC):
 class BackgroundDeliveryQueue(DeliveryQueueBackend):
     """Dev/low-volume — tasks lost on crash (documented)."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, max_inflight: int | None = None) -> None:
+        self._max_inflight = max_inflight if max_inflight is not None else _max_background_inflight()
+        self._inflight = 0
+        self._inflight_lock = asyncio.Lock()
         self._tasks: set[asyncio.Task[Any]] = set()
 
-    async def enqueue(self, manifest: DeliveryManifest) -> None:
+    async def _run_delivery(self, manifest: DeliveryManifest) -> None:
         from webhook_mesh.fsm import dispatch_webhook_delivery
 
-        task = asyncio.create_task(
-            dispatch_webhook_delivery(
+        try:
+            await dispatch_webhook_delivery(
                 manifest_id=manifest.manifest_id,
                 payload=manifest.payload,
                 target_url=manifest.target_url,
@@ -83,11 +99,35 @@ class BackgroundDeliveryQueue(DeliveryQueueBackend):
                 payload_id=manifest.payload_id,
                 client_id=manifest.client_id,
                 dispatch_mode="background",
-            ),
+            )
+        finally:
+            async with self._inflight_lock:
+                self._inflight = max(0, self._inflight - 1)
+
+    async def enqueue(self, manifest: DeliveryManifest) -> None:
+        async with self._inflight_lock:
+            if self._inflight >= self._max_inflight:
+                raise DeliveryQueueFull(
+                    f"background delivery queue saturated (max_inflight={self._max_inflight})"
+                )
+            self._inflight += 1
+
+        task = asyncio.create_task(
+            self._run_delivery(manifest),
             name=f"delivery-{manifest.manifest_id}",
         )
         self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
+
+        def _done(t: asyncio.Task[Any]) -> None:
+            self._tasks.discard(t)
+            if not t.cancelled() and t.exception() is not None:
+                logger.error(
+                    "BACKGROUND_DELIVERY_TASK_FAILED manifest=%s err=%s",
+                    manifest.manifest_id,
+                    t.exception(),
+                )
+
+        task.add_done_callback(_done)
 
     async def stop_worker(self) -> None:
         if not self._tasks:
@@ -188,6 +228,7 @@ class RedisStreamDeliveryQueue(DeliveryQueueBackend):
 
     async def _handle_message(self, message_id: str, fields: dict[str, str]) -> None:
         manifest = DeliveryManifest.from_stream_fields(fields)
+        dlq_confirmed = False
         try:
             delivered = await self._deliver_manifest(manifest)
         except Exception as exc:
@@ -197,13 +238,28 @@ class RedisStreamDeliveryQueue(DeliveryQueueBackend):
                 exc,
             )
             return
-        # ACK after terminal outcome: success or filesystem DLQ (at-most-once stream).
+        if not delivered:
+            dlq_confirmed = await self._confirm_dead_letter(manifest)
+            if not dlq_confirmed:
+                logger.critical(
+                    "DLQ_WRITE_FAILED manifest=%s — stream message NOT acked",
+                    manifest.manifest_id,
+                )
+                return
         await self.redis.xack(self.stream_key, CONSUMER_GROUP, message_id)
         if not delivered:
             logger.warning(
-                "DELIVERY_DEAD_LETTERED manifest=%s stream_ack=true",
+                "DELIVERY_DEAD_LETTERED manifest=%s stream_ack=true dlq=%s",
                 manifest.manifest_id,
+                dlq_confirmed,
             )
+
+    async def _confirm_dead_letter(self, manifest: DeliveryManifest) -> bool:
+        from pathlib import Path
+
+        base = Path(manifest.dead_letter_dir or "./data/dead_letter")
+        bin_path = base / f"{manifest.manifest_id}.bin"
+        return bin_path.is_file() and bin_path.stat().st_size > 0
 
     async def _consume_loop(self) -> None:
         while self._running:

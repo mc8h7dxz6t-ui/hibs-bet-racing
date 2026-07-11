@@ -16,14 +16,15 @@ pytestmark = pytest.mark.skipif(
 async def test_live_redis_idempotency_cas():
     import redis.asyncio as aioredis
 
+    from inst_spine.idempotency import IdempotencyOutcome
     from inst_spine.rates import RedisIdempotencyBackend
 
     client = aioredis.from_url(os.environ["INST_REDIS_URL"], decode_responses=True)
     try:
         backend = RedisIdempotencyBackend(client)
         key = "instpp:live:rigorous-1"
-        assert await backend.consume_idempotency_token(key, ttl_seconds=60) is True
-        assert await backend.consume_idempotency_token(key, ttl_seconds=60) is False
+        assert await backend.consume_idempotency_token(key, ttl_seconds=60) is IdempotencyOutcome.UNIQUE
+        assert await backend.consume_idempotency_token(key, ttl_seconds=60) is IdempotencyOutcome.DUPLICATE
     finally:
         await client.aclose()
 

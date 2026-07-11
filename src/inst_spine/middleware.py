@@ -51,8 +51,12 @@ def device_token_hmac(device_id: str, *, secret: str) -> str:
 
 
 def verify_device_token(device_id: str, token: str, *, secret_env: str = "HEALTH_DEVICE_AUTH_SECRET") -> bool:
+    from inst_spine.ingress_guard import require_device_auth
+
     secret = os.getenv(secret_env, "").strip()
     if not secret:
+        if require_device_auth():
+            return False
         return True
     if not device_id or not token:
         return False
@@ -137,6 +141,16 @@ def install_api_key_middleware(
 
         expected = _expected_api_key(env_var)
         if not expected:
+            from inst_spine.ingress_guard import require_production_auth
+
+            if require_production_auth():
+                return JSONResponse(
+                    {
+                        "error": "unauthorized",
+                        "message": f"production profile requires {env_var}",
+                    },
+                    status_code=401,
+                )
             return await call_next(request)
 
         token = _extract_bearer_token(request)

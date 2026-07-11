@@ -14,6 +14,8 @@ from fastapi import FastAPI, Request, Response, status
 from health_telemetry.ingest import ingest_batch
 from inst_spine.clocks import LamportClock
 from inst_spine.errors import IngestValidationError
+from inst_spine.idempotency import IdempotencyOutcome
+from inst_spine.ingress_guard import install_body_size_limit_middleware
 from inst_spine.middleware import install_api_key_middleware, verify_device_token
 from inst_spine.rates import idempotency_backend_from_env
 from inst_spine.wal import WALWriter
@@ -26,6 +28,7 @@ logger = logging.getLogger("health_telemetry.serve")
 
 app = FastAPI(title="Health Telemetry — WAL-before-ack batch ingress")
 install_api_key_middleware(app, env_var="HEALTH_TELEMETRY_API_KEY")
+install_body_size_limit_middleware(app)
 
 
 class RuntimeState:
@@ -100,15 +103,22 @@ async def post_telemetry_batch(request: Request) -> dict[str, Any] | Response:
     if not isinstance(packets, list) or not packets:
         return _json_response({"error": "packets must be a non-empty array"}, status.HTTP_400_BAD_REQUEST)
 
-    if idem_key:
+    idem_consumed = False
+    if idem_key and state.idempotency is not None:
         ttl = int(os.getenv("HEALTH_IDEMPOTENCY_TTL_SECONDS", "86400"))
-        is_unique = await state.idempotency.consume_idempotency_token(idem_key, ttl_seconds=ttl)
-        if not is_unique:
+        idem_outcome = await state.idempotency.consume_idempotency_token(idem_key, ttl_seconds=ttl)
+        if idem_outcome is IdempotencyOutcome.BACKEND_ERROR:
+            return _json_response(
+                {"error": "idempotency_backend_unavailable"},
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        if idem_outcome is IdempotencyOutcome.DUPLICATE:
             return {
                 "status": "ALREADY_PROCESSED",
                 "device_id": device_id,
                 "batch_id": batch_id or None,
             }
+        idem_consumed = True
 
     assert state.wal_writer is not None
     state.clock.tick()
@@ -136,6 +146,8 @@ async def post_telemetry_batch(request: Request) -> dict[str, Any] | Response:
         )
     except IngestValidationError as exc:
         logger.warning("ingest rejected device=%s: %s", device_id, exc)
+        if idem_consumed and idem_key and state.idempotency is not None:
+            await state.idempotency.revoke_idempotency_token(idem_key)
         return _json_response(
             {"error": str(exc), "device_id": device_id, "wal_acked": True},
             status.HTTP_422_UNPROCESSABLE_ENTITY,

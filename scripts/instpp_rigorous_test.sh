@@ -965,6 +965,7 @@ section "Forensic hardening — Waves 1–2"
   tests/test_altdata_structural_golden.py \
   tests/test_webhook_mesh_chaos.py \
   tests/test_proxy_circuit_fsm.py \
+  tests/test_ingress_guard.py \
   tests/test_redis_soak_memory.py \
   tests/test_spend_guard.py \
   -v --tb=short

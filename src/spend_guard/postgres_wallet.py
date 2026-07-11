@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import threading
 import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from spend_guard.wallet import WalletLockedError, WalletState, _SCHEMA  # noqa: F401
+from spend_guard.wallet import (
+    WalletLockedError,
+    WalletState,
+    _SCHEMA,
+    _default_hold_ttl_seconds,
+    _utc_now,
+)  # noqa: F401
 
 __all__ = ["PostgresSpendWallet", "WalletLockedError", "WalletState"]
 
@@ -156,21 +163,36 @@ class PostgresSpendWallet:
             with self._connect() as conn:
                 with conn.transaction():
                     existing = conn.execute(
-                        "SELECT hold_id, status FROM spend_holds "
+                        "SELECT hold_id, status, amount FROM spend_holds "
                         "WHERE wallet_id = %s AND request_id = %s FOR UPDATE",
                         (self.wallet_id, request_id),
                     ).fetchone()
                     if existing:
-                        return False, "duplicate_request_id", str(existing[0])
+                        hold_id_existing, status_existing, amount_existing = (
+                            str(existing[0]),
+                            str(existing[1]),
+                            float(existing[2]),
+                        )
+                        if status_existing == "reserved":
+                            if amount_existing != amount:
+                                return (
+                                    False,
+                                    "duplicate_request_id_amount_mismatch",
+                                    hold_id_existing,
+                                )
+                            return True, "already_reserved", hold_id_existing
+                        if status_existing == "settled":
+                            return True, "already_settled", hold_id_existing
+                        return False, f"duplicate_request_id_status:{status_existing}", hold_id_existing
 
                     conn.execute(
                         "UPDATE spend_wallet SET reserved = reserved + %s WHERE wallet_id = %s",
                         (amount, self.wallet_id),
                     )
                     conn.execute(
-                        "INSERT INTO spend_holds (hold_id, wallet_id, amount, request_id, status) "
-                        "VALUES (%s, %s, %s, %s, 'reserved')",
-                        (hold_id, self.wallet_id, amount, request_id),
+                        "INSERT INTO spend_holds (hold_id, wallet_id, amount, request_id, status, created_at) "
+                        "VALUES (%s, %s, %s, %s, 'reserved', %s)",
+                        (hold_id, self.wallet_id, amount, request_id, _utc_now()),
                     )
             return True, "reserved", hold_id
 
@@ -186,6 +208,8 @@ class PostgresSpendWallet:
                     if not row:
                         return False, "hold_not_found"
                     reserved_amt, status = float(row[0]), row[1]
+                    if status == "settled":
+                        return True, "already_settled"
                     if status != "reserved":
                         return False, f"hold_status:{status}"
 
@@ -232,6 +256,25 @@ class PostgresSpendWallet:
                         (hold_id,),
                     )
             return True, "released"
+
+    def reap_expired_holds(self, *, ttl_seconds: int | None = None) -> int:
+        ttl = ttl_seconds if ttl_seconds is not None else _default_hold_ttl_seconds()
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=ttl)
+        cutoff_s = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
+        reaped = 0
+        with self._lock:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    "SELECT hold_id FROM spend_holds "
+                    "WHERE wallet_id = %s AND status = 'reserved' "
+                    "AND created_at IS NOT NULL AND created_at != '' AND created_at < %s",
+                    (self.wallet_id, cutoff_s),
+                ).fetchall()
+        for (hold_id,) in rows:
+            ok, reason = self.release(str(hold_id))
+            if ok:
+                reaped += 1
+        return reaped
 
     def to_dict(self) -> dict[str, Any]:
         s = self.get_state()

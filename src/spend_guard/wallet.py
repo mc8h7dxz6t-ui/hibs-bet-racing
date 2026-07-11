@@ -6,6 +6,7 @@ import sqlite3
 import threading
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -45,7 +46,19 @@ CREATE TABLE IF NOT EXISTS spend_holds (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_spend_holds_request
     ON spend_holds(wallet_id, request_id);
+CREATE INDEX IF NOT EXISTS idx_spend_holds_status_created
+    ON spend_holds(status, created_at);
 """
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _default_hold_ttl_seconds() -> int:
+    import os
+
+    return int(os.getenv("SPEND_HOLD_TTL_SECONDS", "3600"))
 
 
 class SpendWallet:
@@ -204,9 +217,9 @@ class SpendWallet:
                     (amount, self.wallet_id),
                 )
                 conn.execute(
-                    "INSERT INTO spend_holds (hold_id, wallet_id, amount, request_id, status) "
-                    "VALUES (?, ?, ?, ?, 'reserved')",
-                    (hold_id, self.wallet_id, amount, request_id),
+                    "INSERT INTO spend_holds (hold_id, wallet_id, amount, request_id, status, created_at) "
+                    "VALUES (?, ?, ?, ?, 'reserved', ?)",
+                    (hold_id, self.wallet_id, amount, request_id, _utc_now()),
                 )
                 conn.execute("COMMIT")
             return True, "reserved", hold_id
@@ -278,6 +291,31 @@ class SpendWallet:
                 )
                 conn.execute("COMMIT")
             return True, "released"
+
+    def reap_expired_holds(self, *, ttl_seconds: int | None = None) -> int:
+        """Release reserved holds past TTL — prevents stranded reserved balance."""
+        ttl = ttl_seconds if ttl_seconds is not None else _default_hold_ttl_seconds()
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=ttl)
+        cutoff_s = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
+        reaped = 0
+        with self._lock:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    "SELECT hold_id FROM spend_holds "
+                    "WHERE wallet_id = ? AND status = 'reserved' AND created_at != '' AND created_at < ?",
+                    (self.wallet_id, cutoff_s),
+                ).fetchall()
+        for (hold_id,) in rows:
+            ok, reason = self.release(str(hold_id))
+            if ok:
+                reaped += 1
+            else:
+                import logging
+
+                logging.getLogger("spend_guard.wallet").warning(
+                    "HOLD_REAP_FAILED hold_id=%s reason=%s", hold_id, reason
+                )
+        return reaped
 
     def to_dict(self) -> dict[str, Any]:
         s = self.get_state()

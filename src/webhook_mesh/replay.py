@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -75,8 +76,10 @@ def load_dead_letter_meta(path: Path) -> dict[str, Any]:
 def can_replay_dead_letter(meta: dict[str, Any]) -> tuple[bool, str]:
     if not meta.get("replay_blocked"):
         return True, "ok"
-    if meta.get("schema_version_required"):
-        return True, "schema_version_cleared"
+    override = os.getenv("WEBHOOK_POISON_OVERRIDE_TOKEN", "").strip()
+    supplied = str(meta.get("poison_override_token") or "")
+    if override and supplied and override == supplied:
+        return True, "poison_override_authorized"
     return False, str(meta.get("block_reason") or "replay_blocked")
 
 

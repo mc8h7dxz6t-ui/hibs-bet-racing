@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request, status
 
 from inst_spine.health_probes import ledger_chain_ready, readiness_payload, redis_ready_from_env, sqlite_db_ready
 from inst_spine.http_lifecycle import error_envelope, json_response, make_lifespan
+from inst_spine.ingress_guard import install_body_size_limit_middleware
 from inst_spine.ledger import AppendOnlyLedger
 from inst_spine.middleware import install_api_key_middleware, install_proxy_client_auth_middleware
 from inst_spine.rates import (
@@ -89,6 +90,7 @@ app = FastAPI(
 )
 install_api_key_middleware(app, env_var="PROXY_RISK_API_KEY")
 install_proxy_client_auth_middleware(app)
+install_body_size_limit_middleware(app)
 
 
 @app.get("/health")

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import asyncio
+import hmac
 import json
 import logging
 from pathlib import Path
@@ -187,7 +189,7 @@ async def replay_dead_letter(
     *,
     manifest_id: str | None = None,
     payload_id: str | None = None,
-    schema_version: str | None = None,
+    poison_override_token: str | None = None,
 ) -> tuple[bool, str]:
     record = find_dead_letter_record(
         dead_letter_dir, manifest_id=manifest_id, payload_id=payload_id
@@ -195,9 +197,14 @@ async def replay_dead_letter(
     if record is None:
         return False, "dead_letter_not_found"
     bin_path, meta_path, meta = record
-    if schema_version:
+    if poison_override_token:
+        import os
+
+        expected = os.getenv("WEBHOOK_POISON_OVERRIDE_TOKEN", "").strip()
+        if not expected or not hmac.compare_digest(expected, poison_override_token.strip()):
+            return False, "poison_override_denied"
         meta = dict(meta)
-        meta["schema_version_required"] = schema_version
+        meta["poison_override_token"] = poison_override_token.strip()
         meta_path.write_text(json.dumps(meta, indent=2, sort_keys=True), encoding="utf-8")
     allowed, reason = can_replay_dead_letter(meta)
     if not allowed:

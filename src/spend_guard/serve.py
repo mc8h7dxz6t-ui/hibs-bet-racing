@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import uuid
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,7 @@ from inst_spine.health_probes import (
 )
 from inst_spine.http_lifecycle import make_lifespan
 from inst_spine.ledger import AppendOnlyLedger
+from inst_spine.ingress_guard import install_body_size_limit_middleware
 from inst_spine.middleware import install_api_key_middleware
 from spend_guard.cost import actual_cost_from_usage, estimate_reserve_cost
 from spend_guard.gateway import SpendGuardGateway, SpendRequest
@@ -47,6 +49,15 @@ class RuntimeState:
 
 
 state = RuntimeState()
+_hold_reap_task: asyncio.Task[None] | None = None
+
+
+def _hold_reap_interval_seconds() -> int:
+    raw = os.getenv("SPEND_HOLD_REAP_SECONDS", "300").strip()
+    try:
+        return max(30, int(raw))
+    except ValueError:
+        return 300
 
 
 def _gateway() -> SpendGuardGateway:
@@ -69,6 +80,11 @@ def _gateway() -> SpendGuardGateway:
 
 def _startup() -> None:
     _gateway()
+    gw = state.gateway
+    if gw is not None:
+        reaped = gw.wallet.reap_expired_holds()
+        if reaped:
+            logger.info("reaped %s expired spend holds on startup", reaped)
     logger.info(
         "Spend Guard gateway online wallet=%s ledger=%s shadow=%s mock=%s",
         state.wallet_db,
@@ -78,16 +94,44 @@ def _startup() -> None:
     )
 
 
-def _shutdown() -> None:
+async def _async_startup() -> None:
+    global _hold_reap_task
+    _startup()
+    interval = _hold_reap_interval_seconds()
+
+    async def _loop() -> None:
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                gw = _gateway()
+                reaped = gw.wallet.reap_expired_holds()
+                if reaped:
+                    logger.info("periodic hold reap released %s stranded holds", reaped)
+            except Exception as exc:
+                logger.error("HOLD_REAP_FAILED: %s", exc)
+
+    _hold_reap_task = asyncio.create_task(_loop(), name="spend-guard-hold-reap")
+
+
+async def _async_shutdown() -> None:
+    global _hold_reap_task
+    if _hold_reap_task is not None:
+        _hold_reap_task.cancel()
+        try:
+            await _hold_reap_task
+        except asyncio.CancelledError:
+            pass
+        _hold_reap_task = None
     if state.ledger:
         state.ledger.stop_async_writer(flush=True)
 
 
 app = FastAPI(
     title="Spend Guard — OpenAI-compatible gateway",
-    lifespan=make_lifespan(_startup, _shutdown),
+    lifespan=make_lifespan(_async_startup, _async_shutdown),
 )
 install_api_key_middleware(app, env_var="SPEND_GUARD_API_KEY", skip_prefixes=("/static",))
+install_body_size_limit_middleware(app)
 
 
 @app.get("/health")
@@ -217,7 +261,16 @@ async def chat_completions(request: Request) -> Response:
         return _error_response(status.HTTP_402_PAYMENT_REQUIRED, "spend_rejected", reserve_resp.reason or "reserve rejected")
 
     hold_id = reserve_resp.hold_id or ""
-    status_code, upstream, raw = await _forward_upstream(body, request)
+    try:
+        status_code, upstream, raw = await _forward_upstream(body, request)
+    except Exception as exc:
+        if hold_id and not state.shadow_mode:
+            gw.wallet.release(hold_id)
+        return _error_response(
+            status.HTTP_502_BAD_GATEWAY,
+            "upstream_error",
+            str(exc),
+        )
     if status_code >= 400 or upstream is None:
         if hold_id and not state.shadow_mode:
             gw.wallet.release(hold_id)

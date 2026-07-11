@@ -51,7 +51,7 @@ class DeviceSequenceStore:
     ) -> dict[str, int | bool]:
         """
         Fail-closed on backward seq or gap > max_gap.
-        max_gap=0 means strictly consecutive (+1).
+        Read + validate + write in one BEGIN IMMEDIATE transaction (no TOCTOU).
         """
         if not packet_seqs:
             raise IngestValidationError("sequence gate: empty packet seq list")
@@ -60,42 +60,51 @@ class DeviceSequenceStore:
         if ordered != packet_seqs:
             raise IngestValidationError("sequence gate: packets must be ordered by seq")
 
-        last = self.last_seq(device_id)
-        expected_start = last + 1 if last > 0 else packet_seqs[0]
-
-        if last > 0 and packet_seqs[0] < last and not allow_replay:
-            raise IngestValidationError(
-                f"sequence gate: backward seq device={device_id} "
-                f"last={last} got={packet_seqs[0]}"
-            )
-
-        if last > 0 and packet_seqs[0] != expected_start and not allow_replay:
-            gap = packet_seqs[0] - expected_start
-            if gap != 0:
-                if gap > max_gap:
-                    raise IngestValidationError(
-                        f"sequence gate: gap device={device_id} "
-                        f"expected>={expected_start} got={packet_seqs[0]} gap={gap}"
-                    )
-
-        for i in range(1, len(packet_seqs)):
-            step = packet_seqs[i] - packet_seqs[i - 1]
-            if step <= 0:
-                raise IngestValidationError(
-                    f"sequence gate: non-monotonic within batch at index {i}"
-                )
-            if max_gap == 0 and step != 1:
-                raise IngestValidationError(
-                    f"sequence gate: non-consecutive within batch seq step={step}"
-                )
-            if step > max_gap + 1:
-                raise IngestValidationError(
-                    f"sequence gate: intra-batch gap step={step} max_gap={max_gap}"
-                )
-
-        new_last = packet_seqs[-1]
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT last_seq FROM device_sequence WHERE device_id = ?",
+                (device_id,),
+            ).fetchone()
+            last = int(row[0]) if row else 0
+            expected_start = last + 1 if last > 0 else packet_seqs[0]
+
+            if last > 0 and packet_seqs[0] < last and not allow_replay:
+                conn.execute("ROLLBACK")
+                raise IngestValidationError(
+                    f"sequence gate: backward seq device={device_id} "
+                    f"last={last} got={packet_seqs[0]}"
+                )
+
+            if last > 0 and packet_seqs[0] != expected_start and not allow_replay:
+                gap = packet_seqs[0] - expected_start
+                if gap != 0:
+                    if gap > max_gap:
+                        conn.execute("ROLLBACK")
+                        raise IngestValidationError(
+                            f"sequence gate: gap device={device_id} "
+                            f"expected>={expected_start} got={packet_seqs[0]} gap={gap}"
+                        )
+
+            for i in range(1, len(packet_seqs)):
+                step = packet_seqs[i] - packet_seqs[i - 1]
+                if step <= 0:
+                    conn.execute("ROLLBACK")
+                    raise IngestValidationError(
+                        f"sequence gate: non-monotonic within batch at index {i}"
+                    )
+                if max_gap == 0 and step != 1:
+                    conn.execute("ROLLBACK")
+                    raise IngestValidationError(
+                        f"sequence gate: non-consecutive within batch seq step={step}"
+                    )
+                if step > max_gap + 1:
+                    conn.execute("ROLLBACK")
+                    raise IngestValidationError(
+                        f"sequence gate: intra-batch gap step={step} max_gap={max_gap}"
+                    )
+
+            new_last = packet_seqs[-1]
             conn.execute(
                 """
                 INSERT INTO device_sequence (device_id, last_seq, batch_count)

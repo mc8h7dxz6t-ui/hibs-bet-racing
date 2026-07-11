@@ -64,6 +64,23 @@ def test_insufficient_balance(tmp_path: Path):
     assert "insufficient" in reason
 
 
+def test_hold_reap_releases_stranded_reserve(tmp_path: Path):
+    from datetime import datetime, timedelta, timezone
+
+    wallet = SpendWallet(tmp_path / "w.sqlite", initial_balance=100.0)
+    ok, _, hold = wallet.reserve(30.0, request_id="stale")
+    assert ok and hold
+    assert wallet.get_state().reserved == 30.0
+    stale = (datetime.now(timezone.utc) - timedelta(seconds=7200)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with wallet._connect() as conn:
+        conn.execute("UPDATE spend_holds SET created_at = ? WHERE hold_id = ?", (stale, hold))
+    reaped = wallet.reap_expired_holds(ttl_seconds=3600)
+    assert reaped == 1
+    state = wallet.get_state()
+    assert state.reserved == 0.0
+    assert state.available == 100.0
+
+
 def test_drift_lockout(tmp_path: Path):
     wallet = SpendWallet(
         tmp_path / "w.sqlite",

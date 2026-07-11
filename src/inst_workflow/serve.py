@@ -21,6 +21,7 @@ from inst_workflow.demo_bootstrap import bootstrap_all, bootstrap_product
 from proxy_risk.router import ProxyRequest, ProxyRiskGateway
 
 from inst_spine.middleware import install_api_key_middleware
+from inst_spine.ingress_guard import install_body_size_limit_middleware
 
 STATIC_DIR = Path(__file__).parent / "static"
 VALID_PRODUCTS = frozenset({"compliance", "proxy", "both"})
@@ -30,6 +31,10 @@ install_api_key_middleware(
     app,
     env_var="INST_WORKFLOW_API_KEY",
     skip_paths=frozenset({"/health", "/ready", "/", "/api/config"}),
+)
+install_body_size_limit_middleware(
+    app,
+    skip_paths=frozenset({"/health", "/ready", "/", "/api/config", "/static"}),
 )
 
 

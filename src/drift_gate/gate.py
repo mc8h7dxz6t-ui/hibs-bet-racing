@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -91,14 +92,19 @@ class DriftGate:
         baseline: FeatureBaseline,
         *,
         config: DriftGateConfig | None = None,
-        rolling_window: dict[str, list[float]] | None = None,
+        rolling_window: dict[str, list[float]] | dict[str, deque[float]] | None = None,
     ) -> None:
         self.baseline = baseline
         self.config = config or DriftGateConfig()
         self._rolling: dict[str, list[float]] = rolling_window or {}
 
-    def _rolling_for(self, feature: str) -> list[float]:
-        return self._rolling.setdefault(feature, [])
+    def _rolling_for(self, feature: str) -> deque[float]:
+        if feature not in self._rolling:
+            self._rolling[feature] = deque(maxlen=self.config.min_baseline_samples * 4)
+        raw = self._rolling[feature]
+        if isinstance(raw, list):
+            self._rolling[feature] = deque(raw, maxlen=self.config.min_baseline_samples * 4)
+        return self._rolling[feature]  # type: ignore[return-value]
 
     def evaluate(self, req: DriftGateRequest) -> DriftGateResponse:
         cfg = self.config

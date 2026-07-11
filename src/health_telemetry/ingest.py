@@ -12,7 +12,7 @@ from health_telemetry.sequence import DeviceSequenceStore
 from inst_spine.clocks import utc_now_iso
 from inst_spine.contracts import RunManifest, stable_id
 from inst_spine.errors import IngestValidationError
-from inst_spine.ledger import AppendOnlyLedger
+from inst_spine.ledger_registry import get_ledger
 
 
 def _packet_seqs(packets: list[dict[str, Any]]) -> list[int]:
@@ -72,7 +72,7 @@ def ingest_batch(
         seq_meta["sequence_gate"] = "passed"
 
     db = database or Path("data/health_telemetry.sqlite")
-    ledger = AppendOnlyLedger(db, writer_id=actor)
+    ledger = get_ledger(db, writer_id=actor)
     manifest = RunManifest(
         manifest_id=stable_id(device_id, "batch", str(packets[0].get("seq")), str(len(packets))),
         run_kind="health_telemetry",
