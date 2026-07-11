@@ -44,7 +44,9 @@ FSM: `CLOSED` → `OPEN` (lockout) → `HALF_OPEN` (probe) → `CLOSED`.
 Hourly cron:
 
 ```bash
-sudo bash /opt/hibs-bet/scripts/run_brier_circuit_breaker.sh
+sudo bash /opt/hibs-bet/deploy/cron-hibs-brier-circuit.sh --install
+# or full ops bundle:
+sudo bash /opt/hibs-bet/deploy/cron-hibs-ops-automation.sh --install
 ```
 
 On trip: sets `HIBS_EXECUTION_LOCKOUT=1`, persists `data/brier_circuit_state.json`, appends hash-chain ledger entry.
