@@ -182,6 +182,80 @@ football_vps_sync_overlay_subset() {
   chmod +x "${bet}/scripts/vps_football_fix_dashboard_500.sh" 2>/dev/null || true
 }
 
+football_vps_install_safe_fixture_row() {
+  local bet="${1:-/opt/hibs-bet}"
+  local overlay="${2:-}"
+  local dest="${bet}/templates/_fixture_row_compact.html"
+  local expand="${bet}/templates/_fixture_expand_panel.html"
+
+  if [[ -f "${dest}" ]] && ! grep -q '_fixture_expand_panel' "${dest}" 2>/dev/null; then
+    echo "[dashboard-fix] fixture row already compact (no expand panel)"
+    return 0
+  fi
+
+  if [[ -n "${overlay}" && -f "${overlay}/templates/_fixture_row_compact.html" ]]; then
+    cp -a "${dest}" "${dest}.bak.$(date +%s)" 2>/dev/null || true
+    install -m 0644 "${overlay}/templates/_fixture_row_compact.html" "${dest}"
+    echo "[dashboard-fix] installed overlay _fixture_row_compact.html"
+    return 0
+  fi
+
+  cp -a "${dest}" "${dest}.bak.$(date +%s)" 2>/dev/null || true
+  cat >"${dest}" <<'HTML'
+{# Compact fixture row for dashboard — overlay must include (was missing on VPS → 500). #}
+{% set fx = fixture %}
+{% set pred = fx.prediction if fx.prediction is mapping else {} %}
+{% set odds = fx.best_odds_1x2 if fx.best_odds_1x2 is mapping else {} %}
+{% set dq = fx.data_quality.score_pct if fx.data_quality is mapping and fx.data_quality.score_pct is not none else (fx.data_quality_pct or 0) %}
+{% set fid = fx.id or fx.fixture_id or loop.index %}
+{% set home = fx.home_team or fx.home or 'Home' %}
+{% set away = fx.away_team or fx.away or 'Away' %}
+{% set ko = fx.kickoff_display or fx.kickoff_local or fx.date or '—' %}
+{% set ph = pred.home_win_prob or pred.prob_home or pred.get('1') %}
+{% set pd = pred.draw_prob or pred.prob_draw or pred.get('X') %}
+{% set pa = pred.away_win_prob or pred.prob_away or pred.get('2') %}
+{% set btts = pred.btts_yes_prob or pred.btts_prob %}
+{% set win_lean = pred.predicted_outcome or pred.lean_1x2 or '—' %}
+<details class="fr-compact fixture-card{% if fx.has_value_bet %} value-card{% endif %}"
+    data-fid="{{ fid }}"
+    data-league="{{ fx.league or '' }}"
+    data-region="{{ fx.dashboard_region or 'other' }}"
+    data-has-value="{{ '1' if fx.has_value_bet else '0' }}"
+    data-data-q="{{ dq }}"
+    data-search="{{ (home ~ ' ' ~ away ~ ' ' ~ (fx.league_name or fx.league or ''))|lower }}"
+    data-kickoff-utc="{{ fx.kickoff_iso or fx.kickoff_utc or '' }}"
+    data-is-live="{{ '1' if fx.is_live else '0' }}"
+    id="fix-{{ fid }}">
+    <summary class="fr-sum fixture-summary">
+        <div class="fr-sum-grid">
+            <span class="fr-ko">{{ ko }}</span>
+            <span class="fr-match">{{ home }} <span class="fr-vs">v</span> {{ away }}</span>
+            <span class="fr-prob">{% if btts is not none %}{{ '%.0f'|format(btts * 100 if btts <= 1 else btts) }}%{% else %}<span class="fr-prob-na">—</span>{% endif %}</span>
+            <span class="fr-prob fr-prob-win"><span class="fr-win-lean">{{ win_lean }}</span></span>
+            <span class="fr-od">{% if odds.home %}{{ '%.2f'|format(odds.home) }}{% else %}—{% endif %}</span>
+            <span class="fr-od">{% if odds.draw %}{{ '%.2f'|format(odds.draw) }}{% else %}—{% endif %}</span>
+            <span class="fr-od">{% if odds.away %}{{ '%.2f'|format(odds.away) }}{% else %}—{% endif %}</span>
+            <span class="fr-od fr-prob-na">—</span>
+            <span class="fr-od fr-prob-na">—</span>
+            <span class="fr-od fr-prob-na">—</span>
+            <span class="fr-od fr-prob-na">—</span>
+            <span class="fr-od fr-prob-na">—</span>
+            <span class="fr-od fr-prob-na">—</span>
+            <span class="fr-dq-compact" title="Data quality">{{ '%.0f'|format(dq) }}%</span>
+        </div>
+    </summary>
+    <div class="expand-panel fr-sum-meta">
+        {% if fx.has_value_bet %}<span class="fr-value-box">Value</span>{% endif %}
+        <span class="fr-league">{{ fx.league_name or fx.league or '' }}</span>
+    </div>
+</details>
+HTML
+  echo "[dashboard-fix] installed embedded safe _fixture_row_compact.html"
+  if [[ -f "${expand}" ]]; then
+    echo "[dashboard-fix] note: _fixture_expand_panel.html left in place but no longer included"
+  fi
+}
+
 football_vps_apply_dashboard_fix() {
   local bet="${1:-/opt/hibs-bet}"
   local racing="${2:-/opt/hibs-racing}"
@@ -197,7 +271,8 @@ football_vps_apply_dashboard_fix() {
 
   football_vps_install_web_format "${bet}" "${overlay}"
   football_vps_patch_web_filters "${bet}"
+  football_vps_install_safe_fixture_row "${bet}" "${overlay}"
   football_vps_fix_sudoers_requiretty "${bet}"
 
-  chown -R www-data:www-data "${bet}/src/hibs_predictor/web_format.py" "${bet}/src/hibs_predictor/web.py" 2>/dev/null || true
+  chown -R www-data:www-data "${bet}/src/hibs_predictor/web_format.py" "${bet}/src/hibs_predictor/web.py" "${bet}/templates/_fixture_row_compact.html" 2>/dev/null || true
 }
