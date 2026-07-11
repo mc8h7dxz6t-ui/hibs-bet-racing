@@ -86,6 +86,19 @@ def fmt_pct(value: Any) -> str:
     return f"{num:.0f}%"
 
 
+def fmt_prob(value: Any, decimals: int = 1) -> str:
+    num = normalize_prob_pct(value)
+    if num is None:
+        return "—"
+    if decimals <= 0:
+        return f"{num:.0f}%"
+    return f"{num:.{decimals}f}%"
+
+
+def fmt_odds(value: Any, decimals: int = 2) -> str:
+    return fmt_num(value, decimals)
+
+
 def fmt_roi(value: Any, decimals: int = 1) -> str:
     """Format edge/ROI percent for value pills (e.g. +12.3%)."""
     if value is None:
@@ -102,6 +115,17 @@ PY
   echo "[dashboard-fix] wrote embedded web_format.py"
 }
 
+football_vps_ensure_web_format_exports() {
+  local bet="${1:-/opt/hibs-bet}"
+  local dest="${bet}/src/hibs_predictor/web_format.py"
+  [[ -f "${dest}" ]] || return 0
+  if grep -q 'def fmt_prob' "${dest}" 2>/dev/null && grep -q 'def fmt_odds' "${dest}" 2>/dev/null; then
+    return 0
+  fi
+  football_vps_install_web_format "${bet}" ""
+  echo "[dashboard-fix] refreshed web_format.py (fmt_prob/fmt_odds)"
+}
+
 football_vps_patch_web_filters() {
   local bet="${1:-/opt/hibs-bet}"
   local web_py="${bet}/src/hibs_predictor/web.py"
@@ -109,42 +133,54 @@ football_vps_patch_web_filters() {
   [[ -f "${web_py}" ]] || { echo "[dashboard-fix] missing ${web_py}" >&2; return 1; }
   [[ -x "${py}" ]] || py=python3
 
-  if grep -q 'add_template_filter(fmt_roi' "${web_py}" 2>/dev/null; then
-    echo "[dashboard-fix] web.py already registers fmt_roi"
-    return 0
-  fi
-
   HOME="${bet}" PYTHONPATH="${bet}/src" "${py}" - "${web_py}" <<'PY'
 import pathlib
+import re
 import sys
 
 path = pathlib.Path(sys.argv[1])
 text = path.read_text(encoding="utf-8")
-if 'add_template_filter(fmt_roi' in text or 'add_template_filter("fmt_roi"' in text:
+
+filters = ("fmt_num", "fmt_pct", "fmt_prob", "fmt_odds", "fmt_roi")
+missing = [name for name in filters if f'add_template_filter({name}' not in text and f'add_template_filter("{name}"' not in text]
+if not missing:
+    print("web.py already registers all fmt_* filters")
     sys.exit(0)
 
-patch = '''
-from hibs_predictor.web_format import fmt_num, fmt_pct, fmt_roi
-
-app.add_template_filter(fmt_num, "fmt_num")
-app.add_template_filter(fmt_pct, "fmt_pct")
-app.add_template_filter(fmt_roi, "fmt_roi")
-'''
-
-needle = 'return str(rank) if rank is not None else str(value or "")'
-idx = text.find(needle)
-if idx == -1:
-    print("ERROR: could not find position_rank filter anchor in web.py", file=sys.stderr)
-    sys.exit(1)
-
-end = text.find("\n\n", idx)
-if end == -1:
-    end = idx + len(needle)
+import_line = "from hibs_predictor.web_format import fmt_num, fmt_odds, fmt_pct, fmt_prob, fmt_roi"
+if "from hibs_predictor.web_format import" in text:
+    text = re.sub(
+        r"from hibs_predictor\.web_format import[^\n]+",
+        import_line,
+        text,
+        count=1,
+    )
 else:
-    end += 2
+    needle = 'return str(rank) if rank is not None else str(value or "")'
+    idx = text.find(needle)
+    if idx == -1:
+        print("ERROR: could not find position_rank filter anchor in web.py", file=sys.stderr)
+        sys.exit(1)
+    end = text.find("\n\n", idx)
+    end = end + 2 if end != -1 else idx + len(needle)
+    block = "\n" + import_line + "\n\n"
+    for name in filters:
+        block += f'app.add_template_filter({name}, "{name}")\n'
+    block += "\n"
+    text = text[:end] + block + text[end:]
 
-path.write_text(text[:end] + patch + text[end:], encoding="utf-8")
-print("patched web.py with fmt_* filters")
+for name in missing:
+    if f'add_template_filter({name}' in text or f'add_template_filter("{name}"' in text:
+        continue
+    insert_at = text.rfind("app.add_template_filter(")
+    if insert_at == -1:
+        print(f"ERROR: cannot place filter registration for {name}", file=sys.stderr)
+        sys.exit(1)
+    line_end = text.find("\n", insert_at)
+    text = text[: line_end + 1] + f'app.add_template_filter({name}, "{name}")\n' + text[line_end + 1 :]
+
+path.write_text(text, encoding="utf-8")
+print("patched web.py filters:", ", ".join(missing))
 PY
 }
 
@@ -270,6 +306,7 @@ football_vps_apply_dashboard_fix() {
   fi
 
   football_vps_install_web_format "${bet}" "${overlay}"
+  football_vps_ensure_web_format_exports "${bet}"
   football_vps_patch_web_filters "${bet}"
   football_vps_install_safe_fixture_row "${bet}" "${overlay}"
   football_vps_fix_sudoers_requiretty "${bet}"

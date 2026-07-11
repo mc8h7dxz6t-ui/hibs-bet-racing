@@ -43,6 +43,21 @@ def fmt_pct(value: Any) -> str:
     return f"{num:.0f}%"
 
 
+def fmt_prob(value: Any, decimals: int = 1) -> str:
+    """Format model probability percent (e.g. 42.3%)."""
+    num = normalize_prob_pct(value)
+    if num is None:
+        return "—"
+    if decimals <= 0:
+        return f"{num:.0f}%"
+    return f"{num:.{decimals}f}%"
+
+
+def fmt_odds(value: Any, decimals: int = 2) -> str:
+    """Format decimal odds for display."""
+    return fmt_num(value, decimals)
+
+
 def fmt_roi(value: Any, decimals: int = 1) -> str:
     """Format edge/ROI percent for value pills (e.g. +12.3%)."""
     if value is None:
