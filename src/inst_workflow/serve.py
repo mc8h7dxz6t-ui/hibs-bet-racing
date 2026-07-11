@@ -323,7 +323,12 @@ async def proof_ingest(product_id: str, body: ProofIngestBody) -> dict[str, Any]
     if not supports_guided_ingest(entry.id):
         raise HTTPException(404, f"guided ingest not available for {entry.id}")
     try:
-        result = await ingest_product_async(entry, body.payload, demo_dir=state.demo_dir)
+        result = await ingest_product_async(
+            entry,
+            body.payload,
+            demo_dir=state.demo_dir,
+            database=_proof_db(entry),
+        )
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:

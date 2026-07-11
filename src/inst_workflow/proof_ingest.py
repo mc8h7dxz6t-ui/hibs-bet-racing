@@ -13,6 +13,8 @@ from inst_workflow.catalog import ProductCatalogEntry
 
 GUIDED_INGEST_IDS = frozenset(
     {
+        "compliance",
+        "proxy",
         "altdata",
         "ai-kit",
         "webhook-mesh",
@@ -31,6 +33,34 @@ def supports_guided_ingest(product_id: str) -> bool:
     return (product_id or "").strip().lower() in GUIDED_INGEST_IDS
 
 
+def _demo_snapshot() -> dict[str, Any]:
+    path = Path("docs/demo_snapshot.json")
+    if path.is_file():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return {
+        "action": "approve",
+        "amount": 1000,
+        "currency": "GBP",
+        "customer_id": "cust_demo_001",
+        "policy": "kyc_tier_2",
+        "risk_score": 0.12,
+    }
+
+
+def _demo_proxy_request() -> dict[str, Any]:
+    path = Path("docs/demo_proxy_request.json")
+    if path.is_file():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return {
+        "client_id": "broker-demo",
+        "method": "POST",
+        "path": "/v1/orders",
+        "body": {"symbol": "AAPL", "qty": 100, "side": "buy"},
+        "reference_price": 10.5,
+        "idempotency_key": "demo-order-001",
+    }
+
+
 def _model_snapshot() -> dict[str, Any]:
     path = Path("docs/demo_model_snapshot.json")
     if path.is_file():
@@ -46,6 +76,14 @@ def _model_snapshot() -> dict[str, Any]:
 def demo_payload(entry: ProductCatalogEntry, *, demo_dir: Path) -> dict[str, Any]:
     """Return a copy-paste JSON payload for guided ingest in Proof Console."""
     pid = entry.id
+    if pid == "compliance":
+        return {
+            "snapshot": _demo_snapshot(),
+            "outcome": {"status": "approved", "ref": "proof-console"},
+            "actor": "proof-console",
+        }
+    if pid == "proxy":
+        return {**_demo_proxy_request(), "live": False}
     if pid == "altdata":
         return {
             "feed_id": "demo_feed",
@@ -130,6 +168,8 @@ def demo_payload(entry: ProductCatalogEntry, *, demo_dir: Path) -> dict[str, Any
 def ingest_schema(entry: ProductCatalogEntry) -> dict[str, Any]:
     """Short UI hint for the ingest textarea."""
     hints = {
+        "compliance": "log_decision — snapshot + outcome (regulated decision audit)",
+        "proxy": "ProxyRiskGateway.evaluate — shadow (live:false) or live forward",
         "altdata": "poll_once — feed_id + ctx (demo_feed ladder fields)",
         "ai-kit": "AgentLoop stub steps → trace ledger",
         "webhook-mesh": "Cold-path ingress ledger append (offline demo)",
@@ -191,19 +231,22 @@ async def ingest_product_async(
     payload: dict[str, Any],
     *,
     demo_dir: Path,
+    database: Path | None = None,
 ) -> dict[str, Any]:
     """Append one guided ingest event to the SKU ledger (offline-safe)."""
     if not supports_guided_ingest(entry.id):
         raise ValueError(f"guided ingest not supported for {entry.id}")
 
     demo_dir.mkdir(parents=True, exist_ok=True)
-    db = entry.db_path(demo_dir)
+    db = database or entry.db_path(demo_dir)
     pid = entry.id
 
+    if pid == "proxy":
+        return await _ingest_proxy(payload, db=db, product_id=pid)
     if pid == "ad-guard":
         return await _ingest_ad_guard(payload, db=db, product_id=pid)
 
-    return ingest_product(entry, payload, demo_dir=demo_dir)
+    return ingest_product(entry, payload, demo_dir=demo_dir, database=db)
 
 
 def ingest_product(
@@ -211,17 +254,32 @@ def ingest_product(
     payload: dict[str, Any],
     *,
     demo_dir: Path,
+    database: Path | None = None,
 ) -> dict[str, Any]:
-    """Synchronous ingest — ad-guard uses ingest_product_async."""
-    if entry.id == "ad-guard":
-        raise ValueError("use ingest_product_async for ad-guard")
+    """Synchronous ingest — proxy/ad-guard use ingest_product_async."""
+    if entry.id in ("ad-guard", "proxy"):
+        raise ValueError(f"use ingest_product_async for {entry.id}")
 
     demo_dir.mkdir(parents=True, exist_ok=True)
-    db = entry.db_path(demo_dir)
+    db = database or entry.db_path(demo_dir)
     pid = entry.id
 
     if not supports_guided_ingest(entry.id):
         raise ValueError(f"guided ingest not supported for {entry.id}")
+
+    if pid == "compliance":
+        from compliance_log.ingest import log_decision
+
+        snapshot = dict(payload.get("snapshot") or _demo_snapshot())
+        outcome = dict(payload.get("outcome") or {"status": "approved"})
+        actor = str(payload.get("actor") or "proof-console")
+        entry_row = log_decision(
+            snapshot=snapshot,
+            outcome=outcome,
+            actor=actor,
+            database=db,
+        )
+        return {"ok": True, "product_id": pid, "entry": entry_row, "database": str(db)}
 
     if pid == "altdata":
         from altdata.poll import poll_once
@@ -450,6 +508,42 @@ def ingest_product(
         raise ValueError(f"unsupported agent-ledger action: {action}")
 
     raise ValueError(f"unhandled product {entry.id}")
+
+
+async def _ingest_proxy(payload: dict[str, Any], *, db: Path, product_id: str) -> dict[str, Any]:
+    from inst_spine.ledger import AppendOnlyLedger
+    from proxy_risk.router import ProxyRequest, ProxyRiskGateway
+
+    live = bool(payload.get("live"))
+    ledger = AppendOnlyLedger(db, async_writes=True)
+    ledger.start_async_writer()
+    gw = ProxyRiskGateway(
+        ledger=ledger,
+        shadow_mode=not live,
+        upstream_base=os.environ.get("PROXY_RISK_UPSTREAM_BASE", "https://httpbin.org"),
+    )
+    body = payload.get("body")
+    if not isinstance(body, dict):
+        body = {}
+    resp = await gw.evaluate(
+        ProxyRequest(
+            client_id=str(payload.get("client_id") or "broker-demo"),
+            method=str(payload.get("method") or "POST"),
+            path=str(payload.get("path") or "/orders"),
+            body=body,
+            idempotency_key=payload.get("idempotency_key"),
+            reference_price=payload.get("reference_price"),
+        )
+    )
+    ledger.stop_async_writer(flush=True)
+    return {
+        "ok": resp.decision.value.upper() in {"APPROVE", "REJECT", "KILL"},
+        "product_id": product_id,
+        "decision": resp.decision.value,
+        "reason": resp.reason,
+        "live": live,
+        "database": str(db),
+    }
 
 
 async def _ingest_ad_guard(payload: dict[str, Any], *, db: Path, product_id: str) -> dict[str, Any]:
