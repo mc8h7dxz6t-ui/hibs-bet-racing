@@ -5,7 +5,7 @@
 **Proof:** 157+ smoke tests · rigorous **12/12** · `industry_gold: true` · offline `verify-bundle` on every SKU  
 **Date:** June 2026
 
-> **License economics and valuation depth:** [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md) · **One-page matrix:** [PORTFOLIO_SALES_SHEET.md](PORTFOLIO_SALES_SHEET.md) · **Evidence only (no prices):** [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md) · **Platform compare:** [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md)
+> **License economics and valuation depth:** [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md) · **One-page matrix:** [PORTFOLIO_SALES_SHEET.md](PORTFOLIO_SALES_SHEET.md) · **Full tech/sales (no prices):** [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) · **Evidence index:** [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md) · **Platform compare + market pricing:** [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md)
 
 ---
 

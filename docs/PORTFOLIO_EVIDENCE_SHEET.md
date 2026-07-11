@@ -6,7 +6,8 @@
 **Date:** July 2026
 
 > **Commercial pricing:** see [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md) and [PORTFOLIO_SALES_SHEET.md](PORTFOLIO_SALES_SHEET.md)  
-> **Platform comparison:** [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md)
+> **Full tech/sales (no prices):** [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md)  
+> **Platform compare + market pricing:** [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md)
 
 ---
 
