@@ -162,6 +162,8 @@ step 11 "Audit surface" \
 step 12 "HTTP gateway" \
   "OpenAI-compat serve — reserve/settle on HTTP path (production ingress proof)."
 
+"$PYTHON" -m spend_guard.cli init-wallet --wallet-db "$WALLET_DB" --balance 500
+
 export SPEND_GUARD_WALLET_DB="$WALLET_DB"
 export SPEND_GUARD_LEDGER_DB="$LEDGER_DB"
 export SPEND_GUARD_MOCK_UPSTREAM=1

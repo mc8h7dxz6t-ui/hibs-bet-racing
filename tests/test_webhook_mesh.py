@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from inst_spine.idempotency import IdempotencyOutcome
 from inst_spine.rates import MemoryIdempotencyBackend, RedisIdempotencyBackend
 from inst_spine.wal import WALWriter
 from webhook_mesh.fsm import (
@@ -39,16 +40,16 @@ from webhook_mesh.replay import assess_payload_integrity, can_replay_dead_letter
 @pytest.mark.asyncio
 async def test_memory_idempotency_unique_then_duplicate():
     backend = MemoryIdempotencyBackend()
-    assert await backend.consume_idempotency_token("k1", 60) is True
-    assert await backend.consume_idempotency_token("k1", 60) is False
+    assert await backend.consume_idempotency_token("k1", 60) == IdempotencyOutcome.UNIQUE
+    assert await backend.consume_idempotency_token("k1", 60) == IdempotencyOutcome.DUPLICATE
 
 
 @pytest.mark.asyncio
 async def test_memory_idempotency_expires():
     backend = MemoryIdempotencyBackend()
-    assert await backend.consume_idempotency_token("k1", 1) is True
+    assert await backend.consume_idempotency_token("k1", 1) == IdempotencyOutcome.UNIQUE
     backend._storage["k1"] = 0.0
-    assert await backend.consume_idempotency_token("k1", 60) is True
+    assert await backend.consume_idempotency_token("k1", 60) == IdempotencyOutcome.UNIQUE
 
 
 @pytest.mark.asyncio
@@ -57,7 +58,7 @@ async def test_redis_idempotency_cas_success():
     redis_client = MagicMock()
     redis_client.register_script.return_value = script
     backend = RedisIdempotencyBackend(redis_client)
-    assert await backend.consume_idempotency_token("client:evt", 3600) is True
+    assert await backend.consume_idempotency_token("client:evt", 3600) == IdempotencyOutcome.UNIQUE
     script.assert_awaited_once()
 
 
@@ -67,7 +68,7 @@ async def test_redis_idempotency_fail_closed_on_error():
     redis_client = MagicMock()
     redis_client.register_script.return_value = script
     backend = RedisIdempotencyBackend(redis_client)
-    assert await backend.consume_idempotency_token("client:evt", 3600) is False
+    assert await backend.consume_idempotency_token("client:evt", 3600) == IdempotencyOutcome.BACKEND_ERROR
 
 
 def test_hmac_verify_roundtrip():
@@ -339,7 +340,7 @@ async def test_redis_stream_worker_acks_on_success(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_redis_stream_worker_acks_after_dlq(monkeypatch):
+async def test_redis_stream_worker_acks_after_dlq(monkeypatch, tmp_path: Path):
     redis_client = MagicMock()
     redis_client.xgroup_create = AsyncMock()
     redis_client.xautoclaim = AsyncMock(return_value=("0-0", [], []))
@@ -356,6 +357,7 @@ async def test_redis_stream_worker_acks_after_dlq(monkeypatch):
                                 payload=b"{}",
                                 target_url="https://example.com",
                                 lamport=3,
+                                dead_letter_dir=str(tmp_path / "dlq"),
                             ).to_stream_fields(),
                         )
                     ],
@@ -366,9 +368,19 @@ async def test_redis_stream_worker_acks_after_dlq(monkeypatch):
     )
     redis_client.xack = AsyncMock()
     queue = RedisStreamDeliveryQueue(redis_client)
+
+    async def _fail_and_dlq(**kwargs: object) -> bool:
+        dlq_dir = Path(str(kwargs.get("dead_letter_dir") or tmp_path / "dlq"))
+        manifest_id = str(kwargs.get("manifest_id") or "m-fail")
+        dlq_dir.mkdir(parents=True, exist_ok=True)
+        (dlq_dir / f"{manifest_id}.bin").write_bytes(
+            kwargs.get("payload") if isinstance(kwargs.get("payload"), bytes) else b"{}"
+        )
+        return False
+
     monkeypatch.setattr(
         "webhook_mesh.fsm.dispatch_webhook_delivery",
-        AsyncMock(return_value=False),
+        AsyncMock(side_effect=_fail_and_dlq),
     )
     queue._running = True
     with pytest.raises(asyncio.CancelledError):

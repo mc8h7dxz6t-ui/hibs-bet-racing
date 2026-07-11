@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import tarfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +17,7 @@ from inst_spine.hash import (
     GENESIS_EVENT,
     read_genesis_anchor,
     verify_chain,
+    verify_chain_linkage,
     verify_genesis_block,
     verify_lamport_monotonic,
 )
@@ -59,6 +61,85 @@ class BundleVerifyResult:
 
 def _canonical_json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, sort_keys=True, default=str, separators=(",", ":")).encode("utf-8")
+
+
+_SENSITIVE_METADATA_KEYS = frozenset(
+    {
+        "api_key",
+        "secret",
+        "password",
+        "token",
+        "authorization",
+        "private_key",
+        "connection_string",
+        "dsn",
+    }
+)
+_REGULATED_OBSERVATION_PRODUCTS = frozenset(
+    {
+        "health-telemetry",
+        "compliance-logger",
+        "compliance-log",
+        "agent-ledger",
+        "ai-kit",
+    }
+)
+
+
+def _export_observation_lane_enabled(product: str | None) -> bool:
+    flag = os.getenv("INST_EXPORT_OBSERVATION_LANE", "").strip().lower()
+    if flag in ("1", "true", "yes"):
+        return True
+    if flag in ("0", "false", "no"):
+        return False
+    return bool(product and product in _REGULATED_OBSERVATION_PRODUCTS)
+
+
+def _scrub_value(key: str, value: Any) -> Any:
+    key_l = key.lower()
+    if any(s in key_l for s in _SENSITIVE_METADATA_KEYS):
+        return "[REDACTED]"
+    if isinstance(value, str):
+        if value.startswith(("/", "file://")) or "/workspace" in value or "/home/" in value:
+            return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+    if isinstance(value, dict):
+        return _redact_export_dict(value)
+    if isinstance(value, list):
+        return [_scrub_value(key, item) for item in value]
+    return value
+
+
+def _redact_export_dict(data: dict[str, Any]) -> dict[str, Any]:
+    return {k: _scrub_value(k, v) for k, v in data.items()}
+
+
+def redact_entries_for_export(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Observation-lane redaction — strip secrets and filesystem paths from bundle exports."""
+    redacted: list[dict[str, Any]] = []
+    for entry in entries:
+        row = dict(entry)
+        metadata = row.get("metadata")
+        if isinstance(metadata, dict):
+            row["metadata"] = _redact_export_dict(metadata)
+        payload = row.get("payload")
+        if isinstance(payload, dict):
+            row["payload"] = _redact_export_dict(payload)
+        if row.get("event_type") in ("agent_trace", "agent_step", "checkpoint"):
+            try:
+                from ai_kit.export import redact_trace_entry
+
+                row = redact_trace_entry(row)
+            except ImportError:
+                pass
+        if row.get("event_type") == "agent_action":
+            try:
+                from agent_ledger.export import redact_permit_entry
+
+                row = redact_permit_entry(row)
+            except ImportError:
+                pass
+        redacted.append(row)
+    return redacted
 
 
 def validate_before_export(
@@ -114,9 +195,12 @@ def _write_bundle_files(
     verify_dict: dict[str, Any],
     product: str | None = None,
     extra_files: dict[str, Path] | None = None,
+    observation_lane: bool = False,
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     entries = ledger.list_entries()
+    if observation_lane:
+        entries = redact_entries_for_export(entries)
     wal_all = ledger.wal.read_all()
 
     manifest: dict[str, Any] = {
@@ -133,6 +217,9 @@ def _write_bundle_files(
     }
     if product:
         manifest["product"] = product
+    if observation_lane:
+        manifest["observation_lane"] = True
+        manifest["redaction"] = "metadata_and_paths_scrubbed"
 
     leaf_hashes = [
         str(e.get("entry_hash") or e.get("entry_id") or "")
@@ -187,6 +274,8 @@ def _write_bundle_files(
         f"lamport_ok: {validation.lamport_ok}\n"
         f"institutional_check: {report_dict.get('passed')}\n"
     )
+    if observation_lane:
+        readme += "observation_lane: true (secrets and host paths redacted; chain intact)\n"
     (out_dir / "README.txt").write_text(readme, encoding="utf-8")
 
 
@@ -282,11 +371,47 @@ def verify_audit_bundle(
 
     genesis_row = entries[0] if entries else None
     genesis = verify_genesis_block(genesis_row, anchor=anchor)
-    chain = verify_chain(entries, anchor=anchor, require_genesis=True)
+    observation_lane = isinstance(manifest, dict) and bool(manifest.get("observation_lane"))
+    chain_fn = verify_chain_linkage if observation_lane else verify_chain
+    chain = chain_fn(entries, anchor=anchor, require_genesis=True)
     lamport_ok = verify_lamport_monotonic(entries)
-    inst_passed = bool((report or {}).get("passed")) if isinstance(report, dict) else False
+    inst_passed = False
+    inst_msg = "institutional check not run offline"
+    try:
+        from inst_spine.check import run_institutional_check
 
-    ok = genesis.ok and chain.ok and lamport_ok and sha_ok and inst_passed
+        product = (manifest or {}).get("product") if isinstance(manifest, dict) else None
+        if isinstance(report, dict) and report.get("passed") is not None:
+            inst_passed = bool(report.get("passed"))
+            inst_msg = str(report.get("summary") or "embedded institutional check")
+        else:
+            ctx: dict[str, Any] = {
+                "ledger_entries": entries,
+                "actual_count": len(entries),
+                "chain_ok": chain.ok,
+                "lamport_monotonic": lamport_ok,
+            }
+            if product:
+                ctx["product"] = product
+            inst_report = run_institutional_check(context=ctx, run_f9=False)
+            inst_passed = bool(inst_report.passed)
+            inst_msg = inst_report.summary
+    except Exception as exc:
+        inst_msg = f"institutional check replay failed: {exc}"
+
+    sig_ok = True
+    sig_msg = "signature_not_required"
+    sidecar_sig = tar_path.with_suffix(tar_path.suffix + ".sig.json")
+    signing_key = os.getenv("INST_BUNDLE_SIGNING_KEY", "").strip()
+    if sidecar_sig.is_file():
+        from inst_spine.bundle_sign import verify_signature_sidecar
+
+        sig_ok, sig_msg = verify_signature_sidecar(tar_path)
+    elif signing_key:
+        sig_ok = False
+        sig_msg = "bundle_signature_sidecar_missing"
+
+    ok = genesis.ok and chain.ok and lamport_ok and sha_ok and inst_passed and sig_ok
     if not sha_ok:
         msg = "bundle SHA256 mismatch"
     elif not genesis.ok:
@@ -296,7 +421,9 @@ def verify_audit_bundle(
     elif not lamport_ok:
         msg = "lamport sequence violation"
     elif not inst_passed:
-        msg = "institutional check failed in bundle"
+        msg = inst_msg or "institutional check failed on offline replay"
+    elif not sig_ok:
+        msg = sig_msg
     else:
         msg = "offline bundle verification passed"
 
@@ -314,6 +441,9 @@ def verify_audit_bundle(
             "protocol": (manifest or {}).get("protocol") if isinstance(manifest, dict) else None,
             "product": (manifest or {}).get("product") if isinstance(manifest, dict) else None,
             "instance_uuid": (manifest or {}).get("instance_uuid") if isinstance(manifest, dict) else None,
+            "signature_ok": sig_ok,
+            "signature_message": sig_msg,
+            "institutional_message": inst_msg,
         },
     )
 
@@ -328,6 +458,7 @@ def build_audit_bundle(
     repro_run: bool = False,
     product: str | None = None,
     extra_files: dict[str, Path] | None = None,
+    observation_lane: bool | None = None,
 ) -> AuditBundleResult:
     """
     Full P2 pipeline:
@@ -338,6 +469,7 @@ def build_audit_bundle(
     tar_path = tarball_path or db.parent / "audit_bundle.tar"
 
     ledger = AppendOnlyLedger(db)
+    lane = observation_lane if observation_lane is not None else _export_observation_lane_enabled(product)
     try:
         if anchor_path is not None and Path(anchor_path).is_file():
             anchor_data = json.loads(Path(anchor_path).read_text(encoding="utf-8"))
@@ -377,6 +509,7 @@ def build_audit_bundle(
             verify_dict=verify_dict,
             product=product,
             extra_files=extra_files,
+            observation_lane=lane,
         )
 
         tar_bytes = deterministic_tarball(out)

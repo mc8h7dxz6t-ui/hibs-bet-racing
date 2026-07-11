@@ -233,15 +233,22 @@ end
 """
 
 
+from inst_spine.idempotency import IdempotencyOutcome
+
+
 class IdempotencyBackend(ABC):
-    """Distributed deduplication — True if unique token registered."""
+    """Distributed deduplication — tri-state outcome."""
 
     @abstractmethod
-    async def consume_idempotency_token(self, key: str, ttl_seconds: int) -> bool:
+    async def consume_idempotency_token(self, key: str, ttl_seconds: int) -> IdempotencyOutcome:
         """
-        Return True if payload token is unique and registered.
-        Return False if already processed within TTL.
+        UNIQUE — first registration in TTL window.
+        DUPLICATE — already processed.
+        BACKEND_ERROR — infra failure; caller must return 503.
         """
+
+    async def revoke_idempotency_token(self, key: str) -> None:
+        """Release token after failed downstream commit — allows safe client retry."""
 
 
 class MemoryIdempotencyBackend(IdempotencyBackend):
@@ -250,15 +257,18 @@ class MemoryIdempotencyBackend(IdempotencyBackend):
     def __init__(self) -> None:
         self._storage: dict[str, float] = {}
 
-    async def consume_idempotency_token(self, key: str, ttl_seconds: int) -> bool:
+    async def consume_idempotency_token(self, key: str, ttl_seconds: int) -> IdempotencyOutcome:
         now = monotonic_seconds()
         exp = self._storage.get(key)
         if exp is not None and exp >= now:
-            return False
+            return IdempotencyOutcome.DUPLICATE
         if exp is not None:
             del self._storage[key]
         self._storage[key] = now + float(ttl_seconds)
-        return True
+        return IdempotencyOutcome.UNIQUE
+
+    async def revoke_idempotency_token(self, key: str) -> None:
+        self._storage.pop(key, None)
 
 
 class RedisIdempotencyBackend(IdempotencyBackend):
@@ -272,20 +282,26 @@ class RedisIdempotencyBackend(IdempotencyBackend):
     def _full_key(self, key: str) -> str:
         return f"{self._prefix}{key}"
 
-    async def consume_idempotency_token(self, key: str, ttl_seconds: int) -> bool:
+    async def consume_idempotency_token(self, key: str, ttl_seconds: int) -> IdempotencyOutcome:
         import logging
 
         logger = logging.getLogger("inst-spine.rates")
         try:
             result = await self._script(keys=[self._full_key(key)], args=[ttl_seconds])
-            return bool(int(result or 0) == 1)
+            return IdempotencyOutcome.UNIQUE if int(result or 0) == 1 else IdempotencyOutcome.DUPLICATE
         except Exception as exc:
             logger.critical(
                 "IDEMPOTENCY_BACKEND_DISRUPTED: key %s failed (%s) — fail-closed",
                 key,
                 exc,
             )
-            return False
+            return IdempotencyOutcome.BACKEND_ERROR
+
+    async def revoke_idempotency_token(self, key: str) -> None:
+        try:
+            await self.redis.delete(self._full_key(key))
+        except Exception:
+            pass
 
 
 def idempotency_backend_from_env(*, redis_client: Any | None = None) -> IdempotencyBackend:

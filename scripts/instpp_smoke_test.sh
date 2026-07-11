@@ -45,6 +45,9 @@ echo "==> Running institutional test suite (12 SKUs)"
   tests/test_altdata_structural_golden.py \
   tests/test_webhook_mesh_chaos.py \
   tests/test_bundle_sign.py \
+  tests/test_production_profile.py \
+  tests/test_sku_layer_hardening.py \
+  tests/test_phase3_buyer_depth.py \
   -q
 
 echo "==> Compliance export repro-check (ephemeral DB)"

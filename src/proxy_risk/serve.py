@@ -10,8 +10,10 @@ from fastapi import FastAPI, Request, status
 
 from inst_spine.health_probes import ledger_chain_ready, readiness_payload, redis_ready_from_env, sqlite_db_ready
 from inst_spine.http_lifecycle import error_envelope, json_response, make_lifespan
+from inst_spine.ingress_guard import install_body_size_limit_middleware
 from inst_spine.ledger import AppendOnlyLedger
-from inst_spine.middleware import install_api_key_middleware
+from inst_spine.middleware import install_api_key_middleware, install_proxy_client_auth_middleware
+from inst_spine.production_profile import production_profile_enabled, redis_production_check
 from inst_spine.rates import (
     MemoryIdempotencyBackend,
     MemoryTokenBucketBackend,
@@ -88,6 +90,12 @@ app = FastAPI(
     lifespan=make_lifespan(_startup, _shutdown),
 )
 install_api_key_middleware(app, env_var="PROXY_RISK_API_KEY")
+install_proxy_client_auth_middleware(app)
+install_body_size_limit_middleware(app)
+
+
+def _live_requires_redis() -> bool:
+    return (not state.shadow_mode) or production_profile_enabled()
 
 
 @app.get("/health")
@@ -109,7 +117,12 @@ async def health() -> dict[str, Any]:
 async def ready() -> Any:
     ledger_db_ok, ledger_db_detail = sqlite_db_ready(state.ledger_db)
     chain_ok, chain_detail = ledger_chain_ready(state.ledger_db)
-    redis_ok, redis_detail = redis_ready_from_env()
+    if _live_requires_redis():
+        redis_ok, redis_detail = redis_production_check()
+        if not redis_ok:
+            redis_detail = f"live_mode_requires_redis:{redis_detail}"
+    else:
+        redis_ok, redis_detail = redis_ready_from_env()
     body = readiness_payload(
         product="proxy-risk",
         checks={
@@ -117,7 +130,7 @@ async def ready() -> Any:
             "ledger_chain": (chain_ok, chain_detail),
             "redis_profile": (redis_ok, redis_detail),
         },
-        extra={"shadow": state.shadow_mode},
+        extra={"shadow": state.shadow_mode, "redis_required": _live_requires_redis()},
     )
     return json_response(body, status_code=200 if body["ready"] else 503)
 

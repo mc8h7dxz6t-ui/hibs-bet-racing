@@ -26,12 +26,35 @@ def test_reserve_and_settle(tmp_path: Path):
     assert state2.reserved == 0.0
 
 
-def test_duplicate_request_id_rejected(tmp_path: Path):
+def test_duplicate_request_id_idempotent_reserve(tmp_path: Path):
     wallet = SpendWallet(tmp_path / "w.sqlite", initial_balance=100.0)
-    ok1, _, h1 = wallet.reserve(10.0, request_id="dup")
-    ok2, reason2, _ = wallet.reserve(10.0, request_id="dup")
-    assert ok1 and not ok2
-    assert "duplicate" in reason2
+    ok1, reason1, h1 = wallet.reserve(10.0, request_id="dup")
+    ok2, reason2, h2 = wallet.reserve(10.0, request_id="dup")
+    assert ok1 and ok2
+    assert h1 == h2
+    assert reason2 == "already_reserved"
+    state = wallet.get_state()
+    assert state.reserved == 10.0
+
+
+def test_duplicate_request_id_amount_mismatch(tmp_path: Path):
+    wallet = SpendWallet(tmp_path / "w.sqlite", initial_balance=100.0)
+    ok1, _, _ = wallet.reserve(10.0, request_id="dup")
+    assert ok1
+    ok2, reason2, _ = wallet.reserve(20.0, request_id="dup")
+    assert not ok2
+    assert "amount_mismatch" in reason2
+
+
+def test_settle_idempotent(tmp_path: Path):
+    wallet = SpendWallet(tmp_path / "w.sqlite", initial_balance=100.0)
+    ok, _, hold = wallet.reserve(15.0, request_id="s1")
+    assert ok and hold
+    ok1, reason1 = wallet.settle(hold or "", actual_amount=12.0)
+    ok2, reason2 = wallet.settle(hold or "", actual_amount=12.0)
+    assert ok1 and ok2
+    assert reason2 == "already_settled"
+    assert wallet.get_state().balance == 88.0
 
 
 def test_insufficient_balance(tmp_path: Path):
@@ -39,6 +62,23 @@ def test_insufficient_balance(tmp_path: Path):
     ok, reason, _ = wallet.reserve(50.0, request_id="r1")
     assert not ok
     assert "insufficient" in reason
+
+
+def test_hold_reap_releases_stranded_reserve(tmp_path: Path):
+    from datetime import datetime, timedelta, timezone
+
+    wallet = SpendWallet(tmp_path / "w.sqlite", initial_balance=100.0)
+    ok, _, hold = wallet.reserve(30.0, request_id="stale")
+    assert ok and hold
+    assert wallet.get_state().reserved == 30.0
+    stale = (datetime.now(timezone.utc) - timedelta(seconds=7200)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with wallet._connect() as conn:
+        conn.execute("UPDATE spend_holds SET created_at = ? WHERE hold_id = ?", (stale, hold))
+    reaped = wallet.reap_expired_holds(ttl_seconds=3600)
+    assert reaped == 1
+    state = wallet.get_state()
+    assert state.reserved == 0.0
+    assert state.available == 100.0
 
 
 def test_drift_lockout(tmp_path: Path):
@@ -99,6 +139,9 @@ def test_spend_guard_serve_mock_chat(tmp_path: Path, monkeypatch):
     serve_mod.state.mock_upstream = True
     serve_mod.state.shadow_mode = False
     serve_mod.state.upstream_api_key = ""
+    serve_mod.state.gateway = None
+    serve_mod.state.ledger = None
+    monkeypatch.delenv("SPEND_GUARD_API_KEY", raising=False)
 
     with TestClient(serve_mod.app) as client:
         r = client.get("/health")
@@ -142,6 +185,8 @@ def test_spend_guard_serve_locked_wallet(tmp_path: Path, monkeypatch):
     serve_mod.state.ledger_db = str(ledger_db)
     serve_mod.state.mock_upstream = True
     serve_mod.state.gateway = None
+    serve_mod.state.ledger = None
+    monkeypatch.delenv("SPEND_GUARD_API_KEY", raising=False)
 
     with TestClient(serve_mod.app) as client:
         r = client.post(

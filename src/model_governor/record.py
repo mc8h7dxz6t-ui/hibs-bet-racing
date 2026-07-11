@@ -10,6 +10,7 @@ from inst_spine.coverage import compute_snapshot_coverage
 from inst_spine.errors import IngestValidationError
 from inst_spine.ledger import AppendOnlyLedger
 from model_governor.lifecycle import validate_deploy_drift_gate, validate_lifecycle_transition
+from model_governor.integrity import validate_artifact_hash
 
 GOVERNANCE_ACTIONS = frozenset(
     {"register", "approve", "reject", "deploy", "retire", "drift_alert"}
@@ -56,6 +57,8 @@ def record_governance_event(
     missing = [f for f in REQUIRED_MODEL_FIELDS if not model_snapshot.get(f)]
     if missing:
         raise IngestValidationError(f"model_snapshot missing required fields: {missing}")
+
+    validate_artifact_hash(model_snapshot)
 
     db = database or _default_db()
     validate_lifecycle_transition(

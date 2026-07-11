@@ -6,6 +6,7 @@ import sqlite3
 import threading
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -45,7 +46,19 @@ CREATE TABLE IF NOT EXISTS spend_holds (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_spend_holds_request
     ON spend_holds(wallet_id, request_id);
+CREATE INDEX IF NOT EXISTS idx_spend_holds_status_created
+    ON spend_holds(status, created_at);
 """
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _default_hold_ttl_seconds() -> int:
+    import os
+
+    return int(os.getenv("SPEND_HOLD_TTL_SECONDS", "3600"))
 
 
 class SpendWallet:
@@ -177,21 +190,36 @@ class SpendWallet:
             with self._connect() as conn:
                 conn.execute("BEGIN IMMEDIATE")
                 existing = conn.execute(
-                    "SELECT hold_id, status FROM spend_holds WHERE wallet_id = ? AND request_id = ?",
+                    "SELECT hold_id, status, amount FROM spend_holds WHERE wallet_id = ? AND request_id = ?",
                     (self.wallet_id, request_id),
                 ).fetchone()
                 if existing:
                     conn.execute("ROLLBACK")
-                    return False, "duplicate_request_id", str(existing[0])
+                    hold_id_existing, status_existing, amount_existing = (
+                        str(existing[0]),
+                        str(existing[1]),
+                        float(existing[2]),
+                    )
+                    if status_existing == "reserved":
+                        if amount_existing != amount:
+                            return (
+                                False,
+                                "duplicate_request_id_amount_mismatch",
+                                hold_id_existing,
+                            )
+                        return True, "already_reserved", hold_id_existing
+                    if status_existing == "settled":
+                        return True, "already_settled", hold_id_existing
+                    return False, f"duplicate_request_id_status:{status_existing}", hold_id_existing
 
                 conn.execute(
                     "UPDATE spend_wallet SET reserved = reserved + ? WHERE wallet_id = ?",
                     (amount, self.wallet_id),
                 )
                 conn.execute(
-                    "INSERT INTO spend_holds (hold_id, wallet_id, amount, request_id, status) "
-                    "VALUES (?, ?, ?, ?, 'reserved')",
-                    (hold_id, self.wallet_id, amount, request_id),
+                    "INSERT INTO spend_holds (hold_id, wallet_id, amount, request_id, status, created_at) "
+                    "VALUES (?, ?, ?, ?, 'reserved', ?)",
+                    (hold_id, self.wallet_id, amount, request_id, _utc_now()),
                 )
                 conn.execute("COMMIT")
             return True, "reserved", hold_id
@@ -209,6 +237,9 @@ class SpendWallet:
                     conn.execute("ROLLBACK")
                     return False, "hold_not_found"
                 reserved_amt, status, _req = float(row[0]), row[1], row[2]
+                if status == "settled":
+                    conn.execute("ROLLBACK")
+                    return True, "already_settled"
                 if status != "reserved":
                     conn.execute("ROLLBACK")
                     return False, f"hold_status:{status}"
@@ -260,6 +291,31 @@ class SpendWallet:
                 )
                 conn.execute("COMMIT")
             return True, "released"
+
+    def reap_expired_holds(self, *, ttl_seconds: int | None = None) -> int:
+        """Release reserved holds past TTL — prevents stranded reserved balance."""
+        ttl = ttl_seconds if ttl_seconds is not None else _default_hold_ttl_seconds()
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=ttl)
+        cutoff_s = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
+        reaped = 0
+        with self._lock:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    "SELECT hold_id FROM spend_holds "
+                    "WHERE wallet_id = ? AND status = 'reserved' AND created_at != '' AND created_at < ?",
+                    (self.wallet_id, cutoff_s),
+                ).fetchall()
+        for (hold_id,) in rows:
+            ok, reason = self.release(str(hold_id))
+            if ok:
+                reaped += 1
+            else:
+                import logging
+
+                logging.getLogger("spend_guard.wallet").warning(
+                    "HOLD_REAP_FAILED hold_id=%s reason=%s", hold_id, reason
+                )
+        return reaped
 
     def to_dict(self) -> dict[str, Any]:
         s = self.get_state()

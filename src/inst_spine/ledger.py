@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS inst_ledger (
     entry_hash TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_inst_ledger_lamport ON inst_ledger(writer_id, lamport_seq);
+CREATE INDEX IF NOT EXISTS idx_inst_ledger_event_type ON inst_ledger(event_type);
 CREATE TABLE IF NOT EXISTS inst_ledger_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -329,11 +330,8 @@ class AppendOnlyLedger:
             conn.commit()
 
     def list_entries(self, *, limit: int = 10000) -> list[dict[str, Any]]:
-        """Authoritative order from WAL (survives SQLite lag)."""
-        records = self.wal.read_all()
-        if limit and len(records) > limit:
-            records = records[:limit]
-        return records
+        """Authoritative order from WAL tail (survives SQLite lag)."""
+        return self.wal.read_tail(limit=limit)
 
     def verify(self) -> dict[str, Any]:
         entries = self.list_entries()

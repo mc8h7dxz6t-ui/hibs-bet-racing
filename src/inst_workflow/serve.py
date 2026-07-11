@@ -21,6 +21,13 @@ from inst_workflow.demo_bootstrap import bootstrap_all, bootstrap_product
 from proxy_risk.router import ProxyRequest, ProxyRiskGateway
 
 from inst_spine.middleware import install_api_key_middleware
+from inst_spine.ingress_guard import install_body_size_limit_middleware
+from inst_spine.health_probes import readiness_payload
+from inst_spine.production_profile import (
+    postgres_ha_check,
+    production_profile_enabled,
+    redis_production_check,
+)
 
 STATIC_DIR = Path(__file__).parent / "static"
 VALID_PRODUCTS = frozenset({"compliance", "proxy", "both"})
@@ -30,6 +37,10 @@ install_api_key_middleware(
     app,
     env_var="INST_WORKFLOW_API_KEY",
     skip_paths=frozenset({"/health", "/ready", "/", "/api/config"}),
+)
+install_body_size_limit_middleware(
+    app,
+    skip_paths=frozenset({"/health", "/ready", "/", "/api/config", "/static"}),
 )
 
 
@@ -151,17 +162,34 @@ async def health() -> dict[str, Any]:
 @app.get("/ready")
 async def ready() -> dict[str, Any]:
     """K8s readiness — Proof Console usable when portfolio is seeded."""
+    from fastapi.responses import JSONResponse
+
     catalog = list_catalog(demo_dir=state.demo_dir)
     seeded = sum(1 for c in catalog if c.get("database_present"))
-    ok = seeded >= len(PRODUCT_CATALOG)
-    return {
-        "ok": ok,
-        "ready": ok,
-        "portfolio_seeded": seeded,
-        "portfolio_total": len(PRODUCT_CATALOG),
-        "demo_dir": str(state.demo_dir),
-        "message": "12/12 seeded" if ok else f"run make demo-all or POST /api/proof/bootstrap-all ({seeded}/12)",
+    portfolio_ok = seeded >= len(PRODUCT_CATALOG)
+    checks: dict[str, tuple[bool, str]] = {
+        "portfolio_seeded": (
+            portfolio_ok,
+            f"{seeded}/{len(PRODUCT_CATALOG)} seeded",
+        ),
     }
+    if production_profile_enabled():
+        redis_ok, redis_detail = redis_production_check()
+        pg_ok, pg_detail = postgres_ha_check(os.getenv("INST_POSTGRES_DSN", ""))
+        checks["redis_profile"] = (redis_ok, redis_detail)
+        checks["postgres_ha"] = (pg_ok, pg_detail)
+    body = readiness_payload(
+        product="inst-workflow",
+        checks=checks,
+        extra={
+            "demo_dir": str(state.demo_dir),
+            "production_profile": production_profile_enabled(),
+            "portfolio_seeded": seeded,
+            "portfolio_total": len(PRODUCT_CATALOG),
+        },
+    )
+    status_code = 200 if body["ready"] else 503
+    return JSONResponse(content=body, status_code=status_code)
 
 
 @app.get("/api/products")

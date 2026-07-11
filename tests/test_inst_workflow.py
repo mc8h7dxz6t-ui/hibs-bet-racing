@@ -214,12 +214,12 @@ def test_ready_not_seeded(workflow_client):
     serve_mod.state.demo_dir.mkdir(parents=True, exist_ok=True)
 
     r = client.get("/ready")
-    assert r.status_code == 200
+    assert r.status_code == 503
     body = r.json()
     assert body["ok"] is False
     assert body["ready"] is False
-    assert body["portfolio_seeded"] == 0
-    assert body["portfolio_total"] == 12
+    assert body["checks"]["portfolio_seeded"]["ok"] is False
+    assert "0/12" in body["checks"]["portfolio_seeded"]["detail"]
 
 
 def test_health_portfolio_seeded_count(workflow_client):

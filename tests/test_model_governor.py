@@ -9,16 +9,19 @@ import pytest
 from inst_spine.errors import IngestValidationError
 from inst_spine.product_cli import run_institutional_export, run_institutional_verify
 from model_governor.record import record_governance_event
+from model_governor.integrity import compute_artifact_digest
 
 
 def _snapshot() -> dict:
-    return {
+    base = {
         "model_id": "test-model",
         "version": "1.0.0",
-        "artifact_hash": "sha256:test",
         "risk_tier": "medium",
         "metrics": {"auc": 0.9},
     }
+    digest = compute_artifact_digest({**base, "artifact_hash": "pending"})
+    base["artifact_hash"] = f"sha256:{digest}"
+    return base
 
 
 def test_model_governor_record_and_chain(tmp_path: Path):

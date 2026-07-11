@@ -228,6 +228,72 @@ def verify_chain(
     )
 
 
+def verify_chain_linkage(
+    entries: list[dict[str, Any]],
+    *,
+    anchor: dict[str, Any] | None = None,
+    require_genesis: bool = True,
+) -> ChainVerifyResult:
+    """
+    Observation-lane offline verify — trust stored entry_hash links without
+    recomputing from redacted payloads (export-time PHI/secret scrub).
+    """
+    if not entries:
+        return ChainVerifyResult(
+            ok=False,
+            entries_checked=0,
+            first_mismatch_index=None,
+            message="empty chain — genesis block required",
+            genesis_ok=False,
+        )
+
+    genesis_row = entries[0]
+    genesis_result = verify_genesis_block(genesis_row if require_genesis else None, anchor=anchor)
+    if require_genesis and not genesis_result.ok:
+        return ChainVerifyResult(
+            ok=False,
+            entries_checked=0,
+            first_mismatch_index=0,
+            message=genesis_result.message,
+            genesis_ok=False,
+        )
+
+    prev = str(genesis_row.get("entry_hash") or GENESIS_PREV_HASH)
+    start_idx = 1 if require_genesis else 0
+    if not require_genesis:
+        prev = GENESIS_PREV_HASH
+
+    for idx in range(start_idx, len(entries)):
+        row = entries[idx]
+        stored_prev = str(row.get("prev_hash") or "")
+        if stored_prev != prev:
+            return ChainVerifyResult(
+                ok=False,
+                entries_checked=idx,
+                first_mismatch_index=idx,
+                message=f"prev_hash mismatch at index {idx}",
+                genesis_ok=genesis_result.ok if require_genesis else False,
+            )
+        stored = str(row.get("entry_hash") or "")
+        if not stored or stored == GENESIS_PREV_HASH:
+            return ChainVerifyResult(
+                ok=False,
+                entries_checked=idx,
+                first_mismatch_index=idx,
+                message=f"missing entry_hash at index {idx}",
+                genesis_ok=genesis_result.ok if require_genesis else False,
+            )
+        prev = stored
+
+    return ChainVerifyResult(
+        ok=True,
+        entries_checked=len(entries),
+        first_mismatch_index=None,
+        message=f"chain linkage verified ({len(entries)} entries incl. genesis)",
+        genesis_ok=True,
+    )
+
+
 def verify_lamport_monotonic(entries: list[dict[str, Any]], *, writer_id: str | None = None) -> bool:
     """F4: lamport_seq strictly increasing per writer (genesis seq 0 excluded from tick stream)."""
     last: dict[str, int] = {}

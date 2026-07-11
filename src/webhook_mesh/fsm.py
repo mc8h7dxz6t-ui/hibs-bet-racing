@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import asyncio
+import hmac
 import json
 import logging
 from pathlib import Path
@@ -136,24 +138,6 @@ async def handle_dead_letter_allocation(
 ) -> Path | None:
     from webhook_mesh.audit import append_delivery_event
 
-    append_delivery_event(
-        manifest_id=manifest_id,
-        client_id=client_id,
-        payload_id=payload_id,
-        target_url=target_url,
-        status="DEAD_LETTER",
-        lamport=lamport,
-        raw_bytes=payload,
-        dispatch_mode=dispatch_mode,
-        extra={
-            "last_status_code": last_status_code,
-            "failure_reason": failure_reason,
-            "attempts": attempts,
-        },
-    )
-    base = Path(dead_letter_dir or "./data/dead_letter")
-    base.mkdir(parents=True, exist_ok=True)
-    path = base / f"{manifest_id}.bin"
     meta = build_dead_letter_meta(
         manifest_id=manifest_id,
         payload=payload,
@@ -163,6 +147,26 @@ async def handle_dead_letter_allocation(
         failure_reason=failure_reason,
         attempts=attempts,
     )
+    delivery_status = "POISON" if meta.get("replay_blocked") else "DEAD_LETTER"
+    append_delivery_event(
+        manifest_id=manifest_id,
+        client_id=client_id,
+        payload_id=payload_id,
+        target_url=target_url,
+        status=delivery_status,
+        lamport=lamport,
+        raw_bytes=payload,
+        dispatch_mode=dispatch_mode,
+        extra={
+            "last_status_code": last_status_code,
+            "failure_reason": failure_reason,
+            "attempts": attempts,
+            "block_reason": meta.get("block_reason"),
+        },
+    )
+    base = Path(dead_letter_dir or "./data/dead_letter")
+    base.mkdir(parents=True, exist_ok=True)
+    path = base / f"{manifest_id}.bin"
     meta_path = dead_letter_meta_path(
         base,
         manifest_id=manifest_id,
@@ -185,7 +189,7 @@ async def replay_dead_letter(
     *,
     manifest_id: str | None = None,
     payload_id: str | None = None,
-    schema_version: str | None = None,
+    poison_override_token: str | None = None,
 ) -> tuple[bool, str]:
     record = find_dead_letter_record(
         dead_letter_dir, manifest_id=manifest_id, payload_id=payload_id
@@ -193,9 +197,14 @@ async def replay_dead_letter(
     if record is None:
         return False, "dead_letter_not_found"
     bin_path, meta_path, meta = record
-    if schema_version:
+    if poison_override_token:
+        import os
+
+        expected = os.getenv("WEBHOOK_POISON_OVERRIDE_TOKEN", "").strip()
+        if not expected or not hmac.compare_digest(expected, poison_override_token.strip()):
+            return False, "poison_override_denied"
         meta = dict(meta)
-        meta["schema_version_required"] = schema_version
+        meta["poison_override_token"] = poison_override_token.strip()
         meta_path.write_text(json.dumps(meta, indent=2, sort_keys=True), encoding="utf-8")
     allowed, reason = can_replay_dead_letter(meta)
     if not allowed:

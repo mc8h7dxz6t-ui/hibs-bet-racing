@@ -14,10 +14,14 @@ from fastapi import FastAPI, Request, Response, status
 from inst_spine.clocks import LamportClock
 from inst_spine.health_probes import readiness_payload, redis_ready_from_env
 from inst_spine.http_lifecycle import make_lifespan
+from inst_spine.idempotency import IdempotencyOutcome
+from inst_spine.ingress_guard import install_body_size_limit_middleware, validate_forward_url
+from inst_spine.middleware import install_api_key_middleware
 from inst_spine.rates import IdempotencyBackend, RedisIdempotencyBackend, idempotency_backend_from_env
 from inst_spine.wal import WALWriter
 from webhook_mesh.hmac_verify import verify_webhook_signature
 from webhook_mesh.audit import append_ingress_event
+from inst_spine.production_profile import webhook_dispatch_check
 from webhook_mesh.queue import (
     BackgroundDeliveryQueue,
     DeliveryManifest,
@@ -83,6 +87,12 @@ app = FastAPI(
     title="Webhook Idempotency Mesh Engine",
     lifespan=make_lifespan(_startup, _shutdown),
 )
+install_api_key_middleware(
+    app,
+    env_var="WEBHOOK_MESH_API_KEY",
+    skip_prefixes=("/static", "/v1/ingress"),
+)
+install_body_size_limit_middleware(app)
 
 
 @app.get("/health")
@@ -95,9 +105,10 @@ async def ready() -> Response:
     wal_ok = state.wal_writer is not None
     secret_ok = bool(state.provider_secret)
     redis_ok, redis_detail = redis_ready_from_env()
-    redis_required = state.dispatch_mode == "redis"
-    if redis_required and not os.getenv("INST_REDIS_URL", "").strip():
-        redis_ok, redis_detail = False, "INST_REDIS_URL required for redis dispatch"
+    dispatch_ok, dispatch_detail = webhook_dispatch_check(state.dispatch_mode)
+    if not dispatch_ok:
+        redis_ok = False
+        redis_detail = dispatch_detail
     queue_ok = state.delivery_queue is not None
     body = readiness_payload(
         product="webhook-mesh",
@@ -106,8 +117,9 @@ async def ready() -> Response:
             "ingress_wal": (wal_ok, "wal_online" if wal_ok else "wal_not_initialized"),
             "delivery_queue": (queue_ok, "queue_online" if queue_ok else "queue_not_initialized"),
             "redis_profile": (redis_ok, redis_detail),
+            "durable_dispatch": (dispatch_ok, dispatch_detail),
         },
-        extra={"dispatch_mode": state.dispatch_mode, "redis_required": redis_required},
+        extra={"dispatch_mode": state.dispatch_mode},
     )
     code = status.HTTP_200_OK if body["ready"] else status.HTTP_503_SERVICE_UNAVAILABLE
     return Response(content=json.dumps(body), status_code=code, media_type="application/json")
@@ -189,6 +201,16 @@ async def _handle_ingress(
             status.HTTP_400_BAD_REQUEST,
         )
 
+    url_ok, url_reason = validate_forward_url(target_url, client_id=client_id)
+    if not url_ok:
+        return _json_response(
+            {"error": "forward_url_rejected", "reason": url_reason},
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    if len(raw_payload) > int(os.getenv("INST_MAX_BODY_BYTES", str(10 * 1024 * 1024))):
+        return _json_response({"error": "payload_too_large"}, status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+
     if not verify_webhook_signature(
         raw_payload,
         provider_sig,
@@ -206,10 +228,16 @@ async def _handle_ingress(
 
     idempotency_key = f"idemp:{client_id}:{payload_id}"
     ttl = int(os.getenv("WEBHOOK_IDEMPOTENCY_TTL_SECONDS", "86400"))
-    is_unique = await state.idempotency_db.consume_idempotency_token(
+
+    idem_outcome = await state.idempotency_db.consume_idempotency_token(
         idempotency_key, ttl_seconds=ttl
     )
-    if not is_unique:
+    if idem_outcome is IdempotencyOutcome.BACKEND_ERROR:
+        return _json_response(
+            {"error": "idempotency_backend_unavailable"},
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    if idem_outcome is IdempotencyOutcome.DUPLICATE:
         return {
             "status": "ALREADY_PROCESSED",
             "payload_id": payload_id,
@@ -217,7 +245,7 @@ async def _handle_ingress(
         }
 
     state.clock.tick()
-    manifest_id = str(uuid.uuid4())
+    manifest_id = f"{client_id}:{payload_id}"
     state.wal_writer.append(
         payload={
             "manifest_id": manifest_id,
@@ -256,17 +284,25 @@ async def _handle_ingress(
         except Exception:
             logger.exception("webhook-replay capture failed (ingress already WAL-acked)")
 
-    await state.delivery_queue.enqueue(
-        DeliveryManifest(
-            manifest_id=manifest_id,
-            payload=raw_payload,
-            target_url=target_url,
-            lamport=state.clock.value,
-            client_id=client_id,
-            payload_id=payload_id,
-            dead_letter_dir=state.dead_letter_dir,
+    try:
+        await state.delivery_queue.enqueue(
+            DeliveryManifest(
+                manifest_id=manifest_id,
+                payload=raw_payload,
+                target_url=target_url,
+                lamport=state.clock.value,
+                client_id=client_id,
+                payload_id=payload_id,
+                dead_letter_dir=state.dead_letter_dir,
+            )
         )
-    )
+    except Exception as exc:
+        logger.critical("WEBHOOK_ENQUEUE_FAILED manifest=%s err=%s", manifest_id, exc)
+        await state.idempotency_db.revoke_idempotency_token(idempotency_key)
+        return _json_response(
+            {"error": "delivery_enqueue_failed", "manifest_id": manifest_id},
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
 
     try:
         append_ingress_event(

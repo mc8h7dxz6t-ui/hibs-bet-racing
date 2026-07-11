@@ -116,5 +116,19 @@ class CaptureStore:
     def list_captures(self) -> list[Path]:
         return sorted(self.base_dir.glob("*.wrcap"))
 
+    def prune_older_than(self, *, max_files: int | None = None) -> int:
+        """F8-aligned retention — drop oldest captures when over cap."""
+        import os
+
+        cap = max_files if max_files is not None else int(os.getenv("WEBHOOK_REPLAY_MAX_CAPTURES", "10000"))
+        files = self.list_captures()
+        if len(files) <= cap:
+            return 0
+        removed = 0
+        for path in files[: len(files) - cap]:
+            path.unlink(missing_ok=True)
+            removed += 1
+        return removed
+
     def read_by_id(self, capture_id: str) -> tuple[CaptureManifest, bytes]:
         return self.read(self._path_for(capture_id))

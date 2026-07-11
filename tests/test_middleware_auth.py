@@ -70,6 +70,42 @@ def test_spend_guard_requires_api_key(tmp_path, monkeypatch):
         assert client.get("/ready").json()["ready"] is True
 
 
+def test_proxy_client_auth(monkeypatch):
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    import hashlib
+    import hmac
+
+    from inst_spine.middleware import device_token_hmac, verify_device_token
+
+    monkeypatch.setenv("PROXY_CLIENT_AUTH_SECRET", "proxy-secret")
+    monkeypatch.setenv("PROXY_RISK_SHADOW", "1")
+    monkeypatch.delenv("PROXY_RISK_API_KEY", raising=False)
+
+    import proxy_risk.serve as mod
+
+    mod.state.gateway = None
+    mod.state.ledger = None
+
+    sig = hmac.new(b"proxy-secret", b"client-a", hashlib.sha256).hexdigest()
+    with TestClient(mod.app) as client:
+        r = client.post(
+            "/v1/evaluate",
+            json={"client_id": "client-a", "method": "POST", "path": "/orders", "body": {}},
+        )
+        assert r.status_code == 401
+        r = client.post(
+            "/v1/evaluate",
+            json={"client_id": "client-a", "method": "POST", "path": "/orders", "body": {}},
+            headers={
+                "X-Inst-Client-Id": "client-a",
+                "X-Proxy-Client-Signature": sig,
+            },
+        )
+        assert r.status_code == 200
+
+
 def test_health_device_token(monkeypatch):
     from inst_spine.middleware import device_token_hmac, verify_device_token
 

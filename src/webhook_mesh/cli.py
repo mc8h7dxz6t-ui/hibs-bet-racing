@@ -51,14 +51,18 @@ def _run_replay(argv: list[str]) -> int:
     parser.add_argument("--dead-letter-dir", default="./data/dead_letter")
     parser.add_argument("--manifest-id", default=None)
     parser.add_argument("--payload-id", default=None)
-    parser.add_argument("--schema-version", default=None)
+    parser.add_argument(
+        "--poison-override-token",
+        default=None,
+        help="Break-glass token matching WEBHOOK_POISON_OVERRIDE_TOKEN for poison DLQ replay",
+    )
     args = parser.parse_args(argv)
     ok, message = asyncio.run(
         replay_dead_letter(
             args.dead_letter_dir,
             manifest_id=args.manifest_id,
             payload_id=args.payload_id,
-            schema_version=args.schema_version,
+            poison_override_token=args.poison_override_token,
         )
     )
     print(f"{'replay_ok' if ok else 'replay_failed'}: {message}")

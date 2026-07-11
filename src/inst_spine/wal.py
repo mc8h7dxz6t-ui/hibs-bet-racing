@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+from collections import deque
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -26,29 +27,33 @@ class AppendOnlyWal:
                 os.fsync(fh.fileno())
 
     def iter_records(self) -> Iterator[dict[str, Any]]:
+        """Stream WAL lines — O(1) memory per line (no unbounded buffer)."""
         if not self.path.exists():
-            return iter(())
-        records: list[dict[str, Any]] = []
-
-        def _gen() -> Iterator[dict[str, Any]]:
-            with open(self.path, encoding="utf-8") as fh:
-                for line in fh:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    records.append(json.loads(line))
-            yield from records
-
-        return _gen()
+            return
+        with open(self.path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                yield json.loads(line)
 
     def read_all(self) -> list[dict[str, Any]]:
         return list(self.iter_records())
 
+    def read_tail(self, *, limit: int = 10000) -> list[dict[str, Any]]:
+        """Bounded tail read — deque maxlen avoids loading full WAL for recent entries."""
+        if limit <= 0:
+            return list(self.iter_records())
+        tail: deque[dict[str, Any]] = deque(maxlen=limit)
+        for record in self.iter_records():
+            tail.append(record)
+        return list(tail)
+
     def tail_hash(self) -> str | None:
-        records = self.read_all()
-        if not records:
-            return None
-        return str(records[-1].get("entry_hash") or "")
+        last_hash: str | None = None
+        for record in self.iter_records():
+            last_hash = str(record.get("entry_hash") or "")
+        return last_hash or None
 
     def count(self) -> int:
         if not self.path.exists():

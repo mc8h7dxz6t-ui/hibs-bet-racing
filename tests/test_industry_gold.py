@@ -159,9 +159,13 @@ def test_webhook_mesh_capture_integration(tmp_path: Path, monkeypatch: pytest.Mo
 def test_spend_wallet_fail_closed_on_duplicate(tmp_path: Path):
     wallet = SpendWallet(tmp_path / "w.sqlite", initial_balance=100.0)
     ok1, _, h1 = wallet.reserve(10.0, request_id="same-id")
-    ok2, reason2, _ = wallet.reserve(10.0, request_id="same-id")
-    assert ok1 and not ok2
-    assert "duplicate" in reason2
+    ok2, reason2, h2 = wallet.reserve(10.0, request_id="same-id")
+    assert ok1 and ok2
+    assert reason2 == "already_reserved"
+    assert h1 == h2
+    ok3, reason3, _ = wallet.reserve(20.0, request_id="same-id")
+    assert not ok3
+    assert "duplicate" in reason3
 
 
 def test_replay_tamper_fails_closed(tmp_path: Path):

@@ -12,6 +12,7 @@ import httpx
 
 from inst_spine.contracts import stable_id
 from inst_spine.gates.circuit import CircuitBreaker, CredentialVault
+from inst_spine.idempotency import IdempotencyOutcome
 from inst_spine.ledger import AppendOnlyLedger
 from inst_spine.rates import (
     IdempotencyBackend,
@@ -140,7 +141,10 @@ class AdGuardGateway:
             f"{req.client_id}:{campaign_id}:{req.method}:{req.path}:"
             f"{json.dumps(req.body, sort_keys=True)}"
         )
-        if not await self.idempotency.consume_idempotency_token(idem_key, self.idempotency_ttl_sec):
+        idem_outcome = await self.idempotency.consume_idempotency_token(idem_key, self.idempotency_ttl_sec)
+        if idem_outcome is IdempotencyOutcome.BACKEND_ERROR:
+            return await self._finish(req, campaign_id, GateDecision.REJECT, "idempotency: backend unavailable")
+        if idem_outcome is IdempotencyOutcome.DUPLICATE:
             return await self._finish(req, campaign_id, GateDecision.REJECT, "idempotency: duplicate request")
 
         spend_signal = spend_delta if spend_delta is not None else bid_amount

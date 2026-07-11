@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from inst_spine.ledger import AppendOnlyLedger
+from inst_spine.ledger_registry import get_ledger
 
 
 def ledger_path() -> Path:
@@ -52,14 +52,13 @@ def append_delivery_event(
     event_type: str = "webhook_delivery",
     extra: dict[str, Any] | None = None,
 ) -> None:
-    """Lifecycle events: FORWARDING, DELIVERED, DEAD_LETTER (+ ingress)."""
-    db = ledger_path()
-    ledger = AppendOnlyLedger(db, writer_id="webhook-mesh", async_writes=False)
+    """Lifecycle events: FORWARDING, DELIVERED, DEAD_LETTER, POISON (+ ingress)."""
+    ledger = get_ledger(ledger_path(), writer_id="webhook-mesh", async_writes=True)
     payload: dict[str, Any] = {
         "manifest_id": manifest_id,
         "client_id": client_id,
         "payload_id": payload_id,
-        "target_url": target_url,
+        "target_url_hash": hashlib.sha256(target_url.encode("utf-8")).hexdigest() if target_url else "",
         "status": status,
         "lamport": lamport,
         "dispatch_mode": dispatch_mode,

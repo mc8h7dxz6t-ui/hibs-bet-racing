@@ -177,12 +177,15 @@ def test_b2_ai_kit_agent_ledger_authorize(tmp_path: Path):
 
 def test_b3_model_governor_lifecycle_fsm(tmp_path: Path):
     db = tmp_path / "mg.sqlite"
-    snap = {
+    from model_governor.integrity import compute_artifact_digest
+
+    base = {
         "model_id": "m",
         "version": "1",
-        "artifact_hash": "a",
         "risk_tier": "low",
     }
+    digest = compute_artifact_digest({**base, "artifact_hash": "pending"})
+    snap = {**base, "artifact_hash": f"sha256:{digest}"}
     record_governance_event(action="register", model_snapshot=snap, database=db)
     with pytest.raises(IngestValidationError, match="lifecycle FSM"):
         record_governance_event(action="deploy", model_snapshot=snap, database=db)

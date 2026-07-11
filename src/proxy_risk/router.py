@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 
 from inst_spine.gates.circuit import CircuitBreaker, CredentialVault
+from inst_spine.idempotency import IdempotencyOutcome
 from inst_spine.ledger import AppendOnlyLedger
 from inst_spine.rates import (
     IdempotencyBackend,
@@ -150,7 +151,10 @@ class ProxyRiskGateway:
         idem_key = req.idempotency_key or (
             f"{req.client_id}:{req.method}:{req.path}:{json.dumps(req.body, sort_keys=True)}"
         )
-        if not await self.idempotency.consume_idempotency_token(idem_key, self.idempotency_ttl_sec):
+        idem_outcome = await self.idempotency.consume_idempotency_token(idem_key, self.idempotency_ttl_sec)
+        if idem_outcome is IdempotencyOutcome.BACKEND_ERROR:
+            return await self._finish(req, GateDecision.REJECT, "idempotency: backend unavailable")
+        if idem_outcome is IdempotencyOutcome.DUPLICATE:
             return await self._finish(req, GateDecision.REJECT, "idempotency: duplicate request")
 
         if req.reference_price is not None:
@@ -209,6 +213,8 @@ class ProxyRiskGateway:
         if status < 200 or status >= 400:
             if hold_id and self._spend_wallet_db:
                 await asyncio.to_thread(self._release_spend, hold_id)
+            self.circuit.record_failure(detail)
+            await self._log_circuit_event(req, f"upstream_failure:{detail}")
             return await self._finish(
                 req,
                 GateDecision.REJECT,
@@ -217,9 +223,22 @@ class ProxyRiskGateway:
                 upstream_body=body,
             )
 
+        self.circuit.record_success()
+
         if hold_id and self._spend_wallet_db:
             actual = self._actual_cost(body, est_cost)
-            await asyncio.to_thread(self._settle_spend, hold_id, spend_request_id, actual)
+            ok, reason = await asyncio.to_thread(
+                self._settle_spend, hold_id, spend_request_id, actual
+            )
+            if not ok:
+                await asyncio.to_thread(self._release_spend, hold_id)
+                return await self._finish(
+                    req,
+                    GateDecision.REJECT,
+                    f"spend_guard: settle failed: {reason}",
+                    upstream_status=status,
+                    upstream_body=body,
+                )
 
         return await self._finish(
             req,
@@ -276,6 +295,7 @@ class ProxyRiskGateway:
             "reason": reason,
             "method": req.method,
             "path": req.path,
+            **self.circuit.transition_snapshot(),
         }
 
         def _append() -> None:
@@ -382,12 +402,12 @@ class ProxyRiskGateway:
             return None, str(result.get("reason") or "reserve_denied")
         return str(result.get("hold_id") or ""), ""
 
-    def _settle_spend(self, hold_id: str, request_id: str, actual: float) -> None:
+    def _settle_spend(self, hold_id: str, request_id: str, actual: float) -> tuple[bool, str]:
         from pathlib import Path
 
         from spend_guard.integrate import settle_api_call
 
-        settle_api_call(
+        result = settle_api_call(
             hold_id=hold_id,
             actual_cost=actual,
             request_id=request_id,
@@ -395,6 +415,10 @@ class ProxyRiskGateway:
             ledger_db=Path(self._spend_ledger_db) if self._spend_ledger_db else None,
             service="proxy-risk",
         )
+        decision = str(result.get("decision") or "")
+        if decision in ("approve", "locked"):
+            return True, str(result.get("reason") or "settled")
+        return False, str(result.get("reason") or "settle_denied")
 
     def _release_spend(self, hold_id: str) -> None:
         from pathlib import Path

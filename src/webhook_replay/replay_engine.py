@@ -131,6 +131,24 @@ class ReplayEngine:
     def replay_all(self) -> list[ReplayResult]:
         return [self.replay_file(p) for p in self.store.list_captures()]
 
+    def replay_batch_parallel(
+        self,
+        paths: list[Path] | None = None,
+        *,
+        max_workers: int | None = None,
+    ) -> list[ReplayResult]:
+        """Bounded parallel replay for large capture sets (scale layer D)."""
+        from concurrent.futures import ThreadPoolExecutor
+        import os
+
+        targets = list(paths or self.store.list_captures())
+        workers = max_workers if max_workers is not None else int(os.getenv("WEBHOOK_REPLAY_WORKERS", "4"))
+        workers = max(1, min(workers, 32))
+        if not targets:
+            return []
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            return list(pool.map(self.replay_file, targets))
+
     def _verify_ingress_lamport(self, manifest: CaptureManifest) -> tuple[bool, str]:
         if self.mesh_ledger_db is None or not self.mesh_ledger_db.is_file():
             return True, "mesh_ledger_not_configured"

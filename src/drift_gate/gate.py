@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -91,25 +92,51 @@ class DriftGate:
         baseline: FeatureBaseline,
         *,
         config: DriftGateConfig | None = None,
-        rolling_window: dict[str, list[float]] | None = None,
+        rolling_window: dict[str, list[float]] | dict[str, deque[float]] | None = None,
     ) -> None:
         self.baseline = baseline
         self.config = config or DriftGateConfig()
         self._rolling: dict[str, list[float]] = rolling_window or {}
 
-    def _rolling_for(self, feature: str) -> list[float]:
-        return self._rolling.setdefault(feature, [])
+    def _rolling_for(self, feature: str) -> deque[float]:
+        if feature not in self._rolling:
+            self._rolling[feature] = deque(maxlen=self.config.min_baseline_samples * 4)
+        raw = self._rolling[feature]
+        if isinstance(raw, list):
+            self._rolling[feature] = deque(raw, maxlen=self.config.min_baseline_samples * 4)
+        return self._rolling[feature]  # type: ignore[return-value]
 
     def evaluate(self, req: DriftGateRequest) -> DriftGateResponse:
         cfg = self.config
+        if not FeatureBaseline.validate_version_compatibility(req.version, self.baseline.version):
+            return DriftGateResponse(
+                decision=DriftGateDecision.REJECT if cfg.mode == DriftGateMode.ENFORCE else DriftGateDecision.APPROVE,
+                reason=f"baseline_version_incompatible: request={req.version} baseline={self.baseline.version}",
+                mode=cfg.mode,
+                reports=[],
+                shadow_would_reject=cfg.mode == DriftGateMode.ENFORCE,
+            )
+
         reports: list[FeatureDriftReport] = []
         worst_psi = 0.0
         any_ks = False
+        missing_baseline_features: list[str] = []
+        invalid_features: list[str] = []
+
+        baseline_feature_names = set(self.baseline.features.keys())
+
+        for name in sorted(baseline_feature_names):
+            if name not in req.feature_vector:
+                missing_baseline_features.append(name)
 
         for name, value in req.feature_vector.items():
+            if value is None:
+                invalid_features.append(name)
+                continue
             try:
                 v = float(value)
             except (TypeError, ValueError):
+                invalid_features.append(name)
                 continue
             self._rolling_for(name).append(v)
             base_samples = self.baseline.features.get(name, [])
@@ -136,6 +163,29 @@ class DriftGate:
             )
             worst_psi = max(worst_psi, psi)
             any_ks = any_ks or ks_exceeded
+
+        if missing_baseline_features or invalid_features:
+            detail_parts: list[str] = []
+            if missing_baseline_features:
+                detail_parts.append(f"missing={','.join(missing_baseline_features)}")
+            if invalid_features:
+                detail_parts.append(f"invalid={','.join(invalid_features)}")
+            reason = "feature_contract_violation:" + ";".join(detail_parts)
+            if cfg.mode == DriftGateMode.ENFORCE:
+                return DriftGateResponse(
+                    decision=DriftGateDecision.REJECT,
+                    reason=reason,
+                    mode=cfg.mode,
+                    reports=reports,
+                    shadow_would_reject=True,
+                )
+            return DriftGateResponse(
+                decision=DriftGateDecision.APPROVE,
+                reason=f"shadow:{reason}",
+                mode=cfg.mode,
+                reports=reports,
+                shadow_would_reject=True,
+            )
 
         would_reject = worst_psi >= cfg.psi_reject or any_ks
         would_warn = worst_psi >= cfg.psi_warn
