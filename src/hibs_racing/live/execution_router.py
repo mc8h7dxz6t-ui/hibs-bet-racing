@@ -728,6 +728,7 @@ def build_execution_intents(
                     row.get("matchbook_place_market_id") or mb.get("matchbook_place_market_id")
                 ),
                 matchbook_event_id=_int_or_none(row.get("matchbook_event_id") or mb.get("matchbook_event_id")),
+                model_win_prob=_float_or_none(row.get("model_win_prob")),
             )
         )
     return intents

@@ -133,6 +133,12 @@ log "personal staking green lights"
 STAKE="${APP}/scripts/verify_personal_staking_greenlights.sh"
 [[ -f "${STAKE}" ]] && bash "${STAKE}" || true
 
+log "execution + automation readiness"
+READY="${APP}/scripts/verify_execution_readiness.sh"
+if [[ -f "${READY}" ]]; then
+  bash "${READY}" || evidence_ok=0
+fi
+
 log "institutional failsafe"
 FAILSAFE="${APP}/scripts/institutional_failsafe_verify.sh"
 [[ -f "${FAILSAFE}" ]] && bash "${FAILSAFE}" || true

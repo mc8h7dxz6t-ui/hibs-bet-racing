@@ -70,6 +70,7 @@ install_base_crons() {
   _install_if_present "${APP_ROOT}/deploy/cron-hibs-hands-off.sh"
   _install_if_present "${APP_ROOT}/deploy/cron-hibs-infra-fallback.sh"
   _install_if_present "${APP_ROOT}/deploy/cron-hibs-brier-circuit.sh"
+  _install_if_present "${APP_ROOT}/deploy/cron-hibs-racing-pre-race-poll.sh"
   _install_if_present "${APP_ROOT}/deploy/cron-hibs-football-fixture-warm.sh"
   if [[ -f "${APP_ROOT}/deploy/cron-hibs-racing-daily.sh" ]]; then
     bash "${APP_ROOT}/deploy/cron-hibs-racing-daily.sh" --install || true
@@ -77,11 +78,8 @@ install_base_crons() {
   if [[ -f "${APP_ROOT}/deploy/cron-hibs-racing-watchdog.sh" ]]; then
     bash "${APP_ROOT}/deploy/cron-hibs-racing-watchdog.sh" --install || true
   fi
-  if [[ -f "${APP_ROOT}/deploy/cron-hibs-racing-value-lane-slo.sh" ]]; then
-    bash "${APP_ROOT}/deploy/cron-hibs-racing-value-lane-slo.sh" --install || true
-  fi
-  if [[ -f "${APP_ROOT}/deploy/cron-hibs-racing-sqlite-maintenance.sh" ]]; then
-    bash "${APP_ROOT}/deploy/cron-hibs-racing-sqlite-maintenance.sh" --install || true
+  if [[ -f "${APP_ROOT}/deploy/cron-hibs-racing-scrape.sh" ]]; then
+    bash "${APP_ROOT}/deploy/cron-hibs-racing-scrape.sh" --install || true
   fi
   if [[ -f "${APP_ROOT}/deploy/cron-hibs-inst-pp-weekly.sh" ]]; then
     bash "${APP_ROOT}/deploy/cron-hibs-inst-pp-weekly.sh" --install || true

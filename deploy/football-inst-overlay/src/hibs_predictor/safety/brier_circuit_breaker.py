@@ -9,7 +9,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
+
+DOMAINS = ("football", "racing")
 
 
 class BreakerState(str, Enum):
@@ -96,6 +98,60 @@ class BrierCircuitBreaker:
         }
 
 
+def _data_root() -> Path:
+    return Path(os.getenv("HIBS_BRIER_DATA_DIR", "/opt/hibs-bet/data"))
+
+
+def domain_state_path(domain: str) -> Path:
+    override = os.getenv(f"HIBS_BRIER_STATE_PATH_{domain.upper()}", "").strip()
+    if override:
+        return Path(override)
+    legacy = os.getenv("HIBS_BRIER_STATE_PATH", "").strip()
+    if legacy and domain == "football":
+        return Path(legacy)
+    return _data_root() / f"brier_circuit_state_{domain}.json"
+
+
+def combined_state_path() -> Path:
+    return _data_root() / "brier_circuit_state.json"
+
+
+def _state_blocks_execution(state: str) -> bool:
+    return str(state or "").upper() in ("OPEN", "HALF_OPEN")
+
+
+def read_domain_state(domain: str) -> Dict[str, Any]:
+    path = domain_state_path(domain)
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def calibration_safety_summary() -> Dict[str, Any]:
+    """Unified operator view across football + racing breakers."""
+    domains: Dict[str, Any] = {}
+    any_lockout = False
+    for domain in DOMAINS:
+        row = read_domain_state(domain)
+        state = str(row.get("state") or "UNKNOWN").upper()
+        locked = _state_blocks_execution(state)
+        any_lockout = any_lockout or locked
+        domains[domain] = {
+            **row,
+            "state": state,
+            "execution_locked": locked,
+            "state_path": str(domain_state_path(domain)),
+        }
+    return {
+        "execution_lockout_active": any_lockout,
+        "domains": domains,
+        "combined_state_path": str(combined_state_path()),
+    }
+
+
 def _append_hash_chain(event: Dict[str, Any], *, ledger_path: Path) -> Dict[str, Any]:
     """Append Brier observation to Inst++ ledger when available; else JSONL fallback."""
     try:
@@ -114,28 +170,59 @@ def _append_hash_chain(event: Dict[str, Any], *, ledger_path: Path) -> Dict[str,
         return event
 
 
-def execution_lockout_active() -> bool:
-    """True when hourly Brier circuit breaker has tripped execution lockout."""
+def execution_lockout_active(*, domain: Optional[str] = None) -> bool:
+    """True when hourly Brier circuit breaker blocks execution (OPEN or HALF_OPEN)."""
     flag = (os.getenv("HIBS_EXECUTION_LOCKOUT") or "").strip().lower()
     if flag in ("1", "true", "yes", "on"):
         return True
-    state_path = Path(
-        os.getenv("HIBS_BRIER_STATE_PATH", "/opt/hibs-bet/data/brier_circuit_state.json")
-    )
-    if state_path.is_file():
+    targets = [domain] if domain else list(DOMAINS)
+    for dom in targets:
+        if not dom:
+            continue
+        row = read_domain_state(dom)
+        if _state_blocks_execution(str(row.get("state") or "")):
+            return True
+    # Legacy single-file fallback
+    legacy = Path(os.getenv("HIBS_BRIER_STATE_PATH", "/opt/hibs-bet/data/brier_circuit_state.json"))
+    if legacy.is_file() and domain is None:
         try:
-            data = json.loads(state_path.read_text(encoding="utf-8"))
-            return str(data.get("state") or "").upper() == "OPEN"
+            data = json.loads(legacy.read_text(encoding="utf-8"))
+            if _state_blocks_execution(str(data.get("state") or "")):
+                return True
+            if isinstance(data.get("domains"), dict):
+                for row in data["domains"].values():
+                    if _state_blocks_execution(str((row or {}).get("state") or "")):
+                        return True
         except Exception:
             pass
     return False
 
 
-def persist_breaker_state(br: BrierCircuitBreaker, *, path: Optional[Path] = None) -> None:
-    """Write breaker FSM snapshot for cross-process lockout checks."""
-    p = path or Path(os.getenv("HIBS_BRIER_STATE_PATH", "/opt/hibs-bet/data/brier_circuit_state.json"))
+def persist_breaker_state(
+    br: BrierCircuitBreaker,
+    *,
+    domain: str,
+    path: Optional[Path] = None,
+) -> None:
+    """Write per-domain FSM snapshot + combined index for cross-process checks."""
+    p = path or domain_state_path(domain)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(br.to_dict(), indent=2), encoding="utf-8")
+    payload = {**br.to_dict(), "domain": domain, "updated_at": datetime.now(timezone.utc).isoformat()}
+    p.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    combined = combined_state_path()
+    index: Dict[str, Any] = {}
+    if combined.is_file():
+        try:
+            index = json.loads(combined.read_text(encoding="utf-8"))
+        except Exception:
+            index = {}
+    if not isinstance(index.get("domains"), dict):
+        index["domains"] = {}
+    index["domains"][domain] = payload
+    index["execution_lockout_active"] = execution_lockout_active()
+    index["updated_at"] = datetime.now(timezone.utc).isoformat()
+    combined.write_text(json.dumps(index, indent=2), encoding="utf-8")
 
 
 def run_hourly_brier_loop(
@@ -144,6 +231,7 @@ def run_hourly_brier_loop(
     breaker: Optional[BrierCircuitBreaker] = None,
     ledger_path: Optional[Path] = None,
     domain: str = "football",
+    state_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """
     Active runtime circuit — call from cron hourly.
@@ -170,8 +258,9 @@ def run_hourly_brier_loop(
     lp = ledger_path or Path(
         os.getenv("HIBS_BRIER_LEDGER_PATH", "/opt/hibs-bet/data/brier_circuit_ledger")
     )
-    _append_hash_chain(event, ledger_path=lp)
-    persist_breaker_state(br)
+    chain = _append_hash_chain(event, ledger_path=lp)
+    event["ledger"] = chain
+    persist_breaker_state(br, domain=domain, path=state_path)
     if not allows:
         os.environ["HIBS_EXECUTION_LOCKOUT"] = "1"
         os.environ["HIBS_EXECUTION_MODE"] = "diagnostic"
