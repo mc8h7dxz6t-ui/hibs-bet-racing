@@ -51,5 +51,5 @@ cat docs/test_logs/instpp_docker_extended_latest_summary.json
 
 ## What is intentionally not in this pack
 
-- Inst++ license bands, ARR projections, or valuation framing  
+- Inst++ license bands, ARR projections, or valuation framing (see `PORTFOLIO_TECH_SALES_SHEET.md` for priced internal conversations only)  
 - Sports / trading / governor consumer apps (out of SKU scope)

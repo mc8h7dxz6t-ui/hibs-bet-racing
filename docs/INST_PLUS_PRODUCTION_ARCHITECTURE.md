@@ -74,6 +74,8 @@ Shared libraries: `inst_spine` (ledger, clocks, export, production profile), `in
 
 | SKU | Demo action | Offline-safe |
 |-----|-------------|--------------|
+| Compliance | `log_decision` — snapshot + outcome | ✅ |
+| Proxy-Risk | Shadow `evaluate` (`live: false`) | ✅ |
 | Alt-Data | `poll_once` stub feed | ✅ |
 | AI Kit | AgentLoop stub steps | ✅ |
 | Webhook Mesh | Cold-path ingress ledger append | ✅ |
@@ -85,7 +87,7 @@ Shared libraries: `inst_spine` (ledger, clocks, export, production profile), `in
 | Spend Guard | init wallet → reserve → settle | ✅ |
 | Agent Ledger | authorize / complete | ✅ |
 
-Compliance (#1) and Proxy (#2) retain full workflows on the Architecture tab.
+Compliance (#1) and Proxy (#2) use the same Proof tab ingest flow as SKUs #3–#12.
 
 ---
 
@@ -105,6 +107,35 @@ Without `INST_PRODUCTION_PROFILE=1`:
 | inst-workflow | 12/12 portfolio DBs seeded |
 
 Rigorous proof: `tests/test_sku_production_envelope.py`
+
+---
+
+## ModelGovernor — same SKU or separate from “governor spine”?
+
+| Name | What it is | In 12-SKU portfolio? |
+|------|------------|----------------------|
+| **`inst_spine`** | Shared audit library (genesis chain, F1–F9, export, verify) used by **all** SKUs | No — infrastructure, not a product |
+| **#8a ModelGovernor** (`src/model_governor/`, CLI `model-governor`) | ML lifecycle governance SKU — register / approve / deploy / retire with `artifact_hash` | **Yes — SKU #8** |
+| **#8b spend plane** (`make demo-gold`) | Sales walkthrough for **Spend Guard (#11)** — reserve → settle → drift lockout | **No** — not a separate CI SKU; grouped historically under “ModelGovernor” marketing |
+| **Drift Gate (#9)** | Statistical drift interceptor; integrates with Proxy + ModelGovernor deploy gate | **Yes — separate SKU #9** |
+| **hibs_racing / governor consumer apps** | Sports/trading overlay — explicitly **out of Inst++ scope** | **No** |
+
+**Answer:** The listed **ModelGovernor SKU is one product** (`model-governor`). It runs **on** `inst_spine`; it is not a second “governor spine” product. Do not confuse #8a with #8b (Spend Guard demo) or with out-of-scope consumer apps.
+
+---
+
+## Docker extreme rigorous — per SKU
+
+| Command | What it does |
+|---------|----------------|
+| `make docker-sku-rigorous` | 12 **isolated** `python:3.11-slim` containers — unit tests + demo + F1–F9 + verify-bundle per SKU |
+| `make docker-extended` | Redis + Postgres compose + full `instpp_rigorous_test.sh` on host (integration soak) |
+
+**Per-SKU logs:** `docs/test_logs/instpp_docker_sku_<sku>_<timestamp>.log`  
+**Matrix summary:** `docs/test_logs/instpp_docker_sku_latest_summary.json`  
+**CI job:** `docker-sku-rigorous` (workflow_dispatch + weekly schedule)
+
+Each container runs `scripts/docker_sku_rigorous_one.sh <sku>` with `SKIP_LIVE=1` and shared Redis/Postgres on host network for scale-profile SKUs.
 
 ---
 

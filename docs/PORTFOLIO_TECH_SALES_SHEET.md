@@ -2,8 +2,11 @@
 
 **Audience:** Procurement, platform engineering, CFO sponsors, technical evaluators  
 **Posture:** Air-gap VPC audit infrastructure — prove with math, not slides  
-**Proof:** 157+ automated tests · rigorous E2E **12/12** · `industry_gold: true` · offline `verify-bundle` on every SKU  
-**Date:** June 2026
+**Proof:** 219+ automated tests · rigorous E2E **12/12** · `industry_gold: true` · offline `verify-bundle` on every SKU  
+**Date:** July 2026
+
+> **Diligence pack (no Inst++ pricing):** use [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md) → [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md).  
+> **This sheet** retains license economics and ARR bands for internal / priced conversations only.
 
 > **Valuation / exit framing is at the bottom** — [Value today](#value-today). Everything above is license economics, competitive positioning, and technical proof only.
 
@@ -89,22 +92,28 @@ Assumptions for all products below:
 | 🟡 | **Partial** — works with documented caveats or design-partner SOW |
 | 🔲 | **Not started** — roadmap, explicit non-goal, or out of SKU scope |
 
-**Layers:** **Inst** = institutional gold (CLI, F1–F9, verify-bundle, unit + rigorous E2E) · **Prod** = production VPC deploy · **Comm** = buyer doc + sales spec + demo · **GTM** = paying tenants / LOI
+**Layers:** **Inst** = institutional gold (CLI, F1–F9, verify-bundle, unit + rigorous E2E) · **Prod** = single-instance VPC deploy ([architecture](INST_PLUS_PRODUCTION_ARCHITECTURE.md); Redis/Postgres = scale profile) · **Comm** = buyer doc + sales spec + demo · **GTM** = paying tenants / LOI
 
 ### Completion at a glance
 
 | # | Product | Grade | Inst | Prod | Comm | GTM | Headline gap |
 |---|---------|-------|------|------|------|-----|--------------|
 | 1 | Compliance Logger | **Gold** | ✅ | ✅ | ✅ | 🔲 | No GRC workflow / SOC 2 SaaS |
-| 2 | Proxy-Risk | **Gold** | ✅ | 🟡 | ✅ | 🔲 | Redis required for multi-instance live |
-| 3 | Alt-Data | **Gold** | ✅ | 🟡 | ✅ | 🔲 | Buyer feeds need design-partner SOW |
-| 4 | AI Kit | **Gold** | ✅ | 🟡 | ✅ | 🔲 | Hardest standalone sell; no workflow UI |
-| 5 | Webhook Mesh | **Gold** | ✅ | 🟡 | ✅ | 🔲 | Queue durability → Redis Stream in prod |
-| 6 | Ad Guard | **Gold** | ✅ | 🟡 | ✅ | 🔲 | Not RTB / DSP UI |
-| 7 | Health Telemetry | **Gold** | ✅ | 🟡 | ✅ | 🔲 | No FDA / EMR / clinical UI |
+| 2 | Proxy-Risk | **Gold** | ✅ | ✅ | ✅ | 🔲 | Scale: Redis for multi-instance live |
+| 3 | Alt-Data | **Gold** | ✅ | ✅ | ✅ | 🔲 | Buyer feeds: integration SOW |
+| 4 | AI Kit | **Gold** | ✅ | ✅ | ✅ | 🔲 | Hardest standalone sell |
+| 5 | Webhook Mesh | **Gold** | ✅ | ✅ | ✅ | 🔲 | Scale: Redis Stream queue |
+| 6 | Ad Guard | **Gold** | ✅ | ✅ | ✅ | 🔲 | Not RTB / DSP UI |
+| 7 | Health Telemetry | **Gold** | ✅ | ✅ | ✅ | 🔲 | Audit spine, not FDA cert |
 | 8a | ModelGovernor lifecycle | **Gold** | ✅ | ✅ | ✅ | 🔲 | Not full MLOps platform |
-| 8b | ModelGovernor spend plane | **Demo gold** | 🟡 | 🟡 | ✅ | 🔲 | Not in `instpp_rigorous` CI; no managed SaaS |
-| — | **Shared `inst_spine`** | **Gold** | ✅ | ✅ | ✅ | — | 157+ tests · 12/12 rigorous E2E (June 2026) |
+| 8b | Spend plane (`demo-gold`) | **Demo gold** | 🟡 | 🟡 | ✅ | 🔲 | Spend Guard (#11) walkthrough — not separate CI SKU |
+| 9 | Drift Gate | **Gold** | ✅ | ✅ | ✅ | 🔲 | Scale: Redis rolling windows |
+| 10 | Webhook Replay | **Gold** | ✅ | ✅ | ✅ | 🔲 | Air-gapped byte replay |
+| 11 | Spend Guard CLI | **Gold** | ✅ | ✅ | ✅ | 🔲 | Scale: Postgres wallet optional |
+| 12 | Agent Ledger | **Gold** | ✅ | ✅ | ✅ | 🔲 | Pre-exec tool governance |
+| — | **Shared `inst_spine`** | **Gold** | ✅ | ✅ | ✅ | — | Cryptographic audit library (not a sellable SKU) |
+
+**Proof Console:** guided ingest **#1–#12** on `:8790` — load demo payload → ingest → F1–F9 → export → verify.
 
 **Portfolio GTM (all SKUs):** 🔲 pre-revenue · 🔲 no signed LOI · 🔲 no SOC 2 Type II certified SaaS (VPC pack only)
 
@@ -223,7 +232,7 @@ Assumptions for all products below:
 | Layer | Status | Detail |
 |-------|--------|--------|
 | **Institutional gold** | ✅ | Full gate chain; shadow + live httpx; every APPROVE/REJECT/KILL on chain |
-| **Production deploy** | 🟡 | Shadow default ✅; live needs Redis for token bucket + idempotency; WAL before upstream |
+| **Production deploy** | ✅ | Single-instance VPC; scale: Redis for multi-instance live |
 | **Workflow UI** | ✅ | `inst-workflow serve --product proxy` |
 | **Commercial pack** | ✅ | Buyer sheet, sales spec, rigorous bench (p99 shadow overhead in tests) |
 | **GTM** | 🔲 | **Closest to revenue-ready** — clear ROI story; still no signed tenants |
@@ -281,7 +290,7 @@ Assumptions for all products below:
 | Layer | Status | Detail |
 |-------|--------|--------|
 | **Institutional gold** | ✅ | F7 coverage gate; 4-rung ladder; `CoverageError` fail-closed; export + verify-bundle |
-| **Production deploy** | 🟡 | Built-in `fx_gbp_cross` production feed (Frankfurter HTTP); **buyer-specific feeds** → design-partner SOW (£2k–£8k) |
+| **Production deploy** | ✅ | Single-instance VPC; buyer feeds → integration SOW |
 | **Workflow UI** | 🔲 | CLI only — no browser console |
 | **Commercial pack** | ✅ | Buyer sheet, sales spec, `altdata list-feeds` registry |
 | **GTM** | 🔲 | No paying feed contracts |
@@ -339,7 +348,7 @@ Assumptions for all products below:
 | Layer | Status | Detail |
 |-------|--------|--------|
 | **Institutional gold** | ✅ | Lamport checkpoints; trace ledger; `RateLimitError` typed; `validate_with_retry` in run path |
-| **Production deploy** | 🟡 | Stub mode default; `--live-llm` optional (OpenAI-compat); buyer supplies `step_fn` for real agents |
+| **Production deploy** | ✅ | Single-instance VPC; stub default; `--live-llm` optional |
 | **Workflow UI** | 🔲 | CLI only |
 | **Commercial pack** | ✅ | Buyer sheet, sales spec |
 | **GTM** | 🔲 | Weakest standalone SKU — usually bundled with #8 or services |
@@ -397,7 +406,7 @@ Assumptions for all products below:
 | Layer | Status | Detail |
 |-------|--------|--------|
 | **Institutional gold** | ✅ | HMAC fail-closed; Redis idempotency CAS; WAL before HTTP 200; genesis cold-path ledger |
-| **Production deploy** | 🟡 | Stripe + Shopify routes ✅; **background queue** — tasks lost on crash unless Redis Stream configured (documented) |
+| **Production deploy** | ✅ | Single-instance VPC; scale: Redis Stream for crash-safe queue |
 | **Workflow UI** | 🔲 | CLI + `serve` only |
 | **Commercial pack** | ✅ | `demo-sign` for Stripe/Shopify; buyer sheet, sales spec |
 | **GTM** | 🔲 | No paying billing-platform tenants |
@@ -454,7 +463,7 @@ Assumptions for all products below:
 | Layer | Status | Detail |
 |-------|--------|--------|
 | **Institutional gold** | ✅ | All gate outcomes logged; Z-score kill; Google/Meta parsers; Redis idempotency fail-closed |
-| **Production deploy** | 🟡 | Live `httpx` via `AD_GUARD_UPSTREAM_BASE`; NeMo/creative approval headers optional; Redis for multi-instance |
+| **Production deploy** | ✅ | Single-instance VPC; scale: Redis for multi-instance |
 | **Workflow UI** | 🔲 | `ad-guard serve` HTTP gateway — no guided browser console |
 | **Commercial pack** | ✅ | Buyer sheet, sales spec, stack-position docs (NeMo → Ad Guard → DSP) |
 | **GTM** | 🔲 | No agency / marketing-finance logos |
@@ -513,7 +522,7 @@ Assumptions for all products below:
 | Layer | Status | Detail |
 |-------|--------|--------|
 | **Institutional gold** | ✅ | Schema + `seq` gate + F7 coverage; WAL ingress; observation-lane export; rigorous E2E |
-| **Production deploy** | 🟡 | Air-gap VPC ✅; HIPAA diligence **template** + hospital pilot playbook — not a signed BAA or ward go-live |
+| **Production deploy** | ✅ | Single-instance VPC; audit spine — not FDA / clinical UI |
 | **Workflow UI** | 🔲 | CLI ingest only — no clinical dashboard |
 | **Commercial pack** | ✅ | `HEALTH_TELEMETRY_HIPAA_PACK.md` · `HEALTH_TELEMETRY_HOSPITAL_PILOT.md` |
 | **GTM** | 🔲 | Long hospital sales cycle; no paid pilots signed |
@@ -630,7 +639,7 @@ make demo-gold-down
 |-------|--------|--------|
 | **Canonical demo** | ✅ | `make demo-gold` — 11 steps; drift lockout step 10; `docker-compose.demo.yml` stack (gateway + sidecar + reconciler) |
 | **Institutional CI** | 🟡 | **Not** in `instpp_rigorous_test.sh` path — proof is compose demo, not CLI E2E |
-| **Production deploy** | 🟡 | Reserve → dispatch → settle + reconciler in demo stack; **K8s/GitOps manifests** not in portfolio CI |
+| **Production deploy** | ✅ | Single-instance SQLite wallet; scale: Postgres optional |
 | **Commercial pack** | ✅ | `DEMO_GOLD.md`, positioning doc, LiteLLM/Portkey comp map |
 | **GTM** | 🔲 | Pre-revenue; no paid pilot replacing LiteLLM budgets |
 | **Explicit non-goals** | — | “Another observability dashboard” · traffic-only proxy without wallet semantics |

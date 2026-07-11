@@ -84,6 +84,7 @@ PHASES: dict[str, list[dict[str, str]]] = {
         {"id": "4.3", "name": "portfolio_evidence_sheet", "artifact": "docs/PORTFOLIO_EVIDENCE_SHEET.md"},
         {"id": "4.4", "name": "platform_compare_deep_dive", "artifact": "docs/INST_PLUS_PLATFORM_COMPARE.md"},
         {"id": "4.5", "name": "docker_extended_ci_job", "artifact": ".github/workflows/instpp-ci.yml"},
+        {"id": "4.6", "name": "docker_sku_rigorous_matrix", "artifact": "scripts/instpp_docker_sku_rigorous.sh"},
     ],
 }
 
@@ -145,6 +146,7 @@ def build_ledger(
             "rigorous_summary": "docs/test_logs/instpp_rigorous_latest_summary.json",
             "proof_lite_summary": "docs/test_logs/instpp_proof_lite_latest_summary.json",
             "docker_extended_summary": "docs/test_logs/instpp_docker_extended_latest_summary.json",
+            "docker_sku_rigorous_summary": "docs/test_logs/instpp_docker_sku_latest_summary.json",
             "soc2_evidence": "docs/test_logs/soc2_evidence_latest.json",
         },
         "updated_utc": now,
@@ -218,7 +220,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Inst++ CI autonomy phase ledger")
     parser.add_argument(
         "--suite",
-        choices=["proof-lite", "rigorous", "proof", "docker-extended"],
+        choices=["proof-lite", "rigorous", "proof", "docker-extended", "docker-sku-rigorous"],
         required=True,
     )
     parser.add_argument("--status", default="PASSED")
