@@ -115,7 +115,11 @@ echo "    ping=${ping_code} login=${login_code} root=${root_code}"
 if [[ "${ping_code}" == "200" && "${login_code}" =~ ^(200|302)$ && "${root_code}" =~ ^(200|302)$ ]]; then
   echo ""
   echo "==> nginx upstream (localhost OK, public 502 → wrong port)"
-  football_vps_fix_nginx_upstream || true
+  football_vps_fix_nginx_upstream "${BET}" || true
+  if [[ -f "${BET}/deploy/apply-vps-racing-link.sh" ]]; then
+    DEPLOY_PATH="${BET}" HIBS_RACING_DEPLOY_PATH="${RACING}" \
+      bash "${BET}/deploy/apply-vps-racing-link.sh" 2>/dev/null || true
+  fi
   pub_code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 https://hibs-bet.co.uk/login 2>/dev/null || echo 000)"
   echo "    public /login: ${pub_code}"
   echo ""

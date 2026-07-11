@@ -67,7 +67,7 @@ football_vps_nginx_fallback() {
   # shellcheck source=lib_racing_vps_probe.sh
   source "${bet}/scripts/lib_racing_vps_probe.sh"
   football_vps_fallback_log "L3 nginx upstream repair (localhost OK, public 502)"
-  football_vps_fix_nginx_upstream || return 1
+  football_vps_fix_nginx_upstream "${bet}" || return 1
   return 0
 }
 

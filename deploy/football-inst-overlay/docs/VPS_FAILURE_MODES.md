@@ -22,15 +22,16 @@
 
 | Field | Detail |
 |-------|--------|
-| **Symptom** | `curl -sI https://www.hibs-bet.co.uk/login` → `HTTP/1.1 502 Bad Gateway`; localhost `:8000/api/ping` fails |
+| **Symptom** | `curl -sI https://www.hibs-bet.co.uk/login` → `HTTP/1.1 502 Bad Gateway`; localhost `:8000/api/ping` may be 200 |
 | **Not the same as** | Login 500 (app error) — 502 means nginx cannot reach gunicorn |
-| **Root causes seen** | (1) gunicorn not listening / crash loop; (2) `HIBS_AUTH_ENABLED=1` without `HIBS_SECRET_KEY` → `init_auth()` raises at import; (3) stuck workers / accept backlog on :8000; (4) OOM during repair (~122Mi free RAM observed); (5) bad deploy overlay without restart; **(6) import OK but 502 = gunicorn never started or nginx upstream still :5001** |
+| **Root causes seen** | (1) gunicorn not listening / crash loop; (2) `HIBS_AUTH_ENABLED=1` without `HIBS_SECRET_KEY` → `init_auth()` raises at import; (3) stuck workers / accept backlog on :8000; (4) OOM during repair (~122Mi free RAM observed); (5) bad deploy overlay without restart; **(6) import OK but 502 = gunicorn never started or nginx upstream still :5001**; **(7) `hibs-unified` dev site enabled alongside production — proxies to :5001** |
 | **Cascade** | FVE `hibs-bet ping failed`, fixture export count=0, line-shopper RED |
 | **Manual fix** | `sudo bash /opt/hibs-bet/scripts/vps_football_hard_recovery.sh` |
+| **Nginx-only fix** | `sudo bash /opt/hibs-bet/scripts/vps_football_ensure_nginx_production.sh` |
 | **Split diagnose** | `sudo bash /opt/hibs-bet/scripts/vps_football_diagnose_502.sh` — import OK + public 502 |
-| **Code fix** | PR #62 `safe_next_url` → `index`; PR #63 hard recovery + auto `HIBS_SECRET_KEY` |
-| **Automation gap** | `vps_three_stack_green.sh` only did soft restart + fixture repair; no hard kill until PR #63 |
-| **Verify green** | `curl -s http://127.0.0.1:8000/api/ping` → 200; `/login` → 200 or 302 |
+| **Code fix** | PR #62 `safe_next_url` → `index`; PR #63 hard recovery + auto `HIBS_SECRET_KEY`; **apply-vps-racing-link + enhanced nginx L3** |
+| **Automation gap** | `vps_three_stack_green.sh` only did soft restart + fixture repair; no hard kill until PR #63; **missing `apply-vps-racing-link.sh` caused bootstrap nginx step to skip** |
+| **Verify green** | `curl -s http://127.0.0.1:8000/api/ping` → 200; `/login` → 200 or 302; **public** `/login` → 200 or 302 |
 
 ---
 
@@ -154,7 +155,7 @@ Use this after a green `vps_industry_standard_run.sh --repair`:
 | Cascade-aware repair | FVE runs when football down | Skip FVE until football GREEN |
 | Restart throttle | 45–60m hands-off guard | Keep — prevents restart storms |
 | OOM awareness | Not in automation | Preflight `free -h` in hard recovery (done) |
-| Drift detection | Missing scripts caused silent skip | `verify_vps_relative_paths.sh` + this doc |
+| Drift detection | Missing scripts caused silent skip | `verify_vps_relative_paths.sh` + `CODE_TO_VPS_AUTOMATION_FORENSICS.md` |
 
 ---
 
@@ -182,7 +183,7 @@ curl -sS https://hibs-bet.co.uk/line-trader | head -5
 |------|-------|
 | 2026-07-10 | Football 502 after login fix; racing hard recovery GREEN; crontab 214 lines blocked automation; FVE docker fail |
 | 2026-07-10 | PR #63: football hard recovery, racing scripts to git, auto crontab emergency |
-| 2026-07-10 | Infra fallback automation: 5m cron, L1→L2→L3 cascade in hands-off + watchdog |
+| 2026-07-11 | FM-01 cause (7): hibs-unified :5001 on prod; added apply-vps-racing-link, nginx ensure script, forensics doc |
 
 ---
 
