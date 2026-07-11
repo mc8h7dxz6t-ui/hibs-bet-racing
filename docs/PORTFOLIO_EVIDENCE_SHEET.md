@@ -1,13 +1,13 @@
 # Institutional++ Portfolio — Evidence Sheet (12 SKUs)
 
 **Audience:** Technical evaluators, auditors, platform engineering, procurement diligence  
-**Posture:** Factual capability and proof only — no pricing, packaging, or revenue projections  
+**Posture:** Factual capability and proof only — no Inst++ pricing  
 **Scope:** SKU / Inst++ layer only (not sports, trading overlay, or governor consumer apps)  
 **Date:** July 2026
 
-> **Commercial pricing:** see [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md) and [PORTFOLIO_SALES_SHEET.md](PORTFOLIO_SALES_SHEET.md)  
-> **Full tech/sales (no prices):** [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md)  
-> **Platform compare + market pricing:** [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md)
+> **Diligence pack:** [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md)  
+> **Full tech/sales:** [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md)  
+> **Market compare:** [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md)
 
 ---
 
@@ -238,13 +238,14 @@ See [INST_PLUS_GOLD_STANDARD.md](INST_PLUS_GOLD_STANDARD.md). All 12 SKUs meet:
 
 ---
 
-## Related documents
+## Related documents (diligence pack)
 
 | Doc | Purpose |
 |-----|---------|
+| [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md) | Pack index — start here |
+| [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) | Full tech + sales |
+| [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | Market compare + comparable pricing |
 | [INST_PLUS_GOLD_STANDARD.md](INST_PLUS_GOLD_STANDARD.md) | Nine dimensions + readiness matrix |
-| [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | Factual comparison vs similar platforms |
 | [BUYER_EVIDENCE_PACK.md](BUYER_EVIDENCE_PACK.md) | 15-minute auditor dry-run |
 | [RUN_DEMO.md](RUN_DEMO.md) | Plug / demo / run guide |
-| [PRODUCTION_REDIS_PROFILE.md](PRODUCTION_REDIS_PROFILE.md) | Multi-instance Redis envelope |
 | [docs/test_logs/README.md](test_logs/README.md) | Committed test log index |

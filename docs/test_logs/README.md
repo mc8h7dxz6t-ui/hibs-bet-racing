@@ -41,3 +41,5 @@ Latest archived passing rigorous run: see `instpp_rigorous_latest.log`.
 Coverage: institutional unit suite + rigorous E2E across 12 SKUs (Compliance through Agent Ledger).
 
 See `docs/INST_PLUS_GOLD_STANDARD.md` for dimension definitions.
+
+**Diligence pack:** [INST_PLUS_DILIGENCE_PACK.md](../INST_PLUS_DILIGENCE_PACK.md)

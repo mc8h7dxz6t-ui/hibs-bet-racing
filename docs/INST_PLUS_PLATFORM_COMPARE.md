@@ -1,12 +1,13 @@
 # Institutional++ — Platform Comparison Deep Dive
 
-**Purpose:** Gauge Inst++ capabilities against adjacent platforms using **factual, evidence-backed** criteria, plus **public market pricing** for comparables (2025–2026). Inst++ pricing is intentionally omitted — see commercial docs separately.  
+**Purpose:** Gauge Inst++ capabilities against adjacent platforms using factual, evidence-backed criteria, plus **public market pricing for comparables only** (2025–2026). Inst++ pricing is not published in this diligence pack.  
 **Scope:** SKU / Inst++ infrastructure only.  
 **Evidence source:** In-repo tests, `verify-bundle`, rigorous CI logs, and public vendor pricing pages (cited below).  
 **Date:** July 2026
 
-> **Inst++ full tech/sales (no prices):** [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md)  
-> **Inst++ evidence index:** [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md)
+> **Diligence pack:** [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md)  
+> **Full tech/sales:** [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md)  
+> **Evidence index:** [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md)
 
 ---
 
@@ -126,7 +127,7 @@ Comparable platforms are grouped by **job-to-be-done**, not by company size. Ins
 
 | | LiteLLM OSS | LiteLLM Enterprise (reports) | Inst++ Spend Guard (#11) |
 |--|-------------|------------------------------|--------------------------|
-| License | $0 | ~$250/mo Basic; ~$30k/yr Premium | VPC deploy (commercial separate) |
+| License | $0 | ~$250/mo Basic; ~$30k/yr Premium | VPC deploy (procurement offline) |
 | Budgets | Virtual keys, team budgets | SSO, RBAC, audit logs, SLA | **Reserve → settle → drift lockout** |
 | TCO at scale | $2k–$3.5k/mo all-in (infra + labor cited) | + license | Air-gap SQLite/Postgres wallet |
 | Proof | Metrics / logs | Enterprise audit logs | **Genesis spend events + verify-bundle** |
@@ -155,7 +156,7 @@ Illustrative **mid-market fintech** needing: audit trail, outbound API control, 
 |----------|----------------|------------------------------|-------------------------|
 | **Best-of-breed SaaS** | ServiceNow PCM + Kong Enterprise + Hookdeck Growth + MLflow/Databricks + Fiddler + LangSmith + LiteLLM Ent | **$400k–$900k+/yr** licenses alone (before PS) | No |
 | **Lean SaaS** | Point GRC + Hookdeck Team + Langfuse Pro + LiteLLM OSS + Evidently OSS | **$50k–$150k/yr** + engineering glue | No |
-| **Inst++ VPC portfolio** | 12 SKUs on `inst_spine` | **License economics separate** — hosting + 1 FTE ops typical | **Yes — `PORTFOLIO_MANIFEST.json`** |
+| **Inst++ VPC portfolio** | 12 SKUs on `inst_spine` | VPC hosting + ops (license offline) | **Yes — `PORTFOLIO_MANIFEST.json`** |
 
 **Value gauge (qualitative):**
 
@@ -421,12 +422,12 @@ Honest gaps vs best-in-category SaaS:
 
 ---
 
-## Related documents
+## Related documents (diligence pack)
 
 | Doc | Purpose |
 |-----|---------|
-| [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) | Full tech + sales sheet (no Inst++ pricing) |
+| [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md) | Pack index — start here |
+| [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) | Full tech + sales (no Inst++ pricing) |
 | [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md) | Per-SKU proof commands and CI artifacts |
 | [INST_PLUS_GOLD_STANDARD.md](INST_PLUS_GOLD_STANDARD.md) | Nine dimensions bar |
-| [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md) | Commercial economics (Inst++ pricing) |
 | [docs/test_logs/README.md](test_logs/README.md) | Committed proof logs |

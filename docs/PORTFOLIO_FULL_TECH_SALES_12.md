@@ -2,10 +2,10 @@
 
 **Audience:** Procurement, platform engineering, CFO sponsors, technical evaluators  
 **Posture:** Air-gap VPC audit infrastructure — prove with math, not slides  
-**Proof:** 157+ smoke tests · rigorous **12/12** · `industry_gold: true` · offline `verify-bundle` on every SKU  
-**Date:** June 2026
+**Proof:** 219+ smoke tests · rigorous **12/12** · `industry_gold: true` · offline `verify-bundle` on every SKU  
+**Date:** July 2026
 
-> **License economics and valuation depth:** [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md) · **One-page matrix:** [PORTFOLIO_SALES_SHEET.md](PORTFOLIO_SALES_SHEET.md) · **Full tech/sales (no prices):** [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) · **Evidence index:** [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md) · **Platform compare + market pricing:** [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md)
+> **Start here:** [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md) — self-contained tech/sales, evidence, and market compare (no Inst++ pricing in repo)
 
 ---
 
@@ -17,32 +17,32 @@
 
 ## SKU index
 
-| # | Product | SKU | Sale-now (perpetual VPC) | Full spec | Demo |
-|---|---------|-----|--------------------------|-----------|------|
-| 1 | Compliance Logger | `compliance-log` | £5,500 | [COMPLIANCE_LOGGER_SALES_TECH_SPEC.md](COMPLIANCE_LOGGER_SALES_TECH_SPEC.md) | `demo_compliance_logger.sh` |
-| 2 | Proxy-Risk | `proxy-risk` | £10,500 | [PROXY_RISK_SALES_TECH_SPEC.md](PROXY_RISK_SALES_TECH_SPEC.md) | `demo_proxy_risk.sh` |
-| 3 | Alt-Data | `altdata` | £7,000 | [ALTDATA_SALES_TECH_SPEC.md](ALTDATA_SALES_TECH_SPEC.md) | `demo_altdata.sh` |
-| 4 | AI Kit | `ai-kit` | £1,400/seat | [AI_KIT_SALES_TECH_SPEC.md](AI_KIT_SALES_TECH_SPEC.md) | `demo_ai_kit.sh` |
-| 5 | Webhook Mesh | `webhook-mesh` | £7,500 | [WEBHOOK_MESH_SALES_TECH_SPEC.md](WEBHOOK_MESH_SALES_TECH_SPEC.md) | `demo_webhook_mesh.sh` |
-| 6 | Ad Guard | `ad-guard` | £5,500 | [AD_GUARD_SALES_TECH_SPEC.md](AD_GUARD_SALES_TECH_SPEC.md) | `demo_ad_guard.sh` |
-| 7 | Health Telemetry | `health-telemetry` | £12,000–£14,000 | [HEALTH_TELEMETRY_SALES_TECH_SPEC.md](HEALTH_TELEMETRY_SALES_TECH_SPEC.md) | `demo_health_telemetry.sh` |
-| 8 | ModelGovernor | `model-governor` | £8,000 | [MODEL_GOVERNOR_SALES_TECH_SPEC.md](MODEL_GOVERNOR_SALES_TECH_SPEC.md) | `demo_model_governor.sh` |
-| 9 | Drift Gate | `drift-gate` | £16,000 | [DRIFT_GATE_SALES_TECH_SPEC.md](DRIFT_GATE_SALES_TECH_SPEC.md) | `demo_drift_gate.sh` |
-| 10 | Webhook Replay | `webhook-replay` | £5,500 | [WEBHOOK_REPLAY_SALES_TECH_SPEC.md](WEBHOOK_REPLAY_SALES_TECH_SPEC.md) | `demo_webhook_replay.sh` |
-| 11 | Spend Guard | `spend-guard` | £22,000 | [SPEND_GUARD_SALES_TECH_SPEC.md](SPEND_GUARD_SALES_TECH_SPEC.md) | `demo_spend_guard.sh` · `make demo-gold` |
-| 12 | Agent Ledger | `agent-ledger` | £9,500 | [AGENT_LEDGER_SALES_TECH_SPEC.md](AGENT_LEDGER_SALES_TECH_SPEC.md) | `demo_agent_ledger.sh` |
+| # | Product | SKU | Full spec | Demo |
+|---|---------|-----|-----------|------|
+| 1 | Compliance Logger | `compliance-log` | [COMPLIANCE_LOGGER_SALES_TECH_SPEC.md](COMPLIANCE_LOGGER_SALES_TECH_SPEC.md) | `demo_compliance_logger.sh` |
+| 2 | Proxy-Risk | `proxy-risk` | [PROXY_RISK_SALES_TECH_SPEC.md](PROXY_RISK_SALES_TECH_SPEC.md) | `demo_proxy_risk.sh` |
+| 3 | Alt-Data | `altdata` | [ALTDATA_SALES_TECH_SPEC.md](ALTDATA_SALES_TECH_SPEC.md) | `demo_altdata.sh` |
+| 4 | AI Kit | `ai-kit` | [AI_KIT_SALES_TECH_SPEC.md](AI_KIT_SALES_TECH_SPEC.md) | `demo_ai_kit.sh` |
+| 5 | Webhook Mesh | `webhook-mesh` | [WEBHOOK_MESH_SALES_TECH_SPEC.md](WEBHOOK_MESH_SALES_TECH_SPEC.md) | `demo_webhook_mesh.sh` |
+| 6 | Ad Guard | `ad-guard` | [AD_GUARD_SALES_TECH_SPEC.md](AD_GUARD_SALES_TECH_SPEC.md) | `demo_ad_guard.sh` |
+| 7 | Health Telemetry | `health-telemetry` | [HEALTH_TELEMETRY_SALES_TECH_SPEC.md](HEALTH_TELEMETRY_SALES_TECH_SPEC.md) | `demo_health_telemetry.sh` |
+| 8 | ModelGovernor | `model-governor` | [MODEL_GOVERNOR_SALES_TECH_SPEC.md](MODEL_GOVERNOR_SALES_TECH_SPEC.md) | `demo_model_governor.sh` |
+| 9 | Drift Gate | `drift-gate` | [DRIFT_GATE_SALES_TECH_SPEC.md](DRIFT_GATE_SALES_TECH_SPEC.md) | `demo_drift_gate.sh` |
+| 10 | Webhook Replay | `webhook-replay` | [WEBHOOK_REPLAY_SALES_TECH_SPEC.md](WEBHOOK_REPLAY_SALES_TECH_SPEC.md) | `demo_webhook_replay.sh` |
+| 11 | Spend Guard | `spend-guard` | [SPEND_GUARD_SALES_TECH_SPEC.md](SPEND_GUARD_SALES_TECH_SPEC.md) | `demo_spend_guard.sh` · `make demo-gold` |
+| 12 | Agent Ledger | `agent-ledger` | [AGENT_LEDGER_SALES_TECH_SPEC.md](AGENT_LEDGER_SALES_TECH_SPEC.md) | `demo_agent_ledger.sh` |
 
-**Buyer one-pagers:** `docs/*_BUYER.md`
+**Full tech/sales depth:** [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) · **Buyer one-pagers:** `docs/*_BUYER.md`
 
 ---
 
 ## Vertical bundles (not separate SKUs)
 
-| Bundle | SKUs | Sale-now band |
-|--------|------|---------------|
-| **Finance Governor** | #11 + #9 (+ #2 optional) | £38k–£48k |
-| **Insurance Governor** | #8 + #9 + #1 | £26k–£32k |
-| **Full spine** | All 12 | £110k–£180k |
+| Bundle | SKUs | Job |
+|--------|------|-----|
+| **Finance Governor** | #11 + #9 (+ #2 optional) | LLM/API spend + drift enforce + outbound firewall |
+| **Insurance Governor** | #8 + #9 + #1 | Model lifecycle + drift + decision audit |
+| **Full spine** | All 12 | One `PORTFOLIO_MANIFEST.json` over 12 verify-bundle |
 
 ---
 
@@ -86,8 +86,10 @@ See [ROADMAP_GTM_DISCIPLINE.md](ROADMAP_GTM_DISCIPLINE.md) for explicit non-SKUs
 
 | Doc | Purpose |
 |-----|---------|
+| [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md) | **Start here** — self-contained diligence pack |
+| [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) | Full tech + sales per SKU |
+| [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md) | CI proof and test artifacts |
+| [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | Market compare + comparable pricing |
 | [INST_PLUS_GOLD_STANDARD.md](INST_PLUS_GOLD_STANDARD.md) | Nine dimensions + completion matrix |
-| [INSTITUTIONAL_STANDARD.md](INSTITUTIONAL_STANDARD.md) | Portfolio overview |
 | [BUYER_EVIDENCE_PACK.md](BUYER_EVIDENCE_PACK.md) | 15-minute auditor dry-run |
 | [RUN_DEMO.md](RUN_DEMO.md) | Plug / demo / run |
-| [INST_PLUS_PRE_REV_VALUATION.md](INST_PLUS_PRE_REV_VALUATION.md) | IP valuation framework |

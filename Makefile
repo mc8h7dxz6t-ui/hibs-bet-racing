@@ -40,7 +40,7 @@ help:
 	@echo ""
 	@echo "Quick start:  make plug"
 	@echo "Diligence:    make proof"
-	@echo "Docs:         docs/RUN_DEMO.md"
+	@echo "Docs:         docs/INST_PLUS_DILIGENCE_PACK.md"
 
 install:
 	$(PYTHON) -m pip install -e ".[dev,instpp]"
