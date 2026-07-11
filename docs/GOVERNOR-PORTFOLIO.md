@@ -3,7 +3,45 @@
 **Audience:** Chief systems architects, acquirers, design partners, internal GTM  
 **Repo:** `hibs-bet-racing` (Inst++ 12-SKU portfolio on `inst_spine`)  
 **As-of:** July 2026  
+**Status:** 🟡 **Active hardening** — governors are **not** frozen or vendor-of-record ready; engineering and audit posture improve continuously on two parallel tracks (below).  
 **Policy:** **No commercial figures in this document** — license fees, deal sizes, valuations, and buyer spend thresholds belong in external SOWs and order forms only.
+
+---
+
+## Hardening status (read before diligence)
+
+Governors are **still being hardened and improved**. Treat every forensic score, compose-smoke claim, and platform port map as **point-in-time engineering**, not a shipped certification.
+
+### Two parallel hardening tracks
+
+| Track | Where | What is moving | Buyer can rely on today |
+|-------|-------|----------------|-------------------------|
+| **A — Inst++ SKU + bundle ingredients** | This repo (`hibs-bet-racing`) | Production profile `/ready`, Redis/Postgres gates, observation-lane export, WAL/replay scale, rigorous E2E per SKU | **CLI proof spine** — `make plug` / `make proof`, offline `verify-bundle`, design-partner VPC pilots on individual SKUs |
+| **B — Four governor platforms** | External `modelgovernor.v01` (not this tree) | Industry-hardening waves: asyncpg SERIALIZABLE reserve, Lua Redis CAS guardrails, Ed25519 bundle sign, mmap `.wrcap` WAL, phase 3–4 closure (ADR 002/003), `deployment-forensic-review`, `gov-live-demo` | **Engineering in flight** — local/CI proof when that repo is in scope; **do not** attribute platform scores to this repo alone |
+
+**Bundle labels (FG / IG / CG)** in track A are **recipes over improving SKUs** — not a unified platform binary. **ModelGovernor (#8)** is the only governor-named **product** in this tree; it is also under active hardening (deploy drift gate, gold demo, export).
+
+### What “hardening” means (no false finish line)
+
+| Layer | In progress (both tracks) | Not done / not claimed |
+|-------|---------------------------|-------------------------|
+| **Concurrency** | SERIALIZABLE reserve paths (external MG); idempotent wallet replay (SKU #11) | Global chain partition; repair CronJob for orphaned business rows (external) |
+| **HA / scale** | Redis fail-closed, stream dispatch, Lua guardrails (external + partial SKU) | Mandatory Postgres in all rigorous CI paths; PgBouncer + asyncpg soak everywhere |
+| **Audit / crypto** | `verify_chain_linkage` for observation lane; optional Ed25519 (both) | Mandatory signing on all examiner packs; key rotation `trusted_public_keys[]` |
+| **Ingress / egress** | WAL-before-ack (#5, #10); proxy gate chain (#2) | mTLS/HMAC on all webhook ingress; Envoy ext_authz (CG platform) |
+| **Mesh / wedges** | Env-wired drift + deploy (#8+#9), proxy baseline (#2+#9) | Warranty mesh (parent FROZEN → child block); ClaimGate, WireMatch, AlgoFreeze as code |
+| **Compliance packs** | SOC2/HIPAA **templates** | SOC 2 Type II, signed BAA, IL 9 letters |
+
+### How to cite readiness externally
+
+| Safe to say | Do not say yet |
+|-------------|----------------|
+| “Inst++ audit spine with offline verify-bundle on 12 SKUs” | “Four governor platforms production-ready” (from this repo alone) |
+| “Governor bundles are SKU combinations we license and harden together” | “ClaimGate / AlgoFreeze / CG `:8120` shipped” |
+| “Active hardening program; design-partner pilots on proof spine” | “IL 9 / 10 across portfolio” without naming the repo + commit + test log |
+| “External MG platform repo has compose-smoke and forensic review (when green)” | “Vendor-of-record without operating company + SOC 2” |
+
+**When this doc conflicts with a slide deck**, trust **git + test logs** (`make proof`, `instpp_rigorous_latest.log`, external `deployment-forensic-review` when applicable).
 
 ---
 
@@ -116,14 +154,14 @@ Full 12-SKU matrix: [FORENSIC_HARDENING_AUDIT.md](FORENSIC_HARDENING_AUDIT.md)
 
 ### Governor-level rollup (honest)
 
-| Governor (bundle) | Effective forensic band | Limiting factor |
-|-------------------|------------------------|-----------------|
-| **FG** (#11+#9+#2) | **~8.5/10** | No unified compose; Postgres wallet not default CI; no WireMatch |
-| **IG** (#8+#9+#1) | **~8/10** | No ClaimGate; deploy drift opt-in; three separate CLIs |
-| **CG** (#2+#1+#5+#12) | **~8/10** | No Envoy ext_authz; no mesh; ingress auth gaps on some serves |
-| **MG** (#8, spend via #11) | **#8: 9** · **spend: 9** | Not a single platform binary; external MG platform is different repo |
+| Governor (bundle) | Effective forensic band | Limiting factor | Hardening focus (active) |
+|-------------------|------------------------|-----------------|--------------------------|
+| **FG** (#11+#9+#2) | **~8.5/10** | No unified compose; Postgres wallet not default CI; no WireMatch | Spend gateway + drift Redis + proxy integration |
+| **IG** (#8+#9+#1) | **~8/10** | No ClaimGate; deploy drift opt-in; three separate CLIs | MG gold demo, deploy drift in rigorous, compliance export |
+| **CG** (#2+#1+#5+#12) | **~8/10** | No Envoy ext_authz; no mesh; ingress auth gaps | Mesh ingress WAL, proxy egress, agent authorize HTTP |
+| **MG** (#8, spend via #11) | **#8: 9** · **spend: 9** | Not a single platform binary | Lifecycle FSM + optional deploy drift; spend plane on #11 |
 
-**Not claimable from this repo alone:** IL 9/10 per external governor, `deployment-forensic-review` 10/10 green, `gov-live-demo`, examiner packs, SERIALIZABLE asyncpg reserve stack — those belong to **`modelgovernor.v01`** hardening program (ADR 002/003), not this tree.
+**Not claimable from this repo alone:** IL 9/10 per external governor, `deployment-forensic-review` 10/10 green, `gov-live-demo`, examiner packs, SERIALIZABLE asyncpg reserve stack — those belong to **`modelgovernor.v01`** hardening program (ADR 002/003), which is **also still in progress** (phase 4b: signing CronJob, chain repair, ingress auth, partitioning).
 
 ---
 
@@ -438,7 +476,22 @@ Principal-engineer waves (asyncpg SERIALIZABLE, Lua Redis CAS, Ed25519 bundle si
 | `verify_chain_linkage` for observation lane | ✅ | parallel pattern |
 | `INST_PRODUCTION_PROFILE` fail-closed `/ready` | ✅ | compose probes (external) |
 
-**Portfolio score (this repo, post SKU hardening PR):** architecture ~8 · code ~7.5 · execution ~7 · audit ~7 · **overall ~7.5/10** — honest ceiling until Postgres in rigorous CI, mandatory signing, and ingress mTLS land universally.
+**Portfolio score (this repo, post SKU hardening):** architecture ~8 · code ~7.5 · execution ~7 · audit ~7 · **overall ~7.5/10** — honest ceiling until Postgres in rigorous CI, mandatory signing, and ingress mTLS land universally. **Scores rise as hardening lands; they are not marketing certifications.**
+
+### Active hardening backlog (governor-relevant)
+
+| Priority | Item | Track | Governor impact |
+|----------|------|-------|-----------------|
+| P0 | Postgres wallet in rigorous CI | A | FG credibility |
+| P0 | Redis stream dispatch default in portfolio demo | A | CG / FG ingress story |
+| P1 | Signed export policy + mandatory Ed25519 on examiner paths | A + B | IG / CG diligence |
+| P1 | Deploy drift in all MG gold paths (`deploy_features`) | A | IG ModelRiskFreeze analogue |
+| P1 | Chain finalize repair + signing CronJob | B | MG/FG/IG/CG platform |
+| P2 | Webhook ingress mTLS/HMAC | A + B | CG |
+| P2 | Mesh / ClaimGate / WireMatch wedges | B | IG / FG platform |
+| P2 | Per-account chain partitioning | B | All platforms at scale |
+
+Update this table when waves close — do not remove the section when items complete; move rows to “Recently landed” with commit/PR reference.
 
 ---
 
@@ -505,6 +558,9 @@ A: Templates only. Buyer-operated VPC scope.
 
 **Q: What is the defensible IP?**  
 A: `inst_spine` cryptographic audit kernel + 12 SKU gate patterns + offline `verify-bundle` + rigorous CI logs — not four Postgres governor databases in this git tree.
+
+**Q: Are governors “done”?**  
+A: **No.** Governors are **actively being hardened** on two tracks: Inst++ SKU/bundle ingredients in this repo, and four platform spines in `modelgovernor.v01`. Forensic bands in this doc are engineering estimates, not final attestations. Design-partner and pilot motions are the appropriate GTM while hardening continues.
 
 ---
 
