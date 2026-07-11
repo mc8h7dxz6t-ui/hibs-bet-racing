@@ -74,6 +74,8 @@ Shared libraries: `inst_spine` (ledger, clocks, export, production profile), `in
 
 | SKU | Demo action | Offline-safe |
 |-----|-------------|--------------|
+| Compliance | `log_decision` — snapshot + outcome | ✅ |
+| Proxy-Risk | Shadow `evaluate` (`live: false`) | ✅ |
 | Alt-Data | `poll_once` stub feed | ✅ |
 | AI Kit | AgentLoop stub steps | ✅ |
 | Webhook Mesh | Cold-path ingress ledger append | ✅ |
@@ -85,7 +87,7 @@ Shared libraries: `inst_spine` (ledger, clocks, export, production profile), `in
 | Spend Guard | init wallet → reserve → settle | ✅ |
 | Agent Ledger | authorize / complete | ✅ |
 
-Compliance (#1) and Proxy (#2) retain full workflows on the Architecture tab.
+Compliance (#1) and Proxy (#2) use the same Proof tab ingest flow as SKUs #3–#12.
 
 ---
 

@@ -182,6 +182,8 @@
   let activeProofProduct = "compliance";
 
   const GUIDED_INGEST_IDS = new Set([
+    "compliance",
+    "proxy",
     "altdata",
     "ai-kit",
     "webhook-mesh",
@@ -206,8 +208,8 @@
     const guided = supportsProofIngest(activeProofProduct);
     if (hint) {
       hint.textContent = guided
-        ? "Guided ingest available — load demo payload or edit JSON, then Ingest."
-        : "Compliance & Proxy use Architecture tabs; other SKUs: bootstrap or make demo-all.";
+        ? "Guided ingest — load demo payload or edit JSON, then Ingest."
+        : "Select a product from the picker.";
     }
     if (payloadEl) payloadEl.disabled = !guided;
     if (btnDemo) btnDemo.style.display = guided ? "" : "none";
