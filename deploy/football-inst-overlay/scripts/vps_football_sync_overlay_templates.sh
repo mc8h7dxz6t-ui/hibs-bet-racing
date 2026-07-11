@@ -15,6 +15,7 @@ TEMPLATES=(
   _hibs_brand.html
   _launch_wait_overlay.html
   _portfolio_bar.html
+  _product_switcher.html
   _term_hint.html
   _site_ops_chips.html
   _inst_grade_chip.html

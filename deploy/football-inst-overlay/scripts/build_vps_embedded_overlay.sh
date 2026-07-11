@@ -12,6 +12,7 @@ FILES = [
     "templates/_hibs_brand.html",
     "templates/_launch_wait_overlay.html",
     "templates/_portfolio_bar.html",
+    "templates/_product_switcher.html",
     "templates/_term_hint.html",
     "templates/_site_ops_chips.html",
     "templates/_inst_grade_chip.html",
