@@ -15,7 +15,6 @@
 
 | | |
 |---|---|
-| **Price band** | £99–£249/seat or £50–150/mo team |
 | **Deploy** | Air-gapped VPC — SQLite trace ledger |
 | **Proof** | Lamport checkpoints + trace export + `verify-bundle` |
 | **Demo** | 60 seconds CLI · `--live-llm` optional |
@@ -119,16 +118,6 @@ ai-kit verify-bundle --tarball ./ai_kit_bundle.tar
 
 ---
 
-## Pricing & packaging
-
-| Tier | Band | Includes |
-|------|------|----------|
-| **Team** | £50–150/mo | Up to 5 seats, trace export |
-| **Seat** | £99–£249/seat | Per developer, unlimited traces |
-| **Enterprise VPC** | Custom | Air-gap deploy + auditor onboarding SOW |
-| **Maintenance** | 15–20% ARR | Spine upgrades, rate-limit tuning |
-
----
 
 ## RFP quick answers
 
@@ -146,5 +135,4 @@ ai-kit verify-bundle --tarball ./ai_kit_bundle.tar
 ## Related documents
 
 - `docs/AI_KIT_BUYER.md` — one-page buyer sheet  
-- `docs/PORTFOLIO_SALES_SHEET.md` — portfolio pricing matrix  
 - `docs/BUYER_EVIDENCE_PACK.md` — procurement dry-run

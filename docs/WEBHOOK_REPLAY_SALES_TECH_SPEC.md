@@ -15,7 +15,6 @@
 
 | | |
 |---|---|
-| **Price band** | £999–£1,800/mo per instance |
 | **Capture format** | `.wrcap` — MAGIC + JSON header + raw body (mmap) |
 | **Replay** | No network — handler + diff report |
 | **Proof** | `webhook_replay` ledger events + offline `verify-bundle` |

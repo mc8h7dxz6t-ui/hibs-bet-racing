@@ -15,7 +15,6 @@
 
 | | |
 |---|---|
-| **Price band** | £300–£800/mo per instance |
 | **Deploy** | VPC + Redis (multi-instance) + SQLite spend ledger |
 | **Proof** | Every approve/reject/kill on genesis chain + `verify-bundle` |
 | **Demo** | 60 seconds CLI · HTTP serve on :8788 |
@@ -133,16 +132,6 @@ ad-guard verify-bundle --tarball ./ad_guard_bundle.tar
 
 ---
 
-## Pricing & packaging
-
-| Tier | Band | Includes |
-|------|------|----------|
-| **Instance license** | £300–£800/mo | Gate chain + export + Google/Meta parsers |
-| **Multi-instance** | +Redis HA SOW | Fail-closed idempotency across pods |
-| **NeMo integration** | Included | Header gate; buyer wires upstream |
-| **Maintenance** | 15–20% ARR | Parser updates, spine upgrades |
-
----
 
 ## RFP quick answers
 
@@ -161,4 +150,3 @@ ad-guard verify-bundle --tarball ./ad_guard_bundle.tar
 
 - `docs/AD_GUARD_BUYER.md` — one-page buyer sheet  
 - `docs/AD_GUARD_INSTITUTIONAL_STACK.md` — stack positioning  
-- `docs/PORTFOLIO_SALES_SHEET.md` — portfolio pricing matrix

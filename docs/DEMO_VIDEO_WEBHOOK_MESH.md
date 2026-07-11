@@ -157,7 +157,7 @@ Look for **repro_check: true** or **PASS** in output.
 **[ON SCREEN]**
 
 ```
-VPC pilot from £2.5k
+VPC pilot available.
 DM / email: [your contact]
 Prove it happened — before the dispute.
 ```
@@ -177,7 +177,7 @@ What you'll see:
 
 For: SaaS billing, fintech, platform engineering.
 Deploy: your VPC — not multi-tenant SaaS.
-Pilot: 4 weeks from £2.5k (shadow available).
+Pilot: 4 weeks (shadow available).
 
 Contact: [your email / LinkedIn]
 

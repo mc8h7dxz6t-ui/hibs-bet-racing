@@ -14,7 +14,6 @@
 | ML platform / MRM | Observability alerts too late | **Enforce mode** rejects traffic, not email only |
 | Model risk / legal | Dispute on production model inputs | `drift_gate_evaluation` events on genesis chain |
 
-**Price band:** £1,500–£3,500/mo per active gateway (VPC license).
 
 ---
 

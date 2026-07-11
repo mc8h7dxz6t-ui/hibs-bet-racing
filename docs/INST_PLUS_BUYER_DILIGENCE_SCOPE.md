@@ -8,7 +8,7 @@
 > **Pack index:** [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md)  
 > **Per-SKU buyer one-pagers:** `docs/*_BUYER.md`  
 > **Per-SKU technical specs:** `docs/*_SALES_TECH_SPEC.md`  
-> **Market comparable gauge (third-party vendors):** [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md)
+> **Capability compare:** [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md)
 
 ---
 
@@ -22,7 +22,7 @@ Each platform section includes:
 | **Real-world example** | Concrete deployment scenario (not demo fiction) |
 | **Tech spec brief** | Ingress, storage, gates, CLI, integrations |
 | **Ratings** | Architecture · Code · Execution (1–5) |
-| **Today's value gauge** | Market category, comparable spend bands (third-party only), qualitative IP position |
+| **Market position** | Category, closest comps, capability overlap (no pricing) |
 
 ### Rating scale (1–5)
 
@@ -99,16 +99,6 @@ compliance-log verify-bundle --tarball ./data/demo/portfolio/compliance_bundle.t
 | **Code** | 4 | Focused package; relies on spine for heavy lifting; serve + CLI tested |
 | **Execution** | 5 | Prod ✅ single-instance; Proof Console #1 ingest; rigorous E2E passed |
 
-### Today's value gauge
-
-| Gauge | Assessment |
-|-------|------------|
-| **Market category** | Tamper-evident decision ledger (not full GRC) |
-| **Closest comps** | immudb / Trillian (OSS), ServiceNow Policy & Compliance (workflow) |
-| **Third-party spend band** | Enterprise GRC modules often **$45k–$140k/yr** per module; immudb **$0 license + ops** |
-| **Inst++ position** | **Narrower, deeper on offline cryptographic proof** — ~10–20% of GRC ACV for the audit spine only |
-| **IP difficulty to replicate** | Medium-high (genesis + F-gates + export contract) |
-| **Pre-revenue IP tier** | Strong diligence wedge for fintech / legal buyers |
 
 ---
 
@@ -153,16 +143,6 @@ proxy-risk evaluate --path /orders --body '{"symbol":"AAPL"}'   # shadow default
 | **Code** | 5 | Deepest hot-path SKU; serve + middleware + Redis paths tested |
 | **Execution** | 5 | Prod ✅; p99 documented; chaos + industry gold coverage |
 
-### Today's value gauge
-
-| Gauge | Assessment |
-|-------|------------|
-| **Market category** | API gateway + risk firewall |
-| **Closest comps** | Kong Konnect / Enterprise, Apigee, AWS API Gateway |
-| **Third-party spend band** | Mid-market Kong year-1 TCO often **$145k–$350k** (license + infra + DevOps) |
-| **Inst++ position** | Trades portal breadth for **Z-score kill + per-gate genesis audit + offline verify** |
-| **IP difficulty to replicate** | High (gate chain + WAL semantics + drift hook) |
-| **Pre-revenue IP tier** | Strong for fintech / quant infra buyers |
 
 ---
 
@@ -206,16 +186,6 @@ altdata poll --feed demo_feed --ctx '{"demo_price":42.5,"demo_seats":180}'
 | **Code** | 4 | Structural golden tests; production feed adapters vary by buyer |
 | **Execution** | 4 | Prod ✅ for envelope; live URL feeds need buyer-specific config |
 
-### Today's value gauge
-
-| Gauge | Assessment |
-|-------|------------|
-| **Market category** | Alt-data ingestion + quality gate |
-| **Closest comps** | Custom scrapers, Fivetran connectors, Evidently data drift (partial) |
-| **Third-party spend band** | ETL mid-market **$1k–$5k+/mo** per connector; scrapers = labor |
-| **Inst++ position** | **Coverage-as-gate + poll proof**, not connector catalog |
-| **IP difficulty to replicate** | Medium (ladder pattern + F7 integration) |
-| **Pre-revenue IP tier** | Niche — strongest when bundled with Drift Gate (#9) or quant buyer |
 
 ---
 
@@ -258,16 +228,6 @@ ai-kit run --steps 3 --trace-db ./trace.sqlite
 | **Code** | 4 | CLI + LLM optional path tested; hardest standalone GTM sell |
 | **Execution** | 4 | Prod ✅ envelope; buyer wires step_fn into their runtime |
 
-### Today's value gauge
-
-| Gauge | Assessment |
-|-------|------------|
-| **Market category** | Agent runtime guardrails + trace audit |
-| **Closest comps** | LangSmith, Langfuse, LangChain defaults |
-| **Third-party spend band** | Langfuse **$29–$2,499+/mo**; LangSmith **$39/seat/mo + traces** |
-| **Inst++ position** | **Offline verify-bundle + Lamport checkpoints** — not hosted observability UI |
-| **IP difficulty to replicate** | Medium |
-| **Pre-revenue IP tier** | Weakest standalone sell; strong as part of Agent stack (#12 + #11) |
 
 ---
 
@@ -311,16 +271,6 @@ export WEBHOOK_PROVIDER_SECRET=demo-secret
 | **Code** | 5 | Largest ingress SKU; chaos tests; Redis soak in CI |
 | **Execution** | 5 | Prod ✅; docker-extended zero-skip; pairs with #10 |
 
-### Today's value gauge
-
-| Gauge | Assessment |
-|-------|------------|
-| **Market category** | Inbound webhook reliability |
-| **Closest comps** | Hookdeck, Svix, DIY middleware |
-| **Third-party spend band** | SMB **$0–$6k/yr**; at scale **$6k–$50k+/yr** metered |
-| **Inst++ position** | **Provable never-double-charge** vs managed delivery UX |
-| **IP difficulty to replicate** | High (WAL + CAS + audit chain) |
-| **Pre-revenue IP tier** | Strong — clear fintech/SaaS buyer |
 
 ---
 
@@ -363,16 +313,6 @@ ad-guard evaluate --provider google --body '{"campaignId":"12345","bidMicros":25
 | **Code** | 4 | Creative header fuzz (phase 3); Google/Meta paths tested |
 | **Execution** | 5 | Prod ✅; shadow burn-in default |
 
-### Today's value gauge
-
-| Gauge | Assessment |
-|-------|------------|
-| **Market category** | Marketing API spend control |
-| **Closest comps** | Finance alerts, DSP native caps, custom middleware |
-| **Third-party spend band** | Often bundled in **$300–$800/mo** ops tools or internal build |
-| **Inst++ position** | **API-boundary kill + offline proof** — not placement verification |
-| **IP difficulty to replicate** | Medium (proxy clone + parsers) |
-| **Pre-revenue IP tier** | Niche — agency / growth ops buyers |
 
 ---
 
@@ -416,16 +356,6 @@ health-telemetry export --observation-lane --tarball ./health_obs.tar
 | **Code** | 5 | Ingest, serve, export paths well tested |
 | **Execution** | 5 | Prod ✅; HIPAA template for buyer questionnaires |
 
-### Today's value gauge
-
-| Gauge | Assessment |
-|-------|------------|
-| **Market category** | Device telemetry integrity (not clinical device) |
-| **Closest comps** | AWS IoT Core, cloud IoT hubs, spreadsheet exports |
-| **Third-party spend band** | IoT pay-per-message; enterprise RPM platforms **$5k–$15k+** license bands |
-| **Inst++ position** | **Tamper evidence + offline verify** — explicit non-FDA honesty |
-| **IP difficulty to replicate** | Medium-high (seq gate + PHI export modes) |
-| **Pre-revenue IP tier** | Strong for digital health diligence — highest standalone health IP |
 
 ---
 
@@ -469,16 +399,6 @@ drift-gate evaluate --baseline ./baseline.json --features '{"f1":0.2,"f2":0.8}'
 | **Code** | 5 | Golden matrices; Redis rolling windows tested |
 | **Execution** | 5 | Prod ✅; shadow→enforce documented |
 
-### Today's value gauge
-
-| Gauge | Assessment |
-|-------|------------|
-| **Market category** | ML drift detection + enforcement |
-| **Closest comps** | Evidently OSS, Fiddler, WhyLabs |
-| **Third-party spend band** | Fiddler **$0–$2k/mo** metered at 1M traces; Evidently **$0 OSS + ops** |
-| **Inst++ position** | **Blocks traffic with genesis audit** — not DS exploration UI |
-| **IP difficulty to replicate** | High (enforce inline + audit) |
-| **Pre-revenue IP tier** | Strong for insurtech / lending MRM |
 
 ---
 
@@ -521,16 +441,6 @@ webhook-replay replay --capture ./captures/event.wrcap
 | **Code** | 4 | Byte-identical replay proven; smaller surface |
 | **Execution** | 5 | Prod ✅; pairs cleanly with Mesh |
 
-### Today's value gauge
-
-| Gauge | Assessment |
-|-------|------------|
-| **Market category** | Forensic webhook replay |
-| **Closest comps** | Hookdeck replay (partial), custom scripts |
-| **Third-party spend band** | Often bundled in webhook SaaS **$500–$2k/mo** tiers |
-| **Inst++ position** | **Byte-identical offline replay + verify-bundle** |
-| **IP difficulty to replicate** | Medium |
-| **Pre-revenue IP tier** | Strong as #5 attach; weaker standalone |
 
 ---
 
@@ -574,16 +484,6 @@ spend-guard verify-bundle --tarball ./data/demo/spend_guard_bundle.tar
 | **Code** | 5 | Largest wallet surface; Postgres profile; gateway tested |
 | **Execution** | 5 | Prod ✅; rigorous idempotency + drift lock proven |
 
-### Today's value gauge
-
-| Gauge | Assessment |
-|-------|------------|
-| **Market category** | LLM/API spend enforcement |
-| **Closest comps** | LiteLLM budgets, cloud org limits, Portkey |
-| **Third-party spend band** | LiteLLM Enterprise **$3k–$36k/yr** + infra TCO |
-| **Inst++ position** | **Money correctness + offline proof** — complements routers |
-| **IP difficulty to replicate** | High (two-phase commit + drift lock) |
-| **Pre-revenue IP tier** | Strong — FinOps / AI platform buyers |
 
 ---
 
@@ -627,20 +527,10 @@ agent-ledger verify-bundle --tarball ./data/demo/agent_ledger_bundle.tar
 | **Code** | 4 | Solid core; buyer agent runtime wiring is integration |
 | **Execution** | 5 | Prod ✅; deny/escalate rigorous pass |
 
-### Today's value gauge
-
-| Gauge | Assessment |
-|-------|------------|
-| **Market category** | Agent tool authorization + audit |
-| **Closest comps** | LangSmith policies, Oso/OPAL, custom guardrails |
-| **Third-party spend band** | LangSmith **$39/seat/mo + traces**; Oso enterprise custom |
-| **Inst++ position** | **Pre-execution proof** — not trace UI |
-| **IP difficulty to replicate** | High (authorize chain + verify) |
-| **Pre-revenue IP tier** | Strong — rising agent-security buyer interest |
 
 ---
 
-## Composite value gauge (today)
+## Composite diligence summary
 
 ### What you are buying (11 platforms, no governor SKU)
 
@@ -651,19 +541,7 @@ agent-ledger verify-bundle --tarball ./data/demo/agent_ledger_bundle.tar
 | **Deployment model** | Air-gap VPC, SQLite default, optional Redis/Postgres scale profiles |
 | **Honest limits** | Pre-revenue; no SOC2 Type II attestation; Python hot path; monorepo sports adjacency |
 
-### Market stack comparison (third-party spend only)
-
-Illustrative **mid-market regulated buyer** needing: decision audit, outbound API control, webhooks, drift enforce, LLM spend guard, agent tool auth — **without** model lifecycle registry:
-
-| Approach | Typical vendors | Indicative third-party annual spend | Offline single manifest |
-|----------|-----------------|-------------------------------------|-------------------------|
-| **Best-of-breed SaaS** | ServiceNow PCM + Kong + Hookdeck + Fiddler + LangSmith + LiteLLM Ent | **$350k–$800k+/yr** licenses (before PS) | No |
-| **Lean SaaS + OSS** | Point GRC + Hookdeck Team + Langfuse + LiteLLM OSS + Evidently | **$50k–$150k/yr** + engineering glue | No |
-| **Inst++ 11-SKU VPC** | This portfolio (excl. ModelGovernor) | VPC hosting + ops (license offline) | **Yes — 11/11 verify-bundle** |
-
-### Qualitative IP value (pre-revenue, no Inst++ price list)
-
-Based on cost-to-replicate and acqui-hire comps in [INST_PLUS_PRE_REV_VALUATION.md](INST_PLUS_PRE_REV_VALUATION.md), adjusted for **11 SKUs** (excl. ModelGovernor):
+### Diligence tier (qualitative)
 
 | Tier | Platforms | Rationale |
 |------|-----------|-----------|
@@ -671,9 +549,7 @@ Based on cost-to-replicate and acqui-hire comps in [INST_PLUS_PRE_REV_VALUATION.
 | **Tier B — solid, often bundled** | #6, #10 | Strong as attach; narrower standalone GTM |
 | **Tier C — integration SOW** | #3, #4 | Real product; buyer feed / agent runtime wiring required |
 
-**Combined 11-SKU IP band (indicative, code + diligence only):** roughly **£55k–£120k** / **$70k–$150k** at 1.5–2.5× replacement cost — **not** seed-round company valuation without revenue and GTM.
-
-### When Inst++ wins vs market (today)
+### When Inst++ wins vs market
 
 | Buyer priority | Market stack wins | Inst++ (11 SKUs) wins |
 |----------------|-------------------|------------------------|
@@ -683,19 +559,18 @@ Based on cost-to-replicate and acqui-hire comps in [INST_PLUS_PRE_REV_VALUATION.
 | Outbound API kill + audit | Access logs only | **#2 + #9** |
 | LLM spend block before inference | Budget alerts | **#11 reserve/settle/lock** |
 | Agent tool authorization proof | Post-hoc traces | **#12 pre-exec chain** |
-| Per-message / per-trace meter at scale | SaaS can compound | **Flat VPC** favorable at volume |
+| High-volume metered SaaS | Per-message / per-trace billing | **Flat VPC** deploy model |
 
-### Value draggers (honest)
+### Diligence draggers (honest)
 
 | Drag | Effect |
 |------|--------|
-| No revenue / no LOI | IP-sale multiples only |
+| No revenue / no LOI | Buyer must evaluate on proof package |
 | Shared monorepo with sports stack | Buyer must scope SKU extract |
 | No SOC2 Type II | Enterprise security questionnaire friction |
 | Python hot path | Quant/latency buyers may discount |
 | GitHub Actions billing blocked | CI green requires account fix — code tested locally |
 
----
 
 ## 15-minute diligence run
 
@@ -723,7 +598,7 @@ Proof Console (guided ingest all SKUs): `make workflow-serve` → `:8790`
 | Document | Purpose |
 |----------|---------|
 | [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) | Sales positioning per SKU |
-| [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | Full 12-SKU market compare + third-party pricing |
+| [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | Capability matrix vs adjacent platforms |
 | [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md) | CI artifacts and test file index |
 | [FORENSIC_ARCHITECTURE_TRUTH.md](FORENSIC_ARCHITECTURE_TRUTH.md) | Honest scope vs external rebrands |
 | [SOC2_VPC_DILIGENCE_PACK.md](SOC2_VPC_DILIGENCE_PACK.md) | VPC evidence template (not attestation) |

@@ -80,12 +80,12 @@ flowchart LR
 
 **Design rule:** Each product is a **standalone package** with zero sports-domain imports. Racing code is the reference implementation only.
 
-| Product | One job | Inst++ means | Price band |
+| Product | One job | Inst++ means |
 |---------|---------|--------------|------------|
-| **1. Proxy-Risk Gateway** | Stop bad automation before it hits live APIs | p99 gate latency <5ms; Z-score kill; async hot path | £199–499/mo per instance |
-| **2. Alt-Data Extractors** | Deliver one clean telemetry feed | ≥95% coverage + structural fallback when DOM breaks | £500–2,000/mo per feed |
+| **1. Proxy-Risk Gateway** | Stop bad automation before it hits live APIs | p99 gate latency <5ms; Z-score kill; async hot path |
+| **2. Alt-Data Extractors** | Deliver one clean telemetry feed | ≥95% coverage + structural fallback when DOM breaks |
 | **3. Compliance Logger** | Prove what the system decided and when | Lamport-ordered hash chain auditors can replay | License + maintenance retainer |
-| **4. AI Boilerplates** | Ship AI apps without rate-limit/state bugs | Token-bucket burst control + checkpoint recovery | £99–249 lifetime/seat |
+| **4. AI Boilerplates** | Ship AI apps without rate-limit/state bugs | Token-bucket burst control + checkpoint recovery |
 
 ---
 
@@ -339,7 +339,7 @@ One headless feed, continuously — clean JSON via secured API. **One feed until
 | **P1 — Field ladder 1–3** | ≥2 sources per field; versioned selectors | ≥85% coverage on primary fields |
 | **P1b — Structural rescue** | Rung 4 worker; rescue count in manifest | DOM-break simulation: coverage stays ≥85% via rung 4 |
 | **P2 — SLA telemetry** | `altdata check` — coverage, rescue rate, p95 latency | Rescue rate <20% of fills (ladder healthy) |
-| **P3 — Secured API** | API keys; token-bucket per client (`rates.py`) | 1 design partner @ £500/mo |
+| **P3 — Secured API** | API keys; token-bucket per client (`rates.py`) | 1 design partner |
 | **P4 — Data room** | Daily export: snapshots + chain + coverage audit | Buyer DD without vendor call |
 
 ### What NOT to build
@@ -514,7 +514,7 @@ compliance-log export --repro-check
 ./scripts/export_audit.sh data/compliance_ledger.sqlite ./audit_bundle ./audit_bundle.tar
 ```
 
-See `docs/INST_PLUS_STRATEGY.md` for HIBS vs Inst++ valuation and UK Code mapping.
+See `docs/INST_PLUS_DILIGENCE_PACK.md` for HIBS vs Inst++ positioning and UK Code mapping.
 
 **31 tests passing** (WAL, genesis, shared bucket, P2 export reproducibility).
 

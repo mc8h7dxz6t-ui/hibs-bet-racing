@@ -15,7 +15,6 @@
 
 | | |
 |---|---|
-| **Price band** | £500–£2,000/mo per feed (design partner for live URL targets) |
 | **Deploy** | Air-gapped VPC / on-prem — SQLite + WAL |
 | **Proof** | Genesis ledger per poll + F7 coverage gate + `verify-bundle` |
 | **Demo** | 60 seconds CLI · production FX feed optional |
@@ -121,16 +120,6 @@ altdata verify-bundle --tarball ./altdata_bundle.tar
 
 ---
 
-## Pricing & packaging
-
-| Tier | Band | Includes |
-|------|------|----------|
-| **Feed license** | £500–£2,000/mo | CLI + spine + one feed config + export |
-| **Design partner** | £2k–£5k SOW | Live URL mapping, ladder tuning, coverage floor |
-| **Additional feed** | +50% per feed | Same spine, separate ledger |
-| **Maintenance** | 15–20% ARR | Security patches, feed registry updates |
-
----
 
 ## RFP quick answers
 
@@ -148,5 +137,4 @@ altdata verify-bundle --tarball ./altdata_bundle.tar
 ## Related documents
 
 - `docs/ALTDATA_BUYER.md` — one-page buyer sheet  
-- `docs/PORTFOLIO_SALES_SHEET.md` — portfolio pricing matrix  
 - `docs/BUYER_EVIDENCE_PACK.md` — procurement dry-run

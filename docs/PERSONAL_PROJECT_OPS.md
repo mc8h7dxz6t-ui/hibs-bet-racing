@@ -104,7 +104,7 @@ sudo OVERLAY_ROOT=/opt/hibs-racing/deploy/football-inst-overlay \
 
 ## Do not use for diligence
 
-- `docs/*_SALES_*.md`, `ACQUIRE_LISTING.md`, `INST_PLUS_PRE_REV_VALUATION.md`
+- `docs/*_SALES_*.md`, `ACQUIRE_LISTING.md`
 - `buyer_ready` as PE pass
 - Governor SKU names (IG/FG/MG/CG) — not in this repo
 

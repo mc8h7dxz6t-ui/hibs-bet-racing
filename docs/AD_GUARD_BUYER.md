@@ -14,7 +14,6 @@
 | Finance / compliance | Post-hoc alerts, no API-boundary proof | Every approve/reject/kill on genesis chain |
 | Enterprise marketing stack | DV/IAS guard placement, not spend | Spend layer between NeMo and DSP |
 
-**Price band:** £300–£800/mo per instance.
 
 ---
 
@@ -84,4 +83,3 @@ See `src/ad_guard/README.md` for architecture.
 | 1 | `./scripts/demo_ad_guard.sh` (60s) |
 | 2 | `ad-guard verify-bundle --tarball ./ad_guard_bundle.tar` |
 | 3 | RFP depth → `docs/AD_GUARD_SALES_TECH_SPEC.md` |
-| 4 | Portfolio pricing → `docs/PORTFOLIO_SALES_SHEET.md` |

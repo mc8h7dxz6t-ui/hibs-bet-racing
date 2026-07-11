@@ -158,12 +158,12 @@ Same spine as Proxy-Risk — forked config:
 
 ---
 
-## Pricing & buyer
+## Buyer segments
 
-| Segment | Price | Buyer |
-|---------|-------|-------|
-| Agency / holding company | £300–£800/mo per instance | Head of programmatic, finance ops |
-| Enterprise marketing ops | £5k–£15k license + maintenance | Procurement + legal (audit requirement) |
+| Segment | Buyer |
+|---------|-------|
+| Agency / holding company | Head of programmatic, finance ops |
+| Enterprise marketing ops | Procurement + legal (audit requirement) |
 
 **Do NOT build before buyer:** Bid strategy, creative scoring, reporting UI, DSP UI, RTB exchange adapter.
 
@@ -185,7 +185,7 @@ Same spine as Proxy-Risk — forked config:
 ## Related
 
 - `docs/INSTITUTIONAL_ENTERPRISE_STACK.md` — full two-pillar map + sales narrative
-- `docs/INST_PLUS_STRATEGY.md` — portfolio strategy
+- `docs/INST_PLUS_DILIGENCE_PACK.md` — portfolio strategy
 - `docs/INST_PLUS_TEST_AND_DEMO.md` — demo commands
 - `src/proxy_risk/` — fork base
 - `src/inst_spine/rates.py` — token bucket + Z-score math

@@ -14,7 +14,6 @@
 | Platform engineering | Can't reproduce prod ingress locally | Air-gapped replay engine |
 | Compliance / legal | Auditor needs offline proof | `webhook_replay` events on genesis chain |
 
-**Price band:** £999–£1,800/mo per instance (VPC license).
 
 ---
 

@@ -367,18 +367,6 @@ inst-workflow serve --port 8790          # browser workflow console
 
 ---
 
-# Pricing & packaging (sell separately)
-
-| Product | Band | Buyer |
-|---------|------|-------|
-| Compliance Logger | £300–£800/mo tenant | Legal, risk, governance |
-| Proxy-Risk Gateway | £400–£1,200/mo tenant | Fintech ops, quant infra |
-| Combined diligence bundle | Custom | Only when same holding co buys both |
-
-**Never bundle with HIBS sports products** in one listing — different buyers, different diligence.
-
----
-
 # What “leading edge” does NOT mean
 
 Honest boundaries preserve credibility in enterprise sales:
@@ -396,7 +384,7 @@ Leading edge **here** = *cryptographic decision proof + fail-closed outbound con
 ## Related documents
 
 - `docs/INST_PLUS_GOLD_STANDARD.md` — six-dimension quality bar
-- `docs/INST_PLUS_STRATEGY.md` — portfolio strategy
+- `docs/INST_PLUS_DILIGENCE_PACK.md` — portfolio strategy
 - `docs/INST_PLUS_TEST_AND_DEMO.md` — command playbook
 - `src/compliance_log/README.md` — product #1 architecture
 - `src/proxy_risk/README.md` — product #2 architecture

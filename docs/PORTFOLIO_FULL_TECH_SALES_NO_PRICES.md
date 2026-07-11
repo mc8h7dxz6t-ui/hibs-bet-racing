@@ -8,8 +8,8 @@
 
 > **Part of the self-contained diligence pack** — [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md)  
 > **Evidence & CI proof:** [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md)  
-> **Market compare + comparable pricing:** [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md)  
-> **No Inst++ pricing in this document or pack.**
+> **Capability compare:** [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md)  
+> **No pricing in diligence pack docs.**
 
 ---
 
@@ -486,7 +486,7 @@ cat docs/test_logs/instpp_rigorous_latest_summary.json
 | Dry-run | 1 meeting | Demo + `verify-bundle` on sample tarball |
 | Shadow | 2–4 weeks | VPC deploy, shadow mode (#2, #6) or read-only (#3) |
 | Live pilot | 4–8 weeks | Single tenant, one route/feed/ward |
-| Production | — | Annual VPC license + maintenance (procurement offline — not in repo) |
+| Production | — | VPC deploy + maintenance (procurement offline — not in repo) |
 
 ---
 
@@ -496,7 +496,7 @@ cat docs/test_logs/instpp_rigorous_latest_summary.json
 |-----|---------|
 | [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md) | Pack index — start here |
 | [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md) | Per-SKU proof commands and CI artifacts |
-| [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | Capability matrix + market pricing gauge |
+| [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | Capability matrix vs adjacent platforms |
 | [INST_PLUS_GOLD_STANDARD.md](INST_PLUS_GOLD_STANDARD.md) | Nine dimensions bar |
 | [BUYER_EVIDENCE_PACK.md](BUYER_EVIDENCE_PACK.md) | 15-minute auditor dry-run |
 | [docs/test_logs/README.md](test_logs/README.md) | Committed CI evidence |

@@ -15,7 +15,6 @@
 
 | | |
 |---|---|
-| **Price band** | £5k–£15k license + £500/mo maintenance · **£12k–£14k sale-now** perpetual VPC |
 | **Deploy** | Air-gapped VPC — buyer-operated SQLite + optional HTTP gateway |
 | **Proof** | Genesis hash chain + per-device `seq` gate + F7 coverage + `verify-bundle` |
 | **Demo** | 60 seconds CLI · `health-telemetry serve` · hospital pilot playbook |
@@ -208,16 +207,6 @@ health-telemetry verify-bundle --tarball ./health_bundle.tar
 
 ---
 
-## Pricing & packaging
-
-| Tier | Band | Includes |
-|------|------|----------|
-| **Site license** | £5k–£15k · sale-now **£12k–£14k** | CLI + serve + sequence gate + HIPAA pack + export |
-| **Maintenance** | £500/mo | Security patches, spine upgrades |
-| **Hospital pilot** | £8k–£25k SOW | Ward deploy, BAA review, auditor onboarding |
-| **Paid shadow pilot** | **£3,500** | 30-day VPC shadow ingest + export walkthrough |
-
----
 
 ## RFP quick answers
 
@@ -240,5 +229,4 @@ health-telemetry verify-bundle --tarball ./health_bundle.tar
 
 - `docs/HEALTH_TELEMETRY_BUYER.md` — one-page buyer sheet  
 - `docs/HEALTH_TELEMETRY_HOSPITAL_PILOT.md` — ward pilot playbook  
-- `docs/PORTFOLIO_SALES_SHEET.md` — portfolio pricing matrix  
 - `docs/ROADMAP_GTM_DISCIPLINE.md` — sequence gate ships **inside #7**, not SKU #13

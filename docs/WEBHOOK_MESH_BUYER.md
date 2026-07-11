@@ -14,7 +14,6 @@
 | Platform teams | Custom middleware without audit trail | Genesis ledger cold path + `verify-bundle` |
 | Multi-instance deploy | In-memory dedupe fails across pods | Redis fail-closed idempotency |
 
-**Price band:** £199–£599/mo per tenant.
 
 ---
 
@@ -76,4 +75,3 @@ See `src/webhook_mesh/README.md` for architecture.
 | 1 | `export WEBHOOK_PROVIDER_SECRET=demo-secret && ./scripts/demo_webhook_mesh.sh` |
 | 2 | `webhook-mesh verify-bundle --tarball ./webhook_mesh_bundle.tar` |
 | 3 | RFP depth → `docs/WEBHOOK_MESH_SALES_TECH_SPEC.md` |
-| 4 | Portfolio pricing → `docs/PORTFOLIO_SALES_SHEET.md` |

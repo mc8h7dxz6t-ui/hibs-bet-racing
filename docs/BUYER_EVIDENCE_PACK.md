@@ -128,7 +128,7 @@ Full matrix: `docs/INSTITUTIONAL_STANDARD.md`
 | [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md) | **Start here** — tech/sales, evidence, market compare (self-contained) |
 | [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) | Full 12-SKU tech + sales positioning |
 | [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md) | CI proof artifacts and per-SKU evidence |
-| [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | Comparable platforms + market pricing bands |
+| [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | Capability comparison vs adjacent platforms |
 | `docs/*_BUYER.md` | 60-second skim per product |
 | `docs/*_SALES_TECH_SPEC.md` | RFP / security questionnaire depth |
 
