@@ -48,6 +48,7 @@ chmod 775 "${BET}/.cache" "${BET}/logs" 2>/dev/null || true
 
 if [[ -f "${BET}/requirements.txt" && -x "${BET}/.venv/bin/pip" ]]; then
   echo "==> pip install (deps refresh)"
+  find "${BET}/.venv/lib" -type d -name '~*' -prune -exec rm -rf {} + 2>/dev/null || true
   sudo -u www-data "${BET}/.venv/bin/pip" install -q -r "${BET}/requirements.txt" 2>/dev/null || true
 fi
 
@@ -83,9 +84,18 @@ if systemctl is-enabled hibs-bet &>/dev/null; then
   echo "==> restart hibs-bet"
   systemctl restart hibs-bet.service
   sleep 4
-  systemctl is-active hibs-bet.service
+  if systemctl is-active hibs-bet.service; then
+    echo "OK: hibs-bet active"
+  else
+    echo "WARN: hibs-bet not active — run: sudo bash ${BET}/scripts/vps_football_hard_recovery.sh" >&2
+  fi
 else
   echo "WARN: hibs-bet service not enabled — start manually: systemctl enable --now hibs-bet"
+fi
+
+if [[ -f "${BET}/deploy/cron-hibs-infra-fallback.sh" ]]; then
+  echo "==> install 5m infra fallback cron (idempotent)"
+  bash "${BET}/deploy/cron-hibs-infra-fallback.sh" --install 2>/dev/null || true
 fi
 
 if [[ "${HIBS_OVERLAY_SKIP_WARM:-0}" != "1" ]]; then
