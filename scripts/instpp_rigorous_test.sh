@@ -190,6 +190,17 @@ echo "$EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit
 test -f "$COMPLIANCE_TAR"
 test -f "${COMPLIANCE_TAR}.sha256"
 test -f "${COMPLIANCE_TAR}.sha256.json"
+"$PYTHON" - <<PY
+import json
+import tarfile
+from pathlib import Path
+tar = Path("$COMPLIANCE_TAR")
+with tarfile.open(tar, "r") as tf:
+    epoch = json.loads(tf.extractfile("epoch_roots.json").read().decode())
+assert epoch.get("entry_count", 0) >= 1
+assert len(epoch.get("merkle_root", "")) == 64
+print(json.dumps({"compliance_epoch_roots": "ok", "entry_count": epoch["entry_count"]}))
+PY
 pass "Audit bundle + SHA256 sidecar"
 
 REPRO=$("$PYTHON" -m compliance_log.cli export --database "$COMPLIANCE_DB" --repro-check)
@@ -547,6 +558,49 @@ echo "$ALT_VERIFY"
 echo "$ALT_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "Alt-Data institutional E2E"
 
+section "Alt-Data — per-feed production registry"
+"$PYTHON" -m altdata.cli list-feeds
+set +e
+"$PYTHON" -m altdata.cli poll \
+  --feed fx_gbp_cross \
+  --production-feed fx_gbp_cross \
+  --ctx '{"rates":{"USD":1.27,"EUR":1.17},"amount":1,"base":"GBP"}' \
+  --database "$ALTDATA_DB"
+ALT_PROD_RC=$?
+set -e
+if [[ "$ALT_PROD_RC" -eq 0 ]]; then
+  pass "Alt-Data per-feed production poll"
+else
+  skip_section "altdata_production_feed" "production feed poll failed (offline-safe)"
+fi
+
+section "Compliance Logger — mTLS ingest gate"
+COMPLIANCE_MTLS_DB="$WORK/compliance_mtls.sqlite"
+rm -f "$COMPLIANCE_MTLS_DB"
+export COMPLIANCE_LOGGER_DATABASE="$COMPLIANCE_MTLS_DB"
+unset COMPLIANCE_LOGGER_API_KEY
+export INST_MTLS_REQUIRED=1
+export INST_MTLS_ALLOWED_CN=rigorous-auditor
+"$PYTHON" - <<'PY'
+import json
+import os
+from fastapi.testclient import TestClient
+import compliance_log.serve as serve_mod
+
+serve_mod.state.database = os.environ["COMPLIANCE_LOGGER_DATABASE"]
+client = TestClient(serve_mod.app)
+body = {"snapshot": {"id": "mtls-rigorous"}, "outcome": {"ok": True}}
+r = client.post("/v1/decisions", json=body)
+assert r.status_code == 401, r.text
+r2 = client.post("/v1/decisions", json=body, headers={"X-Client-Cert-CN": "rigorous-auditor"})
+assert r2.status_code == 200, r2.text
+print(json.dumps({"compliance_mtls": "ok"}))
+PY
+unset INST_MTLS_REQUIRED
+unset INST_MTLS_ALLOWED_CN
+unset COMPLIANCE_LOGGER_API_KEY
+pass "Compliance Logger mTLS ingest"
+
 section "AI Kit — run + agent ledger + check + export + verify"
 AI_AGENT_DB="$WORK/ai_kit_agent.sqlite"
 AI_AGENT_PERMIT="$WORK/ai_kit_agent_permits.sqlite"
@@ -714,7 +768,49 @@ HT_OBS_TAR="$WORK/health_obs_bundle.tar"
 HT_OBS_EXPORT=$("$PYTHON" -m health_telemetry.cli export --database "$HEALTH_DB" --tarball "$HT_OBS_TAR" --observation-lane)
 echo "$HT_OBS_EXPORT"
 echo "$HT_OBS_EXPORT" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+HT_OBS_VERIFY=$("$PYTHON" -m health_telemetry.cli verify-bundle --tarball "$HT_OBS_TAR")
+echo "$HT_OBS_VERIFY"
+echo "$HT_OBS_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "Health Telemetry institutional E2E"
+
+section "Health Telemetry — HTTP device auth (INST_REQUIRE_DEVICE_AUTH)"
+HEALTH_HTTP_DB="$WORK/health_http.sqlite"
+export HEALTH_TELEMETRY_DB="$HEALTH_HTTP_DB"
+export HEALTH_DEVICE_AUTH_SECRET=rigorous-health-device
+export INST_REQUIRE_DEVICE_AUTH=1
+"$PYTHON" - <<'PY'
+import json
+import os
+from fastapi.testclient import TestClient
+from inst_spine.middleware import device_token_hmac
+from inst_spine.wal import WALWriter
+from inst_spine.rates import MemoryIdempotencyBackend
+from inst_spine.clocks import LamportClock
+import health_telemetry.serve as serve_mod
+
+serve_mod.state.ledger_db = os.environ["HEALTH_TELEMETRY_DB"]
+serve_mod.state.wal_writer = WALWriter(os.environ["HEALTH_TELEMETRY_DB"] + ".wal")
+serve_mod.state.clock = LamportClock("rigorous-health")
+serve_mod.state.idempotency = MemoryIdempotencyBackend()
+token = device_token_hmac("rigorous-ward", secret=os.environ["HEALTH_DEVICE_AUTH_SECRET"])
+pkt = {"ts": "2026-06-01T12:00:00Z", "seq": 1, "hr": 72, "spo2": 98}
+client = TestClient(serve_mod.app)
+r = client.post(
+    "/v1/telemetry/batch",
+    json={"device_id": "rigorous-ward", "packets": [pkt], "batch_id": "rig-http-1"},
+    headers={"X-Device-Token": token},
+)
+assert r.status_code == 200, r.text
+if serve_mod.state.wal_writer:
+    serve_mod.state.wal_writer.close()
+serve_mod.state.wal_writer = None
+serve_mod.state.idempotency = None
+serve_mod.state.gateway = None
+print(json.dumps({"health_http_device_auth": "ok"}))
+PY
+unset INST_REQUIRE_DEVICE_AUTH
+unset HEALTH_DEVICE_AUTH_SECRET
+pass "Health Telemetry HTTP device auth"
 
 section "ModelGovernor — record + check + export + verify"
 "$PYTHON" -m model_governor.cli record \
@@ -753,8 +849,11 @@ export MODEL_GOVERNOR_DRIFT_MODE=shadow
 "$PYTHON" - <<PY
 import json
 from pathlib import Path
+from model_governor.integrity import stamp_artifact_hash
+
 snap = json.loads(Path("docs/demo_model_snapshot.json").read_text(encoding="utf-8"))
 snap["deploy_features"] = {"income": 50100.0, "debt_ratio": 0.36}
+snap = stamp_artifact_hash(snap)
 Path("$MG_DEPLOY_MODEL").write_text(json.dumps(snap, indent=2), encoding="utf-8")
 PY
 "$PYTHON" -m model_governor.cli record \
@@ -992,7 +1091,7 @@ print(json.dumps({"agent_ledger_http_auth": "ok"}))
 PY
 pass "Agent Ledger HTTP API auth"
 
-section "Forensic hardening — Waves 1–2"
+section "Forensic hardening — Waves 1–3"
 "$PYTHON" -m pytest \
   tests/test_drift_golden.py \
   tests/test_drift_feature_matrix.py \
@@ -1005,8 +1104,9 @@ section "Forensic hardening — Waves 1–2"
   tests/test_ingress_guard.py \
   tests/test_redis_soak_memory.py \
   tests/test_spend_guard.py \
+  tests/test_phase3_buyer_depth.py \
   -v --tb=short
-pass "Forensic hardening suite (Waves 1–2)"
+pass "Forensic hardening suite (Waves 1–3)"
 
 section "F8 retention drill"
 chmod +x ./scripts/instpp_retention_drill.sh
@@ -1164,6 +1264,7 @@ print(json.dumps({
     'forensic_hardening': True,
     'production_profile': True,
     'bundle_signing': True,
+    'phase_3_buyer_depth': True,
     'forensic_waves': {
         'wave_1': {
             'agent_ledger_http_auth': True,
@@ -1183,6 +1284,22 @@ print(json.dumps({
             'webhook_poison_status': True,
             'f8_retention_per_sku': True,
             'redis_soak_live': bool(os.environ.get('INST_REDIS_URL', '').strip()),
+        },
+        'wave_3': {
+            'health_device_auth': True,
+            'health_observation_lane_verify': True,
+            'altdata_per_feed_registry': True,
+            'webhook_consumer_reclaim': True,
+            'compliance_mtls_ingest': True,
+            'model_artifact_hash_gate': True,
+            'ad_guard_body_fuzz': True,
+            'ai_kit_step_fn_contract': True,
+            'epoch_roots_in_bundle': True,
+        },
+        'wave_4': {
+            'soc2_evidence_collector': True,
+            'bundle_hmac_signing': True,
+            'phase_3_ci_ledger': True,
         },
     },
     'engineering_completion': {

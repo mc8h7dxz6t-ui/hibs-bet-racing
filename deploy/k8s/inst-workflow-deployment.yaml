@@ -25,6 +25,7 @@ spec:
               if [[ ! -f /data/demo/portfolio/compliance.sqlite ]]; then
                 SKIP_LIVE=1 ./scripts/demo_portfolio_all.sh
               fi
+              python3 ./scripts/verify_portfolio.py
           envFrom:
             - configMapRef:
                 name: instpp-config

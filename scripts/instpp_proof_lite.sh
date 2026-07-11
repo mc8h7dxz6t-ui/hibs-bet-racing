@@ -16,6 +16,7 @@ echo "==> Production profile + SKU hardening tests"
   tests/test_production_profile.py \
   tests/test_sku_layer_hardening.py \
   tests/test_production_profile_serve_ready.py \
+  tests/test_phase3_buyer_depth.py \
   -q
 
 echo "==> Seed 12/12 portfolio (offline)"

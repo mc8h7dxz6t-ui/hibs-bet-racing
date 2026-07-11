@@ -13,14 +13,14 @@ make proof                            # smoke + rigorous + verify-portfolio
 | `instpp_rigorous_latest.log` | Symlink to latest rigorous log |
 | `instpp_rigorous_latest_summary.json` | Rigorous PASS/FAIL summary (`skipped_sections`, waves) |
 | `instpp_proof_lite_latest_summary.json` | PR proof-lite summary (profile gates + 12/12 verify) |
-| `instpp_ci_autonomy_phases.json` | Phase 1.1–1.4 + Phase 2.1–2.12 implementation ledger |
+| `instpp_ci_autonomy_phases.json` | Phase 1.1–1.4 + Phase 2.1–2.12 + Phase 3.1–3.20 implementation ledger |
 | `soc2_evidence_latest.json` | SOC2 VPC evidence from `PORTFOLIO_MANIFEST.json` |
 
 ## CI autonomy phases (SKU only)
 
 `instpp_ci_autonomy_phases.json` is rewritten on each `proof-lite` or `rigorous` run by `scripts/instpp_ci_autonomy_log.py`. It records:
 
-- Phase checklist (1.1–1.4 smoke/rigorous honesty, 2.1–2.12 production envelope)
+- Phase checklist (1.1–1.4 smoke/rigorous honesty, 2.1–2.12 production envelope, 3.1–3.20 buyer depth)
 - Last run metadata (commit, branch, skipped sections, Redis/Postgres env presence)
 - Pointers to summary artifacts
 

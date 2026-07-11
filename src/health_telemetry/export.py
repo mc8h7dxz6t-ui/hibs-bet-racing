@@ -123,6 +123,7 @@ def build_health_audit_bundle(
             report_dict=report_dict,
             verify_dict=verify_dict,
             product=product,
+            observation_lane=True,
         )
         readme = out / "README.txt"
         readme.write_text(

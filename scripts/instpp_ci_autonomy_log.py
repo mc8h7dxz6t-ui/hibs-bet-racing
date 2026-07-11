@@ -56,6 +56,28 @@ PHASES: dict[str, list[dict[str, str]]] = {
         {"id": "2.11", "name": "f8_retention_per_sku", "artifact": "scripts/instpp_retention_drill.sh"},
         {"id": "2.12", "name": "demo_mg_gold_mandatory", "artifact": "scripts/demo_mg_gold.sh"},
     ],
+    "phase_3": [
+        {"id": "3.1", "name": "health_device_auth_rigorous", "artifact": "tests/test_phase3_buyer_depth.py"},
+        {"id": "3.2", "name": "health_observation_lane_verify", "artifact": "tests/test_phase3_buyer_depth.py"},
+        {"id": "3.3", "name": "altdata_per_feed_ci_slot", "artifact": "tests/test_phase3_buyer_depth.py"},
+        {"id": "3.4", "name": "altdata_structural_rescue_golden", "artifact": "tests/test_altdata_structural_golden.py"},
+        {"id": "3.5", "name": "webhook_consumer_crash_reclaim", "artifact": "tests/test_phase3_buyer_depth.py"},
+        {"id": "3.6", "name": "webhook_poison_dlq_matrix", "artifact": "tests/test_webhook_mesh_chaos.py"},
+        {"id": "3.7", "name": "wrcap_corruption_fuzz", "artifact": "tests/test_webhook_mesh_chaos.py"},
+        {"id": "3.8", "name": "compliance_export_policy_manifest", "artifact": "src/compliance_log/export_policy.py"},
+        {"id": "3.9", "name": "compliance_mtls_ingest", "artifact": "tests/test_phase3_buyer_depth.py"},
+        {"id": "3.10", "name": "soc2_evidence_collector", "artifact": "scripts/soc2_evidence_collector.py"},
+        {"id": "3.11", "name": "bundle_hmac_signing", "artifact": "src/inst_spine/bundle_sign.py"},
+        {"id": "3.12", "name": "epoch_roots_export_verify", "artifact": "tests/test_phase3_buyer_depth.py"},
+        {"id": "3.13", "name": "ai_kit_agent_ledger_rigorous", "artifact": "scripts/instpp_rigorous_test.sh"},
+        {"id": "3.14", "name": "model_governor_artifact_hash_gate", "artifact": "src/model_governor/integrity.py"},
+        {"id": "3.15", "name": "ad_guard_creative_body_fuzz", "artifact": "tests/test_phase3_buyer_depth.py"},
+        {"id": "3.16", "name": "ai_kit_step_fn_contract", "artifact": "tests/test_phase3_buyer_depth.py"},
+        {"id": "3.17", "name": "k8s_init_verify_portfolio", "artifact": "deploy/k8s/inst-workflow-deployment.yaml"},
+        {"id": "3.18", "name": "phase_3_ci_ledger", "artifact": "scripts/instpp_ci_autonomy_log.py"},
+        {"id": "3.19", "name": "zero_skip_rigorous_on_main", "artifact": ".github/workflows/instpp-ci.yml"},
+        {"id": "3.20", "name": "soc2_evidence_ci_job", "artifact": ".github/workflows/instpp-ci.yml"},
+    ],
 }
 
 
@@ -95,7 +117,7 @@ def build_ledger(
         "branch": _git_branch(),
         "commit": _git_sha(),
         "status": status,
-        "portfolio_envelope_target": "9.0-9.5/10 after phase_1_and_2",
+        "portfolio_envelope_target": "9.5-10/10 after phase_1_2_3",
         "last_run": {
             "suite": suite,
             "status": status,
@@ -144,7 +166,7 @@ def write_proof_lite_summary(manifest_path: Path | None = None) -> Path:
         "portfolio_verified_ok": manifest_data.get("verified_ok"),
         "portfolio_total": manifest_data.get("products"),
         "manifest_path": str(manifest) if manifest.is_file() else None,
-        "phase_coverage": ["1.1", "1.2", "2.1", "2.5"],
+        "phase_coverage": ["1.1", "1.2", "2.1", "2.5", "3.1", "3.14"],
     }
     out = LOG_DIR / "instpp_proof_lite_latest_summary.json"
     out.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
