@@ -118,12 +118,37 @@ PY
 football_vps_ensure_web_format_exports() {
   local bet="${1:-/opt/hibs-bet}"
   local dest="${bet}/src/hibs_predictor/web_format.py"
+  local overlay="${2:-}"
   [[ -f "${dest}" ]] || return 0
   if grep -q 'def fmt_prob' "${dest}" 2>/dev/null && grep -q 'def fmt_odds' "${dest}" 2>/dev/null; then
     return 0
   fi
-  football_vps_install_web_format "${bet}" ""
-  echo "[dashboard-fix] refreshed web_format.py (fmt_prob/fmt_odds)"
+  if [[ -n "${overlay}" && -f "${overlay}/src/hibs_predictor/web_format.py" ]]; then
+    cp -a "${dest}" "${dest}.bak.$(date +%s)" 2>/dev/null || true
+    install -m 0644 "${overlay}/src/hibs_predictor/web_format.py" "${dest}"
+    echo "[dashboard-fix] upgraded web_format.py from overlay"
+    return 0
+  fi
+  if ! grep -q 'def fmt_prob' "${dest}" 2>/dev/null; then
+    cat >>"${dest}" <<'PY'
+
+def fmt_prob(value: Any, decimals: int = 1) -> str:
+    num = normalize_prob_pct(value)
+    if num is None:
+        return "—"
+    if decimals <= 0:
+        return f"{num:.0f}%"
+    return f"{num:.{decimals}f}%"
+PY
+  fi
+  if ! grep -q 'def fmt_odds' "${dest}" 2>/dev/null; then
+    cat >>"${dest}" <<'PY'
+
+def fmt_odds(value: Any, decimals: int = 2) -> str:
+    return fmt_num(value, decimals)
+PY
+  fi
+  echo "[dashboard-fix] appended fmt_prob/fmt_odds to web_format.py"
 }
 
 football_vps_patch_web_filters() {
@@ -306,7 +331,7 @@ football_vps_apply_dashboard_fix() {
   fi
 
   football_vps_install_web_format "${bet}" "${overlay}"
-  football_vps_ensure_web_format_exports "${bet}"
+  football_vps_ensure_web_format_exports "${bet}" "${overlay}"
   football_vps_patch_web_filters "${bet}"
   football_vps_install_safe_fixture_row "${bet}" "${overlay}"
   football_vps_fix_sudoers_requiretty "${bet}"
