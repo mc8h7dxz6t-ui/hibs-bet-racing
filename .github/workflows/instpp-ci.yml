@@ -405,3 +405,28 @@ jobs:
             docs/test_logs/instpp_ci_autonomy_phases.json
             docs/test_logs/soc2_evidence_latest.json
           if-no-files-found: warn
+
+  docker-sku-rigorous:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 60
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker SKU rigorous matrix (12 isolated containers)
+        run: |
+          chmod +x ./scripts/instpp_docker_sku_rigorous.sh ./scripts/docker_sku_rigorous_one.sh
+          ./scripts/instpp_docker_sku_rigorous.sh
+
+      - name: Upload per-SKU docker rigorous logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instpp-docker-sku-rigorous-evidence
+          path: |
+            docs/test_logs/instpp_docker_sku_latest_summary.json
+            docs/test_logs/instpp_docker_sku_matrix_latest.log
+            docs/test_logs/instpp_docker_sku_*_latest.log
+            docs/test_logs/instpp_ci_autonomy_phases.json
+          if-no-files-found: warn
