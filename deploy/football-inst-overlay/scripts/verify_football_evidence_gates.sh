@@ -3,8 +3,10 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export PYTHONPATH="${ROOT}/src${PYTHONPATH:+:$PYTHONPATH}"
+PY="${ROOT}/.venv/bin/python3"
+[[ -x "${PY}" ]] || PY=python3
 
-python3 - <<'PY'
+"${PY}" - <<'PY'
 import sys
 from hibs_predictor.forward_evidence import forward_evidence_gates
 

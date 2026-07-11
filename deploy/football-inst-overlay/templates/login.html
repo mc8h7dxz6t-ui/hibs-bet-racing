@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in — hibs-bet</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='hibs_theme.css') }}">
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: Inter, system-ui, sans-serif;
+            background: linear-gradient(165deg, #060e18 0%, #0c1a12 42%, #0a1628 100%);
+            color: #f8fafc;
+        }
+        .login-card {
+            width: min(420px, 92vw);
+            padding: 2rem;
+            border-radius: 16px;
+            border: 1px solid rgba(190, 220, 205, 0.16);
+            background: rgba(16, 32, 24, 0.92);
+            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+        }
+        h1 {
+            margin: 0 0 0.35rem;
+            font-size: 1.35rem;
+            color: #b7f7c8;
+        }
+        p.sub {
+            margin: 0 0 1.25rem;
+            color: #94a3b8;
+            font-size: 0.92rem;
+            line-height: 1.45;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.35rem;
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+        input[type="password"] {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0.65rem 0.75rem;
+            border-radius: 10px;
+            border: 1px solid rgba(190, 220, 205, 0.2);
+            background: #07110c;
+            color: #f8fafc;
+            font-size: 1rem;
+        }
+        button {
+            margin-top: 1rem;
+            width: 100%;
+            padding: 0.7rem 1rem;
+            border: none;
+            border-radius: 10px;
+            background: #007a33;
+            color: #fff;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        button:hover { background: #059669; }
+        .error {
+            margin-bottom: 1rem;
+            padding: 0.65rem 0.75rem;
+            border-radius: 10px;
+            background: rgba(252, 165, 165, 0.12);
+            border: 1px solid rgba(252, 165, 165, 0.35);
+            color: #fecaca;
+            font-size: 0.9rem;
+        }
+        input[name="next"] { display: none; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>hibs-bet</h1>
+        <p class="sub">Enter the site password to open the dashboard.</p>
+        {% if error %}
+        <div class="error" role="alert">{{ error }}</div>
+        {% endif %}
+        <form method="post" action="{{ url_for('login') }}">
+            <input type="hidden" name="next" value="{{ next_url or '' }}">
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+            <button type="submit">Sign in</button>
+        </form>
+    </div>
+</body>
+</html>

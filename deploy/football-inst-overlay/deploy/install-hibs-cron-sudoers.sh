@@ -15,7 +15,7 @@ fi
 
 cat >"${DEST}" <<EOF
 ${MARKER}
-Defaults:www-data !requiretty
+Defaults:www-data !use_pty
 www-data ALL=(root) NOPASSWD: /bin/bash ${APP}/deploy/cron-hibs-hands-off.sh --run
 www-data ALL=(root) NOPASSWD: /bin/bash ${APP}/deploy/cron-hibs-institutional-watchdog.sh --run
 www-data ALL=(root) NOPASSWD: /bin/bash ${APP}/deploy/cron-hibs-infra-fallback.sh --run

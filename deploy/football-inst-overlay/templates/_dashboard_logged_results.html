@@ -1,0 +1,10 @@
+{% if logged_results %}
+<section class="logged-results-strip" aria-label="Recent logged picks">
+    <h3 class="logged-results-heading">Recent audit log</h3>
+    <ul class="logged-results-list">
+        {% for row in logged_results %}
+        <li>{{ row.home_name or row.home }} v {{ row.away_name or row.away }} — {{ row.result_outcome or 'pending' }}</li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}

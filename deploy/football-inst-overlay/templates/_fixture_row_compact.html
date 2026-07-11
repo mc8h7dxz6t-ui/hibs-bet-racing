@@ -1,0 +1,47 @@
+{# Compact fixture row for dashboard — overlay must include (was missing on VPS → 500). #}
+{% set fx = fixture %}
+{% set pred = fx.prediction if fx.prediction is mapping else {} %}
+{% set odds = fx.best_odds_1x2 if fx.best_odds_1x2 is mapping else {} %}
+{% set dq = fx.data_quality.score_pct if fx.data_quality is mapping and fx.data_quality.score_pct is not none else (fx.data_quality_pct or 0) %}
+{% set fid = fx.id or fx.fixture_id or loop.index %}
+{% set home = fx.home_team or fx.home or 'Home' %}
+{% set away = fx.away_team or fx.away or 'Away' %}
+{% set ko = fx.kickoff_display or fx.kickoff_local or fx.date or '—' %}
+{% set ph = pred.home_win_prob or pred.prob_home or pred.get('1') %}
+{% set pd = pred.draw_prob or pred.prob_draw or pred.get('X') %}
+{% set pa = pred.away_win_prob or pred.prob_away or pred.get('2') %}
+{% set btts = pred.btts_yes_prob or pred.btts_prob %}
+{% set win_lean = pred.predicted_outcome or pred.lean_1x2 or '—' %}
+<details class="fr-compact fixture-card{% if fx.has_value_bet %} value-card{% endif %}"
+    data-fid="{{ fid }}"
+    data-league="{{ fx.league or '' }}"
+    data-region="{{ fx.dashboard_region or 'other' }}"
+    data-has-value="{{ '1' if fx.has_value_bet else '0' }}"
+    data-data-q="{{ dq }}"
+    data-search="{{ (home ~ ' ' ~ away ~ ' ' ~ (fx.league_name or fx.league or ''))|lower }}"
+    data-kickoff-utc="{{ fx.kickoff_iso or fx.kickoff_utc or '' }}"
+    data-is-live="{{ '1' if fx.is_live else '0' }}"
+    id="fix-{{ fid }}">
+    <summary class="fr-sum fixture-summary">
+        <div class="fr-sum-grid">
+            <span class="fr-ko">{{ ko }}</span>
+            <span class="fr-match">{{ home }} <span class="fr-vs">v</span> {{ away }}</span>
+            <span class="fr-prob">{% if btts is not none %}{{ '%.0f'|format(btts * 100 if btts <= 1 else btts) }}%{% else %}<span class="fr-prob-na">—</span>{% endif %}</span>
+            <span class="fr-prob fr-prob-win"><span class="fr-win-lean">{{ win_lean }}</span></span>
+            <span class="fr-od">{% if odds.home %}{{ '%.2f'|format(odds.home) }}{% else %}—{% endif %}</span>
+            <span class="fr-od">{% if odds.draw %}{{ '%.2f'|format(odds.draw) }}{% else %}—{% endif %}</span>
+            <span class="fr-od">{% if odds.away %}{{ '%.2f'|format(odds.away) }}{% else %}—{% endif %}</span>
+            <span class="fr-od fr-prob-na">—</span>
+            <span class="fr-od fr-prob-na">—</span>
+            <span class="fr-od fr-prob-na">—</span>
+            <span class="fr-od fr-prob-na">—</span>
+            <span class="fr-od fr-prob-na">—</span>
+            <span class="fr-od fr-prob-na">—</span>
+            <span class="fr-dq-compact" title="Data quality">{{ '%.0f'|format(dq) }}%</span>
+        </div>
+    </summary>
+    <div class="expand-panel fr-sum-meta">
+        {% if fx.has_value_bet %}<span class="fr-value-box">Value</span>{% endif %}
+        <span class="fr-league">{{ fx.league_name or fx.league or '' }}</span>
+    </div>
+</details>

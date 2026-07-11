@@ -1,0 +1,11 @@
+{# Football-safe portfolio bar — no racing-only url_for endpoints. #}
+<div id="hibs-portfolio-bar" class="hibs-portfolio-bar" data-api-url="{{ portfolio_api_url | default('/api/portfolio/summary') }}">
+    <div class="hibs-portfolio-inner">
+        <span class="hibs-portfolio-label">Paper P&amp;L</span>
+        <span class="hibs-portfolio-stat" id="pf-combined">—</span>
+        <span class="hibs-portfolio-meta">verified ledger</span>
+        <span class="hibs-portfolio-pill" id="pf-settled">— settled</span>
+        <a class="hibs-portfolio-link" href="{{ portfolio_football_url | default('/tracker') }}">Football tracker →</a>
+        <a class="hibs-portfolio-link" href="{{ portfolio_racing_url | default('/racing/portfolio') }}">Racing ledger</a>
+    </div>
+</div>

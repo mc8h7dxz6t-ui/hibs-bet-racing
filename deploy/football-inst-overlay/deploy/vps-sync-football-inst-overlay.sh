@@ -10,7 +10,13 @@ set -euo pipefail
 
 BET="${DEPLOY_PATH:-/opt/hibs-bet}"
 RACING="${HIBS_RACING_DEPLOY_PATH:-/opt/hibs-racing}"
-OVERLAY="${OVERLAY_ROOT:-${RACING}/deploy/football-inst-overlay}"
+OVERLAY="${OVERLAY_ROOT:-}"
+if [[ -z "${OVERLAY}" || ! -d "${OVERLAY}" ]]; then
+  OVERLAY="${BET}/deploy/football-inst-overlay"
+fi
+if [[ ! -d "${OVERLAY}" ]]; then
+  OVERLAY="${RACING}/deploy/football-inst-overlay"
+fi
 DOMAIN="${HIBS_DOMAIN:-hibs-bet.co.uk}"
 HOST="${DEPLOY_HOST:-$(hostname -s 2>/dev/null || hostname -f 2>/dev/null || echo vps)}"
 STAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

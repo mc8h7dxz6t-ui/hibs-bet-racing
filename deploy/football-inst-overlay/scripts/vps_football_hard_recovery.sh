@@ -34,6 +34,17 @@ if ss -ltn 2>/dev/null | grep -q ':8000 '; then
 fi
 
 echo ""
+echo "==> dashboard template filters (fmt_roi)"
+LIB="${BET}/scripts/lib_football_dashboard_fix.sh"
+if [[ -f "${LIB}" ]]; then
+  # shellcheck source=lib_football_dashboard_fix.sh
+  source "${LIB}"
+  football_vps_apply_dashboard_fix "${BET}" "${RACING}"
+else
+  warn "missing ${LIB} — run vps_football_fix_dashboard_500.sh after sync"
+fi
+
+echo ""
 echo "==> env + auth guards"
 touch "${BET}/.env"
 grep -q '^HIBS_CACHE_DIR=' "${BET}/.env" 2>/dev/null || echo 'HIBS_CACHE_DIR=/opt/hibs-bet/.cache' >>"${BET}/.env"
@@ -98,9 +109,10 @@ echo "    login ${login_code}"
 echo ""
 echo "==> smoke"
 ping_code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 http://127.0.0.1:8000/api/ping 2>/dev/null || echo 000)"
-echo "    ping=${ping_code} login=${login_code}"
+root_code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 http://127.0.0.1:8000/ 2>/dev/null || echo 000)"
+echo "    ping=${ping_code} login=${login_code} root=${root_code}"
 
-if [[ "${ping_code}" == "200" && "${login_code}" =~ ^(200|302)$ ]]; then
+if [[ "${ping_code}" == "200" && "${login_code}" =~ ^(200|302)$ && "${root_code}" =~ ^(200|302)$ ]]; then
   echo ""
   echo "==> nginx upstream (localhost OK, public 502 → wrong port)"
   football_vps_fix_nginx_upstream || true
