@@ -1,0 +1,15 @@
+<section class="results-section" id="dash-results-section" aria-labelledby="dash-results-heading">
+    <h2 class="results-day-heading" id="dash-results-heading">Recent results ({{ recent_results_days }}d)</h2>
+    {% for day in recent_results_days_groups or [] %}
+    <h3 class="results-day-heading">{{ day.label or day.date }}</h3>
+    <ul>
+        {% for r in day.results or [] %}
+        <li>{{ r.home }} {{ r.score or '—' }} {{ r.away }}</li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    {% for r in recent_results or [] %}
+    <p>{{ r.home }} {{ r.score or '—' }} {{ r.away }}</p>
+    {% endfor %}
+    {% endfor %}
+</section>

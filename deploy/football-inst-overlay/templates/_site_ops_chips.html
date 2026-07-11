@@ -1,0 +1,4 @@
+{# Ops status chips — optional; empty safe default for overlay sync. #}
+{% if scrape_first_status and scrape_first_status.get('enabled') %}
+<span class="pill-soft" title="Scrape-first enrichment">{{ scrape_first_status.get('label', 'Scrape') }}</span>
+{% endif %}
