@@ -23,6 +23,7 @@ for rel in \
   deploy/hibs-bet.nginx.conf \
   deploy/vps-sync-overlay-from-github.sh \
   deploy/vps-bootstrap-from-github.sh \
+  deploy/apply-vps-racing-link.sh \
   deploy/apply-vps-site-cross-links.sh \
   deploy/cron-hibs-infra-fallback.sh \
   deploy/cron-hibs-ops-automation.sh \
