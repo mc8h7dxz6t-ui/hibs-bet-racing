@@ -71,6 +71,15 @@ def football_staking_greenlight() -> Dict[str, Any]:
         if int(fwd.get("matchdays_7d") or 0) < MATCHDAYS_MIN:
             notes.append("summer/off-season: matchday gates expected red until fixtures return")
 
+        try:
+            from hibs_predictor.safety.brier_circuit_breaker import execution_lockout_active
+
+            if execution_lockout_active():
+                blockers.append("brier_circuit_breaker_OPEN")
+                metrics["execution_lockout"] = True
+        except Exception:
+            pass
+
         ready = not blockers
         if ready:
             notes.append(
@@ -121,6 +130,15 @@ def racing_staking_greenlight() -> Dict[str, Any]:
             if EXECUTION_DISABLED:
                 notes.append("Live exchange routing disabled (analytics mode) — funded API ≠ auto-stake")
         except ImportError:
+            pass
+
+        try:
+            from hibs_predictor.safety.brier_circuit_breaker import execution_lockout_active
+
+            if execution_lockout_active():
+                blockers.append("brier_circuit_breaker_OPEN")
+                metrics["execution_lockout"] = True
+        except Exception:
             pass
 
         ready = not blockers

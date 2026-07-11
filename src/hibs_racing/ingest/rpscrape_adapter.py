@@ -60,6 +60,13 @@ def normalize_rpscrape_csv(
     Convert rpscrape CSV → hibs-racing ingest schema.
     Requires rpscrape columns: date, course, off, race_name, horse, pos, comment.
     """
+    raw = source.read_bytes()
+    try:
+        from inst_spine.webhook_wal import capture_before_parse
+
+        capture_before_parse("rpscrape", raw, source=str(source))
+    except Exception:
+        pass
     frame = pd.read_csv(source)
     required = {"date", "horse", "pos", "comment"}
     missing = required - set(frame.columns)

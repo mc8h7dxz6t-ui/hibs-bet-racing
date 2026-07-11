@@ -132,6 +132,8 @@ cd "${RACING_ROOT}"
 if [[ ! -x .venv/bin/pip ]]; then
   python3 -m venv .venv
 fi
+# Interrupted pip uninstalls leave ~package dist-info dirs — clean before reinstall.
+find .venv/lib -type d -name '~*' -prune -exec rm -rf {} + 2>/dev/null || true
 .venv/bin/pip install -q -r requirements.txt
 [[ -f pyproject.toml || -f setup.py ]] && .venv/bin/pip install -q -e . || true
 

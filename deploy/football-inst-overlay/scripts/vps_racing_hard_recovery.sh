@@ -44,6 +44,16 @@ racing_vps_fix_systemd_wsgi "${APP}" "${BET}"
 echo "    gunicorn app=hibs_racing.web:create_app() (gthread config: deploy/gunicorn-racing.conf.py)"
 
 echo ""
+echo "==> repair pip venv (remove ~ibs-racing corruption)"
+REPAIR="${BET}/scripts/repair_racing_venv_pip.sh"
+if [[ -x "${REPAIR}" ]]; then
+  bash "${REPAIR}" || warn "pip repair failed — continue"
+else
+  find "${APP}/.venv/lib" \( -type d -o -type f \) -name '~*' -exec rm -rf {} + 2>/dev/null || true
+  rm -rf "${APP}/.venv/lib"/python*/site-packages/~ibs-racing* 2>/dev/null || true
+fi
+
+echo ""
 echo "==> import test as www-data"
 PY="${APP}/.venv/bin/python3"
 [[ -x "${PY}" ]] || { echo "missing ${PY}" >&2; exit 1; }
