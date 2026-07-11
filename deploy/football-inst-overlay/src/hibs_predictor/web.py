@@ -116,6 +116,13 @@ def _jinja_position_rank(value: Any) -> str:
     return str(rank) if rank is not None else str(value or "")
 
 
+from hibs_predictor.web_format import fmt_num, fmt_pct, fmt_roi
+
+app.add_template_filter(fmt_num, "fmt_num")
+app.add_template_filter(fmt_pct, "fmt_pct")
+app.add_template_filter(fmt_roi, "fmt_roi")
+
+
 @app.after_request
 def _persist_fetch_days_cookie(response):
     response = _set_fetch_days_cookie_if_requested(response)
