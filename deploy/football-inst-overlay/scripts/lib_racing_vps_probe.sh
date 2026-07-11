@@ -224,8 +224,28 @@ football_vps_diagnose_502() {
 }
 
 football_vps_fix_nginx_upstream() {
+  local bet="${1:-/opt/hibs-bet}"
   local fixed=0
-  local f
+  local f site_avail="/etc/nginx/sites-available/hibs-bet"
+  local site_enabled="/etc/nginx/sites-enabled/hibs-bet"
+
+  if [[ -f "${bet}/deploy/hibs-bet.nginx.conf" ]]; then
+    if [[ ! -f "${site_avail}" ]] || ! grep -qE 'proxy_pass http://127\.0\.0\.1:8000' "${site_avail}" 2>/dev/null; then
+      cp "${bet}/deploy/hibs-bet.nginx.conf" "${site_avail}"
+      ln -sf "${site_avail}" "${site_enabled}"
+      echo "installed canonical hibs-bet.nginx.conf → ${site_avail}"
+      fixed=1
+    fi
+  fi
+
+  if [[ -L /etc/nginx/sites-enabled/hibs-unified ]] || [[ -f /etc/nginx/sites-enabled/hibs-unified ]]; then
+    if grep -qE '127\.0\.0\.1:5001|upstream hibs_football' /etc/nginx/sites-enabled/hibs-unified 2>/dev/null; then
+      rm -f /etc/nginx/sites-enabled/hibs-unified
+      echo "disabled hibs-unified (dev :5001 conflicts with gunicorn :8000)"
+      fixed=1
+    fi
+  fi
+
   for f in /etc/nginx/sites-available/* /etc/nginx/sites-enabled/*; do
     [[ -f "${f}" ]] || continue
     if grep -qE '127\.0\.0\.1:5001|server 127\.0\.0\.1:5001' "${f}" 2>/dev/null; then
@@ -234,7 +254,14 @@ football_vps_fix_nginx_upstream() {
       echo "patched nginx upstream 5001→8000: ${f}"
       fixed=1
     fi
+    if grep -qE 'proxy_pass http://hibs_football' "${f}" 2>/dev/null && \
+       grep -qE 'upstream hibs_football' "${f}" 2>/dev/null; then
+      sed -i '/upstream hibs_football/,/}/ s|server 127\.0\.0\.1:5001|server 127.0.0.1:8000|g' "${f}"
+      echo "patched upstream hibs_football block: ${f}"
+      fixed=1
+    fi
   done
+
   if [[ "${fixed}" -eq 1 ]] && command -v nginx >/dev/null 2>&1; then
     nginx -t && systemctl reload nginx
     echo "nginx reloaded"

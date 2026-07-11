@@ -26,11 +26,23 @@ sys.exit(0 if service_restart_allowed('${key}', min_minutes=${mins}) else 1)
 " 2>/dev/null
 }
 
+football_vps_fallback_public_host() {
+  local pub="${HIBS_PUBLIC_HOST:-}"
+  if [[ -z "${pub}" && -f /etc/hibs-bet/stack.env ]]; then
+    # shellcheck disable=SC1091
+    source /etc/hibs-bet/stack.env
+    pub="${HIBS_PUBLIC_HOST:-}"
+  fi
+  echo "${pub:-hibs-bet.co.uk}"
+}
+
 football_vps_probe() {
   local bet="${1:-${football_vps_fallback_bet}}"
+  local pub
+  pub="$(football_vps_fallback_public_host)"
   FB_PING="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 8 "http://127.0.0.1:8000/api/ping" 2>/dev/null || echo 000)"
   FB_LOGIN="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:8000/login" 2>/dev/null || echo 000)"
-  FB_PUBLIC_LOGIN="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 12 "https://hibs-bet.co.uk/login" 2>/dev/null || echo 000)"
+  FB_PUBLIC_LOGIN="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 12 "https://${pub}/login" 2>/dev/null || echo 000)"
   FB_UNIT="$(systemctl is-active hibs-bet 2>/dev/null || echo inactive)"
   if ss -ltn 2>/dev/null | grep -q ':8000 '; then
     FB_PORT=up
@@ -67,7 +79,12 @@ football_vps_nginx_fallback() {
   # shellcheck source=lib_racing_vps_probe.sh
   source "${bet}/scripts/lib_racing_vps_probe.sh"
   football_vps_fallback_log "L3 nginx upstream repair (localhost OK, public 502)"
-  football_vps_fix_nginx_upstream || return 1
+  football_vps_fix_nginx_upstream "${bet}" || return 1
+  if [[ -f "${bet}/deploy/apply-vps-racing-link.sh" ]]; then
+    DEPLOY_PATH="${bet}" HIBS_RACING_DEPLOY_PATH="${football_vps_fallback_racing}" \
+      HIBS_PUBLIC_HOST="$(football_vps_fallback_public_host)" \
+      bash "${bet}/deploy/apply-vps-racing-link.sh" 2>/dev/null || true
+  fi
   return 0
 }
 
@@ -133,17 +150,32 @@ football_vps_automation_fallback() {
 racing_vps_automation_fallback() {
   local bet="${1:-${football_vps_fallback_bet}}"
   local racing="${2:-${football_vps_fallback_racing}}"
+  local pub ping pub_ping unit
   [[ "$(id -u)" -eq 0 ]] || return 0
   [[ -d "${racing}" ]] || return 0
-  local ping unit
+  pub="$(football_vps_fallback_public_host)"
   ping="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 12 "http://127.0.0.1:5003/api/ping" 2>/dev/null || echo 000)"
+  pub_ping="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "https://${pub}/racing/api/ping" 2>/dev/null || echo 000)"
   unit="$(systemctl is-active hibs-racing 2>/dev/null || echo inactive)"
-  football_vps_fallback_log "racing probe unit=${unit} ping=${ping}"
-  [[ "${ping}" == "200" ]] && return 0
-  if football_vps_fallback_allowed "hibs-racing-hard" 45 && [[ -f "${bet}/scripts/vps_racing_hard_recovery.sh" ]]; then
-    football_vps_fallback_log "racing L2 hard recovery"
-    HIBS_BET_DEPLOY_PATH="${bet}" HIBS_RACING_DEPLOY_PATH="${racing}" \
-      bash "${bet}/scripts/vps_racing_hard_recovery.sh" || true
+  football_vps_fallback_log "racing probe unit=${unit} local=${ping} public=${pub_ping}"
+  if [[ "${ping}" == "200" && "${pub_ping}" == "200" ]]; then
+    return 0
+  fi
+  if [[ "${ping}" == "200" && "${pub_ping}" != "200" ]]; then
+    if football_vps_fallback_allowed "hibs-racing-nginx" 30 && [[ -f "${bet}/deploy/apply-vps-racing-link.sh" ]]; then
+      football_vps_fallback_log "racing L3 nginx /racing proxy repair"
+      DEPLOY_PATH="${bet}" HIBS_RACING_DEPLOY_PATH="${racing}" HIBS_PUBLIC_HOST="${pub}" \
+        bash "${bet}/deploy/apply-vps-racing-link.sh" || true
+      pub_ping="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "https://${pub}/racing/api/ping" 2>/dev/null || echo 000)"
+      [[ "${pub_ping}" == "200" ]] && return 0
+    fi
+  fi
+  if [[ "${ping}" != "200" ]]; then
+    if football_vps_fallback_allowed "hibs-racing-hard" 45 && [[ -f "${bet}/scripts/vps_racing_hard_recovery.sh" ]]; then
+      football_vps_fallback_log "racing L2 hard recovery"
+      HIBS_BET_DEPLOY_PATH="${bet}" HIBS_RACING_DEPLOY_PATH="${racing}" \
+        bash "${bet}/scripts/vps_racing_hard_recovery.sh" || true
+    fi
   fi
   ping="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 12 "http://127.0.0.1:5003/api/ping" 2>/dev/null || echo 000)"
   [[ "${ping}" == "200" ]]

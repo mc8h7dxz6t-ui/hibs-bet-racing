@@ -249,8 +249,9 @@ football_vps_install_safe_fixture_row() {
   local dest="${bet}/templates/_fixture_row_compact.html"
   local expand="${bet}/templates/_fixture_expand_panel.html"
 
-  if [[ -f "${dest}" ]] && ! grep -q '_fixture_expand_panel' "${dest}" 2>/dev/null; then
-    echo "[dashboard-fix] fixture row already compact (no expand panel)"
+  if [[ -f "${dest}" ]] && ! grep -q '_fixture_expand_panel' "${dest}" 2>/dev/null \
+    && ! grep -qE 'pred\.(btts_prob|btts_yes_prob|home_win_prob)' "${dest}" 2>/dev/null; then
+    echo "[dashboard-fix] fixture row already compact (safe dict access)"
     return 0
   fi
 
@@ -267,16 +268,17 @@ football_vps_install_safe_fixture_row() {
 {% set fx = fixture %}
 {% set pred = fx.prediction if fx.prediction is mapping else {} %}
 {% set odds = fx.best_odds_1x2 if fx.best_odds_1x2 is mapping else {} %}
-{% set dq = fx.data_quality.score_pct if fx.data_quality is mapping and fx.data_quality.score_pct is not none else (fx.data_quality_pct or 0) %}
-{% set fid = fx.id or fx.fixture_id or loop.index %}
+{% set dq = (fx.data_quality.get('score_pct') if fx.data_quality is mapping else none) or fx.data_quality_pct or 0 %}
+{% set fid = (fx.get('id') or fx.get('fixture_id')) if fx is mapping else (fx.id or fx.fixture_id) %}
+{% if not fid %}{% set fid = 0 %}{% endif %}
 {% set home = fx.home_team or fx.home or 'Home' %}
 {% set away = fx.away_team or fx.away or 'Away' %}
 {% set ko = fx.kickoff_display or fx.kickoff_local or fx.date or '—' %}
-{% set ph = pred.home_win_prob or pred.prob_home or pred.get('1') %}
-{% set pd = pred.draw_prob or pred.prob_draw or pred.get('X') %}
-{% set pa = pred.away_win_prob or pred.prob_away or pred.get('2') %}
-{% set btts = pred.btts_yes_prob or pred.btts_prob %}
-{% set win_lean = pred.predicted_outcome or pred.lean_1x2 or '—' %}
+{% set ph = pred.get('home_win_prob') or pred.get('prob_home') or pred.get('1') %}
+{% set pd = pred.get('draw_prob') or pred.get('prob_draw') or pred.get('X') %}
+{% set pa = pred.get('away_win_prob') or pred.get('prob_away') or pred.get('2') %}
+{% set btts = pred.get('btts_yes_prob') or pred.get('btts_prob') %}
+{% set win_lean = pred.get('predicted_outcome') or pred.get('lean_1x2') or '—' %}
 <details class="fr-compact fixture-card{% if fx.has_value_bet %} value-card{% endif %}"
     data-fid="{{ fid }}"
     data-league="{{ fx.league or '' }}"
@@ -293,9 +295,9 @@ football_vps_install_safe_fixture_row() {
             <span class="fr-match">{{ home }} <span class="fr-vs">v</span> {{ away }}</span>
             <span class="fr-prob">{% if btts is not none %}{{ '%.0f'|format(btts * 100 if btts <= 1 else btts) }}%{% else %}<span class="fr-prob-na">—</span>{% endif %}</span>
             <span class="fr-prob fr-prob-win"><span class="fr-win-lean">{{ win_lean }}</span></span>
-            <span class="fr-od">{% if odds.home %}{{ '%.2f'|format(odds.home) }}{% else %}—{% endif %}</span>
-            <span class="fr-od">{% if odds.draw %}{{ '%.2f'|format(odds.draw) }}{% else %}—{% endif %}</span>
-            <span class="fr-od">{% if odds.away %}{{ '%.2f'|format(odds.away) }}{% else %}—{% endif %}</span>
+            <span class="fr-od">{% if odds.get('home') is not none %}{{ '%.2f'|format(odds.get('home')) }}{% else %}—{% endif %}</span>
+            <span class="fr-od">{% if odds.get('draw') is not none %}{{ '%.2f'|format(odds.get('draw')) }}{% else %}—{% endif %}</span>
+            <span class="fr-od">{% if odds.get('away') is not none %}{{ '%.2f'|format(odds.get('away')) }}{% else %}—{% endif %}</span>
             <span class="fr-od fr-prob-na">—</span>
             <span class="fr-od fr-prob-na">—</span>
             <span class="fr-od fr-prob-na">—</span>

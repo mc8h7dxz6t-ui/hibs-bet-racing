@@ -30,11 +30,21 @@ Overlay sync now auto-installs: infra fallback (5m), Brier circuit (hourly), sud
 ## Verify
 
 ```bash
+bash /opt/hibs-bet/scripts/verify_vps_relative_paths.sh
+bash /opt/hibs-bet/scripts/verify_public_edge.sh
 bash /opt/hibs-bet/scripts/verify_execution_readiness.sh
 bash /opt/hibs-bet/scripts/verify_personal_staking_greenlights.sh --json
 curl -fsS http://127.0.0.1:8000/api/ping
 curl -fsS http://127.0.0.1:5003/api/ping
 ```
+
+## Full stack recovery (502 / unarmed automation)
+
+```bash
+sudo bash /opt/hibs-bet/scripts/vps_full_stack_recovery.sh
+```
+
+See `docs/ORDERED_RECOVERY_RUNBOOK.md` for phased manual recovery.
 
 ## Cron bundle (www-data)
 
