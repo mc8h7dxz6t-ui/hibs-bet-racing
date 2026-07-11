@@ -147,7 +147,7 @@ EOF
 log "fve_proxy=${FVE_PROXY_OK} fve_health=${FVE_HEALTH} football=${FOOTBALL_PING} health_light=${FOOTBALL_HEALTH_LIGHT} racing=${RACING_PING} data_producer=${DATA_PROD_OK}"
 
 if [[ "${RACING_PING}" -eq 0 ]]; then
-  warn "racing not reachable — private repo: run ./scripts/deploy_racing_to_vps.sh from Mac once"
+  warn "racing not reachable — run: sudo HIBS_RACING_SYNC_REF=main bash ${APP}/deploy/vps-sync-racing-from-github.sh"
 fi
 if [[ "${FVE_HEALTH}" -eq 0 ]]; then
   warn "FVE health failed at http://${FVE_HOST}:${FVE_PORT}/health"

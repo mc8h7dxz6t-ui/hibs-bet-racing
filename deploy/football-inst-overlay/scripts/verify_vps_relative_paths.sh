@@ -21,7 +21,8 @@ echo "==> verify_vps_relative_paths app=${APP}"
 
 for rel in \
   deploy/hibs-bet.nginx.conf \
-  deploy/apply-vps-racing-link.sh \
+  deploy/vps-sync-overlay-from-github.sh \
+  deploy/vps-bootstrap-from-github.sh \
   deploy/apply-vps-site-cross-links.sh \
   deploy/cron-hibs-infra-fallback.sh \
   deploy/cron-hibs-ops-automation.sh \

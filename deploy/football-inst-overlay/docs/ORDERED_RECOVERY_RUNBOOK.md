@@ -39,7 +39,31 @@ curl -s -o /dev/null -w 'public_racing=%{http_code}\n' https://hibs-bet.co.uk/ra
 
 ## Phase 1 — One-shot full recovery (VPS)
 
-**Primary entry point** (encodes all phases below):
+### Public GitHub (repo now public — preferred)
+
+On **MAIN `.52`**:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mc8h7dxz6t-ui/hibs-bet-racing/main/deploy/football-inst-overlay/deploy/vps-bootstrap-from-github.sh | \
+  sudo HIBS_OVERLAY_REF=main FVE_REMOTE_HOST=77.68.89.75 bash
+```
+
+Before PR #71 merges to `main`, pin the branch:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mc8h7dxz6t-ui/hibs-bet-racing/cursor/fix-login-500-b3fc/deploy/football-inst-overlay/deploy/vps-bootstrap-from-github.sh | \
+  sudo HIBS_OVERLAY_REF=cursor/fix-login-500-b3fc FVE_REMOTE_HOST=77.68.89.75 bash
+```
+
+Or if scripts already on disk:
+
+```bash
+sudo HIBS_OVERLAY_REF=main bash /opt/hibs-bet/deploy/vps-sync-overlay-from-github.sh
+sudo bash /opt/hibs-bet/scripts/vps_full_stack_recovery.sh
+bash /opt/hibs-bet/scripts/verify_public_edge.sh
+```
+
+**Primary entry point** (after sync):
 
 ```bash
 sudo bash /opt/hibs-bet/scripts/vps_full_stack_recovery.sh

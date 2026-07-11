@@ -8,7 +8,7 @@ set -euo pipefail
 BET="${DEPLOY_PATH:-/opt/hibs-bet}"
 RACING="${HIBS_RACING_DEPLOY_PATH:-/opt/hibs-racing}"
 GITHUB_REPO="${GITHUB_OVERLAY_REPO:-mc8h7dxz6t-ui/hibs-bet-racing}"
-GITHUB_REF="${GITHUB_OVERLAY_REF:-cursor/fix-login-500-b3fc}"
+GITHUB_REF="${GITHUB_OVERLAY_REF:-main}"
 GITHUB_BASE="https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_REF}/deploy/football-inst-overlay"
 
 TEMPLATES=(
@@ -86,7 +86,7 @@ for tpl in "${TEMPLATES[@]}"; do
     exit $?
   else
     if ! curl -fsSL "${GITHUB_BASE}/templates/${tpl}" -o "${dest}.tmp"; then
-      echo "ERROR: curl 404 — repo is private. Copy scripts/vps_football_apply_embedded_overlay.sh to VPS." >&2
+      echo "ERROR: curl failed for ${url} — check GITHUB_OVERLAY_REF and repo visibility." >&2
       exit 1
     fi
     mv "${dest}.tmp" "${dest}"
