@@ -181,6 +181,39 @@
 
   let activeProofProduct = "compliance";
 
+  const GUIDED_INGEST_IDS = new Set([
+    "altdata",
+    "ai-kit",
+    "webhook-mesh",
+    "ad-guard",
+    "health",
+    "model-governor",
+    "drift-gate",
+    "webhook-replay",
+    "spend-guard",
+    "agent-ledger",
+  ]);
+
+  function supportsProofIngest(productId) {
+    return GUIDED_INGEST_IDS.has(productId);
+  }
+
+  function updateProofIngestUi() {
+    const hint = document.getElementById("proof-ingest-hint");
+    const payloadEl = document.getElementById("proof-ingest-payload");
+    const btnDemo = document.getElementById("btn-proof-demo-payload");
+    const btnIngest = document.getElementById("btn-proof-ingest");
+    const guided = supportsProofIngest(activeProofProduct);
+    if (hint) {
+      hint.textContent = guided
+        ? "Guided ingest available — load demo payload or edit JSON, then Ingest."
+        : "Compliance & Proxy use Architecture tabs; other SKUs: bootstrap or make demo-all.";
+    }
+    if (payloadEl) payloadEl.disabled = !guided;
+    if (btnDemo) btnDemo.style.display = guided ? "" : "none";
+    if (btnIngest) btnIngest.style.display = guided ? "" : "none";
+  }
+
   async function loadProofCatalog() {
     const data = await api("GET", "/api/products");
     const picker = document.getElementById("proof-product-picker");
@@ -195,6 +228,7 @@
     activeProofProduct = data.active || (data.catalog[0] && data.catalog[0].id) || "compliance";
     picker.value = activeProofProduct;
     updateProofMeta(data.catalog || []);
+    updateProofIngestUi();
     return data;
   }
 
@@ -206,9 +240,10 @@
     if (st && entry) {
       st.textContent = entry.database_present
         ? `DB: ${entry.database}`
-        : `Missing DB — run: make demo-all`;
+        : `Missing DB — bootstrap SKU or ingest`;
       st.style.color = entry.database_present ? "var(--muted)" : "#c45c5c";
     }
+    updateProofIngestUi();
   }
 
   async function onProofSelect() {
@@ -220,6 +255,37 @@
     updateProofMeta(cat.catalog || []);
     setOutput("#proof-output", `Selected: ${activeProofProduct}`);
     await loadProofLedger();
+  }
+
+  async function onProofDemoPayload() {
+    try {
+      const data = await api("GET", `/api/proof/${activeProofProduct}/demo-payload`);
+      const el = document.getElementById("proof-ingest-payload");
+      if (el) el.value = JSON.stringify(data.payload, null, 2);
+      const hint = document.getElementById("proof-ingest-hint");
+      if (hint && data.schema && data.schema.hint) {
+        hint.textContent = data.schema.hint;
+      }
+      setOutput("#proof-output", "Demo payload loaded.");
+    } catch (e) {
+      setOutput("#proof-output", e.payload || e.message || String(e));
+    }
+  }
+
+  async function onProofIngest() {
+    try {
+      markStep("proof-steps", "0", "active");
+      const payload = parseJsonField("#proof-ingest-payload", "Ingest payload");
+      const data = await api("POST", `/api/proof/${activeProofProduct}/ingest`, { payload });
+      markStep("proof-steps", "0", data.ok !== false ? "done" : "active");
+      markStep("proof-steps", "1", "done");
+      setOutput("#proof-output", data);
+      const cat = await api("GET", "/api/products");
+      updateProofMeta(cat.catalog || []);
+      await loadProofLedger();
+    } catch (e) {
+      setOutput("#proof-output", e.payload || e.message || String(e));
+    }
   }
 
   async function loadProofLedger() {
@@ -457,6 +523,8 @@
     if (proofPicker) {
       proofPicker.addEventListener("change", () => onProofSelect().catch((e) => setOutput("#proof-output", e.message)));
     }
+    bind("btn-proof-demo-payload", onProofDemoPayload);
+    bind("btn-proof-ingest", onProofIngest);
     bind("btn-proof-bootstrap", onProofBootstrap);
     bind("btn-proof-bootstrap-all", onProofBootstrapAll);
     bind("btn-proof-refresh", () => loadProofLedger().catch((e) => setOutput("#proof-output", e.message)));

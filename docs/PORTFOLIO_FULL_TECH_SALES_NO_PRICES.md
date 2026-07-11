@@ -56,7 +56,8 @@
 | Rigorous E2E section per SKU | ✅ |
 | Bundle HMAC signing (rigorous wave 4) | ✅ |
 
-**Production multi-instance:** [PRODUCTION_REDIS_PROFILE.md](PRODUCTION_REDIS_PROFILE.md) (#2, #5, #6, #9)
+**Production multi-instance:** [PRODUCTION_REDIS_PROFILE.md](PRODUCTION_REDIS_PROFILE.md) (#2, #5, #6, #9)  
+**Architecture + execution map:** [INST_PLUS_PRODUCTION_ARCHITECTURE.md](INST_PLUS_PRODUCTION_ARCHITECTURE.md)
 
 ---
 
@@ -82,18 +83,20 @@
 | # | Product | Grade | Inst | Prod | Comm | GTM headline |
 |---|---------|-------|------|------|------|--------------|
 | 1 | Compliance Logger | **Gold** | ✅ | ✅ | ✅ | No GRC workflow / SOC2 SaaS |
-| 2 | Proxy-Risk | **Gold** | ✅ | 🟡 | ✅ | Redis for multi-instance live |
-| 3 | Alt-Data | **Gold** | ✅ | 🟡 | ✅ | Buyer feeds need integration SOW |
-| 4 | AI Kit | **Gold** | ✅ | 🟡 | ✅ | Hardest standalone sell |
-| 5 | Webhook Mesh | **Gold** | ✅ | 🟡 | ✅ | Redis Stream for crash-safe queue |
-| 6 | Ad Guard | **Gold** | ✅ | 🟡 | ✅ | Not RTB / DSP UI |
-| 7 | Health Telemetry | **Gold** | ✅ | 🟡 | ✅ | Audit spine, not FDA cert |
+| 2 | Proxy-Risk | **Gold** | ✅ | ✅ | ✅ | Scale: Redis for multi-instance live |
+| 3 | Alt-Data | **Gold** | ✅ | ✅ | ✅ | Buyer feeds: integration SOW |
+| 4 | AI Kit | **Gold** | ✅ | ✅ | ✅ | Hardest standalone sell |
+| 5 | Webhook Mesh | **Gold** | ✅ | ✅ | ✅ | Scale: Redis Stream queue |
+| 6 | Ad Guard | **Gold** | ✅ | ✅ | ✅ | Not RTB / DSP UI |
+| 7 | Health Telemetry | **Gold** | ✅ | ✅ | ✅ | Audit spine, not FDA cert |
 | 8a | ModelGovernor lifecycle | **Gold** | ✅ | ✅ | ✅ | Not full MLOps platform |
 | 8b | Spend plane (`demo-gold`) | **Demo gold** | 🟡 | 🟡 | ✅ | Canonical walkthrough, not separate CI SKU |
-| 11 | Spend Guard CLI | **Gold** | ✅ | 🟡 | ✅ | Postgres profile optional |
+| 9 | Drift Gate | **Gold** | ✅ | ✅ | ✅ | Scale: Redis rolling windows |
+| 10 | Webhook Replay | **Gold** | ✅ | ✅ | ✅ | Air-gapped byte replay |
+| 11 | Spend Guard CLI | **Gold** | ✅ | ✅ | ✅ | Scale: Postgres wallet optional |
 | 12 | Agent Ledger | **Gold** | ✅ | ✅ | ✅ | Pre-exec tool governance |
 
-**Layers:** Inst = F1–F9 + verify-bundle + rigorous E2E · Prod = VPC deploy envelope · Comm = buyer + sales spec + demo · GTM = paying tenants (pre-revenue today)
+**Layers:** Inst = F1–F9 + verify-bundle + rigorous E2E · **Prod** = single-instance VPC deploy envelope ([architecture](INST_PLUS_PRODUCTION_ARCHITECTURE.md)) · Comm = buyer + sales spec + demo · GTM = paying tenants (pre-revenue today)
 
 ---
 
@@ -196,7 +199,7 @@ proxy-risk verify-bundle --tarball ./data/demo/portfolio/proxy_bundle.tar
 | Layer | Status | Detail |
 |-------|--------|--------|
 | Institutional gold | ✅ | Full gate chain; p99 bench |
-| Production | 🟡 | Live needs Redis for token bucket + idempotency |
+| Production | ✅ | Single-instance VPC; scale: Redis for live multi-replica |
 | CI | ✅ | `proxy_risk` rigorous — PASSED |
 
 ---
@@ -418,7 +421,7 @@ spend-guard verify-bundle --tarball ./data/demo/spend_guard_bundle.tar
 | Layer | Status | Detail |
 |-------|--------|--------|
 | Institutional gold | ✅ | Rigorous: idempotency, API key, drift lock |
-| Production | 🟡 | Postgres wallet when `INST_TEST_POSTGRES_DSN` set |
+| Production | ✅ | Single-instance SQLite wallet; scale: Postgres profile optional |
 | CI | ✅ | `spend_guard` rigorous — PASSED |
 
 ---

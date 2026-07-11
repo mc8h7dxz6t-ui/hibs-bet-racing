@@ -14,6 +14,7 @@
 | 1 | [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) | **Full tech & sales** — 12 SKUs, buyer segments, problem→solution, competitive positioning, proof commands, completion matrix |
 | 2 | [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md) | **Factual evidence** — CI artifacts, rigorous sections, per-SKU test files, docker-extended logs |
 | 3 | [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | **Market deep dive** — capability matrix vs Hookdeck, Svix, Kong, ServiceNow GRC, Langfuse, LiteLLM, Fiddler, etc. + **2025–2026 public pricing bands** |
+| 4 | [INST_PLUS_PRODUCTION_ARCHITECTURE.md](INST_PLUS_PRODUCTION_ARCHITECTURE.md) | **Production map** — spine architecture, per-SKU execution paths, `/ready` criteria, Proof Console ingest |
 
 ---
 

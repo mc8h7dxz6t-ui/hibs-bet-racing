@@ -18,6 +18,12 @@ from inst_spine.export import build_audit_bundle, verify_audit_bundle
 from inst_spine.ledger import AppendOnlyLedger
 from inst_workflow.catalog import PRODUCT_CATALOG, catalog_by_id, list_catalog
 from inst_workflow.demo_bootstrap import bootstrap_all, bootstrap_product
+from inst_workflow.proof_ingest import (
+    demo_payload,
+    ingest_product_async,
+    ingest_schema,
+    supports_guided_ingest,
+)
 from proxy_risk.router import ProxyRequest, ProxyRiskGateway
 
 from inst_spine.middleware import install_api_key_middleware
@@ -205,6 +211,10 @@ class ProofSelectBody(BaseModel):
     product_id: str
 
 
+class ProofIngestBody(BaseModel):
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
 @app.post("/api/proof/{product_id}/bootstrap")
 async def proof_bootstrap(product_id: str) -> dict[str, Any]:
     entry = _proof_entry(product_id)
@@ -291,6 +301,34 @@ def _proof_db(entry) -> Path:
         db = state.proxy_db
     db.parent.mkdir(parents=True, exist_ok=True)
     return db
+
+
+@app.get("/api/proof/{product_id}/demo-payload")
+async def proof_demo_payload(product_id: str) -> dict[str, Any]:
+    entry = _proof_entry(product_id)
+    if not supports_guided_ingest(entry.id):
+        raise HTTPException(404, f"guided ingest not available for {entry.id}")
+    return {
+        "ok": True,
+        "product_id": entry.id,
+        "sku": entry.sku,
+        "schema": ingest_schema(entry),
+        "payload": demo_payload(entry, demo_dir=state.demo_dir),
+    }
+
+
+@app.post("/api/proof/{product_id}/ingest")
+async def proof_ingest(product_id: str, body: ProofIngestBody) -> dict[str, Any]:
+    entry = _proof_entry(product_id)
+    if not supports_guided_ingest(entry.id):
+        raise HTTPException(404, f"guided ingest not available for {entry.id}")
+    try:
+        result = await ingest_product_async(entry, body.payload, demo_dir=state.demo_dir)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(400, f"ingest failed: {exc}") from exc
+    return result
 
 
 @app.get("/api/proof/{product_id}/ledger")
