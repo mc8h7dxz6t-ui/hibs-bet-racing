@@ -269,7 +269,8 @@ football_vps_install_safe_fixture_row() {
 {% set pred = fx.prediction if fx.prediction is mapping else {} %}
 {% set odds = fx.best_odds_1x2 if fx.best_odds_1x2 is mapping else {} %}
 {% set dq = (fx.data_quality.get('score_pct') if fx.data_quality is mapping else none) or fx.data_quality_pct or 0 %}
-{% set fid = fx.id or fx.fixture_id or loop.index %}
+{% set fid = (fx.get('id') or fx.get('fixture_id')) if fx is mapping else (fx.id or fx.fixture_id) %}
+{% if not fid %}{% set fid = 0 %}{% endif %}
 {% set home = fx.home_team or fx.home or 'Home' %}
 {% set away = fx.away_team or fx.away or 'Away' %}
 {% set ko = fx.kickoff_display or fx.kickoff_local or fx.date or '—' %}
