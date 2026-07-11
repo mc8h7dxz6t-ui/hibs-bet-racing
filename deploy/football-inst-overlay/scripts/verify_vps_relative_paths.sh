@@ -30,6 +30,9 @@ for rel in \
   scripts/vps_football_hard_recovery.sh \
   scripts/vps_football_diagnose_502.sh \
   scripts/vps_football_ensure_nginx_production.sh \
+  scripts/vps_full_stack_recovery.sh \
+  scripts/vps_post_overlay_sync.sh \
+  scripts/verify_public_edge.sh \
   scripts/vps_infra_fallback_cycle.sh \
   scripts/vps_three_stack_green.sh; do
   check "${rel}"
