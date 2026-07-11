@@ -33,7 +33,7 @@ if [[ -f /etc/hibs-bet/stack.env ]]; then
   source /etc/hibs-bet/stack.env
   PUBLIC="${HIBS_PUBLIC_HOST:-${PUBLIC}}"
 fi
-FVE_HOST="${FVE_REMOTE_HOST:-127.0.0.1}"
+FVE_HOST="${FVE_REMOTE_HOST:-77.68.89.75}"
 
 log() { echo "[full-recovery] $*"; }
 warn() { echo "[full-recovery] WARN: $*" >&2; }

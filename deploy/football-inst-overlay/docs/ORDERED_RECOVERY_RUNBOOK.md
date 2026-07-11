@@ -59,9 +59,9 @@ If scripts are **missing on VPS** (private repo drift), from Mac:
 scp -r deploy/football-inst-overlay/scripts/*.sh \
     deploy/football-inst-overlay/deploy/apply-vps-*.sh \
     deploy/football-inst-overlay/deploy/hibs-bet.nginx.conf \
-    root@77.68.89.73:/opt/hibs-bet/scripts/
+    root@87.106.100.52:/opt/hibs-bet/scripts/
 # or embedded overlay (no network on VPS):
-ssh root@77.68.89.73 'sudo bash /opt/hibs-bet/scripts/vps_football_apply_embedded_overlay.sh'
+ssh root@87.106.100.52 'sudo bash /opt/hibs-bet/scripts/vps_football_apply_embedded_overlay.sh'
 ```
 
 ---

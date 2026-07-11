@@ -202,3 +202,5 @@ crontab -u www-data -l | wc -l   # target < 50
 | 2026-07-11 | Added `apply-vps-racing-link.sh`, `apply-vps-site-cross-links.sh`, `vps_football_ensure_nginx_production.sh`, `verify_vps_relative_paths.sh` |
 | 2026-07-11 | Enhanced `football_vps_fix_nginx_upstream` — install canonical nginx, disable `hibs-unified` |
 | 2026-07-10 | FM-01..FM-07 in `VPS_FAILURE_MODES.md` |
+
+**On-call runbook:** `docs/ORDERED_RECOVERY_RUNBOOK.md`

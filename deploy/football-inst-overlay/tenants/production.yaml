@@ -9,13 +9,17 @@ stack_layout: split  # football+racing on main; FVE on dedicated box optional
 managed: false  # personal project — no SaaS tenant
 
 vps:
-  host: "77.68.89.73"
+  host: "87.106.100.52"
   user: root
 
 fve_vps:
   host: "77.68.89.75"
   user: root
   api_port: 8010
+
+legacy_vps:
+  host: "77.68.89.73"
+  note: "RETIRED — FVE or legacy only; main stack on .52"
 
 domain: hibs-bet.co.uk
 

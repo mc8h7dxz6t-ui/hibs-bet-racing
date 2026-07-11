@@ -135,3 +135,8 @@ curl -fsS --max-time 10 "http://127.0.0.1:8000/api/ping" 2>/dev/null | head -c 4
 echo ""
 echo ""
 echo "==> football overlay applied to ${BET} at ${STAMP}"
+
+if [[ -f "${BET}/scripts/vps_post_overlay_sync.sh" ]]; then
+  echo "==> post-overlay sync (cross-links + crons)"
+  bash "${BET}/scripts/vps_post_overlay_sync.sh" || true
+fi
