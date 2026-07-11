@@ -3,7 +3,7 @@
 
 .PHONY: help install plug buyer-pack demo-ready demo demo-all demo-phase2 demo-gold demo-mg-gold \
         demo-gold-up demo-gold-down demo-gold-reset smoke rigorous chaos proof proof-lite \
-        verify-portfolio redis-soak retention-drill soc2-evidence test instpp-test workflow-up workflow-down stack-up redis-up
+        verify-portfolio redis-soak retention-drill soc2-evidence test instpp-test workflow-up workflow-down stack-up redis-up docker-extended
 
 PYTHON ?= python3
 DEMO_DIR ?= ./data/demo/portfolio
@@ -34,12 +34,13 @@ help:
 	@echo "  make rigorous          12/12 rigorous E2E → docs/test_logs/"
 	@echo "  make proof             smoke + rigorous + verify-portfolio"
 	@echo "  make proof-lite        PR diligence: profile gates + demo-all + verify"
+	@echo "  make docker-extended   Redis+Postgres compose + logged full live proof"
 	@echo "  make chaos             chaos + integration drills"
 	@echo "  make test              full pytest suite"
 	@echo ""
 	@echo "Quick start:  make plug"
 	@echo "Diligence:    make proof"
-	@echo "Docs:         docs/RUN_DEMO.md"
+	@echo "Docs:         docs/INST_PLUS_DILIGENCE_PACK.md"
 
 install:
 	$(PYTHON) -m pip install -e ".[dev,instpp]"
@@ -98,6 +99,10 @@ stack-up:
 
 redis-up:
 	$(COMPOSE) --profile redis up -d
+
+docker-extended:
+	chmod +x ./scripts/instpp_docker_extended_test.sh
+	./scripts/instpp_docker_extended_test.sh
 
 workflow-up: demo-gold-up
 

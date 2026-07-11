@@ -125,11 +125,12 @@ Full matrix: `docs/INSTITUTIONAL_STANDARD.md`
 
 | Doc | Use when |
 |-----|----------|
-| [PORTFOLIO_SALES_SHEET.md](PORTFOLIO_SALES_SHEET.md) | First meeting — all SKUs + pricing |
-| [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md) | Full tech + license economics |
+| [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md) | **Start here** — tech/sales, evidence, market compare (self-contained) |
+| [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) | Full 12-SKU tech + sales positioning |
+| [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md) | CI proof artifacts and per-SKU evidence |
+| [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | Comparable platforms + market pricing bands |
 | `docs/*_BUYER.md` | 60-second skim per product |
 | `docs/*_SALES_TECH_SPEC.md` | RFP / security questionnaire depth |
-| [INST_PLUS_DEEP_DIVE_ALL_7.md](INST_PLUS_DEEP_DIVE_ALL_7.md) | Technical architecture review |
 
 ---
 

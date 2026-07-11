@@ -137,4 +137,4 @@ GitHub Actions workflow `.github/workflows/instpp-ci.yml`:
 | **12/12 CLI demos + rigorous E2E** | ✅ |
 | **12/12 offline verify (`make verify-portfolio`)** | ✅ after `make demo-all` |
 | **Postgres `docker-compose.demo.yml`** | ❌ North star only |
-| **Proof Console full ingest UI per SKU** | 🟡 Spine check/export/verify; compliance/proxy have full workflows |
+| **Proof Console guided ingest (#3–#12)** | ✅ Load demo payload → ingest → ledger → F1–F9 → export → verify |

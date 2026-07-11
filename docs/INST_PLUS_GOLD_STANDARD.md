@@ -142,7 +142,7 @@ See [RUN_DEMO.md](RUN_DEMO.md) for the full plug/demo/run guide.
 
 ## Related documents
 
+- `docs/INST_PLUS_DILIGENCE_PACK.md` — self-contained tech/sales, evidence, market compare
 - `docs/BUYER_EVIDENCE_PACK.md` — procurement 15-minute script
-- `docs/PORTFOLIO_TECH_SALES_SHEET.md` — license economics
 - `docs/SOC2_VPC_DILIGENCE_PACK.md` — VPC diligence
 - `docs/INSTITUTIONAL_STANDARD.md` — portfolio overview
