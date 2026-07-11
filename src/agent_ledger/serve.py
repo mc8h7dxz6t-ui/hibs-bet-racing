@@ -14,6 +14,8 @@ from fastapi.responses import JSONResponse
 from agent_ledger.gate import AgentActionRequest, gate_from_paths
 from agent_ledger.permits import PermitStore
 from inst_spine.health_probes import ledger_chain_ready, readiness_payload, sqlite_db_ready
+from inst_spine.production_profile import redis_production_check
+from inst_spine.rates import TokenBucket, token_bucket_backend_from_env
 from inst_spine.http_lifecycle import json_response, make_lifespan
 from inst_spine.ingress_guard import install_body_size_limit_middleware
 from inst_spine.middleware import install_api_key_middleware
@@ -105,15 +107,27 @@ async def ready() -> Any:
     ledger_ok, ledger_detail = sqlite_db_ready(_ledger_db())
     permit_ok, permit_detail = sqlite_db_ready(_permit_db())
     chain_ok, chain_detail = ledger_chain_ready(_ledger_db())
+    redis_ok, redis_detail = redis_production_check()
     body = readiness_payload(
         product="agent-ledger",
         checks={
             "ledger_db": (ledger_ok, ledger_detail),
             "permit_db": (permit_ok, permit_detail),
             "ledger_chain": (chain_ok, chain_detail),
+            "redis_profile": (redis_ok, redis_detail),
         },
     )
     return json_response(body, status_code=200 if body["ready"] else 503)
+
+
+def _authorize_rate_limit(agent_id: str) -> bool:
+    bucket = TokenBucket(
+        capacity=float(os.getenv("AGENT_LEDGER_RATE_CAPACITY", "120")),
+        refill_rate=float(os.getenv("AGENT_LEDGER_RATE_REFILL", "20")),
+        key=f"agent-ledger:{agent_id}",
+        backend=token_bucket_backend_from_env(),
+    )
+    return bucket.consume(1.0)
 
 
 @app.post("/v1/authorize")
@@ -127,6 +141,9 @@ async def authorize(request: Request) -> JSONResponse:
     tool_name = str(body.get("tool_name") or "").strip()
     if not tool_name:
         return JSONResponse({"ok": False, "error": "tool_name required"}, status_code=400)
+    agent_id = str(body.get("agent_id") or "agent")
+    if not _authorize_rate_limit(agent_id):
+        return JSONResponse({"ok": False, "error": "rate_limit_exceeded"}, status_code=429)
     gw = gate_from_paths(ledger_db=_ledger_db(), permit_db=_permit_db())
     resp = gw.authorize(
         AgentActionRequest(

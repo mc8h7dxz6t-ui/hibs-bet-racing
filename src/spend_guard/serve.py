@@ -20,6 +20,7 @@ from inst_spine.health_probes import (
     sqlite_db_ready,
     wallet_state_ready,
 )
+from inst_spine.production_profile import postgres_ha_check, production_profile_enabled, redis_production_check
 from inst_spine.http_lifecycle import make_lifespan
 from inst_spine.ledger import AppendOnlyLedger
 from inst_spine.ingress_guard import install_body_size_limit_middleware
@@ -153,7 +154,10 @@ async def ready() -> Response:
     wallet_ok, wallet_detail = wallet_state_ready(state.wallet_db)
     ledger_ok, ledger_detail = sqlite_db_ready(state.ledger_db)
     chain_ok, chain_detail = ledger_chain_ready(state.ledger_db)
-    redis_ok, redis_detail = redis_ready_from_env()
+    redis_ok, redis_detail = redis_production_check() if production_profile_enabled() else redis_ready_from_env()
+    pg_ok, pg_detail = postgres_ha_check(os.getenv("INST_TEST_POSTGRES_DSN") or os.getenv("SPEND_GUARD_POSTGRES_DSN", ""))
+    if production_profile_enabled() and not pg_ok:
+        wallet_ok, wallet_detail = pg_ok, pg_detail
     body = readiness_payload(
         product="spend-guard",
         checks={
@@ -162,6 +166,7 @@ async def ready() -> Response:
             "ledger_db": (ledger_ok, ledger_detail),
             "ledger_chain": (chain_ok, chain_detail),
             "redis_profile": (redis_ok, redis_detail),
+            "postgres_ha": (pg_ok, pg_detail),
         },
         extra={"mock_upstream": state.mock_upstream},
     )

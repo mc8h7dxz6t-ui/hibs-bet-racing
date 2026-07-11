@@ -117,7 +117,13 @@ class RollingStateStore:
         state_path: Path | None = None,
         redis_key: str | None = None,
     ) -> RollingStateStore:
+        from inst_spine.production_profile import drift_redis_rolling_required
+
         url = os.environ.get("INST_REDIS_URL", "").strip()
+        if drift_redis_rolling_required() and not (url and redis_key):
+            raise RuntimeError(
+                "INST_REDIS_URL and redis_key required for drift rolling state in production profile"
+            )
         if url and redis_key:
             return cls(RedisRollingStateBackend(url, key=redis_key))
         path = state_path or FileRollingStateBackend.default_path_for(baseline_path)

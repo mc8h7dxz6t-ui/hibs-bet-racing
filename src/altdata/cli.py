@@ -99,15 +99,33 @@ def main(argv: list[str] | None = None) -> int:
         return code
 
     if args.cmd == "export":
-        code, body = run_institutional_export(
+        from altdata.feed_schema import write_feed_schema_file
+        from inst_spine.export import build_audit_bundle, verify_bundle_reproducible
+
+        if args.repro_check:
+            ok, msg = verify_bundle_reproducible(args.database)
+            print_json({"ok": ok, "message": msg, "product": PRODUCT})
+            return 0 if ok else 1
+        schema_path = Path(args.database).parent / "feed_schema_registry.json"
+        write_feed_schema_file(schema_path)
+        result = build_audit_bundle(
             args.database,
-            product=PRODUCT,
             out_dir=args.out_dir,
-            tarball=args.tarball,
-            repro_check=args.repro_check,
+            tarball_path=args.tarball,
+            product=PRODUCT,
+            extra_files={"feed_schema_registry.json": schema_path},
         )
-        print_json(body)
-        return code
+        print_json(
+            {
+                "ok": result.ok,
+                "product": PRODUCT,
+                "bundle_sha256": result.bundle_sha256,
+                "tarball": str(result.tarball_path) if result.tarball_path else None,
+                "validation": result.validation.message,
+                "institutional_passed": result.institutional_passed,
+            }
+        )
+        return 0 if result.ok else 1
 
     if args.cmd == "verify-bundle":
         code, body = run_institutional_verify(args.tarball, product=PRODUCT, anchor=args.anchor)

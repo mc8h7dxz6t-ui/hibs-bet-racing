@@ -902,6 +902,17 @@ echo "$GOLD_VERIFY"
 echo "$GOLD_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
 pass "Spend Guard gold demo walkthrough (make demo-gold)"
 
+section "ModelGovernor — gold demo walkthrough (7 steps)"
+MG_GOLD_DIR="$WORK/mg_gold_walkthrough"
+export MG_GOLD_DIR
+rm -rf "$MG_GOLD_DIR"
+./scripts/demo_mg_gold.sh
+test -f "$MG_GOLD_DIR/model_governor_bundle.tar"
+MG_VERIFY=$("$PYTHON" -m model_governor.cli verify-bundle --tarball "$MG_GOLD_DIR/model_governor_bundle.tar")
+echo "$MG_VERIFY"
+echo "$MG_VERIFY" | "$PYTHON" -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('ok') else 1)"
+pass "ModelGovernor gold demo walkthrough (make demo-mg-gold)"
+
 section "Agent Ledger — authorize/complete + check + export + verify"
 AL_DB="$WORK/agent_ledger.sqlite"
 AL_PERMIT="$WORK/agent_ledger_permits.sqlite"

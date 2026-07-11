@@ -89,6 +89,23 @@ def wallet_state_ready(database: str | Path) -> tuple[bool, str]:
         return False, f"wallet_error:{exc}"
 
 
+def postgres_ready_from_env(*, env_var: str = "INST_POSTGRES_DSN") -> tuple[bool, str]:
+    """Postgres connectivity when DSN configured or required by production profile."""
+    from inst_spine.ledger_factory import is_postgres_dsn, open_ledger
+    from inst_spine.production_profile import postgres_ha_check
+
+    dsn = os.getenv(env_var, "").strip()
+    if not dsn:
+        return postgres_ha_check(None)
+    if not is_postgres_dsn(dsn):
+        return False, f"invalid_postgres_dsn:{env_var}"
+    try:
+        open_ledger(dsn).verify()
+        return True, "postgres_ok"
+    except Exception as exc:
+        return False, f"postgres_error:{exc}"
+
+
 def readiness_payload(
     *,
     product: str,

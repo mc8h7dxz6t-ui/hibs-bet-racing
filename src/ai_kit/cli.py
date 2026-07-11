@@ -15,10 +15,11 @@ from ai_kit.validate import validate_with_retry
 from inst_spine.cli_util import run_cli
 from inst_spine.errors import InstError
 from inst_spine.ledger import AppendOnlyLedger
+from ai_kit.export import build_ai_kit_audit_bundle
+from inst_spine.export import verify_bundle_reproducible
 from inst_spine.product_cli import (
     print_json,
     run_f9_check,
-    run_institutional_export,
     run_institutional_verify,
 )
 
@@ -59,6 +60,11 @@ def main(argv: list[str] | None = None) -> int:
     p_export.add_argument("--out-dir", type=Path, default=None)
     p_export.add_argument("--tarball", type=Path, default=None)
     p_export.add_argument("--repro-check", action="store_true")
+    p_export.add_argument(
+        "--observation-lane",
+        action="store_true",
+        help="Redact prompts/completions in export bundle",
+    )
 
     p_bundle = sub.add_parser("verify-bundle", help="Offline auditor replay")
     p_bundle.add_argument("--tarball", type=Path, required=True)
@@ -134,15 +140,29 @@ def main(argv: list[str] | None = None) -> int:
         return code
 
     if args.cmd == "export":
-        code, body = run_institutional_export(
+        if args.repro_check:
+            ok, msg = verify_bundle_reproducible(args.database)
+            print_json({"ok": ok, "message": msg, "product": PRODUCT})
+            return 0 if ok else 1
+        result = build_ai_kit_audit_bundle(
             args.database,
-            product=PRODUCT,
             out_dir=args.out_dir,
-            tarball=args.tarball,
-            repro_check=args.repro_check,
+            tarball_path=args.tarball,
+            observation_lane=args.observation_lane,
+            product=PRODUCT,
         )
+        body = {
+            "ok": result.ok,
+            "product": PRODUCT,
+            "bundle_sha256": result.bundle_sha256,
+            "tarball": str(result.tarball_path) if result.tarball_path else None,
+            "validation": result.validation.message,
+            "institutional_passed": result.institutional_passed,
+            "observation_lane": args.observation_lane
+            or os.getenv("INST_EXPORT_OBSERVATION_LANE", "").strip().lower() in ("1", "true", "yes"),
+        }
         print_json(body)
-        return code
+        return 0 if result.ok else 1
 
     if args.cmd == "verify-bundle":
         code, body = run_institutional_verify(args.tarball, product=PRODUCT)

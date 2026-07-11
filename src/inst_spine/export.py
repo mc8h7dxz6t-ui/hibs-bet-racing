@@ -17,6 +17,7 @@ from inst_spine.hash import (
     GENESIS_EVENT,
     read_genesis_anchor,
     verify_chain,
+    verify_chain_linkage,
     verify_genesis_block,
     verify_lamport_monotonic,
 )
@@ -78,7 +79,9 @@ _REGULATED_OBSERVATION_PRODUCTS = frozenset(
     {
         "health-telemetry",
         "compliance-logger",
+        "compliance-log",
         "agent-ledger",
+        "ai-kit",
     }
 )
 
@@ -121,6 +124,20 @@ def redact_entries_for_export(entries: list[dict[str, Any]]) -> list[dict[str, A
         payload = row.get("payload")
         if isinstance(payload, dict):
             row["payload"] = _redact_export_dict(payload)
+        if row.get("event_type") in ("agent_trace", "agent_step", "checkpoint"):
+            try:
+                from ai_kit.export import redact_trace_entry
+
+                row = redact_trace_entry(row)
+            except ImportError:
+                pass
+        if row.get("event_type") == "agent_action":
+            try:
+                from agent_ledger.export import redact_permit_entry
+
+                row = redact_permit_entry(row)
+            except ImportError:
+                pass
         redacted.append(row)
     return redacted
 
@@ -354,7 +371,9 @@ def verify_audit_bundle(
 
     genesis_row = entries[0] if entries else None
     genesis = verify_genesis_block(genesis_row, anchor=anchor)
-    chain = verify_chain(entries, anchor=anchor, require_genesis=True)
+    observation_lane = isinstance(manifest, dict) and bool(manifest.get("observation_lane"))
+    chain_fn = verify_chain_linkage if observation_lane else verify_chain
+    chain = chain_fn(entries, anchor=anchor, require_genesis=True)
     lamport_ok = verify_lamport_monotonic(entries)
     inst_passed = False
     inst_msg = "institutional check not run offline"

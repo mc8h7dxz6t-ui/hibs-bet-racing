@@ -1,7 +1,7 @@
 # Institutional++ portfolio — plug / demo / run
 # Sports (hibs-racing) targets are unchanged; inst++ targets are prefixed or grouped below.
 
-.PHONY: help install plug buyer-pack demo-ready demo demo-all demo-phase2 demo-gold \
+.PHONY: help install plug buyer-pack demo-ready demo demo-all demo-phase2 demo-gold demo-mg-gold \
         demo-gold-up demo-gold-down demo-gold-reset smoke rigorous chaos proof \
         verify-portfolio redis-soak retention-drill soc2-evidence test instpp-test workflow-up workflow-down stack-up redis-up
 
@@ -21,6 +21,7 @@ help:
 	@echo "  make verify-portfolio  offline verify-bundle 12/12 after demo-all"
 	@echo "  make demo-phase2       drift-gate + webhook-replay + spend-guard only"
 	@echo "  make demo-gold         canonical spend-plane walkthrough"
+	@echo "  make demo-mg-gold      ModelGovernor lifecycle gold walkthrough"
 	@echo "  make demo-gold-reset   wipe spend-gold wallet after drift lockout"
 	@echo "  make demo-gold-up      seed data + Proof Console UI (http://127.0.0.1:8790, proof tab)"
 	@echo "  make redis-soak        Redis production profile soak (needs INST_REDIS_URL)"
@@ -63,6 +64,10 @@ demo-phase2:
 
 demo-gold:
 	./scripts/demo_gold.sh
+
+demo-mg-gold:
+	chmod +x ./scripts/demo_mg_gold.sh
+	./scripts/demo_mg_gold.sh
 
 demo-gold-reset:
 	rm -f "$(GOLD_DIR)/spend_wallet.sqlite" "$(GOLD_DIR)/spend_guard.sqlite" \

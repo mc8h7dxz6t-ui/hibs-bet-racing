@@ -21,6 +21,7 @@ from inst_spine.rates import IdempotencyBackend, RedisIdempotencyBackend, idempo
 from inst_spine.wal import WALWriter
 from webhook_mesh.hmac_verify import verify_webhook_signature
 from webhook_mesh.audit import append_ingress_event
+from inst_spine.production_profile import webhook_dispatch_check
 from webhook_mesh.queue import (
     BackgroundDeliveryQueue,
     DeliveryManifest,
@@ -104,9 +105,10 @@ async def ready() -> Response:
     wal_ok = state.wal_writer is not None
     secret_ok = bool(state.provider_secret)
     redis_ok, redis_detail = redis_ready_from_env()
-    redis_required = state.dispatch_mode == "redis"
-    if redis_required and not os.getenv("INST_REDIS_URL", "").strip():
-        redis_ok, redis_detail = False, "INST_REDIS_URL required for redis dispatch"
+    dispatch_ok, dispatch_detail = webhook_dispatch_check(state.dispatch_mode)
+    if not dispatch_ok:
+        redis_ok = False
+        redis_detail = dispatch_detail
     queue_ok = state.delivery_queue is not None
     body = readiness_payload(
         product="webhook-mesh",
@@ -115,8 +117,9 @@ async def ready() -> Response:
             "ingress_wal": (wal_ok, "wal_online" if wal_ok else "wal_not_initialized"),
             "delivery_queue": (queue_ok, "queue_online" if queue_ok else "queue_not_initialized"),
             "redis_profile": (redis_ok, redis_detail),
+            "durable_dispatch": (dispatch_ok, dispatch_detail),
         },
-        extra={"dispatch_mode": state.dispatch_mode, "redis_required": redis_required},
+        extra={"dispatch_mode": state.dispatch_mode},
     )
     code = status.HTTP_200_OK if body["ready"] else status.HTTP_503_SERVICE_UNAVAILABLE
     return Response(content=json.dumps(body), status_code=code, media_type="application/json")

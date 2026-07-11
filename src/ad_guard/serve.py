@@ -11,8 +11,13 @@ from fastapi import FastAPI, Request, Response, status
 
 from ad_guard.creative import parse_creative_approved
 from ad_guard.proxy import AdGuardGateway, AdSpendRequest
+from inst_spine.health_probes import ledger_chain_ready, readiness_payload, sqlite_db_ready
+from inst_spine.http_lifecycle import json_response
+from inst_spine.ingress_guard import install_body_size_limit_middleware
 from inst_spine.ledger import AppendOnlyLedger
 from inst_spine.middleware import install_api_key_middleware, install_proxy_client_auth_middleware
+from inst_spine.production_profile import production_profile_enabled, redis_production_check
+from inst_spine.rates import idempotency_backend_from_env, token_bucket_backend_from_env
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,6 +28,7 @@ logger = logging.getLogger("ad_guard.serve")
 app = FastAPI(title="Ad-Tech Budget Guardrail")
 install_api_key_middleware(app, env_var="AD_GUARD_API_KEY")
 install_proxy_client_auth_middleware(app)
+install_body_size_limit_middleware(app)
 
 
 class RuntimeState:
@@ -40,11 +46,17 @@ async def startup() -> None:
     db_path = os.getenv("AD_GUARD_DATABASE", "data/ad_guard_ledger.sqlite")
     state.ledger = AppendOnlyLedger(db_path, async_writes=True)
     state.ledger.start_async_writer()
-    state.gateway = AdGuardGateway(ledger=state.ledger, shadow_mode=state.shadow_mode)
+    state.gateway = AdGuardGateway(
+        ledger=state.ledger,
+        shadow_mode=state.shadow_mode,
+        rate_backend=token_bucket_backend_from_env(),
+        idempotency=idempotency_backend_from_env(),
+    )
     logger.info(
-        "Ad Guard online db=%s shadow=%s",
+        "Ad Guard online db=%s shadow=%s redis=%s",
         db_path,
         state.shadow_mode,
+        os.getenv("INST_REDIS_URL") or "memory",
     )
 
 
@@ -56,7 +68,31 @@ async def shutdown() -> None:
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
-    return {"ok": True, "product": "ad-guard", "shadow": state.shadow_mode}
+    return {
+        "ok": True,
+        "product": "ad-guard",
+        "shadow": state.shadow_mode,
+        "auth_required": bool(os.getenv("AD_GUARD_API_KEY", "").strip()),
+    }
+
+
+@app.get("/ready")
+async def ready() -> Any:
+    db_path = os.getenv("AD_GUARD_DATABASE", "data/ad_guard_ledger.sqlite")
+    db_ok, db_detail = sqlite_db_ready(db_path)
+    chain_ok, chain_detail = ledger_chain_ready(db_path)
+    live = not state.shadow_mode or production_profile_enabled()
+    redis_ok, redis_detail = redis_production_check() if live else (True, "shadow_mode")
+    body = readiness_payload(
+        product="ad-guard",
+        checks={
+            "ledger_db": (db_ok, db_detail),
+            "ledger_chain": (chain_ok, chain_detail),
+            "redis_profile": (redis_ok, redis_detail),
+        },
+        extra={"shadow": state.shadow_mode},
+    )
+    return json_response(body, status_code=200 if body["ready"] else 503)
 
 
 @app.post("/v1/guard/{client_id}", response_model=None)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -109,6 +110,7 @@ def main(argv: list[str] | None = None) -> int:
             anchor_path=args.anchor,
             product=PRODUCT,
             extra_files={"export_policy.json": policy_path},
+            observation_lane=os.getenv("INST_COMPLIANCE_OBSERVATION_LANE", "0") == "1",
         )
         print(
             json.dumps(
