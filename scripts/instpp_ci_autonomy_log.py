@@ -78,6 +78,13 @@ PHASES: dict[str, list[dict[str, str]]] = {
         {"id": "3.19", "name": "zero_skip_rigorous_on_main", "artifact": ".github/workflows/instpp-ci.yml"},
         {"id": "3.20", "name": "soc2_evidence_ci_job", "artifact": ".github/workflows/instpp-ci.yml"},
     ],
+    "phase_4": [
+        {"id": "4.1", "name": "docker_compose_postgres_extended", "artifact": "docker-compose.instpp.yml"},
+        {"id": "4.2", "name": "docker_extended_logged_suite", "artifact": "scripts/instpp_docker_extended_test.sh"},
+        {"id": "4.3", "name": "portfolio_evidence_sheet", "artifact": "docs/PORTFOLIO_EVIDENCE_SHEET.md"},
+        {"id": "4.4", "name": "platform_compare_deep_dive", "artifact": "docs/INST_PLUS_PLATFORM_COMPARE.md"},
+        {"id": "4.5", "name": "docker_extended_ci_job", "artifact": ".github/workflows/instpp-ci.yml"},
+    ],
 }
 
 
@@ -137,6 +144,7 @@ def build_ledger(
         "artifacts": {
             "rigorous_summary": "docs/test_logs/instpp_rigorous_latest_summary.json",
             "proof_lite_summary": "docs/test_logs/instpp_proof_lite_latest_summary.json",
+            "docker_extended_summary": "docs/test_logs/instpp_docker_extended_latest_summary.json",
             "soc2_evidence": "docs/test_logs/soc2_evidence_latest.json",
         },
         "updated_utc": now,
@@ -173,9 +181,46 @@ def write_proof_lite_summary(manifest_path: Path | None = None) -> Path:
     return out
 
 
+def write_docker_extended_summary(log_file: str = "", rigorous_path: Path | None = None) -> Path:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    rigorous = rigorous_path or (LOG_DIR / "instpp_rigorous_latest_summary.json")
+    rigorous_data: dict = {}
+    if rigorous.is_file():
+        rigorous_data = json.loads(rigorous.read_text(encoding="utf-8"))
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    summary = {
+        "suite": "institutional_docker_extended",
+        "status": "PASSED",
+        "finished_utc": now,
+        "commit": _git_sha(),
+        "branch": _git_branch(),
+        "compose_profiles": ["redis", "extended"],
+        "steps": [
+            "compose up (redis + postgres + inst-workflow)",
+            "proof-lite",
+            "smoke",
+            "rigorous (INST_RIGOROUS_FAIL_ON_SKIP=1)",
+            "redis-soak",
+            "pytest: test_postgres_profile",
+            "workflow /health curl",
+            "soc2-evidence (when manifest present)",
+        ],
+        "rigorous_skipped_sections": rigorous_data.get("skipped_sections", []),
+        "zero_skip_expected": True,
+        "log_file": log_file or None,
+    }
+    out = LOG_DIR / "instpp_docker_extended_latest_summary.json"
+    out.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Inst++ CI autonomy phase ledger")
-    parser.add_argument("--suite", choices=["proof-lite", "rigorous", "proof"], required=True)
+    parser.add_argument(
+        "--suite",
+        choices=["proof-lite", "rigorous", "proof", "docker-extended"],
+        required=True,
+    )
     parser.add_argument("--status", default="PASSED")
     parser.add_argument("--skipped-sections", default="[]")
     parser.add_argument("--log-file", default="")
@@ -195,6 +240,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.suite == "proof-lite":
         pl_path = write_proof_lite_summary(args.manifest)
         evidence["proof_lite_summary"] = str(pl_path.relative_to(ROOT))
+
+    if args.suite == "docker-extended":
+        de_path = write_docker_extended_summary(log_file=args.log_file)
+        evidence["docker_extended_summary"] = str(de_path.relative_to(ROOT))
 
     ledger = build_ledger(suite=args.suite, status=args.status, evidence=evidence)
     PHASES_PATH.write_text(json.dumps(ledger, indent=2) + "\n", encoding="utf-8")

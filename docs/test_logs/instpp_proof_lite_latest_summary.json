@@ -1,8 +1,8 @@
 {
   "suite": "institutional_proof_lite",
   "status": "PASSED",
-  "finished_utc": "2026-07-11T12:09:35Z",
-  "commit": "891eab4",
+  "finished_utc": "2026-07-11T14:52:43Z",
+  "commit": "d1b9b8a",
   "branch": "cursor/sku-forensic-layer-fixes-b511",
   "steps": [
     "pytest: test_production_profile",
@@ -18,6 +18,8 @@
     "1.1",
     "1.2",
     "2.1",
-    "2.5"
+    "2.5",
+    "3.1",
+    "3.14"
   ]
 }

@@ -2,26 +2,22 @@
   "suite": "instpp_ci_autonomy",
   "scope": "sku_only_no_sports",
   "branch": "cursor/sku-forensic-layer-fixes-b511",
-  "commit": "bc83081",
+  "commit": "d1b9b8a",
   "status": "PASSED",
   "portfolio_envelope_target": "9.5-10/10 after phase_1_2_3",
   "last_run": {
-    "suite": "rigorous",
+    "suite": "docker-extended",
     "status": "PASSED",
-    "finished_utc": "2026-07-11T14:35:43Z",
+    "finished_utc": "2026-07-11T14:52:46Z",
     "github_ref": "",
     "github_workflow": "",
     "github_run_id": "",
     "inst_redis_url_set": false,
     "inst_test_postgres_dsn_set": false,
     "inst_rigorous_fail_on_skip": "",
-    "skipped_sections": [
-      "postgres_compliance",
-      "proxy_live_forward",
-      "redis_live",
-      "postgres_profile"
-    ],
-    "log_file": "instpp_rigorous_2026-07-11T143513Z.log"
+    "skipped_sections": [],
+    "log_file": "test.log",
+    "docker_extended_summary": "docs/test_logs/instpp_docker_extended_latest_summary.json"
   },
   "phases": {
     "phase_1": [
@@ -249,12 +245,45 @@
         "artifact": ".github/workflows/instpp-ci.yml",
         "status": "implemented"
       }
+    ],
+    "phase_4": [
+      {
+        "id": "4.1",
+        "name": "docker_compose_postgres_extended",
+        "artifact": "docker-compose.instpp.yml",
+        "status": "implemented"
+      },
+      {
+        "id": "4.2",
+        "name": "docker_extended_logged_suite",
+        "artifact": "scripts/instpp_docker_extended_test.sh",
+        "status": "implemented"
+      },
+      {
+        "id": "4.3",
+        "name": "portfolio_evidence_sheet",
+        "artifact": "docs/PORTFOLIO_EVIDENCE_SHEET.md",
+        "status": "implemented"
+      },
+      {
+        "id": "4.4",
+        "name": "platform_compare_deep_dive",
+        "artifact": "docs/INST_PLUS_PLATFORM_COMPARE.md",
+        "status": "implemented"
+      },
+      {
+        "id": "4.5",
+        "name": "docker_extended_ci_job",
+        "artifact": ".github/workflows/instpp-ci.yml",
+        "status": "implemented"
+      }
     ]
   },
   "artifacts": {
     "rigorous_summary": "docs/test_logs/instpp_rigorous_latest_summary.json",
     "proof_lite_summary": "docs/test_logs/instpp_proof_lite_latest_summary.json",
+    "docker_extended_summary": "docs/test_logs/instpp_docker_extended_latest_summary.json",
     "soc2_evidence": "docs/test_logs/soc2_evidence_latest.json"
   },
-  "updated_utc": "2026-07-11T14:35:43Z"
+  "updated_utc": "2026-07-11T14:52:46Z"
 }

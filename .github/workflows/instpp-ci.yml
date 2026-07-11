@@ -375,3 +375,33 @@ jobs:
       - name: Tear down compose stack
         if: always()
         run: docker compose -f docker-compose.instpp.yml --profile redis down -v
+
+  docker-extended:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 45
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Docker extended live proof (Redis + Postgres + rigorous)
+        run: |
+          chmod +x ./scripts/instpp_docker_extended_test.sh
+          ./scripts/instpp_docker_extended_test.sh
+
+      - name: Upload docker extended evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instpp-docker-extended-evidence
+          path: |
+            docs/test_logs/instpp_docker_extended_latest_summary.json
+            docs/test_logs/instpp_docker_extended_latest.log
+            docs/test_logs/instpp_rigorous_latest_summary.json
+            docs/test_logs/instpp_ci_autonomy_phases.json
+            docs/test_logs/soc2_evidence_latest.json
+          if-no-files-found: warn
