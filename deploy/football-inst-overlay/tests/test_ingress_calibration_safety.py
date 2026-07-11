@@ -15,6 +15,7 @@ from hibs_predictor.safety.brier_circuit_breaker import (
     BrierCircuitBreaker,
     execution_lockout_active,
     persist_breaker_state,
+    read_domain_state,
 )
 
 
@@ -70,11 +71,27 @@ def test_brier_fsm_trips_open_then_half_open(monkeypatch):
 
 def test_execution_lockout_reads_state_file(tmp_path, monkeypatch):
     monkeypatch.delenv("HIBS_EXECUTION_LOCKOUT", raising=False)
-    state = tmp_path / "brier_circuit_state.json"
-    monkeypatch.setenv("HIBS_BRIER_STATE_PATH", str(state))
+    monkeypatch.setenv("HIBS_BRIER_DATA_DIR", str(tmp_path))
     br = BrierCircuitBreaker(state=BreakerState.OPEN, reason="test")
-    persist_breaker_state(br, path=state)
-    assert execution_lockout_active()
+    persist_breaker_state(br, domain="football")
+    assert execution_lockout_active(domain="football")
+    assert not execution_lockout_active(domain="racing")
+
+
+def test_brier_domains_do_not_overwrite(tmp_path, monkeypatch):
+    monkeypatch.setenv("HIBS_BRIER_DATA_DIR", str(tmp_path))
+    persist_breaker_state(
+        BrierCircuitBreaker(state=BreakerState.OPEN, reason="fb", last_brier=0.3, last_n=40),
+        domain="football",
+    )
+    persist_breaker_state(
+        BrierCircuitBreaker(state=BreakerState.CLOSED, reason="ok", last_brier=0.2, last_n=25),
+        domain="racing",
+    )
+    fb = read_domain_state("football")
+    rc = read_domain_state("racing")
+    assert fb["state"] == "OPEN"
+    assert rc["state"] == "CLOSED"
 
 
 def test_football_data_csv_parser(tmp_path):

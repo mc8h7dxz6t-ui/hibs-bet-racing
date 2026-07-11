@@ -45,7 +45,7 @@ install_cron() {
     printf '%s\n' "${existing}"
     echo ""
     echo "${MARKER}"
-    echo "5 * * * * sudo bash ${APP_ROOT}/deploy/cron-hibs-brier-circuit.sh --run >> ${LOG_FILE} 2>&1"
+    echo "5 * * * * bash ${APP_ROOT}/deploy/cron-hibs-brier-circuit.sh --run >> ${LOG_FILE} 2>&1"
   } >"${tmp}"
   crontab -u www-data "${tmp}"
   rm -f "${tmp}"

@@ -1369,6 +1369,10 @@ class DataAggregator:
         enriched["best_odds_1x2"] = bundle.get("best_odds_1x2") or {}
         enriched["best_odds_source"] = bundle.get("best_odds_source") or {}
         enriched["sharp_anchor_implied"] = bundle.get("sharp_anchor_implied") or {}
+        if bundle.get("opening_odds_1x2"):
+            enriched["opening_odds_1x2"] = bundle["opening_odds_1x2"]
+        if bundle.get("price_truth"):
+            enriched["price_truth_ingress"] = bundle["price_truth"]
         enriched["league_factor"] = league.get("strength_factor", 1.0)
         try:
             fid_int = int(raw_fid) if raw_fid not in (None, "", "0", 0) else 0
@@ -2121,15 +2125,16 @@ class DataAggregator:
                             str(event.get("home_team") or ""),
                             str(event.get("away_team") or ""),
                         )
+                        event_panel: List[Dict[str, Any]] = []
                         for row in event.get("_oddspapi_panel") or []:
                             bm_odds = dict(row)
                             if swapped and bm_odds.get("home") and bm_odds.get("away"):
                                 bm_odds["home"], bm_odds["away"] = bm_odds["away"], bm_odds["home"]
-                            oddspapi_panel.append(bm_odds)
+                            event_panel.append(bm_odds)
                             all_bookmakers.append(bm_odds)
-                        homes = [float(r["home"]) for r in oddspapi_panel if r.get("home")]
-                        draws = [float(r["draw"]) for r in oddspapi_panel if r.get("draw")]
-                        aways = [float(r["away"]) for r in oddspapi_panel if r.get("away")]
+                        homes = [float(r["home"]) for r in event_panel if r.get("home")]
+                        draws = [float(r["draw"]) for r in event_panel if r.get("draw")]
+                        aways = [float(r["away"]) for r in event_panel if r.get("away")]
                         if homes:
                             op_home = max(homes)
                         if draws:
@@ -2137,6 +2142,7 @@ class DataAggregator:
                         if aways:
                             op_away = max(aways)
                         if op_home and op_draw and op_away:
+                            oddspapi_panel = event_panel
                             break
             except Exception:
                 pass

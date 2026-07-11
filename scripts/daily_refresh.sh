@@ -71,6 +71,11 @@ run_tier2_logged "daily-notify" \
 run_tier2_logged "daily-log-retention" \
   hibs-racing retain-logs
 
+if command -v hibs-racing >/dev/null 2>&1; then
+  run_tier2_logged "daily-market-steam-detect" \
+    hibs-racing poll-odds --once --milestone baseline || true
+fi
+
 PRIMARY_DATE="$(date -u +%F)"
 # TIER-2: backfill snapshots best-effort.
 if ! hibs-racing snapshot-backfill --start "${START_DATE}" --end "${PRIMARY_DATE}" >/dev/null 2>&1; then

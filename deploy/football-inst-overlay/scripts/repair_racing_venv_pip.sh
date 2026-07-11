@@ -17,9 +17,17 @@ rm -rf "${VENV}/lib"/python*/site-packages/~ibs-racing* 2>/dev/null || true
 
 echo "==> reinstall hibs-racing"
 cd "${RACING}"
-sudo -u www-data "${VENV}/bin/pip" install -q -r requirements.txt
-[[ -f pyproject.toml || -f setup.py ]] && sudo -u www-data "${VENV}/bin/pip" install -q -e .
+export HOME="${RACING}"
+sudo -u www-data env HOME="${RACING}" PIP_CACHE_DIR="${RACING}/.cache/pip" \
+  "${VENV}/bin/pip" install -q -r requirements.txt
+[[ -f pyproject.toml || -f setup.py ]] && \
+  sudo -u www-data env HOME="${RACING}" PIP_CACHE_DIR="${RACING}/.cache/pip" \
+    "${VENV}/bin/pip" install -q -e .
+
+mkdir -p "${RACING}/.cache/pip"
+chown -R www-data:www-data "${RACING}/.cache" 2>/dev/null || true
 
 echo "==> verify (should be silent — no ~ibs-racing warnings)"
-sudo -u www-data "${VENV}/bin/pip" check 2>&1 | head -5 || true
-"${VENV}/bin/python3" -c "import hibs_racing; print('hibs_racing import OK')"
+sudo -u www-data env HOME="${RACING}" "${VENV}/bin/pip" check 2>&1 | head -5 || true
+sudo -u www-data env HOME="${RACING}" PYTHONPATH="${RACING}/src" \
+  "${VENV}/bin/python3" -c "import hibs_racing; print('hibs_racing import OK')"

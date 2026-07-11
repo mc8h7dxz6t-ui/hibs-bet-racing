@@ -97,6 +97,14 @@ if [[ -f "${BET}/deploy/cron-hibs-infra-fallback.sh" ]]; then
   echo "==> install 5m infra fallback cron (idempotent)"
   bash "${BET}/deploy/cron-hibs-infra-fallback.sh" --install 2>/dev/null || true
 fi
+if [[ -f "${BET}/deploy/cron-hibs-brier-circuit.sh" ]]; then
+  echo "==> install hourly brier circuit cron (idempotent)"
+  bash "${BET}/deploy/cron-hibs-brier-circuit.sh" --install 2>/dev/null || true
+fi
+if [[ -f "${BET}/deploy/install-hibs-cron-sudoers.sh" ]]; then
+  echo "==> refresh cron sudoers"
+  bash "${BET}/deploy/install-hibs-cron-sudoers.sh" 2>/dev/null || true
+fi
 
 if [[ "${HIBS_OVERLAY_SKIP_WARM:-0}" != "1" ]]; then
   echo "==> post-sync fixture warm (set HIBS_OVERLAY_SKIP_WARM=1 to skip)"
