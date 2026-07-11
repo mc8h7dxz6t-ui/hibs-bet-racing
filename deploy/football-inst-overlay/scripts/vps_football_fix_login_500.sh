@@ -16,6 +16,13 @@ done
 [[ "$(id -u)" -eq 0 ]] || { echo "run as root: sudo bash $0" >&2; exit 1; }
 [[ -d "${BET}" ]] || { echo "missing ${BET}" >&2; exit 1; }
 
+LIB="${BET}/scripts/lib_football_dashboard_fix.sh"
+if [[ -f "${LIB}" ]]; then
+  # shellcheck source=lib_football_dashboard_fix.sh
+  source "${LIB}"
+  football_vps_apply_dashboard_fix "${BET}" "${HIBS_RACING_DEPLOY_PATH:-/opt/hibs-racing}"
+fi
+
 touch "${BET}/.env"
 if [[ "${DISABLE_AUTH}" -eq 1 ]]; then
   if grep -q '^HIBS_AUTH_ENABLED=' "${BET}/.env"; then
@@ -59,6 +66,12 @@ fi
 if [[ "${ping_code}" == "200" && "${login_code}" =~ ^(200|302)$ ]]; then
   echo "GREEN: login path OK"
   exit 0
+fi
+
+root_code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 http://127.0.0.1:8000/ 2>/dev/null || echo 000)"
+echo "root=${root_code}"
+if [[ "${root_code}" == "500" ]]; then
+  echo "Try: sudo bash ${BET}/scripts/vps_football_fix_dashboard_500.sh"
 fi
 
 echo "AMBER: partial recovery — journalctl -u hibs-bet -n 40"
