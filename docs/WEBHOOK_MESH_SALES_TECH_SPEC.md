@@ -15,7 +15,6 @@
 
 | | |
 |---|---|
-| **Price band** | £199–£599/mo per tenant |
 | **Deploy** | VPC + Redis (multi-instance) + SQLite genesis ledger |
 | **Proof** | WAL before ack + ingress ledger + `verify-bundle` |
 | **Demo** | 60 seconds CLI · Stripe/Shopify signature demo |
@@ -137,16 +136,6 @@ webhook-mesh verify-bundle --tarball ./webhook_mesh_bundle.tar
 
 ---
 
-## Pricing & packaging
-
-| Tier | Band | Includes |
-|------|------|----------|
-| **Tenant license** | £199–£599/mo | Ingress + idempotency + export |
-| **Multi-tenant** | +£100/tenant | Shared spine, separate ledgers |
-| **Implementation** | £2k–£5k SOW | Stripe/Shopify secret rotation, Redis HA |
-| **Maintenance** | 15–20% ARR | Security patches, route updates |
-
----
 
 ## RFP quick answers
 
@@ -164,5 +153,4 @@ webhook-mesh verify-bundle --tarball ./webhook_mesh_bundle.tar
 ## Related documents
 
 - `docs/WEBHOOK_MESH_BUYER.md` — one-page buyer sheet  
-- `docs/PORTFOLIO_SALES_SHEET.md` — portfolio pricing matrix  
 - `docs/BUYER_EVIDENCE_PACK.md` — procurement dry-run

@@ -15,7 +15,6 @@
 
 | | |
 |---|---|
-| **Price band** | £2,500–£5,000/mo per tenant |
 | **Semantics** | Reserve → dispatch → settle (two-phase commit) |
 | **Drift lockout** | `DRIFT_THRESHOLD_EXCEEDED` → 409 on next reserve |
 | **Proof** | `spend_guard` events + offline `verify-bundle` |

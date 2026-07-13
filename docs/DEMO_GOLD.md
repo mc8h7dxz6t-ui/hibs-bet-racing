@@ -26,7 +26,7 @@ make demo-gold-down         # stop workflow UI
 
 | Step | Theme |
 |------|--------|
-| 1 | Init platform wallet (£1000 budget) |
+| 1 | Init platform wallet (1000 budget units) |
 | 2 | Shadow burn-in (reserve without debit) |
 | 3–4 | Provider A — reserve → settle |
 | 5–6 | Provider B — reserve → settle |
@@ -69,6 +69,6 @@ Complementary to `make demo-gold` — buyers evaluating SR 11-7 / model-risk evi
 ## Related
 
 - [RUN_DEMO.md](RUN_DEMO.md) — single entry point for all demos
-- [MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md](MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md) — comps, exit framing
+- [DEMO_GOLD.md](DEMO_GOLD.md) — comps, exit framing
 - [MODEL_GOVERNOR_BUYER.md](MODEL_GOVERNOR_BUYER.md) — buyer one-pager
 - [SPEND_GUARD_BUYER.md](SPEND_GUARD_BUYER.md) — Spend Guard SKU

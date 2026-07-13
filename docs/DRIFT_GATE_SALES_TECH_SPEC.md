@@ -15,7 +15,6 @@
 
 | | |
 |---|---|
-| **Price band** | £1,500–£3,500/mo per gateway |
 | **Default mode** | Shadow (30-day burn-in recommended) |
 | **Enforce mode** | REJECT or KILL on PSI ≥ threshold or KS exceeded |
 | **Proof** | Every evaluation on genesis chain + offline `verify-bundle` |

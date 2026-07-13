@@ -15,7 +15,6 @@
 | Compliance / legal | Replay/gap attacks on device streams | **Per-device `seq` gate (fail-closed)** |
 | Security / privacy | PHI in audit exports | **`--observation-lane`** — summaries only |
 
-**Price band:** £5k–£15k license + £500/mo maintenance · **£12k–£14k sale-now** perpetual VPC.
 
 ---
 

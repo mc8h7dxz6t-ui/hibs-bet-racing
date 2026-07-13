@@ -494,7 +494,7 @@ INST_TEST_POSTGRES_DSN=… python -m pytest tests/test_postgres_profile.py
 ## Related documents
 
 - [INST_PLUS_GOLD_STANDARD.md](INST_PLUS_GOLD_STANDARD.md) — nine dimensions
-- [PORTFOLIO_TECH_SALES_SHEET.md](PORTFOLIO_TECH_SALES_SHEET.md) — completion matrix
+- [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) — completion matrix
 - [PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md) — K8s profiles
 - [ROADMAP_GTM_DISCIPLINE.md](ROADMAP_GTM_DISCIPLINE.md) — explicit non-SKUs
 - [tests/test_forensic_tiers.py](../tests/test_forensic_tiers.py) — Tier A/B/C/D proofs

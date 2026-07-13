@@ -212,5 +212,5 @@ webhook-mesh serve --port 8787
 ## Related docs
 
 - `docs/AD_GUARD_INSTITUTIONAL_STACK.md` — Product #6 deep dive
-- `docs/INST_PLUS_STRATEGY.md` — portfolio strategy & pricing
+- `docs/INST_PLUS_DILIGENCE_PACK.md` — portfolio strategy
 - `docs/INST_PLUS_TEST_AND_DEMO.md` — test & advertise playbook

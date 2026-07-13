@@ -25,16 +25,15 @@
 
 | # | Product | Grade | Tech edge headline | Pre-rev IP |
 |---|---------|-----------------|-------------------|------------|
-| 1 | Compliance Logger | **✅ Gold** | Offline decision proof | £25k–£75k |
-| 2 | Proxy-Risk | **✅ Gold** | Fail-closed outbound + shadow | £30k–£90k |
-| 3 | Alt-Data | **✅ Gold** | Coverage ladder + F7 + export | £20k–£50k |
-| 4 | AI Kit | **✅ Gold** | Lamport checkpoints + trace export | £10k–£30k |
-| 5 | Webhook Mesh | **✅ Gold** | WAL-before-ack + genesis ledger | £15k–£40k |
-| 6 | Ad Guard | **✅ Gold** | Spend Z-score kill + full gate log | £15k–£45k |
-| 7 | Health Telemetry | **✅ Gold** | Batch Lamport ingest + export | £30k–£80k |
-| 8 | ModelGovernor | **✅ Gold** | Model lifecycle + deploy proof | £25k–£70k |
+| 1 | Compliance Logger | **✅ Gold** | Offline decision proof |
+| 2 | Proxy-Risk | **✅ Gold** | Fail-closed outbound + shadow |
+| 3 | Alt-Data | **✅ Gold** | Coverage ladder + F7 + export |
+| 4 | AI Kit | **✅ Gold** | Lamport checkpoints + trace export |
+| 5 | Webhook Mesh | **✅ Gold** | WAL-before-ack + genesis ledger |
+| 6 | Ad Guard | **✅ Gold** | Spend Z-score kill + full gate log |
+| 7 | Health Telemetry | **✅ Gold** | Batch Lamport ingest + export |
+| 8 | ModelGovernor | **✅ Gold** | Model lifecycle + deploy proof |
 
-**Combined portfolio ecosystem (one spine):** £70k–£150k pre-rev · £280k–£400k with £50k+ ARR
 
 ---
 
@@ -153,7 +152,6 @@ poll → field ladder (primary → fallback → structural rescue) → coverage 
 ./scripts/demo_altdata.sh
 ```
 
-**Price:** £500–£2,000/mo per feed
 
 **Docs:** `docs/ALTDATA_SALES_TECH_SPEC.md`
 
@@ -196,7 +194,6 @@ rate limit → step_fn → validate_with_retry → Lamport checkpoint → trace 
 ai-kit validate-demo --raw '{"ok":true}'
 ```
 
-**Price:** £99–£249/seat or £50–150/mo team
 
 **Docs:** `docs/AI_KIT_SALES_TECH_SPEC.md`
 
@@ -243,7 +240,6 @@ export WEBHOOK_PROVIDER_SECRET=demo-secret
 ./scripts/demo_webhook_mesh.sh
 ```
 
-**Price:** £199–£599/mo per tenant
 
 **Docs:** `docs/WEBHOOK_MESH_SALES_TECH_SPEC.md`
 
@@ -287,7 +283,6 @@ NeMo (creative) → Ad Guard (spend) → DSP → DV/IAS (placement)
 ad-guard serve --port 8788
 ```
 
-**Price:** £300–£800/mo per instance
 
 **Docs:** `docs/AD_GUARD_SALES_TECH_SPEC.md`
 
@@ -328,7 +323,6 @@ POST batch → schema validate → ledger append (telemetry_batch) → F1–F9 �
 ./scripts/demo_health_telemetry.sh
 ```
 
-**Price:** £5k–£15k license + £500/mo maintenance
 
 **Docs:** `docs/HEALTH_TELEMETRY_SALES_TECH_SPEC.md`
 
@@ -367,11 +361,10 @@ model-governor record --action deploy --model docs/demo_model_snapshot.json \
   --outcome '{"environment":"production"}'
 ```
 
-**Price:** £400–£1,000/mo per tenant
 
 **Docs:** `docs/MODEL_GOVERNOR_SALES_TECH_SPEC.md`
 
-**Strategic north star:** LLM spend ledger control plane — **`make demo-gold`** (gateway + sidecar + reconciler; drift lockout step 10). Comps and exit bands in `docs/MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md`. **#8 CLI** below is lifecycle governance on `inst_spine`.
+**Strategic north star:** LLM spend ledger control plane — **`make demo-gold`** (gateway + sidecar + reconciler; drift lockout step 10). See `docs/DEMO_GOLD.md` for spend plane walkthrough. **#8 CLI** below is lifecycle governance on `inst_spine`.
 
 ---
 
@@ -389,7 +382,6 @@ model-governor record --action deploy --model docs/demo_model_snapshot.json \
 | `errors.py` | Typed fail-closed errors |
 | `product_cli.py` | Shared export/check/verify helpers |
 
-**Cost to replicate spine alone:** 2–3 senior engineer-months (~£34k–£100k).
 
 ---
 
@@ -471,7 +463,7 @@ pip install -e ".[dev,instpp]"
 
 | Asset | Status |
 |-------|--------|
-| Portfolio sales sheet | `docs/PORTFOLIO_SALES_SHEET.md` — pricing, pilot ladder, RFP matrix |
+| Portfolio sales sheet | `docs/PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md` — tech/sales positioning |
 | Buyer evidence pack | `docs/BUYER_EVIDENCE_PACK.md` — 15-min procurement dry-run |
 | Buyer one-pagers | `docs/*_BUYER.md` — all 8 with pitch + next step |
 | Sales tech specs | `docs/*_SALES_TECH_SPEC.md` — all 8 (RFP depth) |
@@ -484,9 +476,9 @@ pip install -e ".[dev,instpp]"
 
 ## Related documents
 
-- `docs/PORTFOLIO_SALES_SHEET.md` — unified commercial sheet (start here for sales)
+- `docs/PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md` — full tech/sales positioning
 - `docs/BUYER_EVIDENCE_PACK.md` — procurement / auditor evidence index
 - `docs/INST_PLUS_GOLD_STANDARD.md` — six-dimension bar (all 8)
-- `docs/INST_PLUS_PRE_REV_VALUATION.md` — IP ranges (full portfolio)
+- `docs/INST_PLUS_DILIGENCE_PACK.md` — diligence pack index
 - `docs/INST_PLUS_DEEP_DIVE_COMPLIANCE_PROXY.md` — #1 + #2 extended
 - `docs/INSTITUTIONAL_ENTERPRISE_STACK.md` — enterprise positioning

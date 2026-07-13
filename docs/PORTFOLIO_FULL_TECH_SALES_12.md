@@ -5,7 +5,7 @@
 **Proof:** 219+ smoke tests · rigorous **12/12** · `industry_gold: true` · offline `verify-bundle` on every SKU  
 **Date:** July 2026
 
-> **Start here:** [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md) — self-contained tech/sales, evidence, and market compare (no Inst++ pricing in repo)
+> **Start here:** [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md) — self-contained tech/sales, evidence, and market compare (no pricing in repo)
 
 ---
 
@@ -89,7 +89,7 @@ See [ROADMAP_GTM_DISCIPLINE.md](ROADMAP_GTM_DISCIPLINE.md) for explicit non-SKUs
 | [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md) | **Start here** — self-contained diligence pack |
 | [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) | Full tech + sales per SKU |
 | [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md) | CI proof and test artifacts |
-| [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | Market compare + comparable pricing |
+| [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | Capability comparison |
 | [INST_PLUS_GOLD_STANDARD.md](INST_PLUS_GOLD_STANDARD.md) | Nine dimensions + completion matrix |
 | [BUYER_EVIDENCE_PACK.md](BUYER_EVIDENCE_PACK.md) | 15-minute auditor dry-run |
 | [RUN_DEMO.md](RUN_DEMO.md) | Plug / demo / run |

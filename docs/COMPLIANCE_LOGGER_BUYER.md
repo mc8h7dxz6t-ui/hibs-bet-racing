@@ -14,7 +14,6 @@
 | Legal / risk / compliance | CSV exports are editable | Deterministic tar + SHA256 sidecar |
 | UK sport NGBs / governance | DIAP audit without selling betting UI | Governance infrastructure only |
 
-**Price band:** £300–£800/mo per tenant (infra license; not per-seat GRC).
 
 ---
 
@@ -75,4 +74,3 @@ See `src/compliance_log/README.md` for architecture.
 | 1 | `./scripts/demo_compliance_logger.sh` (60s) |
 | 2 | `compliance-log verify-bundle --tarball ./compliance_bundle.tar` |
 | 3 | RFP depth → `docs/COMPLIANCE_LOGGER_SALES_TECH_SPEC.md` |
-| 4 | Portfolio pricing → `docs/PORTFOLIO_SALES_SHEET.md` |

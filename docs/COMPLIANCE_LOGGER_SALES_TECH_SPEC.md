@@ -15,7 +15,6 @@
 
 | | |
 |---|---|
-| **Price band** | £300–£800/mo per tenant (infra license) |
 | **Deploy** | Air-gapped VPC / on-prem — SQLite + WAL |
 | **Proof** | Genesis-anchored hash chain + deterministic audit tarball |
 | **Demo** | 60 seconds CLI · browser workflow console |
@@ -249,18 +248,6 @@ compliance-log verify-bundle --tarball data/demo/compliance_bundle.tar
 
 ---
 
-## Pricing & packaging
-
-| Tier | Band | Includes |
-|------|------|----------|
-| **Tenant license** | £300–£800/mo | CLI + spine + export + verify-bundle |
-| **Workflow console** | Included | `inst-workflow serve --product compliance` |
-| **Implementation** | Custom SOW | Schema mapping, anchor ceremony, auditor onboarding |
-| **Maintenance** | 15–20% ARR | Security patches, spine upgrades |
-
-**Sell separately** from Proxy-Risk — different buyer, different diligence thread.
-
----
 
 ## RFP quick answers
 
@@ -278,7 +265,5 @@ compliance-log verify-bundle --tarball data/demo/compliance_bundle.tar
 ## Related documents
 
 - `docs/COMPLIANCE_LOGGER_BUYER.md` — one-page buyer sheet  
-- `docs/PORTFOLIO_SALES_SHEET.md` — portfolio pricing matrix  
 - `docs/BUYER_EVIDENCE_PACK.md` — procurement dry-run  
-- `docs/INST_PLUS_PRE_REV_VALUATION.md` — IP valuation framework  
 - `docs/DEMO.md` — demo commands

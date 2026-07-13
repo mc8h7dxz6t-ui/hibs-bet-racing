@@ -14,7 +14,6 @@
 | Fintech API ops | Double dispatch on retry | Idempotent `request_id` holds |
 | CFO / platform sponsor | Budget tracking ≠ budget enforcement | **Drift lockout** freezes wallet |
 
-**Price band:** £2,500–£5,000/mo per tenant (VPC license).
 
 ---
 
@@ -62,4 +61,3 @@ spend-guard verify-bundle --tarball ./data/demo/spend_guard_bundle.tar
 | `check` / `export` / `verify-bundle` | Institutional audit |
 
 **Sales spec:** `docs/SPEND_GUARD_SALES_TECH_SPEC.md`  
-**North star:** `docs/MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md` (8b spend plane)

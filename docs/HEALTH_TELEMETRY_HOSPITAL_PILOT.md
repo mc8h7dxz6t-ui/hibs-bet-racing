@@ -60,12 +60,12 @@ health-telemetry verify-bundle --tarball ./ward7_audit.tar
 
 ---
 
-## 5. Commercial framing
+## 5. Pilot framing
 
-| Item | Indicative |
-|------|------------|
-| Pilot license | £5k–£8k (ward, 8 weeks) |
-| Production license | £5k–£15k + £500/mo maintenance |
+| Item | Notes |
+|------|-------|
+| Pilot | Ward deploy, 8 weeks — procurement offline |
+| Production | VPC license + maintenance — procurement offline |
 | Integration SOW | FHIR/EMR quoted separately |
 
 ---

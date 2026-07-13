@@ -204,7 +204,6 @@ proxy-risk export --database ./data/demo_proxy.sqlite --repro-check
 - [ ] `./scripts/instpp_smoke_test.sh` passes
 - [ ] Demo video or screenshot of `curl` → `ACCEPTED` / `approve`
 - [ ] Export bundle + SHA256 sidecar generated
-- [ ] Pricing line ready (£199–£599/mo webhook; £300–£800/mo ad guard)
 - [ ] Non-goals stated (no RTB insert, no LLM firewall, no sports)
 - [ ] Separate listing per product — not one mega-bundle
 
@@ -215,7 +214,7 @@ proxy-risk export --database ./data/demo_proxy.sqlite --repro-check
 | Gap | Impact on advertise |
 |-----|---------------------|
 | Sub-5ms RTB exchange insert | Say no on RTB RFPs — no harm to API proxy buyers |
-| Multi-tenant SaaS UI | Not needed for first £2k MRR |
+| Multi-tenant SaaS UI | Not needed for first revenue|
 | Proxy-Risk live upstream forward | **Done** — use `--live` + `PROXY_RISK_UPSTREAM_BASE` |
 | Health Telemetry (#7) | Do not list |
 
@@ -223,6 +222,6 @@ proxy-risk export --database ./data/demo_proxy.sqlite --repro-check
 
 ## Related docs
 
-- `docs/INST_PLUS_STRATEGY.md` — portfolio strategy
+- `docs/INST_PLUS_DILIGENCE_PACK.md` — portfolio strategy
 - `docs/AD_GUARD_INSTITUTIONAL_STACK.md` — enterprise positioning
 - `docs/NEW_PRODUCT_INST_PLUS_ROADMAPS.md` — technical roadmaps

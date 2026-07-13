@@ -35,6 +35,7 @@ Every SKU ships:
 | Rigorous E2E | `./scripts/instpp_rigorous_test.sh` | Per-SKU ingest → gate → export → verify in CI log |
 | Full proof | `make proof` | Smoke + rigorous + verify-portfolio |
 | Docker extended | `make docker-extended` | Redis + Postgres compose + zero-skip rigorous on host |
+| Docker SKU rigorous | `make docker-sku-rigorous` | 12 isolated containers — per-SKU unit + demo + verify logs |
 | Buyer pack | `make buyer-pack` | `PORTFOLIO_MANIFEST.json` + bundle tarballs |
 | SOC2 evidence | `make soc2-evidence` | VPC evidence JSON from verified manifest |
 | Chaos | `./scripts/chaos_instpp.sh` | WAL / wallet / capture survival drills |
@@ -46,6 +47,8 @@ Every SKU ships:
 | `instpp_rigorous_latest_summary.json` | PASS/FAIL, `skipped_sections`, forensic waves 1–4 |
 | `instpp_proof_lite_latest_summary.json` | PR diligence steps + manifest linkage |
 | `instpp_docker_extended_latest_summary.json` | Compose live run + rigorous zero-skip |
+| `instpp_docker_sku_latest_summary.json` | Per-SKU docker matrix (12 containers) |
+| `instpp_docker_sku_<sku>_latest.log` | Isolated container log per SKU |
 | `instpp_ci_autonomy_phases.json` | Phase 1–4 implementation ledger |
 | `soc2_evidence_latest.json` | SOC2 VPC evidence collector output |
 
@@ -244,7 +247,7 @@ See [INST_PLUS_GOLD_STANDARD.md](INST_PLUS_GOLD_STANDARD.md). All 12 SKUs meet:
 |-----|---------|
 | [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md) | Pack index — start here |
 | [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) | Full tech + sales |
-| [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | Market compare + comparable pricing |
+| [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | Capability comparison |
 | [INST_PLUS_GOLD_STANDARD.md](INST_PLUS_GOLD_STANDARD.md) | Nine dimensions + readiness matrix |
 | [BUYER_EVIDENCE_PACK.md](BUYER_EVIDENCE_PACK.md) | 15-minute auditor dry-run |
 | [RUN_DEMO.md](RUN_DEMO.md) | Plug / demo / run guide |

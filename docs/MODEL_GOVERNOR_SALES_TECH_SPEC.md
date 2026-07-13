@@ -13,11 +13,10 @@
 
 **One-line pitch:** *Prove which model version was approved for production on date X — with math, not a spreadsheet.*
 
-> **This spec describes shipped #8 CLI** (model lifecycle governance). For the LLM spend control-plane demo, comps, and exit valuation bands, see [MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md](MODEL_GOVERNOR_POSITIONING_AND_VALUATION.md) and [DEMO_GOLD.md](DEMO_GOLD.md) (`make demo-gold`).
+> **This spec describes shipped #8 CLI** (model lifecycle governance). For the LLM spend control-plane demo, see [DEMO_GOLD.md](DEMO_GOLD.md) (`make demo-gold`).
 
 | | |
 |---|---|
-| **Price band** | £400–£1,000/mo per tenant |
 | **Deploy** | Air-gapped VPC / on-prem — SQLite + WAL |
 | **Proof** | Genesis-anchored hash chain + deterministic audit tarball |
 | **Demo** | 60 seconds CLI |
@@ -163,16 +162,6 @@ model-governor verify-bundle --tarball ./model_governor_bundle.tar
 
 ---
 
-## Pricing & packaging
-
-| Tier | Band | Includes |
-|------|------|----------|
-| **Tenant license** | £400–£1,000/mo | CLI + spine + export + verify-bundle |
-| **Implementation** | Custom SOW | CI/CD hook mapping, MRM onboarding |
-| **Bundle with Compliance Logger** | 15% discount | Same buyer, decision + model threads |
-| **Maintenance** | 15–20% ARR | Security patches, spine upgrades |
-
----
 
 ## RFP quick answers
 
@@ -190,6 +179,5 @@ model-governor verify-bundle --tarball ./model_governor_bundle.tar
 ## Related documents
 
 - `docs/MODEL_GOVERNOR_BUYER.md` — one-page buyer sheet  
-- `docs/PORTFOLIO_SALES_SHEET.md` — portfolio pricing matrix  
 - `docs/BUYER_EVIDENCE_PACK.md` — procurement dry-run  
 - `docs/COMPLIANCE_LOGGER_SALES_TECH_SPEC.md` — generic decision audit (#1)

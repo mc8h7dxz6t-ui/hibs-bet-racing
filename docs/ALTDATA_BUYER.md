@@ -14,7 +14,6 @@
 | Ops / data engineering | ETL logs are not audit evidence | Genesis ledger per poll + offline `verify-bundle` |
 | Compliance-adjacent feeds | “Prove what the feed contained on date X” | Deterministic export bundle |
 
-**Price band:** £500–£2,000/mo per feed (design partner for live URL targets).
 
 ---
 
@@ -78,4 +77,3 @@ See `src/altdata/README.md` for architecture.
 | 1 | `./scripts/demo_altdata.sh` (60s) |
 | 2 | `altdata verify-bundle --tarball ./altdata_bundle.tar` |
 | 3 | RFP depth → `docs/ALTDATA_SALES_TECH_SPEC.md` |
-| 4 | Portfolio pricing → `docs/PORTFOLIO_SALES_SHEET.md` |

@@ -14,7 +14,6 @@
 | Quant / trading infra | Need shadow mode before live capital | Shadow default; `--live` when ready |
 | Platform teams | No audit trail on proxy layer | Every gate outcome logged to genesis chain |
 
-**Price band:** £400–£1,200/mo per tenant (API proxy + audit).
 
 ---
 
@@ -93,4 +92,3 @@ See `src/proxy_risk/README.md` for architecture.
 | 1 | `./scripts/demo_proxy_risk.sh` (60s) |
 | 2 | `proxy-risk verify-bundle --tarball ./proxy_bundle.tar` |
 | 3 | RFP depth → `docs/PROXY_RISK_SALES_TECH_SPEC.md` |
-| 4 | Portfolio pricing → `docs/PORTFOLIO_SALES_SHEET.md` |

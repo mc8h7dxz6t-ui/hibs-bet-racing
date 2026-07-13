@@ -15,7 +15,6 @@
 
 | | |
 |---|---|
-| **Price band** | £400–£1,200/mo per tenant |
 | **Default mode** | Shadow (gates run, no upstream call) |
 | **Live mode** | Sync WAL → forward → fail-closed on 4xx/5xx |
 | **Proof** | Every approve/reject/kill logged to genesis chain |
@@ -266,18 +265,6 @@ proxy-risk verify-bundle --tarball data/demo/proxy_bundle.tar
 
 ---
 
-## Pricing & packaging
-
-| Tier | Band | Includes |
-|------|------|----------|
-| **Tenant license** | £400–£1,200/mo | Gate chain + ledger + export |
-| **Workflow console** | Included | `inst-workflow serve --product proxy` |
-| **Redis HA add-on** | +£100–200/mo | Multi-instance bucket + idempotency |
-| **Implementation** | Custom SOW | Upstream mapping, shadow burn-in, kill thresholds |
-
-**Sell separately** from Compliance Logger — different buyer, different diligence.
-
----
 
 ## RFP quick answers
 
@@ -295,7 +282,5 @@ proxy-risk verify-bundle --tarball data/demo/proxy_bundle.tar
 ## Related documents
 
 - `docs/PROXY_RISK_BUYER.md` — one-page buyer sheet  
-- `docs/PORTFOLIO_SALES_SHEET.md` — portfolio pricing matrix  
 - `docs/BUYER_EVIDENCE_PACK.md` — procurement dry-run  
-- `docs/INST_PLUS_PRE_REV_VALUATION.md` — IP valuation framework  
 - `docs/DEMO.md` — demo commands

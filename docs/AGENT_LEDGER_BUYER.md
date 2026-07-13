@@ -27,7 +27,6 @@
 | Fintech / ops agents | Critical tools need human gate | Escalation lane + `human_approved` attestation |
 | Compliance | Conflated with generic LLM safety | Tool-specific policy + argument guards |
 
-**Price band:** £500–£1,500/mo per agent fleet (policy + ledger + export).
 
 ---
 

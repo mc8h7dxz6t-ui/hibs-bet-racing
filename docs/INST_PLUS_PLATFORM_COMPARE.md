@@ -1,8 +1,8 @@
 # Institutional++ — Platform Comparison Deep Dive
 
-**Purpose:** Gauge Inst++ capabilities against adjacent platforms using factual, evidence-backed criteria, plus **public market pricing for comparables only** (2025–2026). Inst++ pricing is not published in this diligence pack.  
+**Purpose:** Compare Inst++ capabilities against adjacent platforms using factual, evidence-backed criteria. No pricing in this document.  
 **Scope:** SKU / Inst++ infrastructure only.  
-**Evidence source:** In-repo tests, `verify-bundle`, rigorous CI logs, and public vendor pricing pages (cited below).  
+**Evidence source:** In-repo tests, `verify-bundle`, rigorous CI logs, and public vendor documentation.  
 **Date:** July 2026
 
 > **Diligence pack:** [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md)  
@@ -40,151 +40,6 @@ Comparable platforms are grouped by **job-to-be-done**, not by company size. Ins
 
 ---
 
-## Market pricing gauge (2025–2026 public sources)
-
-**Disclaimer:** Comparable prices are from vendor list pages, AWS Marketplace, and third-party benchmark reports as of mid-2026. Enterprise deals are almost always discounted; self-hosted OSS has **$0 license** but real **TCO** (infra + DevOps). Figures are **USD** unless noted. Verify live before procurement.
-
-### Quick reference — what the market charges
-
-| Category | Vendor | Public entry | Mid-market typical | Enterprise / custom | Billing model |
-|----------|--------|--------------|-------------------|---------------------|---------------|
-| Inbound webhooks | **Hookdeck** | $0 (10k events/mo) | $39/mo + ~$3–33/100k events | $499/mo Growth; Enterprise custom | Base + metered events |
-| Outbound webhooks | **Svix** | $0 (50k msgs/mo) | $490/mo Pro | Custom; $0.0001/msg overage | Base + messages |
-| API gateway | **Kong Konnect Plus** | ~$105/mo per gateway service | $50k–$120k/yr (Vendr benchmarks) | $150k–$300k+/yr Enterprise | Per service + per-million requests |
-| API gateway | **AWS API Gateway** | Pay-per-request | Varies by volume | Enterprise support separate | Per million API calls |
-| GRC / IRM | **ServiceNow GRC** | N/A (quote only) | $85k–$365k/yr (3 modules, Pro) | $780k–$2.2M+ Fortune-scale | Per module + scope band |
-| GRC tier-2 | **OneTrust / MetricStream** | N/A | $75k–$250k/yr | $250k–$500k+ | Module + users |
-| Immutable ledger | **AWS QLDB** | **Discontinued Jul 2025** | Was ~$0.70/M writes | Migrated to Aurora patterns | Was pay-per-IO |
-| Immutable ledger | **immudb** | OSS free | Cloud/hosted varies | Enterprise support custom | OSS + optional cloud |
-| ML registry | **MLflow** | OSS free | Databricks-hosted extra | Enterprise Databricks | Platform bundle |
-| Drift / ML observability | **Evidently** | OSS free (Apache 2.0) | Evidently Cloud (contact) | Enterprise self-hosted | OSS + commercial platform |
-| Drift / AI observability | **Fiddler** | Free guardrails tier | $0.002/trace Developer | ~$24k/yr AWS Marketplace Lite; Enterprise custom | Per trace / custom |
-| LLM observability | **Langfuse** | $0 Hobby (50k units) | $29 Core; $199 Pro | $2,499/mo Enterprise base | Units (traces+spans+scores) |
-| LLM observability | **LangSmith** | $0 (5k traces, 1 seat) | $39/seat/mo + $2.50/1k traces | Enterprise custom | Per seat + traces |
-| LLM gateway | **LiteLLM** | OSS free | ~$250/mo Enterprise Basic (reports) | ~$30k/yr Premium (reports) | Custom quote + infra TCO |
-| ETL | **Fivetran** | Limited free | $1k–$5k+/mo typical connectors | Enterprise custom | Per connector MAR |
-| IoT ingress | **AWS IoT Core** | Pay-per-message | Scales with devices | Enterprise support | Per million messages |
-
-**Sources (verify live):** [hookdeck.com/pricing](https://hookdeck.com/pricing) · [svix.com/pricing](https://www.svix.com/pricing) · [konghq.com/pricing](https://konghq.com/pricing) · [langfuse.com/pricing](https://langfuse.com/pricing) · [langchain.com/pricing](https://www.langchain.com/pricing) · [fiddler.ai/pricing](https://www.fiddler.ai/pricing) · [docs.litellm.ai/docs/enterprise](https://docs.litellm.ai/docs/enterprise) · vendor benchmark reports (ServiceNow GRC, Kong TCO)
-
----
-
-### Category pricing deep dives
-
-#### Webhooks — Hookdeck vs Svix (inbound vs outbound)
-
-| Plan | Hookdeck (inbound) | Svix (outbound + ingest) |
-|------|-------------------|--------------------------|
-| Free | $0 — 10k events/mo, 3-day retention, 1 user | $0 — 50k messages/mo, 50 msg/s, 30-day retention |
-| Team / Pro | **$39/mo** + metered events ($0.33–$3.00 per 100k) | **$490/mo** — 50k included, 400 msg/s, 90-day retention |
-| Growth / Enterprise | **$499/mo** — SLAs, SSO, 30-day retention | Enterprise custom — 99.999% SLA, on-prem options |
-| Static IP add-on | +$100/mo (Hookdeck) | Static IPs on Pro (Svix) |
-
-**Value gauge:** For a SaaS doing **500k inbound billing webhooks/month**, Hookdeck Team often lands **~$40–55/mo** (base + metered). Svix at **1M outbound deliveries/month** is roughly **$490 base + ~$95 overage** ≈ **$585/mo** — order of magnitude **$5k–7k/year** for serious webhook infra, before Enterprise.
-
-**Inst++ (#5 + #10) value angle:** VPC perpetual deploy — no per-message meter. Buyer pays **hosting + maintenance**, not **$0.0001/message** at scale. Trade-off: no managed portal, buyer operates Redis/compose.
-
----
-
-#### API gateway — Kong vs DIY proxy
-
-| Cost line | Kong Konnect Plus (public + benchmarks) | Kong Enterprise (benchmarks) | Inst++ Proxy-Risk (#2) |
-|-----------|----------------------------------------|------------------------------|------------------------|
-| License | ~$105/mo per gateway service + $200 per extra 1M requests/mo | $30k–$50k/yr small; $150k–$400k/yr large | **No per-request meter in repo** |
-| Infra | Dedicated gateway ~$720/mo cited in AI routing guides | Self-hosted nodes + support tier | SQLite/Redis VPC |
-| DevOps TCO | 0.5–2 FTE ($60k–$240k/yr cited) | Same + PS $40k–$80k | Lower surface — CLI + K8s init |
-| Audit proof | Enterprise audit logs (SSO-gated) | CloudTrail partial | **Genesis per gate + verify-bundle** |
-
-**Value gauge:** Mid-market Kong **year-1 TCO** often **$145k–$350k** (license + infra + DevOps per Zuplo/Vendr 2026 analyses). Inst++ targets buyers who need **Z-score kill + offline proof** at **infra license economics**, not **full API lifecycle platform**.
-
----
-
-#### GRC vs tamper-evident decision ledger
-
-| Tier | Typical annual spend (USD) | What you get |
-|------|---------------------------|--------------|
-| Point compliance tools | $5k–$25k | Narrow attestations |
-| Mid-market GRC (LogicGate, Riskonnect) | $15k–$75k | Risk + policy modules |
-| Enterprise GRC (ServiceNow IRM) | $180k–$500k+ | Workflow, attestations, audit mgmt |
-| Global enterprise GRC | $580k–$2.2M+ post-discount | Full IRM + VRM + resilience |
-
-**Value gauge:** ServiceNow **Policy & Compliance** alone is often **$45k–$140k/yr** list band per module (Reveal Compliance 2026 planning ranges). Inst++ Compliance Logger (#1) is **not** a GRC replacement — it is **10–20% of GRC ACV** for the **cryptographic decision spine only** when buyers already have workflow elsewhere.
-
----
-
-#### LLM observability — Langfuse vs LangSmith
-
-| Vendor | Entry paid | Mid-volume example | Enterprise |
-|--------|-----------|-------------------|------------|
-| **Langfuse** | $29/mo Core (100k units) | 500k units/mo ≈ **$231/mo** on Core | $2,499/mo base + graduated overage |
-| **LangSmith** | $39/seat/mo (10k traces) | 8 seats + 500k traces/mo ≈ **$1,300+/mo** | Custom |
-
-**Value gauge:** Observability is **usage- and seat-compounding**. LangSmith **seat tax** ($39 × team size) dominates at 10+ engineers. Langfuse **unit overage** dominates at high trace volume. Neither provides **offline verify-bundle** or **pre-execution tool authorization** — different job from Inst++ #4 / #12.
-
----
-
-#### LLM gateway & spend — LiteLLM vs Spend Guard
-
-| | LiteLLM OSS | LiteLLM Enterprise (reports) | Inst++ Spend Guard (#11) |
-|--|-------------|------------------------------|--------------------------|
-| License | $0 | ~$250/mo Basic; ~$30k/yr Premium | VPC deploy (procurement offline) |
-| Budgets | Virtual keys, team budgets | SSO, RBAC, audit logs, SLA | **Reserve → settle → drift lockout** |
-| TCO at scale | $2k–$3.5k/mo all-in (infra + labor cited) | + license | Air-gap SQLite/Postgres wallet |
-| Proof | Metrics / logs | Enterprise audit logs | **Genesis spend events + verify-bundle** |
-
-**Value gauge:** LiteLLM wins **routing breadth** (100+ providers) at **$0 OSS**. Enterprise adds **$3k–$36k/yr** for governance features. Spend Guard competes on **money correctness** (hold/settle/lockout), not **provider catalog** — complementary in many architectures.
-
----
-
-#### Drift & model risk — Evidently vs Fiddler vs Drift Gate
-
-| Vendor | Entry | Mid | Enterprise |
-|--------|-------|-----|------------|
-| **Evidently OSS** | $0 (Apache 2.0) | Self-host infra only | Evidently Cloud / Enterprise (quote) |
-| **Fiddler** | Free guardrails | **$0.002/trace** Developer | **~$24k/yr** AWS Marketplace Lite (1 model, 0.5GB/mo); Enterprise custom |
-| **Inst++ Drift Gate** | VPC deploy | PSI/KS **inline enforce** | Offline verify-bundle |
-
-**Value gauge:** Fiddler at **1M traces/month** on Developer ≈ **$2,000/mo** metered. Evidently OSS is **free** but **dashboard/enforce** is DIY. Drift Gate value is **blocking traffic** with **genesis audit**, not **DS exploration UI**.
-
----
-
-### Composite stack TCO — buy vs build vs Inst++
-
-Illustrative **mid-market fintech** needing: audit trail, outbound API control, webhook idempotency, model approval, drift enforce, LLM spend guard, agent tool auth.
-
-| Approach | Typical vendors | Indicative annual spend (USD) | Offline single manifest |
-|----------|----------------|------------------------------|-------------------------|
-| **Best-of-breed SaaS** | ServiceNow PCM + Kong Enterprise + Hookdeck Growth + MLflow/Databricks + Fiddler + LangSmith + LiteLLM Ent | **$400k–$900k+/yr** licenses alone (before PS) | No |
-| **Lean SaaS** | Point GRC + Hookdeck Team + Langfuse Pro + LiteLLM OSS + Evidently OSS | **$50k–$150k/yr** + engineering glue | No |
-| **Inst++ VPC portfolio** | 12 SKUs on `inst_spine` | VPC hosting + ops (license offline) | **Yes — `PORTFOLIO_MANIFEST.json`** |
-
-**Value gauge (qualitative):**
-
-| Buyer priority | Market stack wins | Inst++ wins |
-|----------------|-------------------|-------------|
-| Fastest time-to-dashboard | Langfuse, Hookdeck, Fiddler SaaS | — |
-| Lowest year-1 cash (OSS) | LiteLLM + Evidently + immudb DIY | Partial — VPC license + ops |
-| Auditor offline proof | Weak across SaaS | **verify-bundle 12/12** |
-| Regulated agent + spend + model | 4–6 vendors + integration risk | **#8 + #9 + #11 + #12 one spine** |
-| Per-message / per-trace meter at scale | SaaS can get expensive | **Flat VPC** favorable at high volume |
-
----
-
-### Inst++ positioning vs market spend (no Inst++ prices)
-
-Use this table in sales conversations — **compare buyer's current vendor line items** to **capability overlap**, not dollar-for-dollar SKU mapping.
-
-| Inst++ SKU | Closest market comp | Market $ band (indicative) | Inst++ proof advantage | Market comp advantage |
-|------------|--------------------|-----------------------------|------------------------|----------------------|
-| #1 Compliance Logger | ServiceNow PCM / immudb | $45k–$140k/yr module vs OSS | Offline decision-event verify | Workflow / ecosystem |
-| #2 Proxy-Risk | Kong / Apigee | $50k–$300k+/yr | Z-score kill + genesis audit | Plugins, scale, portal |
-| #5 Webhook Mesh | Hookdeck / Svix | $0–$6k/yr SMB; $6k–$50k+ at scale | WAL-before-ack + verify-bundle | Managed reliability UI |
-| #8 ModelGovernor | MLflow + GRC | $20k–$200k+ depending stack | Approve/deploy chain proof | Experiment UI, hosting |
-| #9 Drift Gate | Fiddler / Evidently | $0 OSS – $24k+/yr | Inline enforce + audit | Dashboards, judges |
-| #11 Spend Guard | LiteLLM Enterprise | $3k–$36k/yr + TCO | Reserve/settle/lockout | 100+ provider routes |
-| #12 Agent Ledger | LangSmith + Oso | $39/seat/mo + traces | Pre-exec authorization proof | Trace UI, policy DSL |
-
----
 
 ## Category 1 — Tamper-evident audit & compliance ledger
 
@@ -406,7 +261,7 @@ Honest gaps vs best-in-category SaaS:
 
 ---
 
-## Summary gauge
+## Summary
 
 | Platform type | Inst++ relative position |
 |---------------|-------------------------|
@@ -418,7 +273,7 @@ Honest gaps vs best-in-category SaaS:
 | LLM proxy | Stronger hold/settle/lockout; weaker routing catalog |
 | Agent observability | Stronger pre-exec authorization proof; weaker trace UI |
 
-**Bottom line:** Inst++ value is **portfolio-level cryptographic diligence** — one spine, twelve gates, reproducible CI and docker-extended logs — not winning every category feature-for-feature against specialized SaaS leaders.
+**Bottom line:** Inst++ strength is **portfolio-level cryptographic diligence** — one spine, twelve gates, reproducible CI and docker-extended logs — not winning every category feature-for-feature against specialized SaaS leaders.
 
 ---
 
@@ -427,7 +282,7 @@ Honest gaps vs best-in-category SaaS:
 | Doc | Purpose |
 |-----|---------|
 | [INST_PLUS_DILIGENCE_PACK.md](INST_PLUS_DILIGENCE_PACK.md) | Pack index — start here |
-| [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) | Full tech + sales (no Inst++ pricing) |
+| [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) | Full tech + sales positioning |
 | [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md) | Per-SKU proof commands and CI artifacts |
 | [INST_PLUS_GOLD_STANDARD.md](INST_PLUS_GOLD_STANDARD.md) | Nine dimensions bar |
 | [docs/test_logs/README.md](test_logs/README.md) | Committed proof logs |

@@ -215,7 +215,7 @@ When the script pauses, read the **SAY** block (~60–90 sec each), then press E
 
 ```
 Prove it happened — before the bill, the audit, or the dispute.
-Pilot from £2.5k · [your email / LinkedIn]
+VPC pilot available.
 ```
 
 ---
@@ -252,7 +252,7 @@ Full portfolio demo — 12 VPC audit products on one cryptographic spine.
 Every product: check → export → offline verify-bundle (no vendor callback).
 
 For: fintech, SaaS billing, lending, platform eng, marketing finance, health tech, MRM, AI FinOps.
-Deploy: your VPC. Pilots from £2.5k.
+Deploy: your VPC. VPC pilots available.
 
 Contact: [your details]
 
@@ -285,4 +285,4 @@ Commands: ./scripts/demo_portfolio_all.sh
 - `scripts/demo_portfolio_all.sh` — run all 12 without recording  
 - `scripts/record_portfolio_demo_video.sh` — guided pauses  
 - `docs/PORTFOLIO_FULL_TECH_SALES_12.md` — 12-SKU index  
-- `docs/PORTFOLIO_SALES_SHEET.md` — pricing
+- `docs/PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md` — tech/sales positioning
