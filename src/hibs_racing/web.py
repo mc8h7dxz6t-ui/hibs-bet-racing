@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, render_template, request
 
 from hibs_racing.hibs_brand import hibs_brand_context
+from hibs_racing.product_links import product_bar_context
 from hibs_racing.models.feature_impact import impact_artifact_paths, load_feature_impact_report
 from hibs_racing.models.ranker_attribution import live_ranker_attribution
 from hibs_racing.monitor import monitor_snapshot
@@ -127,6 +128,9 @@ def create_app() -> Flask:
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "hibs-racing-dev")
     app.add_template_filter(fmt_num, "fmt_num")
     app.add_template_filter(fmt_pct, "fmt_pct")
+    from hibs_racing.ui_shell import static_v
+
+    app.jinja_env.globals["static_v"] = static_v
 
     @app.context_processor
     def inject_brand() -> dict:
@@ -134,25 +138,9 @@ def create_app() -> Flask:
 
         ctx = hibs_brand_context()
         ctx.update(ui_shell_context())
-        ctx["portfolio_api_url"] = "/api/portfolio/summary"
+        ctx.update(product_bar_context(active="racing"))
         ctx["portfolio_full_url"] = "/portfolio"
         ctx["health"] = health_status()
-        football_base = os.environ.get("HIBS_FOOTBALL_BASE_URL", "http://127.0.0.1:5000").rstrip("/")
-        football_home = os.environ.get("HIBS_FOOTBALL_HOME_URL", "").rstrip("/") or football_base
-        racing_public = os.environ.get("HIBS_RACING_PUBLIC_URL", "").rstrip("/")
-        domain = os.environ.get("HIBS_DOMAIN", "hibs-bet.co.uk").strip()
-        ctx["hibs_football_base_url"] = football_base
-        ctx["hibs_racing_base_url"] = racing_public
-        ctx["hibs_football_home_url"] = football_home + ("" if football_home.endswith("/") else "/")
-        ctx["hibs_racing_home_url"] = "/cards"
-        ctx["hibs_racing_cards_url"] = (racing_public + "/cards") if racing_public else "/cards"
-        ctx["hibs_trading_status_url"] = os.environ.get(
-            "HIBS_TRADING_STATUS_URL", f"https://{domain}/harvested-execution"
-        )
-        ctx["hibs_line_trader_url"] = os.environ.get(
-            "HIBS_LINE_TRADER_URL", f"https://{domain}/line-trader"
-        )
-        ctx["hibs_product_active"] = "racing"
         return ctx
 
     def _cors_summary(resp):
@@ -470,6 +458,9 @@ def create_app() -> Flask:
         except Exception as exc:
             return jsonify({"ok": False, "error": str(exc)}), 500
 
+    from hibs_racing.url_prefix import apply_url_prefix
+
+    apply_url_prefix(app)
     return app
 
 

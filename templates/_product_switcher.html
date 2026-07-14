@@ -6,7 +6,7 @@
         <a href="{{ hibs_football_home_url|default('/') }}"
            class="hibs-product-pill {% if hibs_product_active == 'football' %}active{% endif %}"
            rel="noopener">⚽ Football</a>
-        <a href="{{ hibs_racing_cards_url|default('/cards') }}"
+        <a href="{{ hibs_racing_cards_url|default(hibs_racing_base_url|default('/racing') ~ '/cards') }}"
            class="hibs-product-pill {% if hibs_product_active == 'racing' %}active{% endif %}"
            rel="noopener">🏇 Racing</a>
         <a href="{{ hibs_trading_status_url|default('/harvested-execution') }}"
