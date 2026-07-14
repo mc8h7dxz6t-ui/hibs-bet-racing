@@ -1,4 +1,5 @@
-/* HIBS — unified lite shell (football + racing + trading) */
+/* HIBS — unified lite shell (football + racing + trading)
+   Pastel teal on slate — high contrast readable text */
 :root {
     --hibs-green: #0d9488;
     --hibs-green-dark: #0f172a;
@@ -27,12 +28,22 @@
     --shadow-md: 0 10px 32px rgba(0, 0, 0, 0.32);
     --primary-brand-color: var(--hibs-green);
     --wordmark-font: 'Inter', sans-serif;
+    --hibs-accent-bg: rgba(13, 148, 136, 0.1);
+    --hibs-accent-bg-strong: rgba(13, 148, 136, 0.16);
+    --hibs-accent-border: rgba(94, 234, 212, 0.28);
+    --hibs-accent-border-strong: rgba(94, 234, 212, 0.35);
+    --hibs-mint: #a7f3d0;
+    --hibs-mint-soft: rgba(167, 243, 208, 0.14);
+    --hibs-success-text: #86efac;
+    --hibs-slate-card: rgba(15, 23, 42, 0.96);
 }
 
 body {
     background-color: var(--hibs-navy-deep);
+    color: var(--text);
     background-image:
-        radial-gradient(ellipse at 20% 0%, rgba(13, 148, 136, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 12% 40%, rgba(13, 148, 136, 0.1) 0%, transparent 48%),
+        radial-gradient(ellipse at 88% 12%, rgba(13, 148, 136, 0.12) 0%, transparent 42%),
         linear-gradient(180deg, var(--hibs-navy-deep) 0%, #0f172a 100%);
 }
 
@@ -65,7 +76,7 @@ body::before {
     gap: 10px 14px;
     padding: 8px 14px;
     margin-bottom: 12px;
-    background: rgba(15, 23, 42, 0.92);
+    background: var(--hibs-slate-card);
     border: 1px solid var(--border);
     border-radius: 10px;
 }
@@ -97,9 +108,10 @@ body::before {
 .hibs-product-pill.active,
 .tab-btn.active,
 .sub-tab.active,
-.chip.active {
+.chip.active,
+.ot-active {
     background: linear-gradient(135deg, var(--hibs-green), #0f766e);
-    border-color: rgba(94, 234, 212, 0.28);
+    border-color: var(--hibs-accent-border);
     color: #fff;
     box-shadow: none;
 }
@@ -125,23 +137,102 @@ body::before {
     max-width: min(480px, 62vw);
 }
 
+.hibs-portfolio-bar {
+    margin: 0 0 12px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: linear-gradient(90deg, var(--hibs-green-soft), rgba(15, 23, 42, 0.88));
+    font-size: 0.82em;
+}
+
+.hibs-portfolio-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+}
+
+.hibs-portfolio-label {
+    font-family: 'Orbitron', monospace;
+    color: var(--neon-value);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.hibs-portfolio-stat {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.15em;
+    font-weight: 700;
+    color: var(--hibs-success-text);
+}
+
+.hibs-portfolio-stat.neg {
+    color: #fca5a5;
+}
+
+.hibs-portfolio-meta {
+    color: var(--muted);
+    font-size: 0.85em;
+}
+
+.hibs-portfolio-pill {
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    color: #cbd5e1;
+    font-size: 0.88em;
+}
+
+.hibs-portfolio-link {
+    color: var(--neon-value);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.88em;
+}
+
+.hibs-portfolio-link:hover {
+    text-decoration: underline;
+}
+
 .stat-pill.gold {
-    background: rgba(13, 148, 136, 0.1);
-    border-color: rgba(94, 234, 212, 0.28);
+    background: var(--hibs-accent-bg);
+    border-color: var(--hibs-accent-border);
     color: var(--neon-value);
 }
 
 .nav-btn:hover,
 .site-links a:hover,
 .site-links a.active,
-.site-links a.site-link-active {
+.site-links a.site-link-active,
+.site-link:hover,
+.site-link-active {
     background: var(--hibs-green-soft);
     border-color: var(--border);
     color: var(--text);
 }
 
+header,
 .site-top {
     background: linear-gradient(135deg, rgba(13, 148, 136, 0.18), rgba(11, 18, 32, 0.92));
+    border-color: var(--border);
+}
+
+.tab-bar {
+    background: var(--hibs-slate-card);
+    border: 1px solid var(--border);
+}
+
+.tab-btn:hover,
+.sub-tab:hover {
+    background: var(--hibs-accent-bg);
+    color: var(--text);
+}
+
+.nav-btn:hover {
+    background: var(--hibs-accent-bg-strong);
+    border-color: var(--hibs-accent-border);
+    color: var(--neon-value);
 }
 
 @media (max-width: 640px) {
