@@ -10,7 +10,8 @@
 
 | # | Document | What it covers |
 |---|----------|----------------|
-| 1 | [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) | **Full tech & sales** — 12 SKUs, buyer segments, problem→solution, competitive positioning, proof commands, completion matrix |
+| 1 | [PORTFOLIO_12_SKU_TECH_SALES_SHEET.md](PORTFOLIO_12_SKU_TECH_SALES_SHEET.md) | **12 SKU tech sales sheet** — what each does, maturity %, tech brief (no pricing) |
+| 2 | [PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md](PORTFOLIO_FULL_TECH_SALES_NO_PRICES.md) | **Full tech & sales** — buyer segments, problem→solution, competitive positioning, proof commands |
 | 2 | [INST_PLUS_BUYER_DILIGENCE_SCOPE.md](INST_PLUS_BUYER_DILIGENCE_SCOPE.md) | **Per-platform buyer scope** — 11 SKUs (excl. ModelGovernor): what it does, real-world example, tech brief, architecture/code/execution ratings |
 | 3 | [PORTFOLIO_EVIDENCE_SHEET.md](PORTFOLIO_EVIDENCE_SHEET.md) | **Factual evidence** — CI artifacts, rigorous sections, per-SKU test files, docker-extended logs |
 | 4 | [INST_PLUS_PLATFORM_COMPARE.md](INST_PLUS_PLATFORM_COMPARE.md) | **Capability compare** — matrix vs Hookdeck, Svix, Kong, ServiceNow GRC, Langfuse, LiteLLM, Fiddler, etc. |
