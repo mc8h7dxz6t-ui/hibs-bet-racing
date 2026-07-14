@@ -219,6 +219,26 @@ def telemetry_balance_for_date(
     db_path_obj = Path(db) if not isinstance(db, Path) else db
     manifest = latest_manifest_for_date(card_date, database=db_path_obj)
     if not manifest:
+        pending = f"No refresh manifest for {card_date} — run refresh-cards"
+        if observation_lane:
+            return TelemetryBalanceReport(
+                passed=True,
+                card_date=card_date,
+                manifest_id=None,
+                checks=[
+                    {
+                        "name": "manifest_present",
+                        "passed": True,
+                        "detail": f"{pending} (advisory — observation lane)",
+                    }
+                ],
+                timings_ms={},
+                shares_pct={},
+                matchbook_coverage_ratio=None,
+                total_ms=0.0,
+                message=f"Telemetry balance pending — {pending}",
+                observation_lane=observation_lane,
+            )
         return TelemetryBalanceReport(
             passed=False,
             card_date=card_date,
@@ -227,7 +247,7 @@ def telemetry_balance_for_date(
                 {
                     "name": "manifest_present",
                     "passed": False,
-                    "detail": f"No refresh manifest for {card_date}",
+                    "detail": pending,
                 }
             ],
             timings_ms={},

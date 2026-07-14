@@ -49,6 +49,16 @@ class HealthStatus:
     unscored_runners: int | None = None
     nan_integrity_passed: bool | None = None
     production_value_count: int | None = None
+    paper: dict | None = None
+    cron: dict | None = None
+    reliability: dict | None = None
+    place_reliability: dict | None = None
+    sale_gates: dict | None = None
+    backtest_results: dict | None = None
+    evidence_truth: dict | None = None
+    latest_card_date: str | None = None
+    card_fresh: bool | None = None
+    data_producer: dict | None = None
 
     def to_dict(self) -> dict:
         out = {
@@ -69,6 +79,7 @@ class HealthStatus:
             out["engine_profile"] = self.engine_profile
         if self.paper_recon_clean is not None:
             out["paper_recon_clean"] = self.paper_recon_clean
+            out["recon_clean"] = self.paper_recon_clean
         if self.manifest_id is not None:
             out["manifest_id"] = self.manifest_id
         if self.snapshot_coverage_pct is not None:
@@ -83,6 +94,51 @@ class HealthStatus:
             out["nan_integrity_passed"] = self.nan_integrity_passed
         if self.production_value_count is not None:
             out["production_value_count"] = self.production_value_count
+        if self.paper is not None:
+            out["paper"] = self.paper
+        if self.cron is not None:
+            out["cron"] = self.cron
+        if self.reliability is not None:
+            out["reliability"] = self.reliability
+        if self.place_reliability is not None:
+            out["place_reliability"] = self.place_reliability
+        if self.sale_gates is not None:
+            out["sale_gates"] = self.sale_gates
+        if self.backtest_results is not None:
+            out["backtest_results"] = self.backtest_results
+        if self.evidence_truth is not None:
+            out["evidence_truth"] = self.evidence_truth
+        if self.latest_card_date is not None:
+            out["latest_card_date"] = self.latest_card_date
+        out["card_fresh"] = self.card_fresh if self.card_fresh is not None else False
+        if self.data_producer is not None:
+            out["data_producer"] = self.data_producer
+        try:
+            from hibs_racing.live.execution_config import execution_summary
+
+            out["execution"] = execution_summary()
+            out["execution"]["institutional_note"] = (
+                "Sub-100ms exchange execution not in analytics license."
+            )
+        except Exception:
+            pass
+        if not _health_light_mode():
+            try:
+                from pathlib import Path
+
+                from hibs_racing.config import db_path
+                from inst_spine.check import run_institutional_check
+
+                spine_db = Path(str(db_path())).parent / "inst_spine.sqlite"
+                if spine_db.is_file():
+                    rep = run_institutional_check(database=spine_db)
+                    out["inst_spine"] = {
+                        "passed": rep.passed,
+                        "message": rep.message,
+                        "n_checks": len(rep.checks),
+                    }
+            except Exception:
+                pass
         return out
 
 
@@ -91,6 +147,55 @@ def _env_ok(*keys: str) -> bool:
         if not os.environ.get(key, "").strip():
             return False
     return True
+
+
+def _health_light_mode() -> bool:
+    raw = os.environ.get("HIBS_HEALTH_LIGHT", "").strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return False
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    return os.environ.get("HIBS_PRODUCTION", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _paper_health_summary(database) -> dict:
+    """Fast COUNT-only paper ledger summary for R7 parity."""
+    from hibs_racing.features.store import connect, init_db
+
+    init_db(database)
+    out = {"n_rows": 0, "open": 0, "settled": 0}
+    try:
+        with connect(database) as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS n,
+                    SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open_n,
+                    SUM(CASE WHEN status != 'open' THEN 1 ELSE 0 END) AS settled_n
+                FROM paper_bets
+                WHERE backtest = 0
+                """
+            ).fetchone()
+            if row:
+                out["n_rows"] = int(row[0] or 0)
+                out["open"] = int(row[1] or 0)
+                out["settled"] = int(row[2] or 0)
+    except Exception:
+        pass
+    return out
+
+
+def _cron_health_summary(database) -> dict:
+    from hibs_racing.place.public_tracker import automation_ops_status
+
+    ops = automation_ops_status(database=database)
+    ok_n = sum(1 for step in ops if step.get("status") == "success")
+    return {
+        "steps": len(ops),
+        "ok": ok_n,
+        "healthy": ok_n == len(ops) if ops else False,
+        "ingestion_ok": any(s.get("id") == "ingestion" and s.get("status") == "success" for s in ops),
+    }
 
 
 def health_status() -> HealthStatus:
@@ -122,18 +227,15 @@ def health_status() -> HealthStatus:
     telemetry_balance = None
     if manifest:
         from hibs_racing.institutional.telemetry_balance import evaluate_telemetry_balance
+        from hibs_racing.models.ranker_preflight import observation_lane_enabled
 
-        observation_lane = os.environ.get("HIBS_OBSERVATION_LANE", "1").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-        )
+        observation_lane = observation_lane_enabled()
         telemetry_balance = evaluate_telemetry_balance(
             manifest=manifest,
             observation_lane=observation_lane,
         ).to_dict()
     recon_clean = None
-    if runners is not None and len(runners) > 0:
+    if not _health_light_mode() and runners is not None and len(runners) > 0:
         try:
             recon = reconcile_paper_ledger(today, database=db)
             recon_clean = recon.is_clean
@@ -142,9 +244,74 @@ def health_status() -> HealthStatus:
     sync = db_ui_sync_report(database=db)
     from hibs_racing.monitoring.nan_alert import run_nan_integrity_check
 
-    scored = load_scored_cards()
+    light = _health_light_mode()
+    scored = load_scored_cards() if not light else pd.DataFrame()
     prod_n = int(safe_value_mask(scored).sum()) if not scored.empty else 0
-    nan_report = run_nan_integrity_check(database=db, strict=False)
+    nan_report = run_nan_integrity_check(database=db, strict=False) if not light else None
+    paper_summary = _paper_health_summary(db)
+    cron_summary = _cron_health_summary(db)
+    reliability_summary = None
+    place_reliability = None
+    if not light:
+        try:
+            from hibs_racing.analytics.reliability_bins import (
+                place_reliability_from_ledger,
+                place_reliability_from_snapshots,
+                settled_paper_calibration,
+            )
+
+            reliability_summary = settled_paper_calibration(db)
+            with connect(db) as conn:
+                place_reliability = place_reliability_from_ledger(conn, days=60, backtest=False)
+                if int(place_reliability.get("n") or 0) < 20:
+                    snap = place_reliability_from_snapshots(conn, days=60)
+                    if int(snap.get("n") or 0) > int(place_reliability.get("n") or 0):
+                        place_reliability = snap
+        except Exception:
+            reliability_summary = None
+            place_reliability = None
+    from hibs_racing.sale_gates import sale_gate_status
+
+    try:
+        from hibs_racing.analytics.backtest_results import backtest_results_summary
+
+        backtest_results = backtest_results_summary()
+    except Exception:
+        backtest_results = None
+    evidence_truth = None
+    if not light:
+        try:
+            from hibs_racing.analytics.evidence_truth_plane import build_evidence_truth_plane
+
+            partial_health = {
+                "reliability": reliability_summary,
+                "place_reliability": place_reliability,
+            }
+            evidence_truth = build_evidence_truth_plane(health=partial_health, days=90)
+        except Exception:
+            evidence_truth = None
+    tel = telemetry_balance if isinstance(telemetry_balance, dict) else {}
+    if cov.get("coverage_pct") is not None and "coverage_pct" not in tel:
+        tel = {**tel, "coverage_pct": float(cov.get("coverage_pct"))}
+    latest_card_date = None
+    card_fresh = None
+    if runners is not None and len(runners) > 0 and "card_date" in runners.columns:
+        try:
+            latest_card_date = str(runners["card_date"].astype(str).max())
+            card_fresh = latest_card_date >= today
+        except Exception:
+            latest_card_date = None
+    elif manifest is not None:
+        latest_card_date = manifest.card_date
+        card_fresh = str(latest_card_date) >= today if latest_card_date else False
+    data_producer = None
+    if not light:
+        try:
+            from hibs_racing.data_producer_slo import build_data_producer_snapshot
+
+            data_producer = build_data_producer_snapshot()
+        except Exception:
+            data_producer = None
     return HealthStatus(
         db_ok=db.exists(),
         runners_loaded=len(runners),
@@ -161,11 +328,21 @@ def health_status() -> HealthStatus:
         paper_recon_clean=recon_clean,
         manifest_id=manifest.manifest_id if manifest else None,
         snapshot_coverage_pct=cov.get("coverage_pct"),
-        telemetry_balance=telemetry_balance,
+        telemetry_balance=tel or None,
         db_ui_in_sync=bool(sync.get("in_sync")),
         unscored_runners=int(sync.get("unscored_on_card") or 0),
-        nan_integrity_passed=nan_report.passed,
+        nan_integrity_passed=nan_report.passed if nan_report is not None else None,
         production_value_count=prod_n,
+        paper=paper_summary,
+        cron=cron_summary,
+        reliability=reliability_summary,
+        place_reliability=place_reliability,
+        sale_gates=sale_gate_status(),
+        backtest_results=backtest_results,
+        evidence_truth=evidence_truth,
+        latest_card_date=latest_card_date,
+        card_fresh=card_fresh,
+        data_producer=data_producer,
     )
 
 
@@ -187,7 +364,7 @@ def _offered_place_decimal(row: dict | pd.Series, *, default_fraction: float = 0
     return round(1.0 + (win_f - 1.0) * pf, 2)
 
 
-def _enrich_runner(row: dict, peers: pd.DataFrame) -> dict:
+def _enrich_runner(row: dict, peers: pd.DataFrame, *, paper_status: dict | None = None) -> dict:
     explained = explain_pick(row, race_peers=peers)
     row["engine_opinion"] = explained.get("pick_summary")
     row["engine_reasons"] = explained.get("pick_reasons") or []
@@ -198,12 +375,19 @@ def _enrich_runner(row: dict, peers: pd.DataFrame) -> dict:
     comment = raw_comment.strip() if isinstance(raw_comment, str) else ""
     row["rp_comment_short"] = (comment[:120] + "…") if len(comment) > 120 else comment
     row.update(build_enrich_display(row))
+    rid = str(row.get("runner_id") or "")
+    if paper_status and rid in paper_status:
+        row["paper_ledger"] = paper_status[rid]
     return row
 
 
 def group_meetings(frame: pd.DataFrame) -> list[dict]:
     if frame.empty:
         return []
+    from hibs_racing.place.paper_ledger import paper_bet_status_by_runner
+
+    card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if "card_date" in frame.columns else []
+    paper_status = paper_bet_status_by_runner(card_dates=card_dates) if card_dates else {}
     meetings: list[dict] = []
     group_cols = ["card_date", "course"]
     if "region" in frame.columns and frame["region"].notna().any():
@@ -220,7 +404,7 @@ def group_meetings(frame: pd.DataFrame) -> list[dict]:
         for race_id, race_df in course_df.groupby("race_id", sort=False):
             race_df = race_df.sort_values("model_place_prob", ascending=False, na_position="last")
             peers = race_df.copy()
-            runners = [_enrich_runner(rec, peers) for rec in race_df.to_dict(orient="records")]
+            runners = [_enrich_runner(rec, peers, paper_status=paper_status) for rec in race_df.to_dict(orient="records")]
             first = race_df.iloc[0]
             insights = build_race_insights(race_df)
             rp_verdict = race_verdict_from_runners(race_df)
@@ -370,8 +554,58 @@ def _base_frame(*, card_date: str | None = None, window_hours: int | None = 24) 
     if card_date and not frame.empty:
         frame = frame[frame["card_date"].astype(str) == card_date]
     if window_hours and not frame.empty:
-        frame = filter_next_hours(frame, hours=window_hours)
+        narrowed = filter_next_hours(frame, hours=window_hours)
+        if narrowed.empty and window_hours < 48:
+            widened = filter_next_hours(frame, hours=48)
+            if not widened.empty:
+                frame = widened
+            else:
+                frame = narrowed
+        else:
+            frame = narrowed
     return frame
+
+
+def _ui_data_status(frame: pd.DataFrame) -> dict:
+    from hibs_racing.matchbook_guard import status_payload as matchbook_status
+    from hibs_racing.scrapers.racing_scrape_api import odds_coverage_summary
+    from hibs_racing.scrapers.scrape_resilience import circuit_status
+    from hibs_racing.scrape_first import scrape_first_status
+
+    cov = odds_coverage_summary(frame)
+    scrape = scrape_first_status()
+    mb = matchbook_status()
+    oc = circuit_status().get("oddschecker") or {}
+
+    messages: list[str] = []
+    level = "ok"
+    if frame.empty:
+        level = "error"
+        messages.append("No runners loaded for this window — click Refresh 24h.")
+    elif not cov.get("ok"):
+        level = "warn"
+        messages.append(
+            f"Odds on {cov.get('priced', 0)}/{cov.get('total', 0)} runners "
+            f"({cov.get('coverage_pct', 0)}%) — target ≥{cov.get('min_pct', 40)}%."
+        )
+        if not mb.get("configured"):
+            messages.append("Matchbook not configured — add MATCHBOOK_USERNAME and MATCHBOOK_PASSWORD to .env.")
+        elif not mb.get("traffic_allowed"):
+            messages.append("Matchbook poll gated (rate limit, Mac quotes fresh, or poll interval).")
+        if oc.get("state") == "open":
+            err = str(oc.get("last_error") or "blocked")[:100]
+            messages.append(f"Oddschecker scrape paused ({err}).")
+
+    return {
+        "level": level,
+        "messages": messages,
+        "odds_coverage": cov,
+        "scrape_first": scrape,
+        "matchbook": mb,
+        "oddschecker_circuit": oc,
+        "odds_source": os.getenv("HIBS_ODDS_SOURCE", "auto"),
+        "cards_source": os.getenv("HIBS_RACING_CARD_SOURCE", "auto"),
+    }
 
 
 def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
@@ -397,6 +631,7 @@ def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
         "scoring_method": scoring_method,
         "feature_impact": feature_impact,
         "window_hours": window_hours,
+        "ui_data_status": _ui_data_status(frame),
     }
 
 
@@ -510,4 +745,5 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
         "gate_summary": gate_summary,
         "market_gauges": latest_gauges(limit=100),
         "parquet_path": str(Path(load_config()["paths"]["parquet_dir"]) / "card_scores.parquet"),
+        "ui_data_status": _ui_data_status(frame),
     }

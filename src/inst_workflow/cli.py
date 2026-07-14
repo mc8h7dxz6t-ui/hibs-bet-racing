@@ -1,0 +1,93 @@
+"""Workflow UI CLI."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+from pathlib import Path
+
+
+def _use_uvloop() -> None:
+    try:
+        import uvloop
+
+        uvloop.install()
+    except ImportError:
+        pass
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="inst-workflow",
+        description="Proof Console — 12 SKU picker + Compliance + Proxy-Risk workflows",
+    )
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_serve = sub.add_parser("serve", help="Start workflow UI server")
+    p_serve.add_argument("--host", default="127.0.0.1")
+    p_serve.add_argument("--port", type=int, default=8790)
+    p_serve.add_argument(
+        "--compliance-db",
+        type=Path,
+        default=Path(os.getenv("INST_COMPLIANCE_DB", "data/demo/compliance.sqlite")),
+    )
+    p_serve.add_argument(
+        "--proxy-db",
+        type=Path,
+        default=Path(os.getenv("INST_PROXY_DB", "data/demo/proxy.sqlite")),
+    )
+    p_serve.add_argument(
+        "--export-dir",
+        type=Path,
+        default=Path(os.getenv("INST_EXPORT_DIR", "data/demo/ui_exports")),
+    )
+    p_serve.add_argument(
+        "--demo-dir",
+        type=Path,
+        default=Path(os.getenv("PORTFOLIO_DEMO_DIR", "data/demo/portfolio")),
+        help="Portfolio demo directory (make demo-all output)",
+    )
+    p_serve.add_argument(
+        "--product",
+        choices=["compliance", "proxy", "both"],
+        default=os.getenv("INST_WORKFLOW_PRODUCT", "both"),
+        help="Single-product console or both (default: both)",
+    )
+
+    p_serve.add_argument(
+        "--no-shadow",
+        action="store_true",
+        help="Disable proxy shadow mode by default",
+    )
+
+    args = parser.parse_args(argv)
+
+    if args.cmd == "serve":
+        _use_uvloop()
+        import uvicorn
+
+        from inst_workflow import serve
+
+        serve.state.compliance_db = args.compliance_db
+        serve.state.proxy_db = args.proxy_db
+        serve.state.export_dir = args.export_dir
+        serve.state.demo_dir = args.demo_dir
+        serve.state.proxy_shadow = not args.no_shadow
+        serve.state.product = serve.normalize_product(args.product)
+
+        label = {
+            "compliance": "Compliance Logger",
+            "proxy": "Proxy-Risk Gateway",
+            "both": "Proof Console · Compliance · Proxy-Risk",
+        }[serve.state.product]
+        print(f"{label} Workflow Console → http://{args.host}:{args.port}")
+        uvicorn.run(serve.app, host=args.host, port=args.port, log_level="info")
+        return 0
+
+    parser.print_help()
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -62,6 +62,27 @@
     .toolbar-actions{width:100%;margin-left:0;}
 }
 .runner-highlight td{background:rgba(246,216,137,0.18)!important;box-shadow:inset 0 0 0 1px rgba(246,216,137,0.45);}
+.steam-badge{
+    display:inline-block;font-size:0.65em;font-weight:700;padding:2px 7px;border-radius:999px;
+    margin-left:4px;vertical-align:middle;text-transform:uppercase;letter-spacing:0.04em;
+}
+.steam-badge.proceed{background:rgba(16,185,129,0.2);color:#6ee7b7;border:1px solid rgba(16,185,129,0.45);}
+.steam-badge.scale_up{background:rgba(59,130,246,0.18);color:#93c5fd;border:1px solid rgba(59,130,246,0.4);}
+.steam-badge.abort,.steam-badge.drift{background:rgba(239,68,68,0.15);color:#fca5a5;border:1px solid rgba(239,68,68,0.35);}
+.steam-badge.unknown{background:rgba(148,163,184,0.12);color:#cbd5e1;border:1px dashed rgba(148,163,184,0.35);}
+.off-countdown{font-size:0.72em;color:var(--gold);font-weight:600;margin-left:6px;}
+@media(max-width:720px){
+    .runner-mobile-card{
+        display:block;padding:12px 14px;margin:8px 0;border-radius:12px;
+        border:1px solid var(--border);background:rgba(0,0,0,0.28);
+    }
+    .runner-mobile-card.has-value{border-color:rgba(246,216,137,0.45);}
+    .runner-mobile-card .rm-name{font-weight:700;font-size:1em;}
+    .runner-mobile-card .rm-meta{font-size:0.78em;color:var(--muted);margin-top:4px;}
+    .runner-mobile-card .rm-bars{display:flex;gap:6px;margin-top:8px;}
+    .runner-mobile-card .rm-bar{flex:1;height:6px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden;}
+    .runner-mobile-card .rm-bar > span{display:block;height:100%;background:linear-gradient(90deg,#007A33,#B7F7C8);}
+}
 .rp-verdict-block{
     margin:0 0 14px;padding:12px 14px;border-radius:10px;
     background:rgba(0,0,0,0.22);border:1px solid rgba(94,234,212,0.18);
@@ -169,6 +190,23 @@
     {% endif %}
 </div>
 
+{% if ui_data_status and ui_data_status.messages %}
+<div class="banner {% if ui_data_status.level == 'error' %}error{% elif ui_data_status.level == 'warn' %}{% endif %}"
+    style="{% if ui_data_status.level == 'warn' %}background:rgba(245,158,11,0.12);border-color:rgba(245,158,11,0.35);{% endif %}">
+    {% for msg in ui_data_status.messages %}
+    <div>{{ msg }}</div>
+    {% endfor %}
+    {% if ui_data_status.odds_coverage and ui_data_status.odds_coverage.priced is not none %}
+    <div style="font-size:0.85em;margin-top:4px;opacity:0.9;">
+        Odds source: {{ ui_data_status.odds_source }} · cards: {{ ui_data_status.cards_source }}
+        {% if ui_data_status.scrape_first and ui_data_status.scrape_first.scrape_first %}
+        · scrape-first ({{ ui_data_status.scrape_first.reason }})
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
 <div class="smart-portfolio-row">
 <section class="smart-picks-hero brand-panel-framed" id="smart-picks-hero" aria-live="polite">
     {% from '_hibs_brand.html' import brand_logo_watermark %}
@@ -226,7 +264,19 @@
                     <strong>{% if monitor.ledger.value_pick_strike_pct %}{{ monitor.ledger.value_pick_strike_pct }}%{% else %}—{% endif %}</strong>
                 </span>
                 {% endif %}
+                {% if monitor and monitor.recent_ledger %}
+                <span class="pill" title="Recent logged paper bets">{{ monitor.recent_ledger|length }} logged</span>
+                {% endif %}
             </div>
+            {% if monitor and monitor.recent_ledger %}
+            <ul class="recent-ledger-list" style="font-size:0.85em;margin:8px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px;">
+                {% for row in monitor.recent_ledger[:8] %}
+                <li class="pill {% if row.status == 'settled' %}ledger-settled{% else %}ledger-open{% endif %}">
+                    {{ row.horse_name or row.runner_id }} · {{ row.status }}{% if row.result_pnl is not none %} {{ '%+.2f'|format(row.result_pnl) }}u{% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
         </div>
         <span class="pill" id="monitor-updated">
             {% if monitor %}Updated {{ (monitor.updated_at or '')[:19]|replace('T',' ') }} UTC{% endif %}
@@ -240,7 +290,7 @@
                 <div class="hero-horse">{{ r.horse_name }}</div>
                 <div class="hero-meta">{{ r.off_time or '—' }} {{ r.course or '' }}<br>{{ r.jockey or '—' }} · {{ r.trainer or '—' }}</div>
                 <div class="hero-prob">{{ (r.model_place_prob or 0)|fmt_pct }}</div>
-                <div class="hero-meta">combo {{ r.combo_bayes_place|fmt_num }} · score {{ r.place_score|fmt_num }}
+                <div class="hero-meta">combo {{ r.combo_bayes_place|fmt_pct }} · score {{ r.place_score|fmt_num }}
                 {% if r.win_decimal and r.monetized_link %}
                 · <a class="odds-affiliate-link" href="{{ r.monetized_link }}" target="_blank" rel="noopener sponsored">win {{ r.win_decimal|fmt_num }}</a>
                 {% elif r.win_decimal %}
@@ -428,7 +478,7 @@
                                     data-stake-units="1"
                                     data-bet-type="each_way">
                                     <td class="num">{{ loop.index }}</td>
-                                    <td class="strong horse-cell">{{ r.horse_name }}{% if r.draw %} <span class="pill" style="font-size:0.7em;">({{ r.draw }})</span>{% endif %}{% if r.value_flag %} <span class="value-flag">VALUE</span>{% endif %}{% if r.value_gate_label %}<span class="gate-reason" title="Value not flagged">{{ r.value_gate_label }}</span>{% endif %}<span class="risk-badge-slot"></span></td>
+                                    <td class="strong horse-cell">{{ r.horse_name }}{% if r.draw %} <span class="pill" style="font-size:0.7em;">({{ r.draw }})</span>{% endif %}{% if r.value_flag %} <span class="value-flag">VALUE</span>{% endif %}{% if r.paper_ledger %} <span class="paper-ledger-badge pill" title="Paper ledger {{ r.paper_ledger.status }}">{% if r.paper_ledger.status == 'settled' %}✓{% else %}●{% endif %}</span>{% endif %}{% if r.value_gate_label %}<span class="gate-reason" title="Value not flagged">{{ r.value_gate_label }}</span>{% endif %}<span class="risk-badge-slot"></span></td>
                                     <td>{{ r.jockey or '—' }}</td>
                                     <td>{{ r.trainer or '—' }}</td>
                                     <td class="num">{% if r.official_rating is not none and r.official_rating == r.official_rating %}{{ r.official_rating|int }}{% else %}—{% endif %}</td>
@@ -461,7 +511,7 @@
                                     <td class="rp-comment" title="{{ r.card_comment or '' }}">{{ r.rp_comment_short or '—' }}</td>
                                     <td class="engine-opinion" title="{% for reason in r.engine_reasons or [] %}{{ reason }} {% endfor %}">{{ r.engine_opinion or '—' }}</td>
                                     <td class="num">{{ (r.model_place_prob or 0)|fmt_pct }}</td>
-                                    <td class="num">{{ r.combo_bayes_place|fmt_num }}</td>
+                                    <td class="num">{{ r.combo_bayes_place|fmt_pct }}</td>
                                     <td class="num">{{ r.ew_combined_ev|fmt_num }}</td>
                                     <td class="num stake-cell"><span class="stake-units-label">1.0u</span><span class="stake-cash-hint stake-cash-slot"></span></td>
                                 </tr>

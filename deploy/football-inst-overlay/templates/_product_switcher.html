@@ -1,0 +1,45 @@
+{# Cross-platform nav — UI only; logo + four product lanes. #}
+<style>
+.hibs-product-bar{
+    display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;
+    padding:8px 14px;margin-bottom:12px;
+    background:rgba(15,23,42,0.92);border:1px solid var(--border);border-radius:10px;
+}
+.hibs-product-switch{display:inline-flex;border:1px solid rgba(148,163,184,0.25);border-radius:999px;overflow:hidden;flex-wrap:wrap;}
+.hibs-product-pill{
+    padding:6px 14px;font-size:0.82em;font-weight:700;text-decoration:none;color:#cbd5e1;
+    background:rgba(0,0,0,0.25);transition:background .15s,color .15s;white-space:nowrap;
+}
+.hibs-product-pill:hover{background:var(--hibs-green-soft,rgba(13,148,136,0.18));color:#e2e8f0;}
+.hibs-product-pill.active{background:linear-gradient(135deg,var(--hibs-green,#0d9488),#0f766e);color:#fff;}
+.hibs-harvested-logo-link{display:inline-flex;align-items:center;line-height:0;flex-shrink:0;}
+.hibs-harvested-logo,.hibs-header-logo{
+    height:56px;width:auto;max-width:min(420px,58vw);object-fit:contain;
+    filter:drop-shadow(0 2px 12px rgba(0,0,0,0.35));
+}
+.hibs-product-bar .hibs-harvested-logo{height:64px;max-width:min(480px,62vw);}
+@media(max-width:640px){
+    .hibs-harvested-logo,.hibs-header-logo{height:44px;}
+    .hibs-product-bar .hibs-harvested-logo{height:48px;}
+    .hibs-product-pill{padding:6px 10px;font-size:0.78em;}
+}
+</style>
+<div class="hibs-product-bar" role="navigation" aria-label="HIBS products">
+    {% from '_hibs_brand.html' import harvested_logo_link %}
+    {{ harvested_logo_link(home_url=hibs_football_home_url|default('/'), height=64) }}
+    <div class="hibs-product-switch">
+        <a href="{{ hibs_football_home_url|default('/') }}"
+           class="hibs-product-pill {% if hibs_product_active == 'football' %}active{% endif %}">⚽ Football</a>
+        <a href="{{ hibs_racing_cards_url|default(hibs_racing_base_url|default('/racing') ~ '/cards') }}"
+           class="hibs-product-pill {% if hibs_product_active == 'racing' %}active{% endif %}"
+           rel="noopener">🏇 Racing</a>
+        <a href="{{ hibs_trading_status_url|default('/harvested-execution') }}"
+           class="hibs-product-pill {% if hibs_product_active == 'trading' %}active{% endif %}"
+           rel="noopener">📈 Trading</a>
+        <a href="{{ hibs_line_trader_url|default('/line-trader') }}"
+           class="hibs-product-pill {% if hibs_product_active in ('lines', 'fve') %}active{% endif %}"
+           rel="noopener">📊 Lines</a>
+    </div>
+    <span class="hibs-product-bar-spacer" style="flex:1;" aria-hidden="true"></span>
+    {% include '_inst_grade_chip.html' %}
+</div>

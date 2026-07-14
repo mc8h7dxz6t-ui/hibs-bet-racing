@@ -1,3 +1,10 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
+# Safe VPS/core stack — NOT the legacy FastAPI stub (no pydantic compile on Py 3.14).
+# Full install: pip install -e ".[ranker,web,api]" then hibs-bet/deploy/hibs-racing-web-requirements.txt
+pyyaml>=6.0
+pandas>=2.0
+pyarrow>=14.0
+python-dotenv>=1.0
+numpy>=1.26
+requests>=2.28
+flask>=3.0
+gunicorn>=22.0

@@ -340,38 +340,28 @@
 {% include '_launch_wait_overlay.html' %}
 <div class="ref-page">
     {% include '_product_switcher.html' %}
-    {% from '_hibs_brand.html' import site_crests, heritage_strip %}
     <header class="site-top">
         <div class="site-top-left">
-            {{ site_crests(height=56) }}
-            <div>
-                <div class="site-wordmark" id="site-wordmark">{{ product_name }}</div>
-                <div class="site-tagline" id="site-tagline">{{ product_tagline }}</div>
-            </div>
+            <nav class="site-links" aria-label="Racing">
+                <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Cards</a>
+                <a href="{{ url_for('insights_page') }}" class="nav-primary-only {% if request.endpoint == 'insights_page' %}active{% endif %}">Insights</a>
+                <a href="{{ url_for('tracker_page') }}" class="nav-primary-only {% if request.endpoint == 'tracker_page' %}active{% endif %}">Track Record</a>
+                <details class="nav-more">
+                    <summary>More ▾</summary>
+                    <div class="nav-more-menu">
+                        <a href="{{ url_for('portfolio_page') }}">Ledger</a>
+                        <a href="{{ url_for('backtest_page') }}">Backtest</a>
+                        <a href="{{ url_for('status_page') }}">Status</a>
+                        <a href="{{ url_for('tips_page') }}">Tips</a>
+                        <a href="{{ url_for('settings_monetization_page') }}">Settings</a>
+                    </div>
+                </details>
+            </nav>
         </div>
-        <nav class="site-links">
-            <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Cards</a>
-            <a href="{{ url_for('insights_page') }}" class="nav-primary-only {% if request.endpoint == 'insights_page' %}active{% endif %}">Insights</a>
-            <a href="{{ url_for('portfolio_page') }}" class="nav-primary-only {% if request.endpoint == 'portfolio_page' %}active{% endif %}">Ledger</a>
-            <a href="{{ url_for('tracker_page') }}" class="nav-primary-only {% if request.endpoint == 'tracker_page' %}active{% endif %}">Track Record</a>
-            <a href="{{ url_for('tips_page') }}" class="nav-primary-only {% if request.endpoint == 'tips_page' %}active{% endif %}">Tips</a>
-            <details class="nav-more">
-                <summary>Menu ▾</summary>
-                <div class="nav-more-menu">
-                    <a href="{{ url_for('insights_page') }}">Insights</a>
-                    <a href="{{ url_for('portfolio_page') }}">Ledger</a>
-                    <a href="{{ url_for('tracker_page') }}">Track Record</a>
-                    <a href="{{ url_for('tips_page') }}">Tips</a>
-                    <a href="{{ url_for('backtest_page') }}">Backtest</a>
-                    <a href="{{ url_for('status_page') }}">Status</a>
-                    <a href="{{ url_for('admin_branding_page') }}">Branding</a>
-                    <a href="{{ url_for('settings_monetization_page') }}">Monetization</a>
-                </div>
-            </details>
-            <a href="{{ url_for('backtest_page') }}" class="nav-primary-only {% if request.endpoint == 'backtest_page' %}active{% endif %}">Backtest</a>
-            <a href="{{ url_for('status_page') }}" class="nav-primary-only {% if request.endpoint == 'status_page' %}active{% endif %}">Status</a>
-        </nav>
         <div class="site-top-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <a href="{{ url_for('status_page') }}" id="racing-inst-chip" class="pill" title="Racing Inst++ lane — card freshness and paper ledger">
+                Inst++ <span id="racing-inst-card">—</span>
+            </a>
             {% if ranker_loaded %}<span class="pill ok">Ranker live</span>{% else %}<span class="pill warn">No ranker</span>{% endif %}
             <button type="button" class="btn" id="btn-refresh" title="Fetch next 24h GB+IRE cards, score with LightGBM, pull odds">Refresh 24h</button>
         </div>
@@ -401,11 +391,38 @@
     </footer>
 </div>
 <script>
+(function racingInstChip(){
+    const chip = document.getElementById('racing-inst-chip');
+    const el = document.getElementById('racing-inst-card');
+    if (!chip || !el) return;
+    async function tick(){
+        try {
+            const r = await fetch('/api/health');
+            const h = await r.json();
+            const fresh = h.card_fresh;
+            const tel = (h.telemetry_balance || {}).passed;
+            const settled = (h.paper || {}).settled || 0;
+            let label = fresh ? 'card OK' : 'stale';
+            if (tel === false) label += ' · tel';
+            if (settled < 25) label += ' · n=' + settled;
+            el.textContent = label;
+            chip.classList.toggle('ok', fresh === true && tel !== false);
+            chip.classList.toggle('warn', fresh !== true || tel === false);
+        } catch (e) {
+            el.textContent = 'offline';
+            chip.classList.add('warn');
+        }
+    }
+    tick();
+    setInterval(tick, 120000);
+})();
+</script>
+<script>
 document.getElementById('btn-refresh')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-refresh');
     btn.disabled = true; btn.textContent = 'Fetching…';
     try {
-        const r = await fetch('/api/refresh?source=racing_api&window=24&odds_source=auto', {method:'POST'});
+        const r = await fetch('/api/refresh?source=auto&window=24&odds_source=auto', {method:'POST'});
         const j = await r.json();
         if (j.ok) location.reload();
         else alert(j.error || 'Refresh failed');

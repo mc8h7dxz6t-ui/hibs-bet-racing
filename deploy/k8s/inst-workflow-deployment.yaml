@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inst-workflow
+  namespace: instpp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inst-workflow
+  template:
+    metadata:
+      labels:
+        app: inst-workflow
+    spec:
+      initContainers:
+        - name: bootstrap-portfolio
+          image: python:3.12-slim-bookworm
+          workingDir: /app
+          command:
+            - bash
+            - -c
+            - |
+              pip install -e ".[dev,instpp]" -q &&
+              if [[ ! -f /data/demo/portfolio/compliance.sqlite ]]; then
+                SKIP_LIVE=1 ./scripts/demo_portfolio_all.sh
+              fi
+              python3 ./scripts/verify_portfolio.py
+          envFrom:
+            - configMapRef:
+                name: instpp-config
+          volumeMounts:
+            - name: app
+              mountPath: /app
+            - name: demo-data
+              mountPath: /data/demo
+      containers:
+        - name: inst-workflow
+          image: python:3.12-slim-bookworm
+          workingDir: /app
+          command:
+            - bash
+            - -c
+            - |
+              pip install -e ".[dev,instpp]" -q &&
+              inst-workflow serve --host 0.0.0.0 --port 8790
+          ports:
+            - containerPort: 8790
+          envFrom:
+            - configMapRef:
+                name: instpp-config
+          volumeMounts:
+            - name: app
+              mountPath: /app
+            - name: demo-data
+              mountPath: /data/demo
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8790
+            initialDelaySeconds: 90
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8790
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - name: app
+          emptyDir: {}
+        - name: demo-data
+          persistentVolumeClaim:
+            claimName: instpp-demo-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inst-workflow
+  namespace: instpp
+spec:
+  selector:
+    app: inst-workflow
+  ports:
+    - port: 8790
+      targetPort: 8790

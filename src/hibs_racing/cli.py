@@ -632,6 +632,18 @@ def cmd_weekly_gate_efficacy(args: argparse.Namespace) -> int:
     return 0 if payload.get("ok") else 1
 
 
+def cmd_win_prob_calibration_fit(args: argparse.Namespace) -> int:
+    from hibs_racing.models.win_prob_calibration import fit_from_settled_paper
+
+    days = int(getattr(args, "days", 365) or 365)
+    payload = fit_from_settled_paper(days=days)
+    print(json.dumps(payload, indent=2, default=str))
+    if not payload.get("knots"):
+        print("WARN: insufficient settled paper rows for isotonic fit", file=sys.stderr)
+        return 1
+    return 0
+
+
 def cmd_route_execution(args: argparse.Namespace) -> int:
     from hibs_racing.live.execution_config import EXECUTION_DISABLED_MSG
     from hibs_racing.live.execution_router import route_execution_batch
@@ -685,9 +697,11 @@ def cmd_fetch_cards(args: argparse.Namespace) -> int:
     from hibs_racing.cards.store import store_upcoming_runners
     from hibs_racing.ingest.racecards import load_racecard_frames, parse_racecard_json
     from hibs_racing.ingest.racing_api import fetch_racing_api_racecards
+    from hibs_racing.scrapers.racing_scrape_api import resolve_cards_source
 
+    source = resolve_cards_source(args.source)
     try:
-        if args.source == "racing_api":
+        if source == "racing_api":
             frame = fetch_racing_api_racecards(
                 day=None if args.days else args.day,
                 days=args.days,
@@ -1380,6 +1394,13 @@ def main(argv: list[str] | None = None) -> int:
     p_wge.add_argument("--no-append", action="store_true", help="Print JSON only; do not append markdown")
     p_wge.set_defaults(func=cmd_weekly_gate_efficacy)
 
+    p_wpc = sub.add_parser(
+        "win-prob-calibration-fit",
+        help="Fit isotonic win-prob calibration from settled forward paper bets",
+    )
+    p_wpc.add_argument("--days", type=int, default=365, help="Lookback days for fit sample")
+    p_wpc.set_defaults(func=cmd_win_prob_calibration_fit)
+
     p_fc = sub.add_parser("fetch-cards", help="Fetch upcoming racecards (rpscrape or Racing API)")
     p_fc.add_argument("--day", type=int, default=1, help="Single day: 1=today, 2=tomorrow")
     p_fc.add_argument(
@@ -1388,7 +1409,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Range: 1=today only, 2=today+tomorrow (rpscrape --days N)",
     )
     p_fc.add_argument("--region", default="gb")
-    p_fc.add_argument("--source", choices=["rpscrape", "racing_api"], default="rpscrape")
+    p_fc.add_argument("--source", choices=["auto", "rpscrape", "racing_api"], default="rpscrape")
     p_fc.add_argument("--score", action="store_true", help="Score immediately after fetch")
     p_fc.add_argument("--odds", help="Optional odds CSV for EW value")
     p_fc.add_argument(
@@ -1405,7 +1426,7 @@ def main(argv: list[str] | None = None) -> int:
         "refresh-cards",
         help="Fetch next 24h GB+IRE cards, score with ranker, pull odds (same as web Refresh 24h)",
     )
-    p_refresh.add_argument("--source", choices=["rpscrape", "racing_api"], default="racing_api")
+    p_refresh.add_argument("--source", choices=["auto", "rpscrape", "racing_api"], default="auto")
     p_refresh.add_argument("--region", default="gb", help="Used only when --no-window")
     p_refresh.add_argument("--day", type=int, default=1, help="Used only when --no-window")
     p_refresh.add_argument("--window", type=int, default=24, help="Hours ahead to keep (default 24)")

@@ -218,6 +218,68 @@
     }
   }
 
+  function steamBadgeClass(gate) {
+    const g = String(gate || 'proceed').toLowerCase();
+    if (g === 'scale_up') return 'scale_up';
+    if (g === 'abort' || g === 'drift') return 'abort';
+    if (g === 'unknown') return 'unknown';
+    return 'proceed';
+  }
+
+  function applySteamBadges(root) {
+    (root || document).querySelectorAll('tr[data-steam-gate]').forEach((row) => {
+      const gate = row.dataset.steamGate || 'proceed';
+      const horseCell = row.querySelector('.horse-cell');
+      if (!horseCell) return;
+      let badge = horseCell.querySelector('.steam-badge');
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'steam-badge';
+        horseCell.appendChild(badge);
+      }
+      badge.className = 'steam-badge ' + steamBadgeClass(gate);
+      badge.textContent = gate;
+      badge.title = 'Steam gate: ' + gate;
+    });
+  }
+
+  function buildMobileRunnerCards(root) {
+    if (!window.matchMedia('(max-width: 720px)').matches) return;
+    (root || document).querySelectorAll('.race-table-wrap').forEach((wrap) => {
+      if (wrap.querySelector('.runner-mobile-stack')) return;
+      const rows = wrap.querySelectorAll('tbody tr[data-runner-id]');
+      if (!rows.length) return;
+      const stack = document.createElement('div');
+      stack.className = 'runner-mobile-stack';
+      rows.forEach((row) => {
+        const card = document.createElement('div');
+        const value = row.dataset.valueFlag === '1' || row.classList.contains('runner-value');
+        card.className = 'runner-mobile-card' + (value ? ' has-value' : '');
+        const name = row.dataset.horse || row.querySelector('.horse-cell')?.textContent?.trim() || '?';
+        const gate = row.dataset.steamGate || 'proceed';
+        const placePct = row.querySelector('td.num')?.textContent || '';
+        const win = row.dataset.winOdds || '';
+        const mwp = row.dataset.modelWinProb || '';
+        const barPct = Math.min(100, Math.max(0, Math.round(parseFloat(mwp || '0') * 100)));
+        card.innerHTML =
+          '<div class="rm-name">' + name + ' <span class="steam-badge ' + steamBadgeClass(gate) + '">' + gate + '</span></div>'
+          + '<div class="rm-meta">Win ' + (win || '—') + ' · model win ' + (barPct || '—') + '%</div>'
+          + '<div class="rm-bars"><div class="rm-bar" title="Model win%"><span style="width:' + barPct + '%"></span></div></div>';
+        card.addEventListener('click', () => {
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          row.classList.add('runner-highlight');
+        });
+        stack.appendChild(card);
+      });
+      wrap.parentNode.insertBefore(stack, wrap.nextSibling);
+    });
+  }
+
+  function enhanceRunnerPresentation() {
+    applySteamBadges();
+    buildMobileRunnerCards();
+  }
+
   function bindRacecard() {
     const meetingSel = document.getElementById('meeting-select');
     const panels = document.querySelectorAll('.meeting-panel');
@@ -292,11 +354,13 @@
     document.addEventListener('DOMContentLoaded', () => {
       bindRacecard();
       bindHero();
+      enhanceRunnerPresentation();
       window.HibsNoviceUX?.init();
     });
   } else {
     bindRacecard();
     bindHero();
+    enhanceRunnerPresentation();
     window.HibsNoviceUX?.init();
   }
 })();

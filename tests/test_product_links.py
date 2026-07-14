@@ -1,4 +1,4 @@
-"""Cross-platform product bar URL helpers."""
+"""Cross-platform product bar URL helpers for racing."""
 
 from __future__ import annotations
 
@@ -14,8 +14,16 @@ from hibs_racing.product_links import (
 
 def test_football_home_defaults_to_production_domain(monkeypatch):
     monkeypatch.delenv("HIBS_FOOTBALL_HOME_URL", raising=False)
+    monkeypatch.delenv("HIBS_FOOTBALL_BASE_URL", raising=False)
     monkeypatch.setenv("HIBS_DOMAIN", "hibs-bet.co.uk")
     assert football_home_url() == "https://hibs-bet.co.uk/"
+
+
+def test_cross_app_urls_with_football_base(monkeypatch):
+    monkeypatch.setenv("HIBS_FOOTBALL_BASE_URL", "https://hibs-bet.co.uk")
+    assert football_home_url() == "https://hibs-bet.co.uk/"
+    assert trading_status_url() == "https://hibs-bet.co.uk/harvested-execution"
+    assert line_trader_url() == "https://hibs-bet.co.uk/line-trader"
 
 
 def test_racing_cards_local_direct_port(monkeypatch):
@@ -46,14 +54,6 @@ def test_portfolio_api_url_local(monkeypatch):
     monkeypatch.delenv("HIBS_PORTFOLIO_API_URL", raising=False)
     monkeypatch.delenv("HIBS_URL_PREFIX", raising=False)
     assert portfolio_api_url() == "/api/portfolio/summary"
-
-
-def test_trading_and_lines_urls(monkeypatch):
-    monkeypatch.delenv("HIBS_TRADING_STATUS_URL", raising=False)
-    monkeypatch.delenv("HIBS_LINE_TRADER_URL", raising=False)
-    monkeypatch.setenv("HIBS_DOMAIN", "hibs-bet.co.uk")
-    assert trading_status_url() == "https://hibs-bet.co.uk/harvested-execution"
-    assert line_trader_url() == "https://hibs-bet.co.uk/line-trader"
 
 
 def test_product_bar_context_active_racing(monkeypatch):

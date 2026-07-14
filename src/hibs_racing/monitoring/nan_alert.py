@@ -17,7 +17,7 @@ from hibs_racing.features.store import connect, init_db
 logger = logging.getLogger(__name__)
 
 # In-memory frame columns that must not contain NaN when is_scored=True.
-_SCORED_REQUIRED = (
+SCORED_REQUIRED_FIELDS = _SCORED_REQUIRED = (
     "model_score",
     "model_win_prob",
     "model_place_prob",
@@ -127,7 +127,7 @@ def run_nan_integrity_check(
         else:
             scored_rows = frame[frame["model_score"].notna()]
 
-        for col in _SCORED_REQUIRED:
+        for col in SCORED_REQUIRED_FIELDS:
             if col not in scored_rows.columns:
                 continue
             bad = scored_rows[scored_rows[col].apply(_frame_val_nan)]

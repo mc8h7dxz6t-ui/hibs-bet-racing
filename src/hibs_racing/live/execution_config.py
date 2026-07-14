@@ -40,4 +40,9 @@ def execution_summary(cfg: dict | None = None) -> dict:
         "betfair_configured": betfair_configured(),
         "preferred_venues": [],
         "max_stake": 0.0,
+        "sub_100ms_exchange": False,
+        "co_location": False,
+        "institutional_note": (
+            "Sub-100ms exchange execution not in analytics license (EXECUTION_DISABLED)."
+        ),
     }

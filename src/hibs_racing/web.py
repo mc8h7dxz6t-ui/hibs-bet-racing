@@ -27,6 +27,7 @@ from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.config import db_path, load_config
 from hibs_racing.web_format import fmt_num, fmt_pct
 from hibs_racing.web_service import cards_deep_link_context, dashboard_context, health_status, insights_context
+from hibs_racing.middleware.auth import require_api_key, validate_auth_config
 from hibs_racing.utils.ui_settings import (
     apply_saved_ui_env,
     monetization_form_payload,
@@ -35,6 +36,9 @@ from hibs_racing.utils.ui_settings import (
 
 ROOT = Path(__file__).resolve().parents[2]
 FAQ_PATH = ROOT / "docs" / "TECHNICAL_DUE_DILIGENCE_FAQ.md"
+
+_HEALTH_CACHE: dict = {"t": 0.0, "payload": None}
+_HEALTH_TTL_SEC = float(os.environ.get("HIBS_RACING_HEALTH_TTL_SEC", "20"))
 
 
 def _channel_digest_preview(ctx: dict | None = None) -> str:
@@ -120,6 +124,7 @@ def _render_markdown_simple(text: str) -> str:
 def create_app() -> Flask:
     load_dotenv(ROOT / ".env")
     apply_saved_ui_env()
+    validate_auth_config()
     app = Flask(
         __name__,
         template_folder=str(ROOT / "templates"),
@@ -248,6 +253,7 @@ def create_app() -> Flask:
         return resp
 
     @app.route("/api/settle-paper", methods=["POST"])
+    @require_api_key
     def api_settle_paper():
         try:
             result = settle_paper_bets()
@@ -334,6 +340,7 @@ def create_app() -> Flask:
         )
 
     @app.route("/api/settings/monetization", methods=["GET", "POST"])
+    @require_api_key(methods=("POST",))
     def api_settings_monetization():
         if request.method == "GET":
             return jsonify(monetization_form_payload())
@@ -348,9 +355,11 @@ def create_app() -> Flask:
 
     @app.route("/status")
     def status_page():
+        hs = health_status()
         return render_template(
             "status.html",
-            health=health_status(),
+            health=hs,
+            evidence_truth=hs.evidence_truth,
             feature_impact=load_feature_impact_report(),
             ranker_attribution=live_ranker_attribution(),
             market_gauges=latest_gauges(limit=40),
@@ -371,6 +380,7 @@ def create_app() -> Flask:
         )
 
     @app.route("/api/tips/paste", methods=["POST"])
+    @require_api_key
     def api_tips_paste():
         from hibs_racing.tips.ingest import ingest_pasted_text
 
@@ -387,6 +397,7 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "error": str(exc)}), 500
 
     @app.route("/api/tips/fetch-imap", methods=["POST"])
+    @require_api_key
     def api_tips_fetch_imap():
         from hibs_racing.tips.imap_fetch import imap_configured
         from hibs_racing.tips.ingest import ingest_from_imap
@@ -411,9 +422,65 @@ def create_app() -> Flask:
     def api_ping():
         return jsonify({"ok": True, "product": "hibs-racing"})
 
+    @app.route("/api/scrapers/catalog")
+    def api_scrapers_catalog():
+        from hibs_racing.cards.runner_field_api import scraper_catalog_payload
+
+        return jsonify(scraper_catalog_payload())
+
+    @app.route("/api/scrape/status")
+    def api_scrape_status():
+        from hibs_racing.scrapers.racing_scrape_api import scrape_status_payload
+
+        return jsonify(scrape_status_payload())
+
+    @app.route("/api/scrape/cards")
+    def api_scrape_cards():
+        from hibs_racing.scrapers.racing_scrape_api import list_cards_payload
+
+        enrich = request.args.get("enrich", "0") == "1"
+        rescue = request.args.get("rescue", "0") == "1"
+        return jsonify(list_cards_payload(slim=not enrich, rescue=rescue))
+
+    @app.route("/api/scrape/resilience")
+    def api_scrape_resilience():
+        from hibs_racing.scrapers.robust_scrape_cycle import read_robust_scrape_status
+        from hibs_racing.scrapers.scrape_resilience import scrape_resilience_status
+
+        return jsonify(
+            {
+                "ok": True,
+                "resilience": scrape_resilience_status(),
+                "last_cycle": read_robust_scrape_status(),
+            }
+        )
+
+    @app.route("/api/runner/<runner_id>")
+    def api_runner_fields(runner_id: str):
+        from hibs_racing.cards.runner_field_api import resolve_runner_fields
+
+        rescue = request.args.get("rescue", "0") == "1"
+        payload = resolve_runner_fields(runner_id, rescue=rescue)
+        if not payload:
+            return jsonify({"ok": False, "error": "runner_not_found", "runner_id": runner_id}), 404
+        return jsonify({"ok": True, **payload})
+
     @app.route("/api/health")
     def api_health():
-        return jsonify(health_status().to_dict())
+        import time as _time
+
+        force = request.args.get("full", "0") == "1"
+        now = _time.monotonic()
+        if (
+            not force
+            and _HEALTH_CACHE["payload"] is not None
+            and (now - float(_HEALTH_CACHE["t"])) < _HEALTH_TTL_SEC
+        ):
+            return jsonify(_HEALTH_CACHE["payload"])
+        payload = health_status().to_dict()
+        _HEALTH_CACHE["t"] = now
+        _HEALTH_CACHE["payload"] = payload
+        return jsonify(payload)
 
     @app.route("/api/dashboard")
     def api_dashboard():
@@ -433,30 +500,74 @@ def create_app() -> Flask:
         return jsonify(payload)
 
     @app.route("/api/refresh", methods=["POST", "GET"])
+    @require_api_key
     def api_refresh():
-        source = request.args.get("source", "racing_api")
+        from hibs_racing.scrapers.racing_scrape_api import (
+            odds_coverage_summary,
+            resolve_cards_source,
+            run_thin_rescue_pass,
+        )
+
+        source = resolve_cards_source(request.args.get("source", "auto"))
         region = request.args.get("region", "gb")
         day = int(request.args.get("day", "1"))
         odds_source = os.environ.get("HIBS_ODDS_SOURCE") or request.args.get("odds_source", "auto")
         window = request.args.get("window", "24")
         window_hours = int(window) if window.isdigit() else 24
-        try:
-            paper_on_refresh = bool(load_config().get("paper", {}).get("log_on_refresh", True))
-            stats = refresh_cards(
-                source=source,
+        paper_on_refresh = bool(load_config().get("paper", {}).get("log_on_refresh", True))
+
+        def _do_refresh(src: str) -> dict:
+            return refresh_cards(
+                source=src,
                 region=region,
                 day=day,
                 odds_source=odds_source,
                 window_hours=window_hours if window_hours > 0 else None,
                 paper=paper_on_refresh,
             )
-            monitor = monitor_snapshot(refresh=False, settle=True)
-            payload = {"ok": True, **stats, "monitor": monitor}
-            if paper_on_refresh and not stats.get("paper_recon_clean", True):
-                return jsonify(payload), 503
-            return jsonify(payload)
+
+        stats: dict | None = None
+        err: Exception | None = None
+        try:
+            stats = _do_refresh(source)
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            err = exc
+            if source == "racing_api":
+                from hibs_racing.racing_api_guard import record_forbidden
+
+                record_forbidden(http_status=403, reason=str(exc)[:80])
+                fallback = resolve_cards_source("rpscrape")
+                if fallback != source:
+                    try:
+                        stats = _do_refresh(fallback)
+                        stats["cards_source_fallback"] = fallback
+                        err = None
+                    except Exception as exc2:
+                        err = exc2
+
+        if err is not None or stats is None:
+            return jsonify({"ok": False, "error": str(err)}), 500
+
+        rescue: dict | None = None
+        cov = odds_coverage_summary()
+        if not cov.get("ok") and os.getenv("HIBS_RACING_ROBUST_RESCUE", "1").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        ):
+            try:
+                rescue = run_thin_rescue_pass()
+                stats["thin_rescue"] = rescue
+                cov = rescue.get("coverage") or cov
+            except Exception as exc:
+                stats["thin_rescue_error"] = str(exc)[:120]
+
+        monitor = monitor_snapshot(refresh=False, settle=True)
+        payload = {"ok": True, **stats, "monitor": monitor, "odds_coverage": cov}
+        if paper_on_refresh and not stats.get("paper_recon_clean", True):
+            return jsonify(payload), 503
+        return jsonify(payload)
 
     from hibs_racing.url_prefix import apply_url_prefix
 

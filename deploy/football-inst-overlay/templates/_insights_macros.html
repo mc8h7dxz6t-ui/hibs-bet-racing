@@ -1,0 +1,6 @@
+{% macro monitor_tally(n) %}{{ n or 0 }}{% endmacro %}
+{% macro value_tally(n) %}{{ n or 0 }}{% endmacro %}
+{% macro result_badge(status) %}{{ status or '—' }}{% endmacro %}
+{% macro monitor_row(row) %}
+<tr><td>{{ row.home or '' }}</td><td>{{ row.away or '' }}</td><td>{{ row.status or '' }}</td></tr>
+{% endmacro %}

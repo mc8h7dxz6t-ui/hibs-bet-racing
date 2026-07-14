@@ -1,0 +1,435 @@
+name: Institutional++ CI
+
+on:
+  pull_request:
+    paths:
+      - "src/inst_spine/**"
+      - "src/compliance_log/**"
+      - "src/proxy_risk/**"
+      - "src/altdata/**"
+      - "src/ai_kit/**"
+      - "src/webhook_mesh/**"
+      - "src/ad_guard/**"
+      - "src/health_telemetry/**"
+      - "src/model_governor/**"
+      - "src/drift_gate/**"
+      - "src/webhook_replay/**"
+      - "src/spend_guard/**"
+      - "src/agent_ledger/**"
+      - "src/inst_workflow/**"
+      - "tests/test_inst*.py"
+      - "tests/test_compliance*.py"
+      - "tests/test_proxy*.py"
+      - "tests/test_altdata*.py"
+      - "tests/test_ai_kit*.py"
+      - "tests/test_webhook*.py"
+      - "tests/test_ad_guard*.py"
+      - "tests/test_health*.py"
+      - "tests/test_model*.py"
+      - "tests/test_drift*.py"
+      - "tests/test_spend*.py"
+      - "tests/test_agent*.py"
+      - "tests/test_production_profile*.py"
+      - "tests/test_sku_layer_hardening.py"
+      - "tests/test_redis_live.py"
+      - "tests/test_redis_soak.py"
+      - "tests/test_postgres_profile.py"
+      - "deploy/k8s/**"
+      - "docs/PRODUCTION_*.md"
+      - "scripts/instpp_*.sh"
+      - "scripts/demo_*.sh"
+      - "scripts/verify_portfolio.*"
+      - "docker-compose.instpp.yml"
+      - "Makefile"
+      - "pyproject.toml"
+      - ".github/workflows/instpp-ci.yml"
+  push:
+    branches: [main, master, "cursor/**"]
+    paths:
+      - "src/inst_spine/**"
+      - "src/compliance_log/**"
+      - "src/proxy_risk/**"
+      - "src/altdata/**"
+      - "src/ai_kit/**"
+      - "src/webhook_mesh/**"
+      - "src/ad_guard/**"
+      - "src/health_telemetry/**"
+      - "src/model_governor/**"
+      - "src/drift_gate/**"
+      - "src/webhook_replay/**"
+      - "src/spend_guard/**"
+      - "src/agent_ledger/**"
+      - "src/inst_workflow/**"
+      - "tests/**"
+      - "scripts/instpp_*.sh"
+      - "scripts/verify_portfolio.*"
+      - "docker-compose.instpp.yml"
+      - "Makefile"
+      - "pyproject.toml"
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Institutional++
+        run: pip install -e ".[dev,instpp]"
+
+      - name: Preflight
+        run: SKIP_INSTALL=1 ./scripts/demo_ready.sh
+
+      - name: Institutional smoke (12 SKUs)
+        run: ./scripts/instpp_smoke_test.sh
+
+  proof-lite:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 25
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Institutional++
+        run: pip install -e ".[dev,instpp]"
+
+      - name: Proof-lite (production profile + portfolio verify)
+        run: chmod +x ./scripts/instpp_proof_lite.sh && ./scripts/instpp_proof_lite.sh
+
+      - name: Upload portfolio manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: instpp-proof-lite-manifest
+          path: data/demo/portfolio/PORTFOLIO_MANIFEST.json
+          if-no-files-found: warn
+
+      - name: Upload proof-lite evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: instpp-proof-lite-evidence
+          path: |
+            docs/test_logs/instpp_proof_lite_latest_summary.json
+            docs/test_logs/instpp_ci_autonomy_phases.json
+          if-no-files-found: warn
+
+  rigorous:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 30
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: instpp
+          POSTGRES_PASSWORD: instpp
+          POSTGRES_DB: instpp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U instpp -d instpp_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    env:
+      INST_REDIS_URL: redis://localhost:6379/0
+      INST_TEST_POSTGRES_DSN: postgresql://instpp:instpp@localhost:5432/instpp_test
+      INST_RIGOROUS_FAIL_ON_SKIP: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Institutional++
+        run: pip install -e ".[dev,instpp]"
+
+      - name: Rigorous E2E 12/12
+        run: ./scripts/instpp_rigorous_test.sh
+
+      - name: Upload rigorous summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instpp-rigorous-summary
+          path: |
+            docs/test_logs/instpp_rigorous_latest_summary.json
+            docs/test_logs/instpp_ci_autonomy_phases.json
+          if-no-files-found: warn
+
+  proof:
+    runs-on: ubuntu-latest
+    needs: rigorous
+    timeout-minutes: 45
+    if: |
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'))
+      || github.event_name == 'schedule'
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: instpp
+          POSTGRES_PASSWORD: instpp
+          POSTGRES_DB: instpp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U instpp -d instpp_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    env:
+      INST_REDIS_URL: redis://localhost:6379/0
+      INST_TEST_POSTGRES_DSN: postgresql://instpp:instpp@localhost:5432/instpp_test
+      INST_RIGOROUS_FAIL_ON_SKIP: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Institutional++
+        run: pip install -e ".[dev,instpp]"
+
+      - name: Full proof (smoke + rigorous + verify-portfolio)
+        run: make proof
+
+  buyer-pack:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 20
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Institutional++
+        run: pip install -e ".[dev,instpp]"
+
+      - name: Buyer pack (demo-all + offline verify)
+        run: SKIP_SMOKE=1 ./scripts/instpp_buyer_pack.sh
+
+      - name: Upload buyer evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: instpp-buyer-pack
+          path: |
+            data/demo/portfolio/PORTFOLIO_MANIFEST.json
+            data/demo/portfolio/BUYER_PACK_SUMMARY.json
+            data/demo/portfolio/*_bundle.tar
+
+  redis-soak:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 15
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    env:
+      INST_REDIS_URL: redis://localhost:6379/0
+      INST_REDIS_SOAK_ITERATIONS: "50"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Institutional++
+        run: pip install -e ".[dev,instpp]"
+
+      - name: Redis production soak
+        run: ./scripts/instpp_redis_soak.sh
+
+  postgres-profile:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 10
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: instpp
+          POSTGRES_PASSWORD: instpp
+          POSTGRES_DB: instpp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U instpp -d instpp_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    env:
+      INST_TEST_POSTGRES_DSN: postgresql://instpp:instpp@localhost:5432/instpp_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Institutional++ (postgres extra)
+        run: pip install -e ".[dev,instpp]"
+
+      - name: Postgres profile (#1 ledger + #11 wallet)
+        run: python -m pytest tests/test_postgres_profile.py -v --tb=short
+
+  soc2-evidence:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 20
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Institutional++
+        run: pip install -e ".[dev,instpp]"
+
+      - name: Seed portfolio + verify for SOC2 evidence
+        run: |
+          SKIP_LIVE=1 ./scripts/demo_portfolio_all.sh
+          ./scripts/verify_portfolio.sh
+          make soc2-evidence
+
+      - name: Upload SOC2 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: instpp-soc2-evidence
+          path: |
+            docs/test_logs/soc2_evidence_latest.json
+            data/demo/portfolio/PORTFOLIO_MANIFEST.json
+          if-no-files-found: warn
+
+  compose-redis:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 20
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compose stack with Redis profile
+        run: |
+          docker compose -f docker-compose.instpp.yml --profile redis up -d --wait
+          docker compose -f docker-compose.instpp.yml ps
+
+      - name: Workflow UI health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8790/health; then
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose -f docker-compose.instpp.yml logs inst-workflow
+          exit 1
+
+      - name: Tear down compose stack
+        if: always()
+        run: docker compose -f docker-compose.instpp.yml --profile redis down -v
+
+  docker-extended:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 45
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Docker extended live proof (Redis + Postgres + rigorous)
+        run: |
+          chmod +x ./scripts/instpp_docker_extended_test.sh
+          ./scripts/instpp_docker_extended_test.sh
+
+      - name: Upload docker extended evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instpp-docker-extended-evidence
+          path: |
+            docs/test_logs/instpp_docker_extended_latest_summary.json
+            docs/test_logs/instpp_docker_extended_latest.log
+            docs/test_logs/instpp_rigorous_latest_summary.json
+            docs/test_logs/instpp_ci_autonomy_phases.json
+            docs/test_logs/soc2_evidence_latest.json
+          if-no-files-found: warn
+
+  docker-sku-rigorous:
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 60
+    if: |
+      github.event_name == 'workflow_dispatch'
+      || github.event_name == 'schedule'
+      || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'))
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker SKU rigorous matrix (12 isolated containers)
+        run: |
+          chmod +x ./scripts/instpp_docker_sku_rigorous.sh ./scripts/docker_sku_rigorous_one.sh
+          ./scripts/instpp_docker_sku_rigorous.sh
+
+      - name: Upload per-SKU docker rigorous logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instpp-docker-sku-rigorous-evidence
+          path: |
+            docs/test_logs/instpp_docker_sku_latest_summary.json
+            docs/test_logs/instpp_docker_sku_matrix_latest.log
+            docs/test_logs/instpp_docker_sku_*_latest.log
+            docs/test_logs/instpp_ci_autonomy_phases.json
+          if-no-files-found: warn

@@ -1,0 +1,38 @@
+[
+  {
+    "name": "json_price",
+    "field": "fare_price",
+    "html": "<script>{\"price\": 129.99}</script>",
+    "expected": 129.99
+  },
+  {
+    "name": "data_attr_price",
+    "field": "fare_price",
+    "html": "<div data-price='45.50'>Buy</div>",
+    "expected": 45.5
+  },
+  {
+    "name": "gbp_symbol",
+    "field": "fare_price",
+    "html": "<span>£ 89.00</span>",
+    "expected": 89.0
+  },
+  {
+    "name": "seats_json",
+    "field": "seat_count",
+    "html": "{\"seatsAvailable\": 12}",
+    "expected": 12
+  },
+  {
+    "name": "route_arrow",
+    "field": "route_code",
+    "html": "<p>EDI → LHR flight</p>",
+    "expected": "EDI-LHR"
+  },
+  {
+    "name": "no_match",
+    "field": "fare_price",
+    "html": "<p>no price here</p>",
+    "expected": null
+  }
+]

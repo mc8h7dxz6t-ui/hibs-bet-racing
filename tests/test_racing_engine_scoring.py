@@ -76,3 +76,24 @@ def test_attach_win_probs_numerical_stability():
     out = attach_win_probs(frame)
     assert out["model_win_prob"].between(0, 1).all()
     assert abs(out["model_win_prob"].sum() - 1.0) < 1e-6
+
+
+def test_production_mode_honors_on(monkeypatch, tmp_path):
+    monkeypatch.setenv("HIBS_RACING_PRODUCTION", "on")
+    monkeypatch.setattr("hibs_racing.config.ROOT", tmp_path)
+    cfg_dir = tmp_path / "ingest"
+    cfg_dir.mkdir()
+    (cfg_dir / "config.yaml").write_text(
+        """
+paths:
+  model_dir: data/models
+ranker:
+  scoring_mode: auto
+  production_scoring_mode: ranker
+  model_file: missing.txt
+  feature_file: missing.json
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(FileNotFoundError, match="CRITICAL: ranker preflight failed"):
+        apply_scoring(_sample_race_df(), config_path=cfg_dir / "config.yaml")

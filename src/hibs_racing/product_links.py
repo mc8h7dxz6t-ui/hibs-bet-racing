@@ -14,10 +14,19 @@ def _url_prefix() -> str:
     return (os.getenv("HIBS_URL_PREFIX") or "").strip().rstrip("/")
 
 
+def _football_base() -> str:
+    return (
+        os.getenv("HIBS_FOOTBALL_BASE_URL") or os.getenv("HIBS_PRODUCTION_URL") or ""
+    ).strip().rstrip("/")
+
+
 def football_home_url() -> str:
     explicit = (os.getenv("HIBS_FOOTBALL_HOME_URL") or "").strip().rstrip("/")
     if explicit:
         return explicit + "/"
+    base = _football_base()
+    if base:
+        return f"{base}/"
     return f"https://{_site_domain()}/"
 
 
@@ -41,6 +50,9 @@ def racing_cards_url() -> str:
     prefix = _url_prefix()
     if prefix:
         return f"{prefix}/cards"
+    explicit = (os.getenv("HIBS_RACING_BASE_URL") or "").strip().rstrip("/")
+    if explicit:
+        return f"{explicit}/cards" if not explicit.endswith("/cards") else explicit
     return "/cards"
 
 
@@ -48,6 +60,9 @@ def trading_status_url() -> str:
     explicit = (os.getenv("HIBS_TRADING_STATUS_URL") or "").strip().rstrip("/")
     if explicit:
         return explicit
+    base = _football_base()
+    if base:
+        return f"{base}/harvested-execution"
     return f"https://{_site_domain()}/harvested-execution"
 
 
@@ -55,6 +70,9 @@ def line_trader_url() -> str:
     explicit = (os.getenv("HIBS_LINE_TRADER_URL") or "").strip().rstrip("/")
     if explicit:
         return explicit
+    base = _football_base()
+    if base:
+        return f"{base}/line-trader"
     return f"https://{_site_domain()}/line-trader"
 
 
@@ -74,9 +92,7 @@ def product_bar_context(*, active: str | None = None) -> dict[str, Any]:
     racing = racing_base_url()
     return {
         "hibs_football_home_url": football_home_url(),
-        "hibs_football_base_url": (
-            os.getenv("HIBS_FOOTBALL_BASE_URL") or f"http://127.0.0.1:5000"
-        ).rstrip("/"),
+        "hibs_football_base_url": _football_base() or "http://127.0.0.1:5000",
         "hibs_racing_base_url": racing,
         "hibs_racing_home_url": racing_cards_url(),
         "hibs_racing_cards_url": racing_cards_url(),

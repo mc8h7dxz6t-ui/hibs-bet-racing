@@ -108,35 +108,6 @@ def enrich_feature_coverage(frame: pd.DataFrame) -> dict[str, float]:
     return out
 
 
-def impute_enrich_features(frame: pd.DataFrame, *args, **kwargs) -> pd.DataFrame:
-    # Institutional++ Invariant Feature Sequence Matrix
-    manifest = [
-        "official_rating", "rpr", "combo_bayes_win", "combo_bayes_place", "combo_prior_rides",
-        "jockey_bayes_place", "trainer_bayes_place", "jockey_place_90d", "trainer_place_90d",
-        "jockey_place_14d", "trainer_place_14d", "jockey_consistency", "trainer_consistency",
-        "jockey_vs_field", "trainer_vs_field", "jockey_cd_bayes_place", "trainer_cd_bayes_place",
-        "combo_cd_bayes_place", "combo_cd_prior_rides", "jockey_cdd_bayes_place", "trainer_cdd_bayes_place",
-        "combo_cdd_bayes_place", "jockey_cd_vs_field", "trainer_cd_vs_field", "combo_cd_vs_field",
-        "combo_cdd_vs_field", "hidden_potential", "or_vs_field", "rpr_vs_field", "nlp_pace_vs_field",
-        "nlp_pace_rank", "combo_vs_field", "draw_bias_z", "sectional_composite", "finishing_burst_level",
-        "days_since_last_run", "horse_course_win_rate", "horse_distance_win_rate", "horse_going_win_rate",
-        "jockey_rp_14d_win_rate", "trainer_rp_14d_win_rate", "trainer_rtf", "trainer_14d_strike",
-        "form_lto_position", "form_trip_change_f", "form_cd_flag", "form_bf_flag", "form_poor_runs_3"
-    ]
-    
-    # Neutralize sparse missing dimensions across features
-    if "trainer_14d_strike" in frame.columns:
-        frame["trainer_14d_strike"] = frame["trainer_14d_strike"].fillna(frame.get("trainer_rp_14d_win_rate", 0.11))
-    
-    for col in manifest:
-        if col not in frame.columns:
-            frame[col] = float("nan")
-        else:
-            frame[col] = frame[col].fillna(0.0 if "flag" in col or "change" in col else float("nan"))
-            
-    # Force absolute matrix dimension matching
-    base_cols = [c for c in frame.columns if c not in manifest]
-    frame = frame[base_cols + manifest]
 def impute_enrich_features(frame: pd.DataFrame, *, log_warnings: bool = True) -> pd.DataFrame:
     """Training-safe imputation for sparse historical enrich coverage."""
     out = compute_enrich_ranker_fields(frame)

@@ -36,6 +36,23 @@ def runner_off_dt(card_date: object, off_time: object) -> datetime | None:
     return base.replace(hour=mins // 60, minute=mins % 60, second=0, microsecond=0)
 
 
+def primary_card_date(frame: pd.DataFrame, *, now: datetime | None = None) -> str | None:
+    """Earliest card_date with a runner still upcoming; else the latest date in frame."""
+    if frame.empty or "card_date" not in frame.columns:
+        return None
+    now = now or datetime.now(LONDON)
+    dates = sorted(frame["card_date"].astype(str).str[:10].unique())
+    for day in dates:
+        day_rows = frame[frame["card_date"].astype(str).str[:10] == day]
+        for _, row in day_rows.iterrows():
+            off = runner_off_dt(row.get("card_date"), row.get("off_time"))
+            if off is None:
+                return day
+            if off >= now - timedelta(minutes=30):
+                return day
+    return dates[-1]
+
+
 def filter_next_hours(frame: pd.DataFrame, *, hours: int = 24) -> pd.DataFrame:
     """Keep runners whose off time falls within the next N hours (Europe/London)."""
     if frame.empty:

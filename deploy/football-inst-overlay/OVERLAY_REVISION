@@ -1,0 +1,7 @@
+built_at=2026-06-17T12:00:00Z
+source=manual-sync-trading-lines-three-host
+base_ref=cursor/robust-scrape-inst-7e4d
+head=trading-lines-gold-standard
+branch=cursor/robust-scrape-inst-7e4d
+file_count=170
+notes=vps-consolidated-gold-standard trading+lines; vps-three-host-layout; apply-vps-trading-link

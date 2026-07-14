@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: instpp-config
+  namespace: instpp
+data:
+  SKIP_LIVE: "1"
+  INST_WORKFLOW_DEFAULT_TAB: "proof"
+  PORTFOLIO_DEMO_DIR: "/data/demo/portfolio"
+  INST_EXPORT_DIR: "/data/demo/ui_exports"
+  INST_REDIS_URL: "redis://redis:6379/0"
+  WEBHOOK_DISPATCH_MODE: "redis"
+  INST_PRODUCTION_PROFILE: "1"
+  INST_REQUIRE_POSTGRES: "1"
+  INST_POSTGRES_DSN: "postgresql://instpp:instpp@postgres:5432/instpp"

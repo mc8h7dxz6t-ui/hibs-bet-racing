@@ -8,6 +8,7 @@ __pycache__/
 
 # Credentials & local IDE
 .env
+.env.instpp
 .DS_Store
 .idea/
 .vscode/
@@ -60,13 +61,8 @@ Library/
 .venv/
 exports/*.json
 exports/*.log
-data/batch_*.json
-
-.env
-.env.save
-*.db
-*.sqlite
-Library/
-.venv/
-exports/
 data/batch_*
+data/demo/
+data/*.wal
+data/*.genesis.json
+.demo/

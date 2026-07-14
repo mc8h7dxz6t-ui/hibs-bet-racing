@@ -1,0 +1,75 @@
+# Personal research stack — football + racing + FVE + shadow trading
+# Facts only. Not for sale, not PE diligence, not regulatory attestation.
+
+tenant_id: personal_research
+display_name: "HIBS personal stack (consolidated VPS)"
+tier: personal_research  # was managed_saas — honesty: SQLite cron research infra
+stack_layout: split  # football+racing on main; FVE on dedicated box optional
+
+managed: false  # personal project — no SaaS tenant
+
+vps:
+  host: "77.68.89.73"
+  user: root
+
+fve_vps:
+  host: "77.68.89.75"
+  user: root
+  api_port: 8010
+
+domain: hibs-bet.co.uk
+
+paths:
+  football: /opt/hibs-bet
+  racing: /opt/hibs-racing
+  trading: /opt/trading-core
+  fve_docker: /opt/fve-stack
+
+volumes:
+  racing_sqlite: /mnt/hibs-racing-data
+  fve_docker: /mnt/fve-data
+
+products:
+  football: true
+  racing: true
+  trading: true  # shadow soak only until Day-15 gate on VPS
+  fve: true
+
+env_pointers:
+  FVE_API_URL: "http://77.68.89.75:8010"
+  FVE_UPSTREAM_HOST: "77.68.89.75"
+  HIBS_RACING_BASE_URL: "https://hibs-bet.co.uk/racing"
+  HIBS_RACING_SQLITE_BEEFY: "1"
+  HIBS_PRESERVE_GREEN_CACHE: "1"
+
+staking_policy:
+  mode: personal_green_lights
+  script: scripts/verify_personal_staking_greenlights.sh
+  football_brier_pass_max: 0.22
+  football_brier_min_n: 30
+  racing_place_brier_pass_max: 0.25
+  clv_min_n: 25
+  live_execution: false  # EXECUTION_DISABLED on racing; football evidence-gated
+
+whitelabel:
+  tagline: "Personal sports research stack"
+  tagline_short: "HIBS research"
+  partner: ""
+  logo: hibs_harvested_logo.png
+
+provision:
+  hands_off: true
+  install_racing_cron: true
+  link_racing: true
+  link_trading: true
+  bootstrap_fve_remote: true
+  mount_racing_volume: true
+  skip_data_seed: true
+
+notes: |
+  Personal project operations:
+    - Staking: run verify_personal_staking_greenlights.sh — not buyer_ready / B2B language
+    - Cache: HIBS_PRESERVE_GREEN_CACHE=1 keeps best disk bundle when enrich is low
+    - F7–F10 + R5–R8 need live match/card days — summer gaps are expected
+    - trading_core partial in repo — shadow only until promotion gate passes on VPS
+  Deploy: overlay from hibs-bet-racing + vps-sync-football-inst-overlay.sh

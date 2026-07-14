@@ -1,0 +1,7 @@
+<div id="hibs-launch-overlay" class="hibs-launch-overlay" role="status" aria-live="polite" aria-busy="true" aria-label="Loading">
+    <div class="hibs-launch-panel">
+        {% from '_hibs_brand.html' import launch_crest %}{{ launch_crest(height=120) }}
+        <p class="hibs-launch-tagline">{{ hibs_tagline|default('Harvested Intelligent Betting Systems') }}</p>
+        <p class="hibs-launch-tip" id="hibs-launch-tip">Loading…</p>
+    </div>
+</div>

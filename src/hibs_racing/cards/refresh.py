@@ -10,7 +10,7 @@ from hibs_racing.cards.refresh_parallel import parallel_map, timed_ms
 from hibs_racing.cards.enrich import dual_source_enrich
 from hibs_racing.cards.score_card import score_upcoming_cards
 from hibs_racing.cards.store import store_upcoming_runners
-from hibs_racing.cards.window import filter_next_hours
+from hibs_racing.cards.window import filter_next_hours, primary_card_date
 from hibs_racing.config import load_config
 from hibs_racing.ingest.rate_limit import (
     racing_api_pause,
@@ -25,22 +25,32 @@ from hibs_racing.odds.loader import resolve_scoring_odds
 
 
 def _cards_cfg() -> dict:
-    return load_config().get("cards", {})
+    cfg = dict(load_config().get("cards", {}))
+    inc = (os.getenv("HIBS_RACING_INCLUDE_TOMORROW") or "").strip().lower()
+    if inc in ("1", "true", "yes", "on"):
+        cfg["include_tomorrow"] = True
+    elif inc in ("0", "false", "no", "off"):
+        cfg["include_tomorrow"] = False
+    pdo = (os.getenv("HIBS_RACING_PRIMARY_DATE_ONLY") or "").strip().lower()
+    if pdo in ("1", "true", "yes", "on"):
+        cfg["primary_date_only"] = True
+    elif pdo in ("0", "false", "no", "off"):
+        cfg["primary_date_only"] = False
+    return cfg
 
 
 def _parallel_workers() -> int:
     return max(1, int(_cards_cfg().get("parallel_workers", 4)))
 
 
-def fetch_cards_window(
+def _fetch_cards_window_inner(
     *,
-    source: str = "racing_api",
-    regions: tuple[str, ...] = ("gb", "ire"),
-    hours: int = 24,
-    parallel_workers: int | None = None,
+    source: str,
+    regions: tuple[str, ...],
+    hours: int,
+    parallel_workers: int,
 ) -> pd.DataFrame:
-    """Next N hours of UK + Ireland racecards (today by default; optional tomorrow)."""
-    workers = parallel_workers if parallel_workers is not None else _parallel_workers()
+    """Fetch raw cards for GB/IRE without window trim (caller applies filter_next_hours)."""
     cfg = _cards_cfg()
     include_tomorrow = bool(cfg.get("include_tomorrow", False))
     frames: list[pd.DataFrame] = []
@@ -52,7 +62,6 @@ def fetch_cards_window(
                 return fetch_racing_api_racecards(day=1, days=2, region=region)
             return fetch_racing_api_racecards(day=1, region=region)
 
-        # Free Racing API tier rate-limits parallel today/tomorrow × region calls.
         region_pause = racing_api_pause()
         for i, region in enumerate(regions):
             if i > 0 and region_pause > 0:
@@ -68,6 +77,7 @@ def fetch_cards_window(
         def _fetch_rpscrape(region: str) -> pd.DataFrame:
             return load_racecard_frames(days=2, region=region)
 
+        workers = parallel_workers
         if len(regions) > 1 and workers > 1:
             frames = parallel_map(list(regions), _fetch_rpscrape, max_workers=min(workers, len(regions)))
         else:
@@ -81,13 +91,55 @@ def fetch_cards_window(
     if not frames:
         raise RuntimeError("No racecards returned for GB/IRE window.")
     combined = pd.concat(frames, ignore_index=True)
-    combined = combined.drop_duplicates(subset=["runner_id"], keep="last")
-    combined = filter_next_hours(combined, hours=hours)
+    return combined.drop_duplicates(subset=["runner_id"], keep="last")
+
+
+def _trim_card_window(frame: pd.DataFrame, *, hours: int) -> pd.DataFrame:
+    cfg = _cards_cfg()
+    combined = filter_next_hours(frame, hours=hours)
     if cfg.get("primary_date_only", True) and not combined.empty:
-        dates = pd.to_datetime(combined["card_date"].astype(str), errors="coerce").dropna()
-        if not dates.empty:
-            primary = dates.min().date().isoformat()
+        primary = primary_card_date(combined)
+        if primary:
             combined = combined[combined["card_date"].astype(str).str[:10] == primary].copy()
+    return combined
+
+
+def fetch_cards_window(
+    *,
+    source: str = "racing_api",
+    regions: tuple[str, ...] = ("gb", "ire"),
+    hours: int = 24,
+    parallel_workers: int | None = None,
+) -> pd.DataFrame:
+    """Next N hours of UK + Ireland racecards (today by default; optional tomorrow)."""
+    workers = parallel_workers if parallel_workers is not None else _parallel_workers()
+    fetch_source = source
+    try:
+        raw = _fetch_cards_window_inner(
+            source=fetch_source,
+            regions=regions,
+            hours=hours,
+            parallel_workers=workers,
+        )
+    except Exception as exc:
+        if fetch_source != "racing_api":
+            raise
+        from hibs_racing.racing_api_guard import record_forbidden
+
+        record_forbidden(http_status=403, reason=str(exc)[:80])
+        raw = _fetch_cards_window_inner(
+            source="rpscrape",
+            regions=regions,
+            hours=hours,
+            parallel_workers=workers,
+        )
+    combined = _trim_card_window(raw, hours=hours)
+    if combined.empty and hours < 48:
+        widened = _trim_card_window(raw, hours=48)
+        if not widened.empty:
+            combined = widened
+    if combined.empty:
+        raise RuntimeError("No racecards in GB/IRE window — check API credentials or off times.")
     return combined
 
 
@@ -103,6 +155,9 @@ def refresh_cards(
     parallel_workers: int | None = None,
     poll_milestone: str | None = None,
 ) -> dict:
+    from hibs_racing.scrapers.racing_scrape_api import resolve_cards_source
+
+    source = resolve_cards_source(source)
     workers = parallel_workers if parallel_workers is not None else _parallel_workers()
     timings: dict[str, float] = {}
 
@@ -148,7 +203,9 @@ def refresh_cards(
 
     _, timings["store_ms"] = timed_ms(lambda: store_upcoming_runners(cards, source=src))
 
-    (odds, odds_meta), timings["odds_ms"] = timed_ms(lambda: resolve_scoring_odds(cards, odds_source=odds_source))
+    (odds, odds_meta), timings["odds_ms"] = timed_ms(
+        lambda: resolve_scoring_odds(cards, odds_source=odds_source, force_live_odds=True)
+    )
 
     milestone = poll_milestone or os.environ.get("HIBS_POLL_MILESTONE", "baseline")
     polled_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -191,6 +248,10 @@ def refresh_cards(
             snapshot_odds_source=str(odds_meta.get("source") or "live"),
         )
     )
+
+    from hibs_racing.cards.lane_paper import attach_lane_flags, sync_lane_paper_ledger
+
+    scored = attach_lane_flags(scored)
 
     from hibs_racing.institutional.ledger_events import append_ledger_event
     from hibs_racing.institutional.run_manifest import build_run_manifest, persist_run_manifest
@@ -254,6 +315,15 @@ def refresh_cards(
                     "clean": recon.is_clean,
                 }
             )
+            sync_lane_paper_ledger(
+                day_scored,
+                card_date=str(card_date),
+                lane="gate3",
+                flag_col="flag_gate3",
+                manifest_id=manifest_id,
+                odds_source=str(odds_meta.get("source")),
+                engine_profile=engine_profile,
+            )
         if milestone in ("baseline", "pre_race_30m"):
             from hibs_racing.odds.exchange_quotes import sync_value_picks_from_scored
 
@@ -292,12 +362,9 @@ def refresh_cards(
         "timings_ms": timings,
     }
     from hibs_racing.institutional.telemetry_balance import record_telemetry_balance
+    from hibs_racing.models.ranker_preflight import observation_lane_enabled
 
-    observation_lane = os.environ.get("HIBS_OBSERVATION_LANE", "1").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+    observation_lane = observation_lane_enabled()
     telemetry = record_telemetry_balance(
         result,
         manifest_id=manifest_id,

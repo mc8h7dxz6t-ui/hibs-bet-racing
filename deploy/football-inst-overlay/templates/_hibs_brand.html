@@ -1,0 +1,22 @@
+{# HIBS brand macros — overlay must ship this (base.html + dashboard depend on it). #}
+{% macro harvested_logo_link(home_url='/', height=56, file=hibs_harvested_logo|default('hibs_harvested_logo.png'), css_class='') %}
+<a href="{{ home_url }}" class="hibs-harvested-logo-link {{ css_class }}" title="{{ hibs_tagline|default('Harvested Intelligent Betting Systems') }}">
+    <img src="{{ url_for('static', filename=file) }}" alt="HIBS" class="hibs-harvested-logo" height="{{ height }}" decoding="async">
+</a>
+{% endmacro %}
+
+{% macro inline_crest(size=22, file=hibs_harvested_logo|default('hibs_harvested_logo.png'), css_class='') %}
+<img src="{{ url_for('static', filename=file) }}" alt="" class="{{ css_class }}" height="{{ size }}" aria-hidden="true" decoding="async">
+{% endmacro %}
+
+{% macro empty_crest(file=hibs_harvested_logo|default('hibs_harvested_logo.png'), height=48) %}
+<img src="{{ url_for('static', filename=file) }}" alt="" height="{{ height }}" style="opacity:0.35;margin-bottom:8px;" aria-hidden="true" decoding="async">
+{% endmacro %}
+
+{% macro footer_crest(file=hibs_harvested_logo|default('hibs_harvested_logo.png'), height=22) %}
+<img src="{{ url_for('static', filename=file) }}" alt="" class="footer-crest" height="{{ height }}" aria-hidden="true" decoding="async">
+{% endmacro %}
+
+{% macro launch_crest(file=hibs_harvested_logo|default('hibs_harvested_logo.png'), height=120) %}
+<img class="hibs-launch-crest hibs-harvested-logo" src="{{ url_for('static', filename=file) }}" alt="HIBS" height="{{ height }}" decoding="async">
+{% endmacro %}

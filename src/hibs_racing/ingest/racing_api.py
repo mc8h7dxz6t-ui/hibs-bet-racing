@@ -112,33 +112,51 @@ def _request_racecards(
     password: str,
     base: str,
 ) -> dict:
+    from hibs_racing.racing_api_guard import racing_api_traffic_allowed, record_forbidden
+
+    if not racing_api_traffic_allowed():
+        raise RuntimeError("Racing API traffic blocked — use rpscrape fallback")
+
     endpoint = ENDPOINTS.get(plan, ENDPOINTS["free"])
     url = f"{base.rstrip('/')}{endpoint}"
     params: dict[str, object] = {"day": day, "region_codes": [region.lower()]}
-    retries = max(1, int(pause_sec("racing_api_429_retries")))
-    pause = pause_sec("racing_api_429_pause_sec")
-    last_resp: requests.Response | None = None
-    for attempt in range(retries):
-        resp = requests.get(url, params=params, auth=(user, password), timeout=30)
-        last_resp = resp
-        if resp.status_code != 429:
-            break
-        if attempt + 1 < retries:
-            time.sleep(pause * (attempt + 1))
-    resp = last_resp
-    assert resp is not None
-    if resp.status_code == 401:
-        raise RuntimeError(
-            "Racing API 401 — check RACING_API_USERNAME and RACING_API_PASSWORD in .env "
-            "(Dashboard → My Account on theracingapi.com)."
-        )
-    if resp.status_code == 403:
-        raise RuntimeError(
-            f"Racing API 403 — plan '{plan}' may not include {endpoint}. "
-            "Set RACING_API_PLAN=free (default) or upgrade."
-        )
-    resp.raise_for_status()
-    return resp.json()
+
+    def _do_request() -> dict:
+        retries = max(1, int(pause_sec("racing_api_429_retries")))
+        pause = pause_sec("racing_api_429_pause_sec")
+        last_resp: requests.Response | None = None
+        for attempt in range(retries):
+            resp = requests.get(url, params=params, auth=(user, password), timeout=30)
+            last_resp = resp
+            if resp.status_code != 429:
+                break
+            if attempt + 1 < retries:
+                time.sleep(pause * (attempt + 1))
+        resp = last_resp
+        assert resp is not None
+        if resp.status_code == 401:
+            record_forbidden(http_status=401, reason="unauthorized")
+            raise RuntimeError(
+                "Racing API 401 — check RACING_API_USERNAME and RACING_API_PASSWORD in .env "
+                "(Dashboard → My Account on theracingapi.com)."
+            )
+        if resp.status_code == 403:
+            record_forbidden(http_status=403, reason=f"plan_{plan}")
+            raise RuntimeError(
+                f"Racing API 403 — plan '{plan}' may not include {endpoint}. "
+                "Set RACING_API_PLAN=free (default) or upgrade."
+            )
+        if resp.status_code == 429:
+            record_forbidden(http_status=429, reason="rate_limit")
+        resp.raise_for_status()
+        return resp.json()
+
+    try:
+        from hibs_racing.scrapers.scrape_resilience import resilient_call
+
+        return resilient_call("racing_api", _do_request, operation=f"racecards_{day}_{region}", max_retries=2)
+    except Exception:
+        return _do_request()
 
 
 def fetch_racing_api_racecards(

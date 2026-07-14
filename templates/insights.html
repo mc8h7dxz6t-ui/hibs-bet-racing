@@ -41,6 +41,13 @@
     {% if scoring_method %}<span class="pill ok">{{ scoring_method }} model</span>{% endif %}
 </div>
 
+{% if ui_data_status and ui_data_status.messages %}
+<div class="banner {% if ui_data_status.level == 'error' %}error{% endif %}"
+    style="{% if ui_data_status.level == 'warn' %}background:rgba(245,158,11,0.12);border-color:rgba(245,158,11,0.35);{% endif %}">
+    {% for msg in ui_data_status.messages %}<div>{{ msg }}</div>{% endfor %}
+</div>
+{% endif %}
+
 <section class="insights-hero brand-panel-framed">
     {% from '_hibs_brand.html' import brand_logo_watermark %}
     {{ brand_logo_watermark(modifier='brand-logo-watermark--corner-tl') }}

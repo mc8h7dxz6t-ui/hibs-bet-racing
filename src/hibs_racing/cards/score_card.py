@@ -33,7 +33,9 @@ def score_upcoming_cards(
     """Score card runners → win/place probs → optional EW value vs offered odds."""
     cfg = load_config()
     db = database or db_path(cfg)
-    paper_cfg = cfg.get("paper", {})
+    from hibs_racing.sale_gates import apply_sale_gate_overrides
+
+    paper_cfg = apply_sale_gate_overrides(cfg.get("paper", {}))
     min_place_ev = paper_cfg.get("min_place_ev", 0.05)
     min_combo_place = paper_cfg.get("min_combo_bayes_place", 0.22)
     longshot_threshold = float(paper_cfg.get("harville_longshot_win_prob_threshold", 0.03))
@@ -52,6 +54,10 @@ def score_upcoming_cards(
         frame = frame.merge(cards[["runner_id"] + card_cols], on="runner_id", how="left")
 
     frame = apply_scoring(frame)
+
+    from hibs_racing.models.win_prob_calibration import apply_win_prob_calibration
+
+    frame = apply_win_prob_calibration(frame)
 
     place_probs: list[float] = []
     for _, group in frame.groupby("race_id", sort=False):

@@ -58,10 +58,10 @@ fi
 
 # 4. Cron posture
 CRON="$(crontab -l 2>/dev/null || true)"
-if echo "${CRON}" | grep -q 'hibs-racing/scripts/daily_refresh.sh'; then
+if echo "${CRON}" | grep -qE 'hibs-racing/scripts/(daily_refresh|cron_refresh_wrapper)\.sh'; then
   pass "daily_refresh cron installed"
 else
-  warn "daily_refresh cron not installed — see MASTER_OPERATIONS_SCORECARD §3.2"
+  warn "daily_refresh cron not installed — run: bash scripts/install_observation_cron.sh"
 fi
 if echo "${CRON}" | grep -v '^#' | grep -q 'weekly_retrain.sh'; then
   fail "weekly_retrain.sh is active in crontab — disable during observation freeze"

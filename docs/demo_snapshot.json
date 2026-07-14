@@ -1,0 +1,8 @@
+{
+  "action": "approve",
+  "amount": 1000,
+  "currency": "GBP",
+  "customer_id": "cust_demo_001",
+  "policy": "kyc_tier_2",
+  "risk_score": 0.12
+}

@@ -24,4 +24,7 @@ run_logged "weekly-build-matrix" \
 run_logged "weekly-train-ranker" \
   hibs-racing train-ranker
 
+run_tier2_logged "weekly-win-prob-calibration" \
+  hibs-racing win-prob-calibration-fit --days 365
+
 echo "Weekly retrain completed — check data/models/feature_impact.json for holdout stats."

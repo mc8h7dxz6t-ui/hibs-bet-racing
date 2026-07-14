@@ -11,9 +11,14 @@ activate_venv() {
   if [[ -n "${HIBS_RACING_SKIP_VENV:-}" ]]; then
     return 0
   fi
+  local py="python3"
+  if command -v python3.13 >/dev/null 2>&1; then py=python3.13
+  elif command -v python3.12 >/dev/null 2>&1; then py=python3.12
+  elif command -v python3.11 >/dev/null 2>&1; then py=python3.11
+  fi
   if [[ ! -d .venv ]]; then
-    echo "Creating .venv..."
-    python3 -m venv .venv
+    echo "Creating .venv with ${py}..."
+    "${py}" -m venv .venv
   fi
   # shellcheck disable=SC1091
   source .venv/bin/activate
@@ -48,6 +53,39 @@ raceform_db() {
     return 1
   fi
   printf '%s' "${db}"
+}
+
+require_ranker_artifacts() {
+  local prod="${HIBS_RACING_PRODUCTION:-0}"
+  case "${prod}" in
+    1|true|yes|on) ;;
+    *) return 0 ;;
+  esac
+  local mp="${ROOT}/data/models/lgbm_ranker.txt"
+  local fp="${ROOT}/data/models/lgbm_ranker_features.json"
+  local missing=0
+  if [[ ! -s "${mp}" ]]; then
+    echo "CRITICAL: missing ranker model ${mp}" >&2
+    missing=1
+  fi
+  if [[ ! -s "${fp}" ]]; then
+    echo "CRITICAL: missing ranker features ${fp}" >&2
+    missing=1
+  fi
+  if [[ "${missing}" -ne 0 ]]; then
+    echo "Aborting — set HIBS_RACING_PRODUCTION=0 for dev heuristic mode or train ranker." >&2
+    return 1
+  fi
+  if [[ -x "${ROOT}/.venv/bin/python" ]]; then
+  PY="${ROOT}/.venv/bin/python"
+  else
+  PY="python3"
+  fi
+  if ! "${PY}" "${ROOT}/scripts/verify_ranker_artifacts.py" >/dev/null; then
+    echo "CRITICAL: ranker preflight failed (manifest/feature parity)" >&2
+    "${PY}" "${ROOT}/scripts/verify_ranker_artifacts.py" >&2 || true
+    return 1
+  fi
 }
 
 lookback_date() {
@@ -122,4 +160,20 @@ run_logged() {
   fi
   echo "OK: ${name}" | tee -a "${log}"
   return 0
+}
+
+# TIER 2 — housekeeping; never aborts the daily cron.
+run_tier2_logged() {
+  local name="$1"
+  shift
+  if ! run_logged "${name}" "$@"; then
+    echo "WARN: [TIER-2] ${name} failed — continuing" >&2
+  fi
+}
+
+is_production_mode() {
+  case "${HIBS_RACING_PRODUCTION:-0}" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
 }

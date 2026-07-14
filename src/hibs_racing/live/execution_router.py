@@ -44,6 +44,7 @@ class ExecutionIntent:
     min_place_odds: float | None = None
     betfair_market_id: str | None = None
     betfair_selection_id: int | None = None
+    model_win_prob: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -373,6 +374,32 @@ class MatchbookExecutionAdapter:
                 odds=odds,
                 stake=stake,
             )
+            filled_odds = float(
+                resp.get("odds") or resp.get("decimal-odds") or resp.get("average-odds-matched") or odds
+            )
+            model_prob = float(intent.model_win_prob or 0)
+            if model_prob > 0 and filled_odds > 1:
+                from hibs_racing.execution.slippage_guard import evaluate_fill_slippage
+
+                verdict = evaluate_fill_slippage(
+                    requested_odds=float(odds),
+                    filled_odds=filled_odds,
+                    model_prob=model_prob,
+                )
+                if not verdict.allowed:
+                    return _leg_result(
+                        intent,
+                        venue=self.name,
+                        bet_leg=bet_leg,
+                        status="held",
+                        dry_run=False,
+                        message=verdict.reason,
+                        market_id=market_id,
+                        runner_id=runner_id,
+                        odds=filled_odds,
+                        stake=stake,
+                        payload={"offer": offer, "slippage": verdict.to_dict(), "response": resp},
+                    )
             return _leg_result(
                 intent,
                 venue=self.name,
@@ -564,6 +591,21 @@ class ExecutionRouter:
                     message=EXECUTION_DISABLED_MSG,
                 )
             ]
+        try:
+            from hibs_predictor.safety.brier_circuit_breaker import execution_lockout_active
+
+            if execution_lockout_active():
+                return [
+                    ExecutionResult(
+                        intent=intent,
+                        venue="none",
+                        status="held",
+                        dry_run=self.dry_run,
+                        message="Brier circuit breaker OPEN — execution lockout",
+                    )
+                ]
+        except Exception:
+            pass
         stake = min(float(intent.stake), self.max_stake) * float(intent.kelly_multiplier or 1.0)
         intent = replace(intent, stake=round(stake, 2))
 
@@ -686,6 +728,7 @@ def build_execution_intents(
                     row.get("matchbook_place_market_id") or mb.get("matchbook_place_market_id")
                 ),
                 matchbook_event_id=_int_or_none(row.get("matchbook_event_id") or mb.get("matchbook_event_id")),
+                model_win_prob=_float_or_none(row.get("model_win_prob")),
             )
         )
     return intents

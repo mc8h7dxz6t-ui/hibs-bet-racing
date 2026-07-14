@@ -20,7 +20,15 @@ if [[ ! -f "${HIBS_RACING_DB_PATH:-/data/feature_store.sqlite}" ]]; then
 fi
 
 if [[ ! -f /data/models/lgbm_ranker.txt ]]; then
+  if [[ "${HIBS_RACING_PRODUCTION:-0}" =~ ^(1|true|yes|on)$ ]]; then
+    echo "CRITICAL: /data/models/lgbm_ranker.txt missing in production mode" >&2
+    exit 1
+  fi
   echo "WARNING: /data/models/lgbm_ranker.txt missing — copy trained model into /data volume or mount at build time."
+fi
+
+if [[ "${HIBS_RACING_PRODUCTION:-0}" =~ ^(1|true|yes|on)$ ]]; then
+  python /app/scripts/verify_ranker_artifacts.py || exit 1
 fi
 
 echo "Starting supercronic (06:00 daily_refresh)…"

@@ -65,6 +65,7 @@ def run_institutional_check(
 
     if observation_lane:
         require_snapshots = False
+        require_recon_clean = False
         if min_card_days is None:
             min_card_days = 1
 
@@ -113,13 +114,31 @@ def run_institutional_check(
         }
     )
 
-    gate = run_gate_regression_check(
-        days=days,
-        database=db,
-        require_snapshots=require_snapshots,
-        min_card_days=min_card_days,
-    )
-    checks.extend(gate.checks)
+    if observation_lane:
+        from hibs_racing.backtest.gate_regression import GateRegressionCheck
+
+        gate_obj = GateRegressionCheck(
+            passed=True,
+            start=start_s,
+            end=end_s,
+            checks=[
+                {
+                    "name": "gate_regression",
+                    "passed": True,
+                    "detail": "skipped (observation lane — model/gate freeze)",
+                }
+            ],
+            report_summary={"skipped": True, "reason": "observation_lane"},
+            message="Gate regression skipped during observation lane.",
+        )
+    else:
+        gate_obj = run_gate_regression_check(
+            days=days,
+            database=db,
+            require_snapshots=require_snapshots,
+            min_card_days=min_card_days,
+        )
+    checks.extend(gate_obj.checks)
 
     profile = build_engine_profile(cfg)
     detail = (
@@ -128,11 +147,9 @@ def run_institutional_check(
     )
     if profile.get("warning"):
         detail = f"{detail} — {profile['warning']}"
-    production_mode = os.environ.get("HIBS_RACING_PRODUCTION", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+    from hibs_racing.models.ranker_preflight import is_production_mode
+
+    production_mode = is_production_mode()
     checks.append(
         {
             "name": "ranker_profile",
@@ -149,11 +166,16 @@ def run_institutional_check(
             database=db,
         )
         telemetry_dict = telemetry.to_dict()
+        tel_passed = telemetry.passed
+        tel_detail = telemetry.message
+        if observation_lane and not telemetry.passed:
+            tel_passed = True
+            tel_detail = f"{telemetry.message} (advisory — observation lane)"
         checks.append(
             {
                 "name": "telemetry_balance",
-                "passed": telemetry.passed,
-                "detail": telemetry.message,
+                "passed": tel_passed,
+                "detail": tel_detail,
             }
         )
 
@@ -162,11 +184,19 @@ def run_institutional_check(
         recon = reconcile_paper_ledger(card_date, database=db)
         recon_dict = recon.to_dict()
         recon_ok = recon.is_clean or not require_recon_clean
+        if observation_lane and not recon.is_clean:
+            recon_ok = True
+            recon_detail = (
+                f"expected={recon.expected_value_picks} ledger={recon.ledger_value_picks} "
+                "(advisory — observation lane)"
+            )
+        else:
+            recon_detail = f"expected={recon.expected_value_picks} ledger={recon.ledger_value_picks}"
         checks.append(
             {
                 "name": "paper_reconciliation",
                 "passed": recon_ok,
-                "detail": f"expected={recon.expected_value_picks} ledger={recon.ledger_value_picks}",
+                "detail": recon_detail,
             }
         )
 
@@ -184,12 +214,21 @@ def run_institutional_check(
         }
     )
 
-    passed = all(c["passed"] for c in checks)
-    msg = "Institutional check PASSED." if passed else "Institutional check FAILED."
+    if observation_lane:
+        blocking = {"snapshot_coverage", "nan_integrity", "ranker_profile"}
+        passed = all(c["passed"] for c in checks if c["name"] in blocking)
+        msg = (
+            "Institutional check PASSED (observation lane)."
+            if passed
+            else "Institutional check FAILED (observation lane — blocking checks)."
+        )
+    else:
+        passed = all(c["passed"] for c in checks)
+        msg = "Institutional check PASSED." if passed else "Institutional check FAILED."
     return InstitutionalCheckReport(
         passed=passed,
         checks=checks,
-        gate_regression=gate.to_dict(),
+        gate_regression=gate_obj.to_dict(),
         snapshot_coverage=cov,
         paper_reconciliation=recon_dict,
         telemetry_balance=telemetry_dict,

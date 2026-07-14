@@ -1,0 +1,148 @@
+"""Display timezone helpers — kickoff labels and calendar windows."""
+
+from __future__ import annotations
+
+import os
+from datetime import date, datetime, time, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
+
+_DEFAULT_TZ = "Europe/London"
+
+
+def display_timezone() -> ZoneInfo:
+    key = (os.getenv("HIBS_DISPLAY_TZ") or _DEFAULT_TZ).strip() or _DEFAULT_TZ
+    try:
+        return ZoneInfo(key)
+    except Exception:
+        return ZoneInfo(_DEFAULT_TZ)
+
+
+def display_tz_label() -> str:
+    tz = display_timezone()
+    return (os.getenv("HIBS_DISPLAY_TZ_LABEL") or str(tz)).strip() or str(tz)
+
+
+def local_today() -> date:
+    return datetime.now(display_timezone()).date()
+
+
+def parse_kickoff_utc(raw: str | None) -> Optional[datetime]:
+    if not raw:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def attach_kickoff_display(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Add display kickoff fields to a fixture row."""
+    ko = parse_kickoff_utc(row.get("kickoff_iso") or row.get("date"))
+    tz = display_timezone()
+    out = dict(row)
+    if ko is None:
+        out.setdefault("kickoff_display", "—")
+        return out
+    local = ko.astimezone(tz)
+    out["kickoff_utc"] = ko.isoformat()
+    out["kickoff_local"] = local.isoformat()
+    out["kickoff_display"] = local.strftime("%a %d %b %H:%M")
+    out["display_tz"] = str(tz)
+    out["display_tz_label"] = display_tz_label()
+    return out
+
+
+def enrich_fixtures_kickoff(fixtures: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return [attach_kickoff_display(fx) for fx in fixtures if isinstance(fx, dict)]
+
+
+def _day_label_for_ref(target: date, ref: date) -> str:
+    if target == ref:
+        return "Today"
+    if target == ref - timedelta(days=1):
+        return "Yesterday"
+    if target == ref + timedelta(days=1):
+        return "Tomorrow"
+    return target.strftime("%A %d %B")
+
+
+def _coerce_local_date(value: date | str) -> date:
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    text = str(value).strip()[:10]
+    return date.fromisoformat(text)
+
+
+def day_heading_for_local_date(
+    d: date | str,
+    count: int | None = None,
+    today: date | None = None,
+) -> str:
+    """
+    Dashboard day heading.
+
+    Legacy:
+      - ``day_heading_for_local_date(day_iso, fixture_count)``
+      - ``day_heading_for_local_date(day_iso, fixture_count, today_local)``
+    """
+    target = _coerce_local_date(d)
+    ref = today if today is not None else local_today()
+    label = _day_label_for_ref(target, ref)
+    if count is None:
+        return label
+    noun = "fixture" if int(count) == 1 else "fixtures"
+    return f"{label} · {int(count)} {noun}"
+
+
+def fixture_window_start_utc(
+    now: datetime | None = None,
+    /,
+    *,
+    days_ahead: int | None = None,
+) -> datetime:
+    """UTC start of a local calendar day in display TZ (``now`` ignored — legacy compat)."""
+    ahead = 0 if days_ahead is None else int(days_ahead)
+    tz = display_timezone()
+    target = local_today() + timedelta(days=ahead)
+    start_local = datetime.combine(target, time.min, tzinfo=tz)
+    return start_local.astimezone(timezone.utc)
+
+
+def fixture_window_end_utc(
+    now: datetime | None = None,
+    window_days: int | None = None,
+    /,
+    *,
+    days_ahead: int | None = None,
+    days: int | None = None,
+) -> datetime:
+    """
+    UTC end of a local calendar day in display TZ.
+
+    Legacy callers:
+      - ``fixture_window_end_utc(now, N)`` — inclusive N-day window from today
+      - ``fixture_window_end_utc(days=N)`` — same (``days`` = window length)
+
+    Preferred: ``days_ahead=k`` — end of ``local_today() + k`` days.
+    """
+    if days_ahead is not None:
+        ahead = int(days_ahead)
+    else:
+        span = window_days if window_days is not None else days
+        if span is None:
+            ahead = 0
+        else:
+            ahead = max(0, int(span) - 1)
+    tz = display_timezone()
+    target = local_today() + timedelta(days=ahead)
+    end_local = datetime.combine(target, time.max.replace(microsecond=0), tzinfo=tz)
+    return end_local.astimezone(timezone.utc)

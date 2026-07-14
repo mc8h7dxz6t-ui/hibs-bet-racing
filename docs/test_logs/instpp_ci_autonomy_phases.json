@@ -1,0 +1,289 @@
+{
+  "suite": "instpp_ci_autonomy",
+  "scope": "sku_only_no_sports",
+  "branch": "cursor/sku-forensic-layer-fixes-b511",
+  "commit": "d1b9b8a",
+  "status": "PASSED",
+  "portfolio_envelope_target": "9.5-10/10 after phase_1_2_3",
+  "last_run": {
+    "suite": "docker-extended",
+    "status": "PASSED",
+    "finished_utc": "2026-07-11T14:52:46Z",
+    "github_ref": "",
+    "github_workflow": "",
+    "github_run_id": "",
+    "inst_redis_url_set": false,
+    "inst_test_postgres_dsn_set": false,
+    "inst_rigorous_fail_on_skip": "",
+    "skipped_sections": [],
+    "log_file": "test.log",
+    "docker_extended_summary": "docs/test_logs/instpp_docker_extended_latest_summary.json"
+  },
+  "phases": {
+    "phase_1": [
+      {
+        "id": "1.1",
+        "name": "orphan_tests_in_smoke",
+        "artifact": "scripts/instpp_smoke_test.sh",
+        "tests": "tests/test_production_profile.py, tests/test_sku_layer_hardening.py",
+        "status": "implemented"
+      },
+      {
+        "id": "1.2",
+        "name": "proof_lite_pr_job",
+        "artifact": ".github/workflows/instpp-ci.yml",
+        "script": "scripts/instpp_proof_lite.sh",
+        "status": "implemented"
+      },
+      {
+        "id": "1.3",
+        "name": "rigorous_skip_honesty",
+        "artifact": "scripts/instpp_rigorous_test.sh",
+        "summary_field": "skipped_sections",
+        "status": "implemented"
+      },
+      {
+        "id": "1.4",
+        "name": "remove_or_true_masks",
+        "artifact": "scripts/instpp_rigorous_test.sh",
+        "targets": "ad_guard, drift_gate enforce, spend_guard demo-drift-lock, agent_ledger deny",
+        "status": "implemented"
+      }
+    ],
+    "phase_2": [
+      {
+        "id": "2.1",
+        "name": "production_profile_serve_ready",
+        "artifact": "tests/test_production_profile_serve_ready.py",
+        "status": "implemented"
+      },
+      {
+        "id": "2.2",
+        "name": "postgres_compliance_spend_http",
+        "artifact": "scripts/instpp_rigorous_test.sh",
+        "status": "implemented"
+      },
+      {
+        "id": "2.3",
+        "name": "redis_stream_dispatch",
+        "artifact": "scripts/instpp_rigorous_test.sh",
+        "status": "implemented"
+      },
+      {
+        "id": "2.4",
+        "name": "bundle_signing_rigorous",
+        "artifact": "scripts/instpp_rigorous_test.sh",
+        "status": "implemented"
+      },
+      {
+        "id": "2.5",
+        "name": "api_key_prod_profile_tests",
+        "artifact": "tests/test_production_profile_serve_ready.py",
+        "status": "implemented"
+      },
+      {
+        "id": "2.6",
+        "name": "webhook_dlq_poison_matrix",
+        "artifact": "tests/test_webhook_mesh_chaos.py",
+        "status": "implemented"
+      },
+      {
+        "id": "2.7",
+        "name": "make_proof_on_main",
+        "artifact": ".github/workflows/instpp-ci.yml",
+        "status": "implemented"
+      },
+      {
+        "id": "2.8",
+        "name": "weekly_scheduled_instpp_ci",
+        "artifact": ".github/workflows/instpp-ci.yml",
+        "status": "implemented"
+      },
+      {
+        "id": "2.9",
+        "name": "compose_redis_ci_job",
+        "artifact": ".github/workflows/instpp-ci.yml",
+        "status": "implemented"
+      },
+      {
+        "id": "2.10",
+        "name": "k8s_pvc_init_bootstrap",
+        "artifact": "deploy/k8s/pvc-instpp.yaml",
+        "status": "implemented"
+      },
+      {
+        "id": "2.11",
+        "name": "f8_retention_per_sku",
+        "artifact": "scripts/instpp_retention_drill.sh",
+        "status": "implemented"
+      },
+      {
+        "id": "2.12",
+        "name": "demo_mg_gold_mandatory",
+        "artifact": "scripts/demo_mg_gold.sh",
+        "status": "implemented"
+      }
+    ],
+    "phase_3": [
+      {
+        "id": "3.1",
+        "name": "health_device_auth_rigorous",
+        "artifact": "tests/test_phase3_buyer_depth.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.2",
+        "name": "health_observation_lane_verify",
+        "artifact": "tests/test_phase3_buyer_depth.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.3",
+        "name": "altdata_per_feed_ci_slot",
+        "artifact": "tests/test_phase3_buyer_depth.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.4",
+        "name": "altdata_structural_rescue_golden",
+        "artifact": "tests/test_altdata_structural_golden.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.5",
+        "name": "webhook_consumer_crash_reclaim",
+        "artifact": "tests/test_phase3_buyer_depth.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.6",
+        "name": "webhook_poison_dlq_matrix",
+        "artifact": "tests/test_webhook_mesh_chaos.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.7",
+        "name": "wrcap_corruption_fuzz",
+        "artifact": "tests/test_webhook_mesh_chaos.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.8",
+        "name": "compliance_export_policy_manifest",
+        "artifact": "src/compliance_log/export_policy.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.9",
+        "name": "compliance_mtls_ingest",
+        "artifact": "tests/test_phase3_buyer_depth.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.10",
+        "name": "soc2_evidence_collector",
+        "artifact": "scripts/soc2_evidence_collector.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.11",
+        "name": "bundle_hmac_signing",
+        "artifact": "src/inst_spine/bundle_sign.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.12",
+        "name": "epoch_roots_export_verify",
+        "artifact": "tests/test_phase3_buyer_depth.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.13",
+        "name": "ai_kit_agent_ledger_rigorous",
+        "artifact": "scripts/instpp_rigorous_test.sh",
+        "status": "implemented"
+      },
+      {
+        "id": "3.14",
+        "name": "model_governor_artifact_hash_gate",
+        "artifact": "src/model_governor/integrity.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.15",
+        "name": "ad_guard_creative_body_fuzz",
+        "artifact": "tests/test_phase3_buyer_depth.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.16",
+        "name": "ai_kit_step_fn_contract",
+        "artifact": "tests/test_phase3_buyer_depth.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.17",
+        "name": "k8s_init_verify_portfolio",
+        "artifact": "deploy/k8s/inst-workflow-deployment.yaml",
+        "status": "implemented"
+      },
+      {
+        "id": "3.18",
+        "name": "phase_3_ci_ledger",
+        "artifact": "scripts/instpp_ci_autonomy_log.py",
+        "status": "implemented"
+      },
+      {
+        "id": "3.19",
+        "name": "zero_skip_rigorous_on_main",
+        "artifact": ".github/workflows/instpp-ci.yml",
+        "status": "implemented"
+      },
+      {
+        "id": "3.20",
+        "name": "soc2_evidence_ci_job",
+        "artifact": ".github/workflows/instpp-ci.yml",
+        "status": "implemented"
+      }
+    ],
+    "phase_4": [
+      {
+        "id": "4.1",
+        "name": "docker_compose_postgres_extended",
+        "artifact": "docker-compose.instpp.yml",
+        "status": "implemented"
+      },
+      {
+        "id": "4.2",
+        "name": "docker_extended_logged_suite",
+        "artifact": "scripts/instpp_docker_extended_test.sh",
+        "status": "implemented"
+      },
+      {
+        "id": "4.3",
+        "name": "portfolio_evidence_sheet",
+        "artifact": "docs/PORTFOLIO_EVIDENCE_SHEET.md",
+        "status": "implemented"
+      },
+      {
+        "id": "4.4",
+        "name": "platform_compare_deep_dive",
+        "artifact": "docs/INST_PLUS_PLATFORM_COMPARE.md",
+        "status": "implemented"
+      },
+      {
+        "id": "4.5",
+        "name": "docker_extended_ci_job",
+        "artifact": ".github/workflows/instpp-ci.yml",
+        "status": "implemented"
+      }
+    ]
+  },
+  "artifacts": {
+    "rigorous_summary": "docs/test_logs/instpp_rigorous_latest_summary.json",
+    "proof_lite_summary": "docs/test_logs/instpp_proof_lite_latest_summary.json",
+    "docker_extended_summary": "docs/test_logs/instpp_docker_extended_latest_summary.json",
+    "soc2_evidence": "docs/test_logs/soc2_evidence_latest.json"
+  },
+  "updated_utc": "2026-07-11T14:52:46Z"
+}
