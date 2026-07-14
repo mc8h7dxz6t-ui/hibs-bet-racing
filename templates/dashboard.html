@@ -167,6 +167,22 @@
     font-size:0.68em;line-height:1.45;color:#e2e8f0;white-space:pre-wrap;word-break:break-word;
 }
 .phone-caption{font-size:0.68em;color:#64748b;text-align:center;margin-top:10px;}
+.day-section{margin-bottom:20px;}
+.day-heading{
+    font-family:'Orbitron',monospace;font-size:1.05em;color:var(--hibs-neon);
+    margin:0 0 10px;padding:8px 0;border-bottom:1px solid rgba(94,234,212,0.2);
+}
+.day-heading .day-date{font-size:0.72em;color:var(--muted);font-weight:600;margin-left:8px;}
+.day-picks-row{
+    display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-bottom:12px;
+}
+.day-pick-chip{
+    flex:1 1 200px;max-width:320px;padding:10px 12px;border-radius:10px;
+    border:1px solid rgba(94,234,212,0.22);background:rgba(0,0,0,0.28);font-size:0.8em;
+}
+.day-pick-chip strong{display:block;color:var(--text);margin-bottom:4px;}
+.day-pick-chip .meta{color:var(--muted);font-size:0.9em;line-height:1.4;}
+.day-picks-link{align-self:center;font-size:0.82em;color:var(--hibs-neon);text-decoration:none;white-space:nowrap;}
 {% endblock %}
 
 {% block content %}
@@ -177,68 +193,20 @@
     {% if highlight_runner %}data-highlight-runner="{{ highlight_runner }}"{% endif %}></div>
 {% endif %}
 <div class="window-banner">
-    <strong>Next {{ window_hours or 24 }}h</strong>
-    <span>UK &amp; Ireland racecards · meetings sorted by first race time</span>
+    <strong>Racecards</strong>
+    <span>Next {{ window_hours or 24 }}h · UK &amp; Ireland</span>
     {% if card_dates %}
     <span class="pill">{{ card_dates|join(' · ') }}</span>
     {% endif %}
-    {% if scoring_method %}<span class="pill ok">Engine: {{ scoring_method }}</span>{% endif %}
-    {% if ranker_profile %}
-    <span class="pill scoring-pill" title="Feature manifest matched to saved ranker">
-        {{ ranker_profile.feature_count or '?' }} features{% if ranker_profile.uses_enrich %} · enrich{% endif %}
-    </span>
-    {% endif %}
 </div>
 
-{% if ui_data_status and ui_data_status.messages %}
-<div class="banner {% if ui_data_status.level == 'error' %}error{% elif ui_data_status.level == 'warn' %}{% endif %}"
-    style="{% if ui_data_status.level == 'warn' %}background:rgba(245,158,11,0.12);border-color:rgba(245,158,11,0.35);{% endif %}">
+{% if ui_data_status and ui_data_status.level == 'error' and ui_data_status.messages %}
+<div class="banner error">
     {% for msg in ui_data_status.messages %}
     <div>{{ msg }}</div>
     {% endfor %}
-    {% if ui_data_status.odds_coverage and ui_data_status.odds_coverage.priced is not none %}
-    <div style="font-size:0.85em;margin-top:4px;opacity:0.9;">
-        Odds source: {{ ui_data_status.odds_source }} · cards: {{ ui_data_status.cards_source }}
-        {% if ui_data_status.scrape_first and ui_data_status.scrape_first.scrape_first %}
-        · scrape-first ({{ ui_data_status.scrape_first.reason }})
-        {% endif %}
-    </div>
-    {% endif %}
 </div>
 {% endif %}
-
-<div class="smart-portfolio-row">
-<section class="smart-picks-hero brand-panel-framed" id="smart-picks-hero" aria-live="polite">
-    {% from '_hibs_brand.html' import brand_logo_watermark %}
-    {{ brand_logo_watermark(modifier='brand-logo-watermark--corner-tl') }}
-    <h2>Hibs Smart Portfolio Picks</h2>
-    <p class="trk-intro" style="margin:0;font-size:0.82em;color:var(--muted);">
-        Top 3 high-conviction each-way angles — value-flagged, strong data quality, steam gate clear.
-    </p>
-    <div class="smart-picks-grid" id="smart-picks-grid">
-        <div class="smart-pick-card"><span class="sp-meta">Loading smart picks…</span></div>
-    </div>
-</section>
-
-<section class="webhook-preview-card brand-panel-framed" id="webhook-preview-card" aria-label="Automated premium channel stream preview">
-    <h2>Automated Premium Channel Stream</h2>
-    <p class="wp-sub">Exact 06:01 AM Telegram / Discord digest — partner tracking links included.</p>
-    <div class="phone-frame">
-        <div class="phone-notch"></div>
-        <div class="phone-screen">
-            <div class="phone-header">
-                <div class="phone-app-icon">🏇</div>
-                <div class="phone-app-name">Hibs Racing Premium</div>
-                <div class="phone-time">06:01</div>
-            </div>
-            <div class="phone-bubble">
-                <pre id="channel-digest-text">{{ channel_digest or '' }}</pre>
-            </div>
-        </div>
-        <p class="phone-caption">Pushed by notify-daily after morning batch</p>
-    </div>
-</section>
-</div>
 
 {% if pick_candidates is defined %}
 <script id="pick-candidates-data" type="application/json">{{ pick_candidates|tojson }}</script>
@@ -246,67 +214,6 @@
 {% if card_dates is defined %}
 <script id="card-dates-data" type="application/json">{{ card_dates|tojson }}</script>
 {% endif %}
-
-<section class="hero-panel is-open" id="hero-monitor">
-    <div class="hero-head">
-        <div style="flex:1;">
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <h2>Quick picks</h2>
-                <a href="{{ url_for('insights_page') }}" class="hero-toggle" style="text-decoration:none;">Full insights →</a>
-            </div>
-            <div class="monitor-bar" id="monitor-ledger-bar">
-                {% if monitor and monitor.ledger %}
-                <span class="pill">Paper P&L: <strong>{{ '%+.2f'|format(monitor.ledger.total_pnl) }}u</strong></span>
-                <span class="pill">Place hit:
-                    <strong>{% if monitor.ledger.place_hit_pct %}{{ monitor.ledger.place_hit_pct }}%{% elif monitor.ledger.strike_rate %}{{ '%.0f'|format(monitor.ledger.strike_rate * 100) }}%{% else %}—{% endif %}</strong>
-                </span>
-                <span class="pill">Value hit:
-                    <strong>{% if monitor.ledger.value_pick_strike_pct %}{{ monitor.ledger.value_pick_strike_pct }}%{% else %}—{% endif %}</strong>
-                </span>
-                {% endif %}
-                {% if monitor and monitor.recent_ledger %}
-                <span class="pill" title="Recent logged paper bets">{{ monitor.recent_ledger|length }} logged</span>
-                {% endif %}
-            </div>
-            {% if monitor and monitor.recent_ledger %}
-            <ul class="recent-ledger-list" style="font-size:0.85em;margin:8px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px;">
-                {% for row in monitor.recent_ledger[:8] %}
-                <li class="pill {% if row.status == 'settled' %}ledger-settled{% else %}ledger-open{% endif %}">
-                    {{ row.horse_name or row.runner_id }} · {{ row.status }}{% if row.result_pnl is not none %} {{ '%+.2f'|format(row.result_pnl) }}u{% endif %}
-                </li>
-                {% endfor %}
-            </ul>
-            {% endif %}
-        </div>
-        <span class="pill" id="monitor-updated">
-            {% if monitor %}Updated {{ (monitor.updated_at or '')[:19]|replace('T',' ') }} UTC{% endif %}
-        </span>
-    </div>
-    <div class="hero-grid-wrap">
-        <div class="hero-grid" id="hero-top-places" data-poll-seconds="{{ monitor.poll_seconds if monitor else 300 }}">
-            {% for r in top_picks %}
-            <div class="hero-pick">
-                <div class="hero-rank">#{{ r.day_rank or loop.index }}</div>
-                <div class="hero-horse">{{ r.horse_name }}</div>
-                <div class="hero-meta">{{ r.off_time or '—' }} {{ r.course or '' }}<br>{{ r.jockey or '—' }} · {{ r.trainer or '—' }}</div>
-                <div class="hero-prob">{{ (r.model_place_prob or 0)|fmt_pct }}</div>
-                <div class="hero-meta">combo {{ r.combo_bayes_place|fmt_pct }} · score {{ r.place_score|fmt_num }}
-                {% if r.win_decimal and r.monetized_link %}
-                · <a class="odds-affiliate-link" href="{{ r.monetized_link }}" target="_blank" rel="noopener sponsored">win {{ r.win_decimal|fmt_num }}</a>
-                {% elif r.win_decimal %}
-                · win {{ r.win_decimal|fmt_num }}
-                {% endif %}
-                </div>
-                {% if r.pick_reasons %}
-                <div class="hero-explain"><strong>Why</strong><ul>{% for reason in r.pick_reasons %}<li>{{ reason }}</li>{% endfor %}</ul></div>
-                {% endif %}
-            </div>
-            {% else %}
-            <div class="hero-pick" style="grid-column:1/-1;"><div class="hero-meta">No card loaded — click <strong>Refresh card</strong>.</div></div>
-            {% endfor %}
-        </div>
-    </div>
-</section>
 
 {% if runner_count == 0 %}
 <div class="banner error">No card in DB for the next {{ window_hours or 24 }}h. Click <strong>Refresh 24h</strong> in the header.</div>
@@ -332,13 +239,6 @@
     </div>
     {% endif %}
 </div>
-{% if gate_summary and gate_summary.reason_counts %}
-<p class="data-note" style="margin-top:6px;">
-    Gate reasons:
-    {% for reason, n in gate_summary.reason_counts.items() %}
-    <span class="pill" style="margin-right:4px;">{{ reason|replace('_',' ') }}: {{ n }}</span>
-    {% endfor %}
-</p>
 {% endif %}
 
 {% if meetings %}
@@ -351,11 +251,17 @@
         <div class="ctrl-group">
             <label for="meeting-select">Meeting</label>
             <select id="meeting-select" class="ctrl-select" aria-label="Select meeting">
-                {% for meeting in meetings %}
-                <option value="{{ meeting.slug }}" {% if loop.first %}selected{% endif %}
+                {% set sel = namespace(first=true) %}
+                {% for day in meeting_days %}
+                <optgroup label="{{ day.label }} ({{ day.card_date }})">
+                {% for meeting in day.meetings %}
+                <option value="{{ meeting.slug }}" {% if sel.first %}selected{% endif %}
                     data-hint="{{ meeting.race_count }} races · {{ meeting.runner_count }} runners{% if meeting.value_count %} · {{ meeting.value_count }} value{% endif %}">
-                    {{ meeting.label }} · {{ meeting.card_date }} · {{ meeting.first_off }}–{{ meeting.last_off }}
+                    {{ meeting.label }} · {{ meeting.first_off }}–{{ meeting.last_off }}
                 </option>
+                {% set sel.first = false %}
+                {% endfor %}
+                </optgroup>
                 {% endfor %}
             </select>
         </div>
@@ -382,8 +288,23 @@
         </div>
     </div>
 
-    {% for meeting in meetings %}
-    {% set meeting_first = loop.first %}
+    {% set ns = namespace(first=true) %}
+    {% for day in meeting_days %}
+    <div class="day-section" data-card-date="{{ day.card_date }}">
+        <h3 class="day-heading">{{ day.label }}<span class="day-date">{{ day.card_date }}</span></h3>
+        {% if picks_by_day and picks_by_day.get(day.card_date) %}
+        <div class="day-picks-row" aria-label="{{ day.label }} place picks">
+            {% for r in picks_by_day[day.card_date] %}
+            <div class="day-pick-chip">
+                <strong>{{ r.off_time or '—' }} · {{ r.horse_name }}</strong>
+                <div class="meta">{{ r.course or '' }} · place {{ (r.model_place_prob or 0)|fmt_pct }} · score {{ r.place_score|fmt_num }}</div>
+            </div>
+            {% endfor %}
+            <a class="day-picks-link" href="{{ url_for('insights_page') }}">Insights →</a>
+        </div>
+        {% endif %}
+    {% for meeting in day.meetings %}
+    {% set meeting_first = ns.first %}
     <div class="meeting-panel {% if meeting_first %}is-active{% endif %}" id="meeting-{{ meeting.slug }}" data-meeting="{{ meeting.slug }}" {% if not meeting_first %}hidden{% endif %}>
         <div class="meeting-header">
             <span class="meeting-course">{{ meeting.course }}</span>
@@ -524,10 +445,12 @@
             {% endfor %}
         </div>
     </div>
+    {% set ns.first = false %}
+    {% endfor %}
+    </div>
     {% endfor %}
 </section>
 {% endif %}
-{% endif %}
 
-<p class="data-note">Scores use ingested history + live card feed + Matchbook odds. RP enrich (course/dist/going W-R, form flags) fills when EMAIL/ACCESS_TOKEN are set — merge-only, never overwrites API fields.</p>
+<p class="data-note">Scores use ingested history + live card feed + Matchbook odds. RP enrich fills when credentials are set.</p>
 {% endblock %}

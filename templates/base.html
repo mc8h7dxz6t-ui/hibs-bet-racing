@@ -248,9 +248,7 @@
             border:1px solid rgba(183,247,200,0.3);color:var(--hibs-neon);
         }
         .method-badge.heuristic{color:#fcd34d;border-color:rgba(252,211,77,0.35);}
-        .sys-strip{
-            display:flex;flex-wrap:wrap;gap:8px;padding:8px 16px 0;font-size:0.75em;
-        }
+        .sys-strip{display:none;}
         .drift-steam{color:#86efac;font-weight:700;}
         .drift-out{color:#fca5a5;font-weight:700;}
         .meeting-panel[hidden]{display:none!important;}
@@ -429,60 +427,9 @@ document.getElementById('btn-refresh')?.addEventListener('click', async () => {
     } catch (e) { alert('Refresh failed'); }
     finally { btn.disabled = false; btn.textContent = 'Refresh 24h'; }
 });
-
-(function autoMonitor(){
-    const mount = document.getElementById('hero-top-places');
-    const stamp = document.getElementById('monitor-updated');
-    const pollSec = Number(mount?.dataset.pollSeconds || 300);
-    if (!mount) return;
-    const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    async function tick(refresh=false) {
-        try {
-            const r = await fetch('/api/monitor' + (refresh ? '?refresh=1' : ''));
-            const j = await r.json();
-            if (stamp && j.updated_at) stamp.textContent = 'Updated ' + j.updated_at.replace('T',' ').slice(0,19) + ' UTC';
-            const ledger = j.ledger || {};
-            const bar = document.getElementById('monitor-ledger-bar');
-            if (bar) {
-                bar.innerHTML = [
-                    ['Paper P&L', ledger.total_pnl != null ? (ledger.total_pnl >= 0 ? '+' : '') + ledger.total_pnl.toFixed(2) + 'u' : '—'],
-                    ['Place hit', ledger.place_hit_pct != null ? ledger.place_hit_pct + '%' : (ledger.strike_rate != null ? Math.round(ledger.strike_rate*100)+'%' : '—')],
-                    ['Value hit', ledger.value_pick_strike_pct != null ? ledger.value_pick_strike_pct + '%' : '—'],
-                    ['Open', ledger.open_bets ?? 0],
-                ].map(([k,v]) => '<span class="pill">' + k + ': <strong>' + v + '</strong></span>').join('');
-            }
-            if (!j.top_places?.length) return;
-            mount.innerHTML = j.top_places.map(p => {
-                const reasons = (p.pick_reasons || []).map(r => `<li>${esc(r)}</li>`).join('');
-                const bankroll = window.HibsNoviceUX?.readBankroll?.();
-                const cash = bankroll != null && window.HibsNoviceUX?.stakeCash ? window.HibsNoviceUX.stakeCash(1, 1) : null;
-                const stakeLine = cash != null ? `<div class="stake-cash-hint">Suggested stake: £${cash.toFixed(2)}</div>` : '';
-                const winOdds = p.win_decimal != null ? Number(p.win_decimal).toFixed(2) : null;
-                const oddsLine = p.monetized_link && winOdds
-                    ? `<div class="hero-meta"><a class="odds-affiliate-link" href="${encodeURI(p.monetized_link)}" target="_blank" rel="noopener sponsored">Partner odds: ${winOdds} EW</a></div>`
-                    : (winOdds ? `<div class="hero-meta">win ${winOdds}</div>` : '');
-                return `
-                <div class="hero-pick">
-                    <div class="hero-rank">#${p.day_rank}</div>
-                    <div class="hero-horse">${esc(p.horse_name)}</div>
-                    <div class="hero-meta">${esc(p.off_time)} ${esc(p.course)}<br>${esc(p.jockey)} · ${esc(p.trainer)}</div>
-                    <div class="hero-prob">${Math.round((p.model_place_prob||0)*100)}% place</div>
-                    <div class="hero-meta">combo ${(p.combo_bayes_place||0).toFixed(2)} · score ${(p.place_score||0).toFixed(2)}</div>
-                    ${oddsLine}
-                    ${stakeLine}
-                    <div class="hero-explain"><strong>Why</strong><ul>${reasons}</ul></div>
-                </div>`;
-            }).join('');
-            window.HibsNoviceUX?.applyStakeHints?.(mount);
-        } catch (_) {}
-    }
-    tick(false);
-    setInterval(() => tick(false), pollSec * 1000);
-})();
 </script>
 <script src="{{ static_v('racing_ui.js') }}" defer></script>
 <script>
-/* Sync whitelabel apply — runs after racing_ui.js defines HibsBranding */
 document.addEventListener('DOMContentLoaded', () => window.HibsBranding?.apply?.());
 </script>
 {% block extra_js %}{% endblock %}

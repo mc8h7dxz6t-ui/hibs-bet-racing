@@ -8,6 +8,7 @@ from hibs_racing.config import load_config
 from hibs_racing.place.paper_ledger import ledger_stats, load_ledger_rows, settle_paper_bets
 from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.cards.query import load_scored_cards
+from hibs_racing.cards.window import filter_next_hours
 from hibs_racing.pick_explain import attach_pick_explanations
 
 
@@ -74,6 +75,14 @@ def monitor_snapshot(*, refresh: bool = False, settle: bool = True) -> dict:
 
     settle_stats = settle_paper_bets() if settle else {}
     frame = load_scored_cards()
+    window_hours = int(cfg.get("window_hours", 24))
+    if not frame.empty and window_hours:
+        narrowed = filter_next_hours(frame, hours=window_hours)
+        if narrowed.empty and window_hours < 48:
+            widened = filter_next_hours(frame, hours=48)
+            frame = widened if not widened.empty else narrowed
+        else:
+            frame = narrowed
     card_date = frame["card_date"].iloc[0] if not frame.empty else None
     picks = top_places_of_day(frame)
     from hibs_racing.utils.monetization import attach_monetized_links
