@@ -39,6 +39,7 @@ jobs:
             tests/test_engine_profile.py \
             tests/test_log_retention.py \
             tests/test_institutional.py \
+            tests/test_ui_shell.py \
             -q
 
   gate-regression-cli:

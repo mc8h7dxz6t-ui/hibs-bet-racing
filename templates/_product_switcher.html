@@ -4,9 +4,16 @@
     {{ harvested_logo_link(home_url=hibs_football_home_url|default('/'), height=64) }}
     <div class="hibs-product-switch">
         <a href="{{ hibs_football_home_url|default('/') }}"
-           class="hibs-product-pill {% if hibs_product_active == 'football' %}active{% endif %}">⚽ Football</a>
-        <a href="{{ hibs_racing_base_url|default('/racing') }}/cards"
+           class="hibs-product-pill {% if hibs_product_active == 'football' %}active{% endif %}"
+           rel="noopener">⚽ Football</a>
+        <a href="{{ hibs_racing_cards_url|default('/cards') }}"
            class="hibs-product-pill {% if hibs_product_active == 'racing' %}active{% endif %}"
            rel="noopener">🏇 Racing</a>
+        <a href="{{ hibs_trading_status_url|default('/harvested-execution') }}"
+           class="hibs-product-pill {% if hibs_product_active == 'trading' %}active{% endif %}"
+           rel="noopener">📈 Trading</a>
+        <a href="{{ hibs_line_trader_url|default('/line-trader') }}"
+           class="hibs-product-pill {% if hibs_product_active in ('lines', 'fve') %}active{% endif %}"
+           rel="noopener">📊 Lines</a>
     </div>
 </div>

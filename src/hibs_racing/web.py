@@ -138,10 +138,20 @@ def create_app() -> Flask:
         ctx["portfolio_full_url"] = "/portfolio"
         ctx["health"] = health_status()
         football_base = os.environ.get("HIBS_FOOTBALL_BASE_URL", "http://127.0.0.1:5000").rstrip("/")
+        football_home = os.environ.get("HIBS_FOOTBALL_HOME_URL", "").rstrip("/") or football_base
+        racing_public = os.environ.get("HIBS_RACING_PUBLIC_URL", "").rstrip("/")
+        domain = os.environ.get("HIBS_DOMAIN", "hibs-bet.co.uk").strip()
         ctx["hibs_football_base_url"] = football_base
-        ctx["hibs_racing_base_url"] = os.environ.get("HIBS_RACING_PUBLIC_URL", "").rstrip("/") or ""
-        ctx["hibs_football_home_url"] = football_base + "/"
+        ctx["hibs_racing_base_url"] = racing_public
+        ctx["hibs_football_home_url"] = football_home + ("" if football_home.endswith("/") else "/")
         ctx["hibs_racing_home_url"] = "/cards"
+        ctx["hibs_racing_cards_url"] = (racing_public + "/cards") if racing_public else "/cards"
+        ctx["hibs_trading_status_url"] = os.environ.get(
+            "HIBS_TRADING_STATUS_URL", f"https://{domain}/harvested-execution"
+        )
+        ctx["hibs_line_trader_url"] = os.environ.get(
+            "HIBS_LINE_TRADER_URL", f"https://{domain}/line-trader"
+        )
         ctx["hibs_product_active"] = "racing"
         return ctx
 
