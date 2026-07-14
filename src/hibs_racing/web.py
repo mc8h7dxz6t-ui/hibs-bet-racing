@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, render_template, request
 
 from hibs_racing.hibs_brand import hibs_brand_context
+from hibs_racing.product_links import product_bar_context
 from hibs_racing.models.feature_impact import impact_artifact_paths, load_feature_impact_report
 from hibs_racing.models.ranker_attribution import live_ranker_attribution
 from hibs_racing.monitor import monitor_snapshot
@@ -132,14 +133,17 @@ def create_app() -> Flask:
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "hibs-racing-dev")
     app.add_template_filter(fmt_num, "fmt_num")
     app.add_template_filter(fmt_pct, "fmt_pct")
+    from hibs_racing.ui_shell import static_v
+
+    app.jinja_env.globals["static_v"] = static_v
 
     @app.context_processor
     def inject_brand() -> dict:
-        from hibs_racing.product_links import product_bar_context
+        from hibs_racing.ui_shell import ui_shell_context
 
         ctx = hibs_brand_context()
+        ctx.update(ui_shell_context())
         ctx.update(product_bar_context(active="racing"))
-        ctx["portfolio_api_url"] = "/api/portfolio/summary"
         ctx["portfolio_full_url"] = "/portfolio"
         ctx["health"] = health_status()
         return ctx
@@ -565,6 +569,9 @@ def create_app() -> Flask:
             return jsonify(payload), 503
         return jsonify(payload)
 
+    from hibs_racing.url_prefix import apply_url_prefix
+
+    apply_url_prefix(app)
     return app
 
 
