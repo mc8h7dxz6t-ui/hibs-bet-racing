@@ -1,4 +1,4 @@
-/* HIBS — Harvested Intelligent Betting Systems (shared neutral theme) */
+/* HIBS — unified lite shell (football + racing + trading) */
 :root {
     --hibs-green: #0d9488;
     --hibs-green-dark: #0f172a;
@@ -21,9 +21,16 @@
     --card: rgba(15, 23, 42, 0.92);
     --text: #f1f5f9;
     --muted: #94a3b8;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --shadow-md: 0 10px 32px rgba(0, 0, 0, 0.32);
+    --primary-brand-color: var(--hibs-green);
+    --wordmark-font: 'Inter', sans-serif;
 }
 
 body {
+    background-color: var(--hibs-navy-deep);
     background-image:
         radial-gradient(ellipse at 20% 0%, rgba(13, 148, 136, 0.06) 0%, transparent 50%),
         linear-gradient(180deg, var(--hibs-navy-deep) 0%, #0f172a 100%);
@@ -51,17 +58,71 @@ body::before {
     letter-spacing: 0.02em;
 }
 
-.hibs-product-pill.active {
-    background: linear-gradient(135deg, #0d9488, #0f766e);
+.hibs-product-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    padding: 8px 14px;
+    margin-bottom: 12px;
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid var(--border);
+    border-radius: 10px;
 }
 
+.hibs-product-switch {
+    display: inline-flex;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 999px;
+    overflow: hidden;
+    flex-wrap: wrap;
+}
+
+.hibs-product-pill {
+    padding: 6px 14px;
+    font-size: 0.82em;
+    font-weight: 700;
+    text-decoration: none;
+    color: #cbd5e1;
+    background: rgba(0, 0, 0, 0.25);
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.hibs-product-pill:hover {
+    background: var(--hibs-green-soft);
+    color: #e2e8f0;
+}
+
+.hibs-product-pill.active,
 .tab-btn.active,
 .sub-tab.active,
 .chip.active {
-    background: rgba(13, 148, 136, 0.14);
+    background: linear-gradient(135deg, var(--hibs-green), #0f766e);
     border-color: rgba(94, 234, 212, 0.28);
-    color: var(--text);
+    color: #fff;
     box-shadow: none;
+}
+
+.hibs-harvested-logo-link {
+    display: inline-flex;
+    align-items: center;
+    line-height: 0;
+    flex-shrink: 0;
+}
+
+.hibs-harvested-logo,
+.hibs-header-logo {
+    height: 56px;
+    width: auto;
+    max-width: min(420px, 58vw);
+    object-fit: contain;
+    filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.35));
+}
+
+.hibs-product-bar .hibs-harvested-logo {
+    height: 64px;
+    max-width: min(480px, 62vw);
 }
 
 .stat-pill.gold {
@@ -70,8 +131,38 @@ body::before {
     color: var(--neon-value);
 }
 
-.nav-btn:hover {
-    background: rgba(148, 163, 184, 0.08);
-    border-color: rgba(148, 163, 184, 0.28);
+.nav-btn:hover,
+.site-links a:hover,
+.site-links a.active,
+.site-links a.site-link-active {
+    background: var(--hibs-green-soft);
+    border-color: var(--border);
     color: var(--text);
+}
+
+.site-top {
+    background: linear-gradient(135deg, rgba(13, 148, 136, 0.18), rgba(11, 18, 32, 0.92));
+}
+
+@media (max-width: 640px) {
+    .hibs-harvested-logo,
+    .hibs-header-logo {
+        height: 44px;
+    }
+
+    .hibs-product-bar .hibs-harvested-logo {
+        height: 48px;
+    }
+
+    .hibs-product-pill {
+        padding: 6px 10px;
+        font-size: 0.78em;
+    }
+
+    .site-links {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+    }
 }

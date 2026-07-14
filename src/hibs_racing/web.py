@@ -130,7 +130,10 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_brand() -> dict:
+        from hibs_racing.ui_shell import ui_shell_context
+
         ctx = hibs_brand_context()
+        ctx.update(ui_shell_context())
         ctx["portfolio_api_url"] = "/api/portfolio/summary"
         ctx["portfolio_full_url"] = "/portfolio"
         ctx["health"] = health_status()
