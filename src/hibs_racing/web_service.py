@@ -602,6 +602,37 @@ def _attach_market_gauges(meetings: list[dict]) -> None:
                 runner["market_gauge"] = gauges.get(rid)
 
 
+def _backfill_win_decimal_from_cache(frame: pd.DataFrame) -> pd.DataFrame:
+    """Attach stale-but-usable exchange quotes when live odds ingest is gated."""
+    if frame.empty or "runner_id" not in frame.columns:
+        return frame
+    out = frame.copy()
+    if "win_decimal" not in out.columns:
+        out["win_decimal"] = None
+    missing = out["win_decimal"].isna() | (pd.to_numeric(out["win_decimal"], errors="coerce") <= 1.0)
+    if not missing.any():
+        return out
+    try:
+        from hibs_racing.odds.exchange_quotes import load_cached_exchange_odds
+
+        cached = load_cached_exchange_odds(out.loc[missing])
+    except Exception:
+        return out
+    if cached is None or cached.empty:
+        return out
+    price_map = dict(zip(cached["runner_id"].astype(str), cached["win_decimal"]))
+    for idx in out.index[missing]:
+        rid = str(out.at[idx, "runner_id"] or "")
+        price = price_map.get(rid)
+        if price is not None:
+            try:
+                if float(price) > 1.0:
+                    out.at[idx, "win_decimal"] = float(price)
+            except (TypeError, ValueError):
+                continue
+    return out
+
+
 def _base_frame(*, card_date: str | None = None, window_hours: int | None = 24) -> pd.DataFrame:
     frame = load_scored_cards()
     if card_date and not frame.empty:
@@ -616,7 +647,7 @@ def _base_frame(*, card_date: str | None = None, window_hours: int | None = 24) 
                 frame = narrowed
         else:
             frame = narrowed
-    return frame
+    return _backfill_win_decimal_from_cache(frame)
 
 
 def _ui_data_status(frame: pd.DataFrame) -> dict:

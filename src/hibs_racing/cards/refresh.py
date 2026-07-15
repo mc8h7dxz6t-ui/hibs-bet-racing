@@ -207,6 +207,25 @@ def refresh_cards(
         lambda: resolve_scoring_odds(cards, odds_source=odds_source, force_live_odds=True)
     )
 
+    try:
+        from hibs_racing.odds.exchange_quotes import load_cached_exchange_odds
+        from hibs_racing.odds.loader import _merge_odds_frames, _min_odds_coverage_ratio, _odds_coverage
+
+        card_n = max(len(cards), 1)
+        cov = _odds_coverage(odds, card_runners=card_n)
+        if cov < _min_odds_coverage_ratio():
+            cached = load_cached_exchange_odds(cards)
+            if cached is not None and not cached.empty:
+                merged = _merge_odds_frames(odds, cached)
+                if merged is not None and not merged.empty:
+                    odds = merged
+                    odds_meta = dict(odds_meta)
+                    prior = str(odds_meta.get("source") or "none")
+                    odds_meta["source"] = "exchange_cache" if prior in ("none", "") else f"{prior}+exchange_cache"
+                    odds_meta["exchange_cache_rows"] = len(cached)
+    except Exception:
+        pass
+
     milestone = poll_milestone or os.environ.get("HIBS_POLL_MILESTONE", "baseline")
     polled_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     exchange_audit: dict = {"poll_milestone": milestone}
