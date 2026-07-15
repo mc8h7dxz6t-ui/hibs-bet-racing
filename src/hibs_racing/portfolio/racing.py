@@ -48,21 +48,27 @@ def build_racing_portfolio(*, racing_limit: int = 200, history_days: int | None 
     tracker = build_public_tracker_dict(limit=racing_limit, history_days=history_days)
     racing_rows = [_normalize_racing_row(r) for r in tracker.get("ledger_rows") or []]
     racing_stats = tracker.get("stats") or {}
-    rc_pnl = sum(r["pnl"] for r in racing_rows if r.get("pnl") is not None)
-    rc_settled = sum(1 for r in racing_rows if r.get("pnl") is not None)
+    # Summary P&L must use full-window ledger_stats — not sum of capped ledger_rows (top bar was under-reporting).
+    rc_pnl = racing_stats.get("total_pnl")
+    if rc_pnl is None:
+        rc_pnl = sum(r["pnl"] for r in racing_rows if r.get("pnl") is not None)
+    rc_settled = racing_stats.get("settled_bets")
+    if rc_settled is None:
+        rc_settled = sum(1 for r in racing_rows if r.get("pnl") is not None)
 
     return {
         "ok": True,
         "mode": "analytics",
         "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "history_days": tracker.get("history_days"),
         "racing_stats": racing_stats,
         "clv": tracker.get("clv"),
         "summary": {
             "total_rows": len(racing_rows),
             "racing_rows": len(racing_rows),
-            "racing_pnl_units": round(rc_pnl, 2),
-            "combined_pnl_units": round(rc_pnl, 2),
-            "racing_settled": rc_settled,
+            "racing_pnl_units": round(float(rc_pnl), 2),
+            "combined_pnl_units": round(float(rc_pnl), 2),
+            "racing_settled": int(rc_settled),
             "open_bets": racing_stats.get("open_bets", 0),
         },
         "ledger": racing_rows,
