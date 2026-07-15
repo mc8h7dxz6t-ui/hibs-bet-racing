@@ -8,8 +8,20 @@ from typing import Any
 COVERAGE_PASS_OBS_PCT = 35.0
 COVERAGE_PASS_PROD_PCT = 50.0
 MIN_PAPER_ROWS = 25
-PLACE_BRIER_PASS_MAX = 0.25
-MIN_PLACE_CALIBRATION_N = 20
+
+
+def _place_brier_pass_max() -> float:
+    try:
+        return float(os.getenv("HIBS_RACING_PLACE_BRIER_PASS_MAX", "0.25"))
+    except ValueError:
+        return 0.25
+
+
+def _min_place_calibration_n() -> int:
+    try:
+        return max(1, int(os.getenv("HIBS_RACING_MIN_PLACE_CALIBRATION_N", "20")))
+    except ValueError:
+        return 20
 
 
 def _gate(
@@ -83,11 +95,11 @@ def racing_evidence_gates_from_health(health: dict[str, Any]) -> dict[str, Any]:
     place_brier = place_rel.get("brier")
     place_n = int(place_rel.get("n") or 0)
     brier_pass = (
-        place_n >= MIN_PLACE_CALIBRATION_N
+        place_n >= _min_place_calibration_n()
         and place_brier is not None
-        and float(place_brier) <= PLACE_BRIER_PASS_MAX
+        and float(place_brier) <= _place_brier_pass_max()
     )
-    brier_insufficient = place_n < MIN_PLACE_CALIBRATION_N
+    brier_insufficient = place_n < _min_place_calibration_n()
 
     dp = health.get("data_producer") or {}
     dp_ok = dp.get("ok") is not False
@@ -166,9 +178,9 @@ def racing_evidence_gates_from_health(health: dict[str, Any]) -> dict[str, Any]:
             label="Place probability calibration (Brier)",
             passed=brier_pass if not brier_insufficient else False,
             actual=place_brier,
-            threshold=f"<={PLACE_BRIER_PASS_MAX} (n>={MIN_PLACE_CALIBRATION_N})",
+            threshold=f"<={_place_brier_pass_max()} (n>={_min_place_calibration_n()})",
             message=(
-                f"Accumulate {MIN_PLACE_CALIBRATION_N}+ settled place bins — "
+                f"Accumulate {_min_place_calibration_n()}+ settled place bins — "
                 f"current n={place_n}"
                 if brier_insufficient
                 else "Tighten isotonic calibration or gate selectivity"

@@ -215,6 +215,25 @@
 <script id="card-dates-data" type="application/json">{{ card_dates|tojson }}</script>
 {% endif %}
 
+{% if pick_candidates is defined and runner_count > 0 %}
+<section class="smart-picks-hero card" id="place-picker-hero" aria-label="Place Picker">
+    <div class="smart-portfolio-row" style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:8px;">
+        <div>
+            <h2>Place Picker</h2>
+            <p class="section-hint" style="margin:0;font-size:0.85em;color:var(--muted);max-width:52rem;">
+                Each-way value picks that pass data quality (≥75%), steam gate, and model place probability. Set your bankroll in the bar above for cash stakes.
+            </p>
+        </div>
+        <span class="pill ok">Smart portfolio</span>
+    </div>
+    <div id="smart-picks-grid" class="smart-picks-grid" role="list" aria-live="polite"></div>
+    <details class="channel-digest-drawer" style="margin-top:12px;">
+        <summary style="cursor:pointer;color:var(--muted);font-size:0.82em;">Channel digest preview</summary>
+        <pre id="channel-digest-text" class="channel-digest-text" style="white-space:pre-wrap;font-size:0.78em;color:var(--muted);margin:8px 0 0;"></pre>
+    </details>
+</section>
+{% endif %}
+
 {% if runner_count == 0 %}
 <div class="banner error">No card in DB for the next {{ window_hours or 24 }}h. Click <strong>Refresh 24h</strong> in the header.</div>
 {% else %}
