@@ -41,9 +41,8 @@
     {% if scoring_method %}<span class="pill ok">{{ scoring_method }} model</span>{% endif %}
 </div>
 
-{% if ui_data_status and ui_data_status.messages %}
-<div class="banner {% if ui_data_status.level == 'error' %}error{% endif %}"
-    style="{% if ui_data_status.level == 'warn' %}background:rgba(245,158,11,0.12);border-color:rgba(245,158,11,0.35);{% endif %}">
+{% if ui_data_status and ui_data_status.level == 'error' and ui_data_status.messages %}
+<div class="banner error">
     {% for msg in ui_data_status.messages %}<div>{{ msg }}</div>{% endfor %}
 </div>
 {% endif %}
@@ -69,7 +68,7 @@
     </div>
 </section>
 
-{% if not top_picks %}
+{% if not top_picks and not picks_by_day %}
 <div class="banner error">No qualifying picks in the next {{ window_hours or 24 }}h window. Run <strong>Refresh 24h</strong> once cards and scores are loaded.</div>
 {% else %}
 
@@ -77,7 +76,9 @@
 <script id="pick-candidates-data" type="application/json">{{ pick_candidates|tojson }}</script>
 {% endif %}
 
-{% for r in top_picks %}
+{% for day in meeting_days %}
+<h2 style="font-family:'Orbitron',monospace;color:var(--hibs-neon);font-size:1em;margin:18px 0 10px;">{{ day.label }} · {{ day.card_date }}</h2>
+{% for r in picks_by_day.get(day.card_date, []) %}
 <article class="pick-card" id="pick-{{ r.day_rank }}"
     data-horse="{{ r.horse_name }}"
     data-course="{{ r.course }}"
@@ -134,6 +135,7 @@
         </div>
     </div>
 </article>
+{% endfor %}
 {% endfor %}
 
 {% endif %}

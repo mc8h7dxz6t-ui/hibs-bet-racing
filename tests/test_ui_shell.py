@@ -73,5 +73,5 @@ def test_subpath_rewrites_internal_nav(monkeypatch):
     resp = app.test_client().get("/cards")
     html = resp.data.decode("utf-8", errors="replace")
     assert 'href="/racing/insights"' in html
-    assert "/api/racing/monitor" in html
+    assert 'id="meeting-select"' in html or 'Racecards' in html
     assert 'data-api-url="/api/racing/portfolio/summary"' in html

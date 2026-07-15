@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -15,6 +16,7 @@ from hibs_racing.cards.ui_frame import (
     safe_value_mask,
 )
 from hibs_racing.cards.window import filter_next_hours, off_minutes
+from hibs_racing.entity.timezone import LONDON
 from hibs_racing.backtest.place_signal import run_place_backtest
 from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.cards.store import load_upcoming_runners
@@ -468,6 +470,57 @@ def group_meetings(frame: pd.DataFrame) -> list[dict]:
     return meetings
 
 
+def day_label(card_date: str, *, now: datetime | None = None) -> str:
+    """Human label for a card_date — Today / Tomorrow / ISO date."""
+    now = now or datetime.now(LONDON)
+    today = now.date().isoformat()
+    tomorrow = (now.date() + timedelta(days=1)).isoformat()
+    d = str(card_date)[:10]
+    if d == today:
+        return "Today"
+    if d == tomorrow:
+        return "Tomorrow"
+    return d
+
+
+def group_meetings_by_day(meetings: list[dict], *, now: datetime | None = None) -> list[dict]:
+    """Group meeting dicts under card_date with display labels."""
+    if not meetings:
+        return []
+    buckets: dict[str, list[dict]] = {}
+    for meeting in meetings:
+        d = str(meeting.get("card_date") or "")[:10]
+        buckets.setdefault(d, []).append(meeting)
+    return [
+        {
+            "card_date": card_date,
+            "label": day_label(card_date, now=now),
+            "meetings": buckets[card_date],
+        }
+        for card_date in sorted(buckets.keys())
+    ]
+
+
+def top_picks_by_day(
+    frame: pd.DataFrame,
+    meetings: list[dict],
+    *,
+    top_n: int = 6,
+) -> dict[str, list[dict]]:
+    """Best place picks per card_date (today vs tomorrow separated)."""
+    from hibs_racing.monitor import top_places_of_day
+
+    if frame.empty or "card_date" not in frame.columns:
+        return {}
+    out: dict[str, list[dict]] = {}
+    for card_date in sorted(frame["card_date"].astype(str).str[:10].unique()):
+        day_frame = frame[frame["card_date"].astype(str).str[:10] == card_date]
+        picks = attach_deep_links_to_picks(top_places_of_day(day_frame, top_n=top_n), meetings)
+        if picks:
+            out[str(card_date)[:10]] = picks
+    return out
+
+
 def race_dom_id(meeting_slug: str, race_slug: str) -> str:
     return f"race-{meeting_slug}-{race_slug}"
 
@@ -584,17 +637,7 @@ def _ui_data_status(frame: pd.DataFrame) -> dict:
         messages.append("No runners loaded for this window — click Refresh 24h.")
     elif not cov.get("ok"):
         level = "warn"
-        messages.append(
-            f"Odds on {cov.get('priced', 0)}/{cov.get('total', 0)} runners "
-            f"({cov.get('coverage_pct', 0)}%) — target ≥{cov.get('min_pct', 40)}%."
-        )
-        if not mb.get("configured"):
-            messages.append("Matchbook not configured — add MATCHBOOK_USERNAME and MATCHBOOK_PASSWORD to .env.")
-        elif not mb.get("traffic_allowed"):
-            messages.append("Matchbook poll gated (rate limit, Mac quotes fresh, or poll interval).")
-        if oc.get("state") == "open":
-            err = str(oc.get("last_error") or "blocked")[:100]
-            messages.append(f"Oddschecker scrape paused ({err}).")
+        # Operator telemetry only — surfaced on /status, not dashboard banners.
 
     return {
         "level": level,
@@ -623,6 +666,8 @@ def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
         scoring_method = modes[0] if len(modes) == 1 else "mixed"
     return {
         "top_picks": picks,
+        "picks_by_day": top_picks_by_day(frame, meetings, top_n=top_n),
+        "meeting_days": group_meetings_by_day(meetings),
         "pick_candidates": pick_candidates,
         "pick_count": len(picks),
         "runner_count": len(frame),
@@ -669,6 +714,7 @@ def novice_pick_candidates(meetings: list[dict]) -> list[dict]:
                         "runner_id": row.get("runner_id"),
                         "horse_name": row.get("horse_name"),
                         "course": course,
+                        "card_date": str(meeting.get("card_date") or "")[:10],
                         "off_time": off_time,
                         "race_name": race.get("race_name"),
                         "win_decimal": win_f,
@@ -722,7 +768,9 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
 
     card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else []
     meetings = group_meetings(frame) if not frame.empty else []
+    meeting_days = group_meetings_by_day(meetings)
     pick_candidates = novice_pick_candidates(meetings)
+    picks_by_day = top_picks_by_day(frame, meetings, top_n=6)
     try:
         gate_summary = compare_value_gates(days=14).to_dict()
     except Exception:
@@ -736,7 +784,9 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
         "race_count": int(frame["race_id"].nunique()) if not frame.empty else 0,
         "value_count": len(value),
         "meetings": meetings,
-        "top_picks": attach_deep_links_to_picks(top_places_of_day(frame, top_n=10), meetings),
+        "meeting_days": meeting_days,
+        "picks_by_day": picks_by_day,
+        "top_picks": [],
         "pick_candidates": pick_candidates,
         "monitor": monitor,
         "backtest": backtest,
