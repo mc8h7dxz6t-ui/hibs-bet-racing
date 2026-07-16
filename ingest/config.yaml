@@ -206,7 +206,8 @@ oddschecker:
   enabled: true
   base_url: https://www.oddschecker.com
   default_source: auto
-  auto_scrape: true
+  auto_scrape: false
+  backup_on_exchange_fail: true
   retail_only: true
   default_place_fraction: 0.25
   default_places: 3
@@ -221,6 +222,7 @@ exchange_profiling:
   weekly_report_path: reports/weekly_gate_efficacy.md
 matchbook:
   enabled: true
+  date_slack_days: 1
   event_time_tolerance_sec: 120
   event_near_miss_sec: 600
   login_base: https://api.matchbook.com/bpapi/rest
