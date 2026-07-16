@@ -88,14 +88,14 @@ if [[ -n "${DB_PATH}" && -f "${DB_PATH}" ]]; then
   if [[ -z "${cols}" ]]; then
     bad "win_engine_predictions table missing — run init_db / deploy migration"
   else
-    for col in runner_id race_id true_probability fair_odds brier_score timestamp; do
+    for col in runner_id race_id true_probability fair_odds brier_score timestamp matchbook_back_odds race_field_brier field_size; do
       if echo "${cols}" | grep -q "|${col}|"; then
         pass "column ${col} present"
       else
         bad "column ${col} missing"
       fi
     done
-    cal="$(sqlite3 "${DB_PATH}" "SELECT calibration_state, rolling_brier, sample_n FROM win_engine_calibration WHERE id=1;" 2>/dev/null || true)"
+    cal="$(sqlite3 "${DB_PATH}" "SELECT calibration_state, rolling_brier, sample_n, variable_bounds_pass, market_beat_pass, exchange_beat_delta_bps FROM win_engine_calibration WHERE id=1;" 2>/dev/null || true)"
     if [[ -n "${cal}" ]]; then
       pass "win_engine_calibration row: ${cal}"
     else
