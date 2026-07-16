@@ -2,6 +2,8 @@
 
 Industry-standard phased rollout for the sandboxed conditional logit win engine on hibs-bet.co.uk. Default posture: **engine scores in background; frontend release blocked** until calibration passes.
 
+> **VPS path:** racing code and `.env` live at `/opt/hibs-racing` (GitHub repo name is `hibs-bet-racing`). The env helper auto-detects this path; override with `HIBS_RACING_ENV_FILE` if needed.
+
 ---
 
 ## Phase 1 — Deploy code (VPS)
@@ -16,7 +18,7 @@ sudo HIBS_SYNC_REF=main bash /opt/hibs-bet/deploy/vps-sync-from-github.sh
 Or use the repo helper after merge:
 
 ```bash
-sudo bash /opt/hibs-bet-racing/deploy/apply-win-engine-env.sh   # idempotent env upsert
+sudo bash /opt/hibs-racing/deploy/apply-win-engine-env.sh   # idempotent env upsert
 sudo systemctl restart hibs-racing
 sudo systemctl restart hibs-bet   # or gunicorn equivalent
 ```
@@ -28,7 +30,7 @@ sudo systemctl restart hibs-bet   # or gunicorn equivalent
 Edit the live racing `.env` on the VPS:
 
 ```bash
-sudo nano /opt/hibs-bet-racing/.env
+sudo nano /opt/hibs-racing/.env
 ```
 
 Append or verify **exactly** these flags at the bottom (leave active **false** until Phase 4):
@@ -56,7 +58,7 @@ sudo systemctl restart hibs-racing
 **Idempotent alternative** (no manual nano):
 
 ```bash
-sudo bash /opt/hibs-bet-racing/deploy/apply-win-engine-env.sh
+sudo bash /opt/hibs-racing/deploy/apply-win-engine-env.sh
 sudo systemctl restart hibs-racing
 ```
 
@@ -68,12 +70,12 @@ Run the bundled probe (local or from Mac against production):
 
 ```bash
 # On VPS (full DB + HTTP checks)
-sudo bash /opt/hibs-bet-racing/scripts/verify_win_engine_deploy.sh
+sudo bash /opt/hibs-racing/scripts/verify_win_engine_deploy.sh
 
 # From dev machine (HTTP only; set DB path if SSH'd)
 HIBS_PRODUCTION_URL=https://hibs-bet.co.uk \
-  HIBS_RACING_DB_PATH=/opt/hibs-bet-racing/data/feature_store.sqlite \
-  bash /opt/hibs-bet-racing/scripts/verify_win_engine_deploy.sh
+  HIBS_RACING_DB_PATH=/opt/hibs-racing/data/feature_store.sqlite \
+  bash /opt/hibs-racing/scripts/verify_win_engine_deploy.sh
 ```
 
 ### Manual audit equivalents
@@ -99,14 +101,14 @@ curl -i -s "https://hibs-bet.co.uk/api/racing/win-engine/predictions" | head -20
 #### 3. Database schema migration integrity
 
 ```bash
-sqlite3 /opt/hibs-bet-racing/data/feature_store.sqlite \
+sqlite3 /opt/hibs-racing/data/feature_store.sqlite \
   "PRAGMA table_info(win_engine_predictions);"
 ```
 
 **Expected:** columns include `runner_id`, `race_id`, `true_probability`, `fair_odds`, `brier_score`, `timestamp`.
 
 ```bash
-sqlite3 /opt/hibs-bet-racing/data/feature_store.sqlite \
+sqlite3 /opt/hibs-racing/data/feature_store.sqlite \
   "SELECT calibration_state, rolling_brier, sample_n FROM win_engine_calibration WHERE id=1;"
 ```
 
@@ -129,7 +131,7 @@ curl -sS "https://hibs-bet.co.uk/" | grep -o 'hibs_system_bets.js' | head -1
 2. Check calibration ledger:
 
 ```bash
-sqlite3 /opt/hibs-bet-racing/data/feature_store.sqlite \
+sqlite3 /opt/hibs-racing/data/feature_store.sqlite \
   "SELECT * FROM win_engine_calibration;"
 ```
 
@@ -141,8 +143,8 @@ sqlite3 /opt/hibs-bet-racing/data/feature_store.sqlite \
 4. Enable release:
 
 ```bash
-sudo sed -i 's/^HIBS_WIN_ENGINE_ACTIVE=.*/HIBS_WIN_ENGINE_ACTIVE=true/' /opt/hibs-bet-racing/.env
-# or: sudo bash /opt/hibs-bet-racing/deploy/apply-win-engine-env.sh --active
+sudo sed -i 's/^HIBS_WIN_ENGINE_ACTIVE=.*/HIBS_WIN_ENGINE_ACTIVE=true/' /opt/hibs-racing/.env
+# or: sudo bash /opt/hibs-racing/deploy/apply-win-engine-env.sh --active
 sudo systemctl restart hibs-racing
 ```
 
@@ -162,7 +164,7 @@ The dashboard sidebar will then show **WIN VALUE** (live vs fair) and **PLACE VA
 ## Rollback
 
 ```bash
-sudo sed -i 's/^HIBS_WIN_ENGINE_ACTIVE=.*/HIBS_WIN_ENGINE_ACTIVE=false/' /opt/hibs-bet-racing/.env
+sudo sed -i 's/^HIBS_WIN_ENGINE_ACTIVE=.*/HIBS_WIN_ENGINE_ACTIVE=false/' /opt/hibs-racing/.env
 sudo systemctl restart hibs-racing
 ```
 

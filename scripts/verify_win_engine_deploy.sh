@@ -3,7 +3,7 @@
 #
 #   ./scripts/verify_win_engine_deploy.sh
 #   HIBS_PRODUCTION_URL=https://hibs-bet.co.uk ./scripts/verify_win_engine_deploy.sh
-#   HIBS_RACING_DB_PATH=/opt/hibs-bet-racing/data/feature_store.sqlite ./scripts/verify_win_engine_deploy.sh
+#   HIBS_RACING_DB_PATH=/opt/hibs-racing/data/feature_store.sqlite ./scripts/verify_win_engine_deploy.sh
 set -euo pipefail
 
 FOOTBALL="${HIBS_PRODUCTION_URL:-https://hibs-bet.co.uk}"
@@ -14,8 +14,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [[ -z "${DB_PATH}" ]]; then
   for candidate in \
     "${REPO_ROOT}/data/feature_store.sqlite" \
-    "/opt/hibs-bet-racing/data/feature_store.sqlite" \
-    "/opt/hibs-racing/data/feature_store.sqlite"; do
+    "/opt/hibs-racing/data/feature_store.sqlite" \
+    "/opt/hibs-bet-racing/data/feature_store.sqlite"; do
     if [[ -f "${candidate}" ]]; then
       DB_PATH="${candidate}"
       break

@@ -1,11 +1,63 @@
 #!/usr/bin/env bash
-# Idempotent upsert of McFadden win engine env flags into hibs-bet-racing .env
+# Idempotent upsert of McFadden win engine env flags into hibs-racing .env
+#
+# VPS default path is /opt/hibs-racing (see hibs-racing.service), not /opt/hibs-bet-racing.
 #
 #   sudo bash deploy/apply-win-engine-env.sh           # staging (active=false)
 #   sudo bash deploy/apply-win-engine-env.sh --active  # Phase 4 go-live
+#
+# Override when needed:
+#   sudo HIBS_RACING_ENV_FILE=/opt/hibs-racing/.env bash deploy/apply-win-engine-env.sh
 set -euo pipefail
 
-ENV_FILE="${HIBS_RACING_ENV_FILE:-/opt/hibs-bet-racing/.env}"
+_resolve_env_file() {
+  if [[ -n "${HIBS_RACING_ENV_FILE:-}" ]]; then
+    echo "${HIBS_RACING_ENV_FILE}"
+    return 0
+  fi
+
+  local deploy="${HIBS_RACING_DEPLOY_PATH:-/opt/hibs-racing}"
+
+  if [[ -f "${deploy}/.env" ]]; then
+    echo "${deploy}/.env"
+    return 0
+  fi
+
+  if [[ -f /etc/systemd/system/hibs-racing.service ]]; then
+    local unit_env
+    unit_env="$(
+      grep -E '^EnvironmentFile=-?' /etc/systemd/system/hibs-racing.service 2>/dev/null \
+        | head -1 \
+        | sed 's/^EnvironmentFile=-//' \
+        || true
+    )"
+    if [[ -n "${unit_env}" ]]; then
+      echo "${unit_env}"
+      return 0
+    fi
+  fi
+
+  for candidate in \
+    "/opt/hibs-racing/.env" \
+    "/opt/hibs-bet-racing/.env" \
+    "${deploy}/.env"; do
+    if [[ -f "${candidate}" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+
+  for root in "/opt/hibs-racing" "${deploy}" "/opt/hibs-bet-racing"; do
+    if [[ -d "${root}" ]]; then
+      echo "${root}/.env"
+      return 0
+    fi
+  done
+
+  echo "/opt/hibs-racing/.env"
+}
+
+ENV_FILE="$(_resolve_env_file)"
 ACTIVE="${HIBS_WIN_ENGINE_ACTIVE:-false}"
 
 for arg in "$@"; do
@@ -16,8 +68,15 @@ for arg in "$@"; do
 done
 
 if [[ ! -f "${ENV_FILE}" ]]; then
-  echo "ERROR: ${ENV_FILE} not found" >&2
-  exit 1
+  root="$(dirname "${ENV_FILE}")"
+  if [[ ! -d "${root}" ]]; then
+    echo "ERROR: racing deploy path ${root} not found." >&2
+    echo "  Sync first: sudo HIBS_SYNC_REF=main bash /opt/hibs-bet/deploy/vps-sync-racing-from-github.sh" >&2
+    echo "  Or set:      sudo HIBS_RACING_ENV_FILE=/opt/hibs-racing/.env bash $0" >&2
+    exit 1
+  fi
+  touch "${ENV_FILE}"
+  chown www-data:www-data "${ENV_FILE}" 2>/dev/null || true
 fi
 
 upsert() {
