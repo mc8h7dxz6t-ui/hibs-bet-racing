@@ -471,6 +471,30 @@ def create_app() -> Flask:
             }
         )
 
+    @app.route("/api/trading/dispatch", methods=["POST"])
+    def api_trading_dispatch():
+        """Workspace order dispatch — routes through execution governor (simulated when live disabled)."""
+        from hibs_racing.trading.daemon import TradingDaemon
+        from hibs_racing.trading.execution_governor import build_order_payload
+
+        body = request.get_json(silent=True) or {}
+        selection = str(body.get("selection") or "").strip()
+        odds = float(body.get("odds") or 2.0)
+        stake = float(body.get("stake") or 2.0)
+        market_id = str(body.get("market_id") or body.get("runner_id") or selection or "ws")
+        runner_id = str(body.get("runner_id") or selection or "ws")
+        daemon = TradingDaemon()
+        payload = build_order_payload(
+            market_id=market_id,
+            runner_id=runner_id,
+            odds=odds,
+            stake=stake,
+        )
+        payload["selection"] = selection
+        payload["source"] = str(body.get("source") or "api_trading_dispatch")
+        result = daemon.submit_order(payload)
+        return jsonify({"ok": bool(result.get("allowed")), "verdict": result})
+
     @app.route("/api/ping")
     def api_ping():
         return jsonify({"ok": True, "product": "hibs-racing"})
