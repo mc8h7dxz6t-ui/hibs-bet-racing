@@ -242,3 +242,13 @@ def recent_hedged_events(database: Path | None = None, *, limit: int = 20) -> li
             (limit,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+def recent_routing_decisions(database: Path | None = None, *, limit: int = 20) -> list[dict[str, Any]]:
+    db = ensure_trading_schema(database)
+    with connect(db) as conn:
+        rows = conn.execute(
+            "SELECT * FROM routing_decisions ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]
