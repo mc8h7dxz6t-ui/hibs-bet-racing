@@ -649,6 +649,19 @@ def create_app() -> Flask:
     from hibs_racing.url_prefix import apply_url_prefix
 
     apply_url_prefix(app)
+
+    @app.errorhandler(404)
+    def _win_engine_404(exc):  # noqa: ARG001
+        if request.path.startswith("/api/win-engine"):
+            return jsonify({"ok": False, "error": "win_engine_unavailable"}), 404
+        return jsonify({"ok": False, "error": "not_found"}), 404
+
+    @app.errorhandler(500)
+    def _win_engine_safe_500(exc):  # noqa: ARG001
+        if request.path.startswith("/api/win-engine"):
+            return jsonify({"ok": False, "error": "win_engine_unavailable"}), 404
+        return jsonify({"ok": False, "error": "internal_error"}), 500
+
     return app
 
 
