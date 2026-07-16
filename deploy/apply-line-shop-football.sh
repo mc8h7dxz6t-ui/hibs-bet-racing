@@ -1,45 +1,53 @@
 #!/usr/bin/env bash
-# Copy Line Shop overlay (PR #85) from hibs-racing → hibs-bet on VPS (no git on /opt/hibs-bet).
+# Line Shop env upsert for hibs-bet. File copy is legacy — Line Shop ships in hibs-bet git (Phase 1).
 #
 #   sudo bash /opt/hibs-racing/deploy/apply-line-shop-football.sh
+#   sudo HIBS_LINE_SHOP_COPY_OVERLAY=1 bash ...   # force overlay file copy (legacy VPS only)
 #
 set -euo pipefail
 
 RACING="${HIBS_RACING_DEPLOY_PATH:-/opt/hibs-racing}"
 BET="${HIBS_BET_DEPLOY_PATH:-/opt/hibs-bet}"
 OVERLAY="${RACING}/deploy/football-inst-overlay"
+COPY_OVERLAY="${HIBS_LINE_SHOP_COPY_OVERLAY:-0}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root: sudo bash $0" >&2
   exit 1
 fi
 
-[[ -d "${OVERLAY}/templates" ]] || { echo "missing overlay at ${OVERLAY}" >&2; exit 1; }
 [[ -d "${BET}/templates" ]] || { echo "missing ${BET}/templates — sync hibs-bet first" >&2; exit 1; }
 
-copy_one() {
-  local rel="$1"
-  local src="${OVERLAY}/${rel}"
-  local dest="${BET}/${rel}"
-  [[ -f "${src}" ]] || { echo "WARN: skip missing ${rel}" >&2; return 0; }
-  mkdir -p "$(dirname "${dest}")"
-  install -m 0644 "${src}" "${dest}"
-  echo "==> ${rel}"
-}
-
-echo "==> Line Shop overlay ${OVERLAY} -> ${BET}"
-copy_one "templates/line_trader.html"
-copy_one "static/line_trader_shop.js"
-copy_one "static/fve_ws_lines.js"
-copy_one "src/hibs_predictor/fve_status.py"
-copy_one "src/hibs_predictor/web.py"
-
-chown -R www-data:www-data \
-  "${BET}/templates/line_trader.html" \
-  "${BET}/static/line_trader_shop.js" \
-  "${BET}/static/fve_ws_lines.js" \
-  "${BET}/src/hibs_predictor/fve_status.py" \
-  "${BET}/src/hibs_predictor/web.py" 2>/dev/null || true
+if [[ "${COPY_OVERLAY}" == "1" ]]; then
+  [[ -d "${OVERLAY}/templates" ]] || { echo "missing overlay at ${OVERLAY}" >&2; exit 1; }
+  copy_one() {
+    local rel="$1"
+    local src="${OVERLAY}/${rel}"
+    local dest="${BET}/${rel}"
+    [[ -f "${src}" ]] || { echo "WARN: skip missing ${rel}" >&2; return 0; }
+    mkdir -p "$(dirname "${dest}")"
+    install -m 0644 "${src}" "${dest}"
+    echo "==> ${rel}"
+  }
+  echo "==> Line Shop overlay copy (legacy) ${OVERLAY} -> ${BET}"
+  copy_one "templates/line_trader.html"
+  copy_one "static/line_trader_shop.js"
+  copy_one "static/fve_ws_lines.js"
+  copy_one "src/hibs_predictor/fve_status.py"
+  copy_one "src/hibs_predictor/web.py"
+  chown -R www-data:www-data \
+    "${BET}/templates/line_trader.html" \
+    "${BET}/static/line_trader_shop.js" \
+    "${BET}/static/fve_ws_lines.js" \
+    "${BET}/src/hibs_predictor/fve_status.py" \
+    "${BET}/src/hibs_predictor/web.py" 2>/dev/null || true
+else
+  if [[ -f "${BET}/static/line_trader_shop.js" ]]; then
+    echo "==> Line Shop git canonical — skipping overlay file copy (set HIBS_LINE_SHOP_COPY_OVERLAY=1 to override)"
+  else
+    echo "WARN: ${BET}/static/line_trader_shop.js missing — sync hibs-bet git or set HIBS_LINE_SHOP_COPY_OVERLAY=1" >&2
+  fi
+fi
 
 ENV_FILE="${BET}/.env"
 touch "${ENV_FILE}"

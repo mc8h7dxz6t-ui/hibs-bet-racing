@@ -97,3 +97,26 @@ def test_router_simulated_hedge_on_line_crash(trading_db, monkeypatch):
         ).fetchone()
     assert row["status"] == "SIMULATED_HEDGE"
     assert float(row["hedge_delta_bps"]) >= 100
+
+
+def test_recent_routing_decisions_helper(trading_db, monkeypatch):
+    from hibs_racing.trading.liquidity_router import recent_routing_decisions
+
+    monkeypatch.setenv("HIBS_LIQUIDITY_ROUTER_ACTIVE", "false")
+    cache = MarketDeltaCache()
+    router = LiquidityRouter(cache=cache, database=trading_db)
+    with connect(trading_db) as conn:
+        record_simulated_trade(
+            conn,
+            payload_hash="route-helper",
+            runner_id="200",
+            market_id="100",
+            odds=5.0,
+            stake=10.0,
+            status="SIMULATED",
+        )
+        conn.commit()
+    router.process_tick()
+    rows = recent_routing_decisions(database=trading_db, limit=5)
+    assert len(rows) == 1
+    assert rows[0]["chosen_channel"]

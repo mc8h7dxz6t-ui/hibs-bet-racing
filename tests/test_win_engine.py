@@ -77,6 +77,41 @@ def test_win_engine_active_default_false(monkeypatch):
     assert win_engine_active() is False
 
 
+def test_win_engine_env_true_blocked_without_calibration(tmp_path, monkeypatch):
+    from hibs_racing.config import db_path, load_config
+    from hibs_racing.models.win_engine_config import win_engine_env_requested
+
+    monkeypatch.setenv("HIBS_WIN_ENGINE_ACTIVE", "true")
+    monkeypatch.setenv("HIBS_RACING_DB_PATH", str(tmp_path / "feature_store.sqlite"))
+    db = tmp_path / "feature_store.sqlite"
+    init_db(db)
+    ensure_win_engine_schema(db)
+    assert win_engine_env_requested() is True
+    assert win_engine_active() is False
+
+
+def test_win_engine_active_when_calibrated(tmp_path, monkeypatch):
+    from hibs_racing.models.win_engine_store import update_calibration_state
+
+    monkeypatch.setenv("HIBS_WIN_ENGINE_ACTIVE", "true")
+    monkeypatch.setenv("HIBS_RACING_DB_PATH", str(tmp_path / "feature_store.sqlite"))
+    monkeypatch.setenv("HIBS_RACING_WIN_BRIER_PASS_MAX", "0.185")
+    monkeypatch.setenv("HIBS_RACING_MIN_WIN_CALIBRATION_N", "100")
+    db = tmp_path / "feature_store.sqlite"
+    init_db(db)
+    ensure_win_engine_schema(db)
+    with connect(db) as conn:
+        update_calibration_state(
+            conn,
+            calibration_state="CALIBRATED",
+            rolling_brier=0.12,
+            sample_n=150,
+            races_in_window=40,
+        )
+        conn.commit()
+    assert win_engine_active() is True
+
+
 def test_run_win_engine_on_minimal_cards(tmp_path, monkeypatch):
     monkeypatch.setenv("HIBS_RACING_PRODUCTION", "0")
     db = tmp_path / "feature_store.sqlite"

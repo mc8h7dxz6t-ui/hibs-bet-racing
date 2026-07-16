@@ -457,7 +457,7 @@ def create_app() -> Flask:
     def api_trading_sandbox():
         """Read-only racing execution sandbox — no order dispatch."""
         from hibs_racing.trading.daemon import TradingDaemon
-        from hibs_racing.trading.liquidity_router import recent_hedged_events
+        from hibs_racing.trading.liquidity_router import recent_hedged_events, recent_routing_decisions
         from hibs_racing.trading.store import recent_simulated_trades
 
         limit = min(int(request.args.get("limit", 20)), 50)
@@ -466,6 +466,7 @@ def create_app() -> Flask:
             {
                 **daemon.status(),
                 "recent_simulated_trades": recent_simulated_trades(limit=limit),
+                "recent_routing_decisions": recent_routing_decisions(limit=limit),
                 "recent_hedged_events": recent_hedged_events(limit=limit),
             }
         )
