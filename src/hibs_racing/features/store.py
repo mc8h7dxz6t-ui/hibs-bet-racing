@@ -217,4 +217,7 @@ def init_db(db: Path) -> None:
         from hibs_racing.models.win_engine_store import ensure_win_engine_schema
 
         ensure_win_engine_schema(db)
+        from hibs_racing.trading.store import apply_trading_schema
+
+        apply_trading_schema(conn)
         conn.commit()

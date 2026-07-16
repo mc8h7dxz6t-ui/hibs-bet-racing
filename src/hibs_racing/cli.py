@@ -653,6 +653,77 @@ def cmd_route_execution(args: argparse.Namespace) -> int:
     return 0 if report.get("status") == "disabled" else 1
 
 
+def cmd_trading_daemon(args: argparse.Namespace) -> int:
+    import asyncio
+
+    from hibs_racing.trading.daemon import TradingDaemon
+
+    daemon = TradingDaemon()
+
+    async def _main() -> None:
+        await daemon.start()
+        try:
+            while True:
+                await asyncio.sleep(1.0)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await daemon.stop()
+
+    try:
+        asyncio.run(_main())
+    except KeyboardInterrupt:
+        print(json.dumps({"ok": True, "stopped": True, **daemon.status()}, indent=2))
+    return 0
+
+
+def cmd_trading_dispatch(args: argparse.Namespace) -> int:
+    from hibs_racing.trading.daemon import TradingDaemon
+    from hibs_racing.trading.execution_governor import build_order_payload
+
+    daemon = TradingDaemon()
+    if args.inject_odds:
+        parts = str(args.inject_odds).split(":")
+        if len(parts) == 3:
+            daemon.listener.inject_delta(
+                {
+                    "market_id": parts[0],
+                    "runner_id": parts[1],
+                    "back_odds": float(parts[2]),
+                    "ts_ms": int(__import__("time").time() * 1000),
+                }
+            )
+    payload = build_order_payload(
+        market_id=args.market_id,
+        runner_id=args.runner_id,
+        odds=float(args.odds),
+        stake=float(args.stake),
+    )
+    if args.latency_ms is not None:
+        payload["created_at_ms"] = int(__import__("time").time() * 1000) - int(args.latency_ms)
+    result = daemon.submit_order(payload)
+    print(json.dumps(result, indent=2))
+    return 0 if result.get("allowed") else 1
+
+
+def cmd_trading_status(args: argparse.Namespace) -> int:
+    from hibs_racing.trading.daemon import TradingDaemon
+    from hibs_racing.trading.store import recent_simulated_trades
+
+    daemon = TradingDaemon()
+    print(
+        json.dumps(
+            {
+                **daemon.status(),
+                "recent_simulated_trades": recent_simulated_trades(limit=int(args.limit)),
+            },
+            indent=2,
+            default=str,
+        )
+    )
+    return 0
+
+
 def cmd_notify_daily(args: argparse.Namespace) -> int:
     from hibs_racing.daily.webhook_notify import notify_daily_digest
 
@@ -1462,6 +1533,35 @@ def main(argv: list[str] | None = None) -> int:
         help="(Disabled) Legacy execution preview — analytics-only product",
     )
     p_exec.set_defaults(func=cmd_route_execution)
+
+    p_td = sub.add_parser(
+        "trading-daemon",
+        help="Background async stream listener + execution governor (isolated; feature-flagged)",
+    )
+    p_td.set_defaults(func=cmd_trading_daemon)
+
+    p_tdispatch = sub.add_parser(
+        "trading-dispatch",
+        help="Submit one order through execution governor (simulated when live flag false)",
+    )
+    p_tdispatch.add_argument("--market-id", required=True)
+    p_tdispatch.add_argument("--runner-id", required=True)
+    p_tdispatch.add_argument("--odds", required=True, type=float)
+    p_tdispatch.add_argument("--stake", required=True, type=float)
+    p_tdispatch.add_argument(
+        "--inject-odds",
+        help="Optional market:runner:odds injected into stream cache before dispatch",
+    )
+    p_tdispatch.add_argument(
+        "--latency-ms",
+        type=int,
+        help="Synthetic packet delay for latency gate testing",
+    )
+    p_tdispatch.set_defaults(func=cmd_trading_dispatch)
+
+    p_tstatus = sub.add_parser("trading-status", help="Trading daemon / simulated_trades snapshot")
+    p_tstatus.add_argument("--limit", type=int, default=10)
+    p_tstatus.set_defaults(func=cmd_trading_status)
 
     p_ic = sub.add_parser("ingest-cards", help="Load racecards from CSV or rpscrape JSON")
     p_ic.add_argument("path", help="cards.csv or YYYY-MM-DD.json")
