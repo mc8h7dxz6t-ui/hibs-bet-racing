@@ -6,6 +6,7 @@ from typing import Any
 
 from hibs_racing.tips.group_combinations import group_tips_from_text
 from hibs_racing.tips.store import load_email_bodies_for_date, load_tips
+from hibs_racing.models.win_engine_insights import attach_win_engine_to_combinations
 
 
 def _runner_lookup_from_rows(rows: list[dict[str, Any]]) -> dict[tuple, str | None]:
@@ -59,10 +60,13 @@ def combinations_for_date(db: Path, card_date: str | None = None) -> dict[str, A
     elif rows:
         singles = _tips_as_singles(rows)
 
-    return {
-        "ok": True,
-        "card_date": target_date,
-        "combinations": combinations,
-        "singles": singles,
-        "tip_count": len(rows),
-    }
+    return attach_win_engine_to_combinations(
+        {
+            "ok": True,
+            "card_date": target_date,
+            "combinations": combinations,
+            "singles": singles,
+            "tip_count": len(rows),
+        },
+        db,
+    )

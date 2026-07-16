@@ -688,6 +688,12 @@ def cmd_refresh_cards(args: argparse.Namespace) -> int:
         print(json.dumps({"ok": False, "error": str(exc)}, indent=2), file=sys.stderr)
         return 1
     print(json.dumps({"ok": True, **stats}, indent=2))
+    try:
+        from hibs_racing.models.win_engine_circuit import run_win_engine_sandbox
+
+        stats["win_engine"] = run_win_engine_sandbox()
+    except Exception:
+        stats["win_engine"] = {"ok": False, "skipped": True}
     if args.paper and not stats.get("paper_recon_clean", True):
         return 1
     return 0
@@ -873,6 +879,12 @@ def cmd_settle_paper(_: argparse.Namespace) -> int:
     result = settle_paper_bets()
     slippage = join_sp_to_value_picks(days=14)
     result["execution_slippage_join"] = slippage
+    try:
+        from hibs_racing.models.win_engine_circuit import run_win_engine_sandbox
+
+        result["win_engine_calibration"] = run_win_engine_sandbox()
+    except Exception:
+        result["win_engine_calibration"] = {"ok": False, "skipped": True}
     print(json.dumps(result, indent=2))
     return 0
 

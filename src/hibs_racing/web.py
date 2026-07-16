@@ -426,6 +426,33 @@ def create_app() -> Flask:
         card_date = (request.args.get("date") or "").strip() or None
         return jsonify(combinations_for_date(db, card_date=card_date))
 
+    @app.route("/api/win-engine/predictions")
+    def api_win_engine_predictions():
+        from hibs_racing.features.store import connect
+        from hibs_racing.models.win_engine_circuit import public_release_allowed
+        from hibs_racing.models.win_engine_insights import build_runner_insights
+        from hibs_racing.models.win_engine_store import load_calibration_state
+
+        if not public_release_allowed(db_path(load_config())):
+            return jsonify({"ok": False, "error": "win_engine_inactive"}), 404
+        db = db_path(load_config())
+        card_date = (request.args.get("date") or "").strip() or None
+        if not card_date:
+            from datetime import date
+
+            card_date = date.today().isoformat()
+        insights = build_runner_insights(db, card_date)
+        with connect(db) as conn:
+            cal = load_calibration_state(conn)
+        return jsonify(
+            {
+                "ok": True,
+                "card_date": card_date,
+                "calibration": cal,
+                "insights": insights or {},
+            }
+        )
+
     @app.route("/api/ping")
     def api_ping():
         return jsonify({"ok": True, "product": "hibs-racing"})
