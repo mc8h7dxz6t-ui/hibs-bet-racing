@@ -93,6 +93,34 @@ def _attach_place_probs(frame: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _resolve_matchbook_back_odds(row: pd.Series) -> float | None:
+    """Exchange back price used for de-vig market Brier overlay."""
+    if "matchbook_back_odds" in row.index and pd.notna(row.get("matchbook_back_odds")):
+        val = float(row["matchbook_back_odds"])
+        return val if val > 1.0 else None
+    book = str(row.get("best_book") or row.get("odds_source") or "").strip().lower()
+    if book in ("matchbook", "mb", "exchange") and pd.notna(row.get("win_decimal")):
+        val = float(row["win_decimal"])
+        return val if val > 1.0 else None
+    if pd.notna(row.get("live_odds_decimal")):
+        val = float(row["live_odds_decimal"])
+        return val if val > 1.0 else None
+    if pd.notna(row.get("win_decimal")):
+        val = float(row["win_decimal"])
+        return val if val > 1.0 else None
+    return None
+
+
+def run_win_engine_calibration_circuit(database: Path) -> dict[str, Any]:
+    """
+    Evaluate variable field-size bounds and exchange market-beat contracts.
+    Forces UNCALIBRATED when sample_n < N or any race block fails — fail-closed for public API.
+    """
+    from hibs_racing.models.win_engine_circuit import apply_calibration_circuit_breaker
+
+    return apply_calibration_circuit_breaker(database)
+
+
 def run_win_engine(
     cards: pd.DataFrame,
     *,
@@ -132,18 +160,23 @@ def run_win_engine(
 
     mcfadden = mcfadden_conditional_logit(scored)
     mcfadden = _attach_place_probs(mcfadden)
+    field_sizes = mcfadden.groupby("race_id", sort=False).size()
 
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     rows: list[dict[str, Any]] = []
     for _, row in mcfadden.iterrows():
+        mb_odds = _resolve_matchbook_back_odds(row)
+        race_id = row["race_id"]
         rows.append(
             {
                 "runner_id": row["runner_id"],
-                "race_id": row["race_id"],
+                "race_id": race_id,
                 "true_probability": float(row["true_probability"]),
                 "fair_odds": float(row["fair_odds"]) if pd.notna(row["fair_odds"]) else None,
                 "place_probability": float(row["place_probability"]) if pd.notna(row.get("place_probability")) else None,
                 "live_odds_decimal": float(row["live_odds_decimal"]) if pd.notna(row["live_odds_decimal"]) else None,
+                "matchbook_back_odds": mb_odds,
+                "field_size": int(field_sizes.get(race_id, 1)),
                 "x_fund": float(row["x_fund"]),
                 "market_velocity": float(row["market_velocity"]) if pd.notna(row.get("market_velocity")) else None,
                 "timestamp": now,
@@ -153,5 +186,6 @@ def run_win_engine(
     if persist:
         with connect(db) as conn:
             upsert_predictions(conn, rows)
+        run_win_engine_calibration_circuit(db)
 
     return mcfadden

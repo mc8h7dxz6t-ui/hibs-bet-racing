@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from hibs_racing.features.store import connect, init_db
-from hibs_racing.models.win_engine_circuit import evaluate_calibration_circuit, sync_brier_from_runners
+from hibs_racing.models.win_engine_circuit import evaluate_calibration_circuit
 from hibs_racing.models.win_engine_config import win_engine_active
 from hibs_racing.models.win_engine_service import mcfadden_conditional_logit, run_win_engine
 from hibs_racing.models.win_engine_store import ensure_win_engine_schema, load_calibration_state, upsert_predictions
@@ -41,6 +41,8 @@ def test_win_engine_schema_and_upsert(tmp_path):
             "fair_odds": 4.0,
             "place_probability": 0.45,
             "live_odds_decimal": 5.0,
+            "matchbook_back_odds": 5.0,
+            "field_size": 4,
             "x_fund": 1.1,
             "market_velocity": 0.2,
         }
@@ -53,20 +55,33 @@ def test_win_engine_schema_and_upsert(tmp_path):
 
 
 def test_circuit_breaker_trips_on_high_brier(tmp_path, monkeypatch):
-    monkeypatch.setenv("HIBS_RACING_WIN_BRIER_PASS_MAX", "0.185")
     monkeypatch.setenv("HIBS_RACING_MIN_WIN_CALIBRATION_N", "3")
+    monkeypatch.setenv("HIBS_RACING_MIN_MARKET_BEAT_BPS", "0")
     db = tmp_path / "feature_store.sqlite"
     init_db(db)
     ensure_win_engine_schema(db)
     with connect(db) as conn:
-        for i in range(5):
+        for i in range(3):
             conn.execute(
                 """
                 INSERT INTO win_engine_predictions (
-                    runner_id, race_id, true_probability, fair_odds, brier_score, timestamp
-                ) VALUES (?, ?, ?, ?, ?, datetime('now'))
+                    runner_id, race_id, true_probability, fair_odds, brier_score,
+                    matchbook_back_odds, live_odds_decimal, race_field_brier,
+                    market_race_brier, field_size, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                 """,
-                (f"r{i}", f"race{i}", 0.9, 1.11, 0.25,),
+                (
+                    f"r{i}",
+                    f"race{i}",
+                    0.99,
+                    1.01,
+                    0.0001,
+                    2.0,
+                    2.0,
+                    2.5,
+                    0.5,
+                    2,
+                ),
             )
     out = evaluate_calibration_circuit(db)
     assert out["calibration_state"] == "UNCALIBRATED"
@@ -78,7 +93,6 @@ def test_win_engine_active_default_false(monkeypatch):
 
 
 def test_win_engine_env_true_blocked_without_calibration(tmp_path, monkeypatch):
-    from hibs_racing.config import db_path, load_config
     from hibs_racing.models.win_engine_config import win_engine_env_requested
 
     monkeypatch.setenv("HIBS_WIN_ENGINE_ACTIVE", "true")
@@ -95,7 +109,6 @@ def test_win_engine_active_when_calibrated(tmp_path, monkeypatch):
 
     monkeypatch.setenv("HIBS_WIN_ENGINE_ACTIVE", "true")
     monkeypatch.setenv("HIBS_RACING_DB_PATH", str(tmp_path / "feature_store.sqlite"))
-    monkeypatch.setenv("HIBS_RACING_WIN_BRIER_PASS_MAX", "0.185")
     monkeypatch.setenv("HIBS_RACING_MIN_WIN_CALIBRATION_N", "100")
     db = tmp_path / "feature_store.sqlite"
     init_db(db)
@@ -106,7 +119,11 @@ def test_win_engine_active_when_calibrated(tmp_path, monkeypatch):
             calibration_state="CALIBRATED",
             rolling_brier=0.12,
             sample_n=150,
-            races_in_window=40,
+            races_in_window=150,
+            market_brier_rolling=0.15,
+            exchange_beat_delta_bps=200.0,
+            variable_bounds_pass=True,
+            market_beat_pass=True,
         )
         conn.commit()
     assert win_engine_active() is True
@@ -168,3 +185,8 @@ def test_run_win_engine_on_minimal_cards(tmp_path, monkeypatch):
     with connect(db) as conn:
         n = conn.execute("SELECT COUNT(*) FROM win_engine_predictions").fetchone()[0]
         assert n == 2
+        row = conn.execute(
+            "SELECT matchbook_back_odds, field_size FROM win_engine_predictions WHERE runner_id='R1:a'"
+        ).fetchone()
+        assert row["matchbook_back_odds"] == pytest.approx(3.5)
+        assert row["field_size"] == 2

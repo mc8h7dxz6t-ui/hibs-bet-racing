@@ -14,8 +14,12 @@ import pandas as pd
 from hibs_racing.backtest.retrospective import _date_range, _load_historical_cards
 from hibs_racing.config import db_path, load_config
 from hibs_racing.features.store import connect, init_db
-from hibs_racing.models.win_engine_circuit import evaluate_calibration_circuit
-from hibs_racing.models.win_engine_config import win_brier_pass_max
+from hibs_racing.models.win_engine_circuit import (
+    devig_exchange_probabilities,
+    evaluate_calibration_circuit,
+    multiclass_field_brier,
+)
+from hibs_racing.models.win_engine_config import min_win_calibration_n, win_brier_pass_max
 from hibs_racing.models.win_engine_service import run_win_engine
 from hibs_racing.models.win_engine_store import ensure_win_engine_schema, update_calibration_state
 
@@ -158,6 +162,7 @@ def run_win_engine_backtest(
 
     threshold = win_brier_pass_max()
     all_rows: list[dict[str, Any]] = []
+    race_rows: list[dict[str, Any]] = []
     days_processed = 0
     races_total = 0
     top1_picks = 0
@@ -198,6 +203,23 @@ def run_win_engine_backtest(
             top1_picks += 1
             if int(top["finish_pos"]) == 1:
                 top1_wins += 1
+
+            probs = group["true_probability"].astype(float).tolist()
+            outcomes = [1 if int(fp) == 1 else 0 for fp in group["finish_pos"].tolist()]
+            field_brier = multiclass_field_brier(probs, outcomes)
+            odds = group["win_decimal"].astype(float).tolist()
+            devig = devig_exchange_probabilities(odds)
+            market_field_brier = (
+                multiclass_field_brier(devig, outcomes) if devig is not None else None
+            )
+            race_rows.append(
+                {
+                    "race_id": race_id,
+                    "field_brier": field_brier,
+                    "market_field_brier": market_field_brier,
+                    "field_size": len(group),
+                }
+            )
 
         for _, row in merged.iterrows():
             won = 1 if int(row["finish_pos"]) == 1 else 0
@@ -255,13 +277,22 @@ def run_win_engine_backtest(
         )
 
     frame = pd.DataFrame(all_rows)
-    mean_brier = float(frame["brier"].mean())
-    market_brier = float(frame["market_brier"].dropna().mean()) if frame["market_brier"].notna().any() else None
+    race_frame = pd.DataFrame(race_rows) if race_rows else pd.DataFrame()
+    if not race_frame.empty:
+        mean_brier = float(race_frame["field_brier"].mean())
+        market_brier = (
+            float(race_frame["market_field_brier"].dropna().mean())
+            if race_frame["market_field_brier"].notna().any()
+            else None
+        )
+    else:
+        mean_brier = float(frame["brier"].mean())
+        market_brier = float(frame["market_brier"].dropna().mean()) if frame["market_brier"].notna().any() else None
     brier_skill = (market_brier - mean_brier) if market_brier is not None else None
     mean_log_loss = float(frame["log_loss"].mean())
     place_brier = float(frame["place_brier"].dropna().mean()) if frame["place_brier"].notna().any() else None
     hit_rate = top1_wins / top1_picks if top1_picks else None
-    brier_pass = mean_brier <= threshold and len(frame) >= 100
+    brier_pass = mean_brier <= threshold and races_total >= min_win_calibration_n()
 
     monthly: list[dict[str, Any]] = []
     calibration_bins: list[dict[str, Any]] = []
@@ -282,16 +313,25 @@ def run_win_engine_backtest(
             )
 
     if seed_calibration:
-        with connect(db) as conn:
-            state = "CALIBRATED" if brier_pass else "UNCALIBRATED"
-            update_calibration_state(
-                conn,
-                calibration_state=state,
-                rolling_brier=mean_brier,
-                sample_n=len(frame),
-                races_in_window=races_total,
-            )
         if persist_predictions:
+            evaluate_calibration_circuit(db)
+        else:
+            with connect(db) as conn:
+                update_calibration_state(
+                    conn,
+                    calibration_state="UNCALIBRATED",
+                    rolling_brier=mean_brier,
+                    sample_n=races_total,
+                    races_in_window=races_total,
+                    market_brier_rolling=market_brier,
+                    exchange_beat_delta_bps=(
+                        ((market_brier - mean_brier) / market_brier * 10_000.0)
+                        if market_brier
+                        else None
+                    ),
+                    variable_bounds_pass=False,
+                    market_beat_pass=False,
+                )
             evaluate_calibration_circuit(db)
 
     if market_brier is not None:

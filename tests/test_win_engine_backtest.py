@@ -55,7 +55,7 @@ def test_win_engine_backtest_on_historical_runners(tmp_path, monkeypatch):
 def test_win_engine_backtest_seed_calibration(tmp_path, monkeypatch):
     pytest.importorskip("sklearn")
     monkeypatch.setenv("HIBS_RACING_PRODUCTION", "0")
-    monkeypatch.setenv("HIBS_RACING_WIN_BRIER_PASS_MAX", "0.99")
+    monkeypatch.setenv("HIBS_RACING_MIN_WIN_CALIBRATION_N", "500")
     db = tmp_path / "feature_store.sqlite"
     init_db(db)
     _seed_historical_runners(db)
@@ -65,6 +65,7 @@ def test_win_engine_backtest_seed_calibration(tmp_path, monkeypatch):
         end="2026-05-15",
         database=db,
         seed_calibration=True,
+        persist_predictions=True,
     )
 
     with connect(db) as conn:
@@ -72,4 +73,5 @@ def test_win_engine_backtest_seed_calibration(tmp_path, monkeypatch):
             "SELECT calibration_state, rolling_brier, sample_n FROM win_engine_calibration WHERE id=1"
         ).fetchone()
     assert row is not None
-    assert int(row["sample_n"]) >= 4
+    assert row["calibration_state"] == "UNCALIBRATED"
+    assert int(row["sample_n"]) >= 2
