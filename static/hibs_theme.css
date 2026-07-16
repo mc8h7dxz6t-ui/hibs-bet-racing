@@ -2,26 +2,26 @@
    Pastel teal on slate — high contrast readable text */
 :root {
     --hibs-green: #0d9488;
-    --hibs-green-dark: #0f172a;
+    --hibs-green-dark: #1e293b;
     --hibs-green-mid: #134e4a;
-    --hibs-green-soft: rgba(13, 148, 136, 0.18);
-    --hibs-green-glow: rgba(13, 148, 136, 0.1);
-    --hibs-green-highlight: rgba(148, 163, 184, 0.06);
-    --hibs-navy: #0f172a;
-    --hibs-navy-deep: #0b1220;
+    --hibs-green-soft: rgba(167, 243, 208, 0.16);
+    --hibs-green-glow: rgba(94, 234, 212, 0.08);
+    --hibs-green-highlight: rgba(167, 243, 208, 0.08);
+    --hibs-navy: #1e293b;
+    --hibs-navy-deep: #0f172a;
     --hibs-neon: #e2e8f0;
     --neon-value: #5eead4;
     --green: #a7f3d0;
-    --green-dim: #64748b;
-    --border: rgba(148, 163, 184, 0.18);
-    --glow: rgba(13, 148, 136, 0.12);
-    --gold: #fcd34d;
-    --gold-dim: rgba(252, 211, 77, 0.1);
-    --accent: #94a3b8;
-    --blue: #7dd3fc;
-    --card: rgba(15, 23, 42, 0.92);
-    --text: #f1f5f9;
-    --muted: #94a3b8;
+    --green-dim: #94a3b8;
+    --border: rgba(167, 243, 208, 0.14);
+    --glow: rgba(94, 234, 212, 0.08);
+    --gold: #fde68a;
+    --gold-dim: rgba(253, 230, 138, 0.12);
+    --accent: #cbd5e1;
+    --blue: #a5f3fc;
+    --card: rgba(30, 41, 59, 0.72);
+    --text: #f8fafc;
+    --muted: #cbd5e1;
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
@@ -42,9 +42,9 @@ body {
     background-color: var(--hibs-navy-deep);
     color: var(--text);
     background-image:
-        radial-gradient(ellipse at 12% 40%, rgba(13, 148, 136, 0.1) 0%, transparent 48%),
-        radial-gradient(ellipse at 88% 12%, rgba(13, 148, 136, 0.12) 0%, transparent 42%),
-        linear-gradient(180deg, var(--hibs-navy-deep) 0%, #0f172a 100%);
+        radial-gradient(ellipse at 10% 20%, rgba(167, 243, 208, 0.07) 0%, transparent 42%),
+        radial-gradient(ellipse at 90% 8%, rgba(125, 211, 252, 0.06) 0%, transparent 38%),
+        linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
 }
 
 body::before {
