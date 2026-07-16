@@ -9,7 +9,7 @@ Group=www-data
 WorkingDirectory=/opt/hibs-racing
 Environment=HOME=/opt/hibs-racing
 Environment=PYTHONPATH=/opt/hibs-racing/src
-Environment=HIBS_RACING_DB_PATH=/opt/hibs-racing/data/feature_store.sqlite
+Environment=HIBS_RACING_DB_PATH=/mnt/hibs-ramdisk/feature_store.sqlite
 Environment=HIBS_LIVE_TRADING_ENABLED=false
 Environment=HIBS_LIQUIDITY_ROUTER_ACTIVE=false
 EnvironmentFile=-/opt/hibs-racing/.env

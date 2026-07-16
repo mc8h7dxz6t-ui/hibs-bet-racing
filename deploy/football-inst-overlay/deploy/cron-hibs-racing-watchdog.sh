@@ -10,13 +10,14 @@ RACING="${HIBS_RACING_DEPLOY_PATH:-/opt/hibs-racing}"
 LOG_DIR="${LOG_DIR:-/var/log/hibs-racing}"
 LOG_FILE="${LOG_DIR}/watchdog.log"
 MARKER="# hibs-racing: ping watchdog"
-PING_URL="${HIBS_RACING_PING_URL:-http://127.0.0.1:5003/api/ping}"
+SOCKET="${HIBS_RACING_UNIX_SOCKET:-/var/run/hibs/racing_execution.sock}"
+PING_URL="${HIBS_RACING_PING_URL:-http://localhost/api/ping}"
 
 usage() { echo "Usage: $0 [--print|--install|--run]"; }
 
 run_watchdog() {
   mkdir -p "${LOG_DIR}"
-  if curl -fsS --max-time 8 "${PING_URL}" >/dev/null 2>&1; then
+  if curl -fsS --unix-socket "${SOCKET}" --max-time 8 "${PING_URL}" >/dev/null 2>&1; then
     exit 0
   fi
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) ping failed — restart hibs-racing" >>"${LOG_FILE}"

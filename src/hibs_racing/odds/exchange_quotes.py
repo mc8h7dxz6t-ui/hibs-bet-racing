@@ -100,6 +100,37 @@ def persist_exchange_quotes(
     return {"rows": rows, "poll_milestone": poll_milestone, "timestamp": ts}
 
 
+def load_runner_price_ticks(
+    runner_id: str,
+    *,
+    limit: int = 3,
+    database: Path | None = None,
+    max_age_seconds: float = 45.0,
+) -> list[dict]:
+    """Last N Matchbook exchange_quotes ticks for a runner (newest first)."""
+    db = database or db_path(load_config())
+    init_db(db)
+    rid = str(runner_id)
+    cutoff = (
+        datetime.now(timezone.utc) - timedelta(seconds=max(max_age_seconds, 1.0))
+    ).replace(microsecond=0).isoformat()
+    with connect(db) as conn:
+        rows = conn.execute(
+            """
+            SELECT runner_id, timestamp, back_price, lay_price, odds_source
+            FROM exchange_quotes
+            WHERE runner_id = ?
+              AND back_price IS NOT NULL
+              AND back_price > 1.0
+              AND timestamp >= ?
+            ORDER BY timestamp DESC
+            LIMIT ?
+            """,
+            (rid, cutoff, int(limit)),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def load_cached_exchange_odds(
     cards: pd.DataFrame,
     *,
