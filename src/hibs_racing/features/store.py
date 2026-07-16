@@ -214,4 +214,7 @@ def init_db(db: Path) -> None:
                 conn.execute(stmt)
             except sqlite3.OperationalError:
                 pass
+        from hibs_racing.models.win_engine_store import ensure_win_engine_schema
+
+        ensure_win_engine_schema(db)
         conn.commit()
