@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-hibs-theme="pastel" data-hibs-density="compact">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -293,16 +293,21 @@
         }
         .odds-affiliate-link:hover{color:var(--hibs-neon);border-bottom-color:var(--hibs-neon);}
         .smart-picks-hero{
-            margin-bottom:16px;padding:16px 18px;border-radius:16px;
-            border:1px solid rgba(246,216,137,0.35);
-            background:linear-gradient(135deg,rgba(246,216,137,0.12),rgba(13,148,136,0.18));
+            margin-bottom:12px;padding:10px 12px;border-radius:12px;
+            border:1px solid rgba(167,243,208,0.22);
+            background:linear-gradient(135deg,rgba(167,243,208,0.08),rgba(30,41,59,0.55));
             position:relative;overflow:hidden;isolation:isolate;
         }
-        .smart-picks-hero h2{font-family:'Orbitron',monospace;color:var(--gold);font-size:1.05em;margin-bottom:6px;}
-        .smart-picks-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:12px;}
+        .place-picker-top{margin-top:0;}
+        .smart-picks-hero h2{font-family:'Orbitron',monospace;color:var(--neon-value);font-size:0.92em;margin-bottom:4px;}
+        .smart-picks-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:8px;}
         .smart-pick-card{
-            background:rgba(0,0,0,0.28);border:1px solid var(--border);border-radius:12px;padding:14px;
+            background:rgba(30,41,59,0.55);border:1px solid rgba(167,243,208,0.14);border-radius:10px;padding:10px;
         }
+        .dash-fold{border:1px solid var(--border);border-radius:10px;margin-bottom:10px;background:rgba(30,41,59,0.45);}
+        .dash-fold > summary{cursor:pointer;padding:8px 10px;font-size:0.72em;font-weight:700;color:var(--muted);list-style:none;}
+        .dash-fold > summary::-webkit-details-marker{display:none;}
+        .dash-fold-body{padding:0 10px 10px;font-size:0.78em;color:var(--muted);line-height:1.45;}
         .smart-pick-card .sp-horse{font-weight:700;font-size:1.05em;color:var(--hibs-neon);}
         .smart-pick-card .sp-meta{font-size:0.8em;color:var(--muted);margin:6px 0;}
         /* Brand accents — decorative only, zero layout impact */
@@ -333,6 +338,17 @@
         }
         {% block extra_css %}{% endblock %}
     </style>
+    <script>
+        (function () {
+            try {
+                var raw = localStorage.getItem('hibs_user_settings_v1');
+                var s = raw ? JSON.parse(raw) : {};
+                var root = document.documentElement;
+                root.setAttribute('data-hibs-theme', s.theme || 'pastel');
+                root.setAttribute('data-hibs-density', s.density || 'compact');
+            } catch (e) {}
+        })();
+    </script>
 </head>
 <body class="hibs-launch-active">
 {% include '_launch_wait_overlay.html' %}
