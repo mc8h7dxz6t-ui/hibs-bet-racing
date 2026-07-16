@@ -1,0 +1,22 @@
+# 256MB tmpfs RAM disk for hot feature_store.sqlite + boot-time activation.
+#
+#   sudo cp deploy/hibs-ramdisk.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now hibs-ramdisk
+
+[Unit]
+Description=HIBS racing feature_store RAM disk (tmpfs)
+DefaultDependencies=no
+Before=hibs-racing.service hibs-trading-daemon.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/hibs-racing/deploy/mount-hibs-ramdisk.sh --activate
+ExecStop=/opt/hibs-racing/deploy/mount-hibs-ramdisk.sh --deactivate
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hibs-ramdisk
+
+[Install]
+WantedBy=multi-user.target

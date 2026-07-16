@@ -67,6 +67,14 @@ else
   log "3/10 — skip block storage (set VOLUME_DEVICE=/dev/sdb to enable)"
 fi
 
+log "3b/10 — RAM disk + hot feature_store activation"
+if [[ -f "${RACING}/deploy/mount-hibs-ramdisk.sh" ]]; then
+  bash "${RACING}/deploy/mount-hibs-ramdisk.sh" --activate
+  bash "${RACING}/deploy/cron-hibs-ramdisk-sync.sh" --install 2>/dev/null || true
+else
+  log "WARN: mount-hibs-ramdisk.sh not found — skip RAM disk"
+fi
+
 log "4/10 — scrape-first institutional profile"
 bash "${APP}/deploy/apply-vps-scrape-first-institutional.sh"
 

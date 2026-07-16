@@ -20,6 +20,7 @@ from hibs_racing.trading.config import (
     min_hedge_delta_bps,
 )
 from hibs_racing.trading.delta_cache import MarketDeltaCache
+from hibs_racing.trading.runner_disarm_registry import is_disarmed
 from hibs_racing.trading.store import ensure_trading_schema
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,7 @@ class LiquidityRouter:
         db = self._db()
         routed = 0
         hedged = 0
+        drift_blocked = 0
         with connect(db) as conn:
             rows = conn.execute(
                 """
@@ -109,13 +111,30 @@ class LiquidityRouter:
                 """
             ).fetchall()
             for row in rows:
-                trade_id = str(row["trade_id"])
+                rec = dict(row)
+                trade_id = str(rec["trade_id"])
+                runner_id = str(rec.get("runner_id") or "")
+                if runner_id and is_disarmed(runner_id):
+                    drift_blocked += 1
+                    continue
+                if runner_id:
+                    try:
+                        from hibs_predictor.drift_gate import validate_market_velocity
+
+                        drift = validate_market_velocity(runner_id, database=db)
+                        if not drift.get("ok", True):
+                            drift_blocked += 1
+                            continue
+                    except ImportError:
+                        pass
+                    except Exception as exc:
+                        logger.debug("drift_gate skipped trade=%s: %s", trade_id[:8], exc)
                 if trade_id not in self._processed_trades:
-                    if self._route_trade(conn, dict(row)):
+                    if self._route_trade(conn, rec):
                         routed += 1
                     self._processed_trades.add(trade_id)
                 if trade_id not in self._hedged_trades:
-                    if self._maybe_hedge(conn, dict(row)):
+                    if self._maybe_hedge(conn, rec):
                         hedged += 1
                         self._hedged_trades.add(trade_id)
             conn.commit()
@@ -123,10 +142,14 @@ class LiquidityRouter:
             "liquidity_router_active": liquidity_router_active(),
             "routed": routed,
             "hedged": hedged,
+            "drift_blocked": drift_blocked,
             "processed_trades": len(self._processed_trades),
         }
 
     def _route_trade(self, conn, row: dict[str, Any]) -> bool:
+        runner_id = str(row.get("runner_id") or "")
+        if runner_id and is_disarmed(runner_id):
+            return False
         odds = float(row["odds"] or 0)
         if odds <= 1.0:
             return False
@@ -177,6 +200,9 @@ class LiquidityRouter:
         return True
 
     def _maybe_hedge(self, conn, row: dict[str, Any]) -> bool:
+        runner_id = str(row.get("runner_id") or "")
+        if runner_id and is_disarmed(runner_id):
+            return False
         back_odds = float(row["odds"] or 0)
         back_stake = float(row["stake"] or 0)
         market_id = str(row.get("market_id") or "")
