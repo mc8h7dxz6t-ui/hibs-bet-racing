@@ -341,6 +341,23 @@ def cmd_backtest_replay(args: argparse.Namespace) -> int:
     return 0 if report.value_picks_logged or report.runners_scored else 1
 
 
+def cmd_win_engine_backtest(args: argparse.Namespace) -> int:
+    from hibs_racing.backtest.win_engine_backtest import run_win_engine_backtest
+
+    report = run_win_engine_backtest(
+        months=int(getattr(args, "months", 6)),
+        start=getattr(args, "start", None),
+        end=getattr(args, "end", None),
+        extended=not getattr(args, "compact", False),
+        seed_calibration=getattr(args, "seed_calibration", False),
+        persist_predictions=getattr(args, "persist_predictions", False),
+    )
+    print(json.dumps(report.to_dict(), indent=2))
+    if report.runners <= 0:
+        return 1
+    return 0 if report.brier_pass or not getattr(args, "require_pass", False) else 1
+
+
 def cmd_export_backtest_master(args: argparse.Namespace) -> int:
     from hibs_racing.backtest.retrospective import write_master_ledger
 
@@ -708,6 +725,7 @@ def cmd_trading_dispatch(args: argparse.Namespace) -> int:
 
 def cmd_trading_status(args: argparse.Namespace) -> int:
     from hibs_racing.trading.daemon import TradingDaemon
+    from hibs_racing.trading.liquidity_router import recent_hedged_events
     from hibs_racing.trading.store import recent_simulated_trades
 
     daemon = TradingDaemon()
@@ -716,6 +734,7 @@ def cmd_trading_status(args: argparse.Namespace) -> int:
             {
                 **daemon.status(),
                 "recent_simulated_trades": recent_simulated_trades(limit=int(args.limit)),
+                "recent_hedged_events": recent_hedged_events(limit=int(args.limit)),
             },
             indent=2,
             default=str,
@@ -1354,6 +1373,31 @@ def main(argv: list[str] | None = None) -> int:
         help="Custom CSV output path (default: exports/Hibs_Racing_OOS_PhaseA_May2026_TrackRecord.csv)",
     )
     p_btr.set_defaults(func=cmd_backtest_replay)
+
+    p_webt = sub.add_parser(
+        "win-engine-backtest",
+        help="Extended OOS backtest for McFadden win engine (Brier vs SP market, calibration bins)",
+    )
+    p_webt.add_argument("--months", type=int, default=6, help="Lookback months when --start/--end omitted")
+    p_webt.add_argument("--start", help="Start date YYYY-MM-DD (OOS: after config backtest.train_end)")
+    p_webt.add_argument("--end", help="End date YYYY-MM-DD (default today)")
+    p_webt.add_argument("--compact", action="store_true", help="Skip calibration bins and monthly breakdown")
+    p_webt.add_argument(
+        "--seed-calibration",
+        action="store_true",
+        help="Write aggregate Brier into win_engine_calibration (does not enable HIBS_WIN_ENGINE_ACTIVE)",
+    )
+    p_webt.add_argument(
+        "--persist-predictions",
+        action="store_true",
+        help="Persist per-runner predictions during replay (debug; default off)",
+    )
+    p_webt.add_argument(
+        "--require-pass",
+        action="store_true",
+        help="Exit 1 unless mean Brier <= HIBS_RACING_WIN_BRIER_PASS_MAX and n>=100",
+    )
+    p_webt.set_defaults(func=cmd_win_engine_backtest)
 
     p_btm = sub.add_parser(
         "export-backtest-master",

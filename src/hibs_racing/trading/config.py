@@ -53,3 +53,24 @@ def stream_tick_size() -> float:
 
 def initial_wallet_balance() -> float:
     return _env_float("HIBS_TRADING_WALLET_BALANCE", 1000.0)
+
+
+def liquidity_router_active() -> bool:
+    return _env_flag("HIBS_LIQUIDITY_ROUTER_ACTIVE", default=False)
+
+
+def max_venue_commission_bps() -> int:
+    return _env_int("HIBS_MAX_VENUE_COMMISSION_BPS", 200)
+
+
+def min_hedge_delta_bps() -> int:
+    return _env_int("HIBS_MIN_HEDGE_DELTA_BPS", 150)
+
+
+def allowed_routing_channels() -> tuple[str, ...]:
+    raw = (os.environ.get("HIBS_ALLOWED_ROUTING_CHANNELS") or "matchbook,betfair_stub").strip()
+    return tuple(ch.strip().lower() for ch in raw.split(",") if ch.strip())
+
+
+def liquidity_router_poll_seconds() -> float:
+    return _env_float("HIBS_LIQUIDITY_ROUTER_POLL_SEC", 5.0)
