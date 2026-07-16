@@ -1,7 +1,7 @@
 # Buyer Evidence Pack — Procurement & Auditor Dry-Run
 
 **Purpose:** Hand this to procurement, InfoSec, or an external auditor — run proof **without a vendor call**.  
-**Scope:** All **12** institutional products on shared `inst_spine` (8 core + 3 Phase 2 + Agent Ledger)  
+**Scope:** All **12** institutional products on shared `inst_spine`  
 **Last rigorous E2E:** **12/12 PASSED** — `industry_gold: true` (see `docs/test_logs/instpp_rigorous_latest_summary.json`)
 
 ---
@@ -10,7 +10,7 @@
 
 | Evidence type | What it proves |
 |---------------|----------------|
-| **113+ automated tests** | Fail-closed gates, hash chain, export determinism, chaos |
+| **157+ automated tests** | Fail-closed gates, hash chain, export determinism, chaos |
 | **Rigorous E2E 12/12** | Each product: ingest → check → export → verify-bundle + spend gold demo |
 | **Chaos suite** | WAL persistence, capture integration, wallet fail-closed |
 | **Offline verify-bundle** | Auditor replays tarball without live DB or vendor API |

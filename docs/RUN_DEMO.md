@@ -57,7 +57,7 @@ make demo-gold-up      # seed UI data + start workflow console
 make demo-gold-down    # stop workflow console
 make stack-up          # docker workflow UI
 make redis-up          # docker workflow + Redis
-make smoke             # 134+ tests
+make smoke             # 157+ tests
 make rigorous          # logged 12/12 E2E
 make chaos             # WAL / wallet / capture chaos
 make test              # full pytest

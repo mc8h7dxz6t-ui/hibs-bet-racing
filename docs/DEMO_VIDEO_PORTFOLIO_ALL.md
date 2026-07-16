@@ -1,7 +1,7 @@
-# Portfolio Demo Video — All 11 Services
+# Portfolio Demo Video — All 12 Services
 
 **Purpose:** One screen-recording covering **every product** — real terminal, plain-English voiceover.  
-**Length:** ~18–25 minutes (or split into Part 1 / Part 2 at 10 min)  
+**Length:** ~25–35 minutes (or split into Part 1 / Part 2 at ~15 min)  
 **Not:** AI avatar marketing — **you + terminal** is the trust signal.
 
 ---
@@ -20,15 +20,15 @@ pip install -e ".[dev,instpp]"
 SKIP_LIVE=1 ./scripts/demo_portfolio_all.sh --clean
 ```
 
-**Artifacts:** `data/demo/portfolio/*.tar` — eleven verify-bundle tarballs.
+**Artifacts:** `data/demo/portfolio/*.tar` — twelve verify-bundle tarballs.
 
 ---
 
 ## Title card (10 sec)
 
 ```
-Eight guardrails. One proof spine.
-Decisions · APIs · Webhooks · Data · AI · Ads · Health · Models
+Twelve guardrails. One proof spine.
+Decisions · APIs · Webhooks · Data · AI · Ads · Health · Models · Spend · Agents
 Prove it offline — your cloud.
 ```
 
@@ -38,9 +38,9 @@ Prove it offline — your cloud.
 
 > “Software moves money and decisions faster than humans can explain them afterward.  
 > When something goes wrong — a double charge, a runaway API call, bad data, runaway ad spend — someone asks **prove it**. Dashboards aren’t enough.  
-> I built **eight small tools** on **one audit spine**: they **stop common failures** and leave **tamper-evident records** an outsider can check **without logging into our website**.  
+> I built **twelve small tools** on **one audit spine**: they **stop common failures** and leave **tamper-evident records** an outsider can check **without logging into our website**.  
 > Everything runs in **the customer’s cloud** — this isn’t a flashy SaaS app.  
-> Next fifteen minutes: **all eight**, real commands, real proof exports. Sports and betting analytics are a **separate project** — this is **business infrastructure**.”
+> Next twenty-five minutes: **all twelve**, real commands, real proof exports. Sports and betting analytics are a **separate project** — this is **business infrastructure**.”
 
 **[ACTION]** Start recording. Terminal full screen. Run:
 
@@ -58,7 +58,7 @@ When the script pauses, read the **SAY** block (~60–90 sec each), then press E
 
 ---
 
-### 1/8 — Compliance Logger
+### 1/12 — Compliance Logger
 
 **Plain:** CCTV for business decisions.
 
@@ -70,7 +70,7 @@ When the script pauses, read the **SAY** block (~60–90 sec each), then press E
 
 ---
 
-### 2/8 — Proxy-Risk
+### 2/12 — Proxy-Risk
 
 **Plain:** Bouncer on outbound API calls.
 
@@ -82,7 +82,7 @@ When the script pauses, read the **SAY** block (~60–90 sec each), then press E
 
 ---
 
-### 3/8 — Alt-Data
+### 3/12 — Alt-Data
 
 **Plain:** Smoke alarm for data feeds.
 
@@ -94,7 +94,7 @@ When the script pauses, read the **SAY** block (~60–90 sec each), then press E
 
 ---
 
-### 4/8 — AI Kit
+### 4/12 — AI Kit
 
 **Plain:** Flight recorder for AI agents.
 
@@ -106,7 +106,7 @@ When the script pauses, read the **SAY** block (~60–90 sec each), then press E
 
 ---
 
-### 5/8 — Webhook Mesh
+### 5/12 — Webhook Mesh
 
 **Plain:** Never charge twice for one webhook.
 
@@ -118,7 +118,7 @@ When the script pauses, read the **SAY** block (~60–90 sec each), then press E
 
 ---
 
-### 6/8 — Ad Guard
+### 6/12 — Ad Guard
 
 **Plain:** Circuit breaker on ad API spend.
 
@@ -130,7 +130,7 @@ When the script pauses, read the **SAY** block (~60–90 sec each), then press E
 
 ---
 
-### 7/8 — Health Telemetry
+### 7/12 — Health Telemetry
 
 **Plain:** Sealed envelope for device readings.
 
@@ -142,16 +142,63 @@ When the script pauses, read the **SAY** block (~60–90 sec each), then press E
 
 ---
 
-### 8/8 — ModelGovernor
+### 8/12 — ModelGovernor
 
 **Plain:** Signed model approvals.
 
 **SAY:**
 
-> “**Eight — ModelGovernor.** Banks and lenders ask: **who approved model version three point two for production?** Spreadsheets fail. This records **register, approve, deploy** with a **fingerprint of the model file** — offline proof for model risk.  
-> There’s also an **LLM spend control plane** for platform teams — meter before the model runs — that’s a separate demo (`make demo-gold`) for AI gateway buyers.”
+> “**Eight — ModelGovernor.** Banks and lenders ask: **who approved model version three point two for production?** Spreadsheets fail. This records **register, approve, deploy** with a **fingerprint of the model file** — offline proof for model risk.”
 
 **On screen:** register → approve → check → export → verify.
+
+---
+
+### 9/12 — Drift Gate
+
+**Plain:** Drift enforcement at the proxy.
+
+**SAY:**
+
+> “**Nine — Drift Gate.** Model inputs drift quietly — PSI and KS catch it before bad decisions ship. **Shadow burn-in** first, then **enforce at the proxy**. Every block is in the same hash chain as the rest of the portfolio.”
+
+**On screen:** baseline → shadow score → check → export → verify.
+
+---
+
+### 10/12 — Webhook Replay
+
+**Plain:** Byte-identical webhook replay from capture.
+
+**SAY:**
+
+> “**Ten — Webhook Replay.** Billing disputes need **the exact bytes** that arrived — not a dashboard summary. Replay from **.wrcap capture** with **idempotency CAS** so auditors see what production saw, offline.”
+
+**On screen:** ingest capture → replay → check → export → verify.
+
+---
+
+### 11/12 — Spend Guard
+
+**Plain:** Reserve before dispatch — LLM/API spend plane.
+
+**SAY:**
+
+> “**Eleven — Spend Guard.** AI gateways burn budget in seconds. This **reserves before dispatch**, **settles after**, and **locks out on drift**. The **eleven-step sales walkthrough** (`make demo-gold`) is the CFO demo — same spine, finance hot path.”
+
+**On screen:** reserve → dispatch → settle → check → export → verify.
+
+---
+
+### 12/12 — Agent Ledger
+
+**Plain:** Permit before agent tools run.
+
+**SAY:**
+
+> “**Twelve — Agent Ledger.** Enterprise agents call tools — transfer funds, file tickets, change configs. This is **permit-before-invoke**: who allowed **this** tool with **these** args, sealed before execution. Offline proof for security and model-risk teams.”
+
+**On screen:** authorize → invoke → check → export → verify.
 
 ---
 
@@ -159,7 +206,7 @@ When the script pauses, read the **SAY** block (~60–90 sec each), then press E
 
 **SAY:**
 
-> “Same idea across all eight: **stop the mistake, seal the evidence, verify offline**.  
+> “Same idea across all twelve: **stop the mistake, seal the evidence, verify offline**.  
 > For regulated companies that’s often **webhooks in, decisions, APIs out** — we bundle those.  
 > **Four-week pilots in your VPC** from **two and a half thousand pounds** — shadow first if you want.  
 > Contact below — or DM for a fifteen-minute dry-run on **one** product that hurts. Thanks.”
@@ -177,17 +224,17 @@ Pilot from £2.5k · [your email / LinkedIn]
 
 | Part | Products | ~Length |
 |------|----------|---------|
-| **Part 1 — Money & APIs** | #1 Compliance, #2 Proxy, #5 Webhook, #6 Ad Guard | ~10 min |
-| **Part 2 — Data, AI, Health, Models** | #3 Alt-Data, #4 AI Kit, #7 Health, #8 ModelGovernor | ~10 min |
+| **Part 1 — Money & APIs** | #1 Compliance, #2 Proxy, #5 Webhook, #6 Ad Guard, #10 Replay, #11 Spend | ~15 min |
+| **Part 2 — Data, AI, Health, Models, Agents** | #3 Alt-Data, #4 AI Kit, #7 Health, #8 ModelGovernor, #9 Drift, #12 Agent Ledger | ~15 min |
 
-Run half the script manually with `PAUSE=1` and stop after product 4 or 5.
+Run half the script manually with `PAUSE=1` and stop after product 6 or 7.
 
 ---
 
-## YouTube description (all 8)
+## YouTube description (all 12)
 
 ```
-Full portfolio demo — 8 VPC audit products on one cryptographic spine.
+Full portfolio demo — 12 VPC audit products on one cryptographic spine.
 
 1 Compliance Logger — decision proof
 2 Proxy-Risk — outbound API guard
@@ -197,10 +244,14 @@ Full portfolio demo — 8 VPC audit products on one cryptographic spine.
 6 Ad Guard — marketing API spend kill
 7 Health Telemetry — device batch integrity
 8 ModelGovernor — model approval proof
+9 Drift Gate — PSI/KS at proxy
+10 Webhook Replay — byte-identical replay
+11 Spend Guard — reserve/settle spend plane
+12 Agent Ledger — permit-before-invoke
 
 Every product: check → export → offline verify-bundle (no vendor callback).
 
-For: fintech, SaaS billing, lending, platform eng, marketing finance, health tech, MRM.
+For: fintech, SaaS billing, lending, platform eng, marketing finance, health tech, MRM, AI FinOps.
 Deploy: your VPC. Pilots from £2.5k.
 
 Contact: [your details]
@@ -212,9 +263,9 @@ Commands: ./scripts/demo_portfolio_all.sh
 
 ## Title options
 
-1. **8 ways to prove your software didn’t lie (full demo)**  
-2. **VPC audit infrastructure — all 8 products, one spine (live demo)**  
-3. **Stop double charges, runaway APIs, and audit gaps — 20 min proof**
+1. **12 ways to prove your software didn’t lie (full demo)**  
+2. **VPC audit infrastructure — all 12 products, one spine (live demo)**  
+3. **Stop double charges, runaway APIs, and audit gaps — 30 min proof**
 
 ---
 
@@ -224,14 +275,14 @@ Commands: ./scripts/demo_portfolio_all.sh
 |-------|-----|
 | Demo fails mid-run | `SKIP_LIVE=1` · Python 3.12 · `pip install -e ".[dev,instpp]"` |
 | Mac FD errors | `ulimit -n 4096` · see INSTITUTIONAL_STANDARD.md |
-| Video too long | Split Part 1 / Part 2 · or show 3 products + “seven more same pattern” |
-| ModelGovernor LLM spend | Mention only · full stack = `make demo-gold` when available |
+| Video too long | Split Part 1 / Part 2 · or show 4 products + “eight more same pattern” |
+| Spend Guard sales walkthrough | `make demo-gold` — separate 11-step CFO demo |
 
 ---
 
 ## Related
 
-- `scripts/demo_portfolio_all.sh` — run all 8 without recording  
+- `scripts/demo_portfolio_all.sh` — run all 12 without recording  
 - `scripts/record_portfolio_demo_video.sh` — guided pauses  
-- `docs/DEMO_VIDEO_WEBHOOK_MESH.md` — deep dive single product  
+- `docs/PORTFOLIO_FULL_TECH_SALES_12.md` — 12-SKU index  
 - `docs/PORTFOLIO_SALES_SHEET.md` — pricing

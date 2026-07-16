@@ -1,9 +1,11 @@
-# Institutional Deep Dive — All 8 Products
+# Institutional Deep Dive — All 8 Products (legacy)
+
+> **Superseded for GTM:** [PORTFOLIO_FULL_TECH_SALES_12.md](PORTFOLIO_FULL_TECH_SALES_12.md) · [INSTITUTIONAL_STANDARD.md](INSTITUTIONAL_STANDARD.md) — **12 SKUs**, 157+ tests, rigorous **12/12**.
 
 **Audience:** Technical buyers, auditors, procurement, enterprise architects  
 **Standard:** Institutional gold standard — fail-closed, offline verify-bundle, F1–F9 gates, typed errors, one-command demo  
 **Spine:** `inst_spine` — genesis WAL, Lamport clocks, deterministic export, Redis fail-closed backends  
-**Proof:** `./scripts/instpp_smoke_test.sh` · `./scripts/instpp_rigorous_test.sh` (all 8 products) · per-product `demo_*.sh`
+**Proof:** `./scripts/instpp_smoke_test.sh` (157+) · `./scripts/instpp_rigorous_test.sh` (12/12 products) · per-product `demo_*.sh`
 
 ---
 
@@ -474,7 +476,7 @@ pip install -e ".[dev,instpp]"
 | Buyer one-pagers | `docs/*_BUYER.md` — all 8 with pitch + next step |
 | Sales tech specs | `docs/*_SALES_TECH_SPEC.md` — all 8 (RFP depth) |
 | SOC 2 VPC pack | `docs/SOC2_VPC_DILIGENCE_PACK.md` |
-| Rigorous E2E proof | `docs/test_logs/instpp_rigorous_latest_summary.json` — 8/8 PASSED |
+| Rigorous E2E proof | `docs/test_logs/instpp_rigorous_latest_summary.json` — 12/12 PASSED |
 
 **Sell motion:** Demo (60s) → `verify-bundle` offline → shadow pilot → paid LOI.
 

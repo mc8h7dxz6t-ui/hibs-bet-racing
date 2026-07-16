@@ -130,7 +130,7 @@ There are many gateways and many cost dashboards. The claim is **ledger-backed g
 | `ad_guard` (#6) | Spend kill + gate audit | **Spend enforcement** pattern on marketing APIs |
 | `model_governor` (#8) | Model lifecycle ledger | **Shipped SKU** — model governance, not LLM wallet |
 
-The portfolio already proves institutional correctness (91 tests, 8/8 rigorous E2E, offline verify-bundle). The north star adds a **finance hot path** on top of that spine.
+The portfolio already proves institutional correctness (157+ tests, 12/12 rigorous E2E, offline verify-bundle). The north star adds a **finance hot path** on top of that spine.
 
 ---
 
