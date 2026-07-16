@@ -418,6 +418,14 @@ def create_app() -> Flask:
         db = db_path(load_config())
         return jsonify({"tips": load_tips(db, limit=100), "summary": tipster_summary(db)})
 
+    @app.route("/api/tips/combinations")
+    def api_tips_combinations():
+        from hibs_racing.tips.combinations_api import combinations_for_date
+
+        db = db_path(load_config())
+        card_date = (request.args.get("date") or "").strip() or None
+        return jsonify(combinations_for_date(db, card_date=card_date))
+
     @app.route("/api/ping")
     def api_ping():
         return jsonify({"ok": True, "product": "hibs-racing"})

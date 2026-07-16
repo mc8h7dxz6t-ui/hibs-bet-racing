@@ -146,7 +146,7 @@ def _parse_schedule_line(line: str) -> ParsedTip | None:
       3.45 Carlisle ARCHER ROYAL 20/1 0.75pt ew 5 places (...)
     """
     stripped = line.strip()
-    if not stripped or _SKIP_LINE_RE.search(stripped):
+    if not stripped:
         return None
     if re.search(r"\bgood luck\b", stripped, re.I) and not _ODDS_FRAC_RE.search(stripped):
         return None
