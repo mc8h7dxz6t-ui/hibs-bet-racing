@@ -3809,7 +3809,7 @@ def api_fve_status():
 @login_required(allow_public_health=True)
 def line_trader_page():
     """Lightweight line-trader shell — client WS to FVE only (no server-side scrape)."""
-    from hibs_predictor.fve_status import fetch_fve_status, fve_public_ws_base
+    from hibs_predictor.fve_status import fetch_fve_status, fve_line_shop_config, fve_public_ws_base
     from hibs_predictor.hibs_brand import hibs_brand_context
     from hibs_predictor.product_links import infer_football_nav_active, infer_product_active, product_bar_context
 
@@ -3819,6 +3819,7 @@ def line_trader_page():
         {
             "fve_status": fetch_fve_status(),
             "fve_ws_base": fve_public_ws_base(),
+            "fve_line_config": fve_line_shop_config(),
         }
     )
     return render_template("line_trader.html", **ctx)

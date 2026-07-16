@@ -30,6 +30,22 @@ def line_trader_page_url() -> str:
     return (os.getenv("HIBS_LINE_TRADER_URL") or "/line-trader").strip() or "/line-trader"
 
 
+def fve_line_shop_config() -> Dict[str, Any]:
+    """Client-side line shop thresholds (decay + value-gap highlight)."""
+    try:
+        decay = int(os.getenv("HIBS_FVE_DECAY_TIMEOUT_SECS", "120"))
+    except ValueError:
+        decay = 120
+    try:
+        arb_bps = int(os.getenv("HIBS_FVE_ARB_DELTA_BPS", "50"))
+    except ValueError:
+        arb_bps = 50
+    return {
+        "decay_timeout_secs": max(15, decay),
+        "arb_delta_bps": max(5, arb_bps),
+    }
+
+
 def fve_integration_enabled() -> bool:
     return (os.getenv("HIBS_FVE_INTEGRATION") or "").strip().lower() in ("1", "true", "yes", "on")
 

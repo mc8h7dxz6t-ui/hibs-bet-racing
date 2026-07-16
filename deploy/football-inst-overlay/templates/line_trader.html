@@ -1,51 +1,101 @@
 {% extends "base.html" %}
-{% block title %}Line Trader — HIBS{% endblock %}
+{% block title %}Line Shop — HIBS{% endblock %}
 {% block portfolio_bar %}{% endblock %}
 {% block extra_css %}
 <style>
-.lt-wrap{max-width:1100px;margin:0 auto;}
-.lt-head{margin-bottom:14px;}
-.lt-head h1{font-size:1.35rem;margin:0 0 6px;}
+.lt-wrap{max-width:1180px;margin:0 auto;}
+.lt-head{margin-bottom:var(--space-md, 14px);}
+.lt-head h1{font-size:1.35rem;margin:0 0 6px;color:var(--text);}
 .lt-sub{color:var(--muted);font-size:0.84rem;line-height:1.45;margin:0;}
 .lt-status{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 14px;}
 .lt-status .pill{font-size:0.78em;}
-.lt-status .ok{color:#5eead4;}
-.lt-status .warn{color:#f59e0b;}
-.lt-status .bad{color:#f87171;}
+.lt-status .ok{color:var(--neon-value);}
+.lt-status .warn{color:var(--gold);}
+.lt-status .bad{color:var(--red);}
 .lt-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:12px;}
 .lt-toolbar label{font-size:0.78em;color:var(--muted);display:block;margin-bottom:4px;}
 .lt-fixture{flex:1;min-width:240px;}
 .lt-fixture select,.lt-fixture input{
-    width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);
+    width:100%;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);
     background:rgba(0,0,0,0.25);color:var(--text);font-size:0.88em;
 }
 .lt-actions{display:flex;flex-wrap:wrap;gap:8px;}
-.lt-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;}
-@media(max-width:860px){.lt-grid{grid-template-columns:1fr;}}
-.lt-panel{border:1px solid var(--border);border-radius:12px;background:rgba(15,23,42,0.88);padding:12px 14px;}
-.lt-panel h2{margin:0 0 10px;font-size:0.82em;text-transform:uppercase;letter-spacing:0.08em;color:var(--hibs-neon);}
-.lt-table{width:100%;border-collapse:collapse;font-size:0.78em;}
-.lt-table th,.lt-table td{padding:6px 8px;border-bottom:1px solid rgba(148,163,184,0.12);text-align:left;}
-.lt-table th{color:var(--muted);font-weight:700;text-transform:uppercase;font-size:0.82em;}
-.lt-table td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;}
+.lt-panel{
+    border:1px solid var(--border);border-radius:var(--radius-md);
+    background:var(--card);padding:12px 14px;box-shadow:var(--shadow-sm);
+}
+.lt-panel h2{
+    margin:0 0 10px;font-size:0.82em;text-transform:uppercase;letter-spacing:0.08em;
+    color:var(--hibs-neon);
+}
 .lt-meta{font-size:0.72em;color:var(--muted);margin-top:8px;line-height:1.4;}
-.lt-log{min-height:160px;max-height:320px;overflow:auto;padding:10px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,0.35);font-size:0.72em;color:var(--muted);white-space:pre-wrap;}
-.lt-edge-pos{color:#6ee7b7;font-weight:700;}
-.lt-edge-neg{color:#fca5a5;}
-.lt-edge-flat{color:var(--muted);}
+.lt-log{
+    min-height:120px;max-height:240px;overflow:auto;padding:10px;border-radius:var(--radius-sm);
+    border:1px solid var(--border);background:rgba(0,0,0,0.35);font-size:0.72em;color:var(--muted);
+    white-space:pre-wrap;
+}
+.lt-empty{color:var(--muted);font-size:0.82em;padding:12px 0;}
+.hibs-deferred-loading.lt-matrix-skel-wrap{padding:16px 12px;text-align:center;}
+.lt-matrix-skel{margin-top:12px;display:grid;gap:8px;}
+.lt-skel-row{
+    height:28px;border-radius:var(--radius-sm);
+    background:linear-gradient(90deg,rgba(148,163,184,0.08),rgba(148,163,184,0.16),rgba(148,163,184,0.08));
+    animation:lt-pulse 1.2s ease-in-out infinite;
+}
+@keyframes lt-pulse{0%,100%{opacity:0.55}50%{opacity:1}}
+.lt-matrix{width:100%;border-collapse:collapse;font-size:0.8em;}
+.lt-matrix th,.lt-matrix td{
+    padding:8px 10px;border-bottom:1px solid rgba(148,163,184,0.12);text-align:left;
+}
+.lt-matrix thead th{
+    color:var(--muted);font-weight:700;text-transform:uppercase;font-size:0.78em;letter-spacing:0.06em;
+}
+.lt-matrix .lt-col-book{border-left:3px solid rgba(148,163,184,0.25);}
+.lt-matrix .lt-col-true{border-left:3px solid var(--hibs-green-soft);}
+.lt-matrix .lt-sel{font-weight:700;color:var(--text);}
+.lt-matrix td.num,.lt-matrix th.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;}
+.lt-row-stale .lt-cell-stale{color:var(--muted);opacity:0.5;}
+.lt-row-stale .lt-sel::after{
+    content:' stale';font-size:0.72em;font-weight:600;color:var(--gold);text-transform:uppercase;
+    letter-spacing:0.06em;margin-left:6px;
+}
+.lt-cell-value{
+    color:var(--accent)!important;
+    background:var(--gold-dim);
+    box-shadow:inset 0 0 0 1px rgba(197,245,212,0.22);
+}
+.lt-row-value .lt-cell-value{font-weight:800;}
+.lt-split-legend{
+    display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;font-size:0.72em;
+}
+.lt-split-legend span{
+    padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);
+    color:var(--muted);
+}
+.lt-split-legend .lt-leg-book{border-left:3px solid rgba(148,163,184,0.35);}
+.lt-split-legend .lt-leg-true{border-left:3px solid var(--hibs-green);color:var(--neon-value);}
+.lt-ingest-bar{
+    display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:0.72em;color:var(--muted);
+}
+.lt-ingest-bar .pill{border:1px solid var(--border);background:rgba(0,0,0,0.2);}
+@media(max-width:720px){
+    .lt-split-legend{grid-template-columns:1fr;}
+    .lt-matrix{font-size:0.74em;}
+}
 </style>
 {% endblock %}
 {% block content %}
 <div class="lt-wrap">
     <div class="lt-head">
-        <h1>Line Trader</h1>
-        <p class="lt-sub">Live 1X2 line shop via FVE — hibs-bet supplies upstream lines; FVE worker ingests without duplicate book polling on the dashboard.</p>
+        <h1>Line Shop</h1>
+        <p class="lt-sub">High-density 1X2 matrix — live REST/WS book decimals vs FVE zero-margin true lines. Presentation only; no order routing on this page.</p>
     </div>
 
     <div class="lt-status" id="lt-status" aria-live="polite">
         <span class="pill" id="lt-chip-api"><span class="warn">●</span> FVE checking…</span>
         <span class="pill" id="lt-chip-worker"><span class="muted">Worker —</span></span>
         <span class="pill" id="lt-chip-ws"><span class="muted">WS —</span></span>
+        <span class="pill muted" id="lt-chip-feed">REST · WS</span>
         <span class="pill muted" id="lt-chip-url">{{ fve_status.ws_base }}</span>
     </div>
 
@@ -61,46 +111,64 @@
             <input id="fixture-key" type="text" placeholder="Arsenal v Chelsea" autocomplete="off">
         </div>
         <div class="lt-actions">
-            <button type="button" class="btn" id="btn-connect">Connect live</button>
+            <button type="button" class="btn" id="btn-connect">Connect WS</button>
             <button type="button" class="btn btn-secondary" id="btn-rest">REST snapshot</button>
             <button type="button" class="btn btn-secondary" id="btn-disconnect">Disconnect</button>
         </div>
     </div>
 
-    <div class="lt-grid">
-        <section class="lt-panel">
-            <h2>Shopped lines (FVE)</h2>
-            <div id="lt-lines-table"><p class="lt-empty">Connect or fetch REST to load lines.</p></div>
-            <p class="lt-meta" id="lt-lines-meta"></p>
-        </section>
-        <section class="lt-panel">
-            <h2>Hibs upstream 1X2</h2>
-            <div id="lt-hibs-table"><p class="lt-empty">Select a fixture.</p></div>
-            <div id="lt-edge-table"></div>
-            <p class="lt-meta">
-                REST: <code>/api/fve/lines/&lt;fixture&gt;</code> ·
-                <a href="{{ hibs_fve_docs_url }}" target="_blank" rel="noopener">FVE API docs</a>
-            </p>
-        </section>
-    </div>
+    <section class="lt-panel">
+        <h2>Line shop matrix</h2>
+        <div class="lt-split-legend" aria-hidden="true">
+            <span class="lt-leg-book">Left — raw bookmaker decimal (REST / WS ticks)</span>
+            <span class="lt-leg-true">Right — zero-margin true line (FVE sharp fair)</span>
+        </div>
+        <div id="lt-shop-mount" class="hibs-deferred" aria-busy="true" data-feed-state="idle">
+            <p class="hibs-deferred-loading">Initializing line feeds…</p>
+            <div class="lt-matrix-skel" aria-hidden="true">
+                <div class="lt-skel-row"></div><div class="lt-skel-row"></div><div class="lt-skel-row"></div>
+            </div>
+        </div>
+        <p class="lt-meta" id="lt-lines-meta"></p>
+        <div class="lt-ingest-bar">
+            <span class="pill" id="lt-feed-rest">REST idle</span>
+            <span class="pill" id="lt-feed-ws">WS idle</span>
+            <span class="pill" id="lt-feed-decay">decay {{ fve_line_config.decay_timeout_secs }}s</span>
+            <span class="pill" id="lt-feed-arb">arb ≥ {{ fve_line_config.arb_delta_bps }} bps</span>
+        </div>
+    </section>
 
     <section class="lt-panel" style="margin-top:12px;">
-        <h2>Session log</h2>
-        <div class="lt-log" id="lines-log">Ready.</div>
+        <h2>Ingestion log</h2>
+        <div class="lt-log" id="lines-log">Ready — localized tick updates only (no page reload).</div>
+        <p class="lt-meta">
+            REST <code>/api/fve/lines/&lt;fixture&gt;</code> ·
+            WS <code>{{ fve_ws_base }}/ws/lines/&lt;fixture&gt;</code> ·
+            <a href="{{ hibs_fve_docs_url }}" target="_blank" rel="noopener">FVE API docs</a>
+        </p>
     </section>
 </div>
 <script src="{{ url_for('static', filename='fve_ws_lines.js') }}"></script>
+<script src="{{ url_for('static', filename='line_trader_shop.js') }}"></script>
 <script>
 (function () {
   const wsBase = {{ fve_ws_base|tojson }};
+  const lineCfg = {{ fve_line_config|tojson }};
   const select = document.getElementById('fixture-select');
   const input = document.getElementById('fixture-key');
   const logEl = document.getElementById('lines-log');
-  const linesTable = document.getElementById('lt-lines-table');
-  const hibsTable = document.getElementById('lt-hibs-table');
-  const edgeTable = document.getElementById('lt-edge-table');
   const linesMeta = document.getElementById('lt-lines-meta');
-  let lastHibsPayload = null;
+  const feedRest = document.getElementById('lt-feed-rest');
+  const feedWs = document.getElementById('lt-feed-ws');
+  const shopMount = document.getElementById('lt-shop-mount');
+
+  const shop = createLineShopController({
+    mount: shopMount,
+    metaEl: linesMeta,
+    decayTimeoutSecs: lineCfg.decay_timeout_secs,
+    arbDeltaBps: lineCfg.arb_delta_bps,
+  });
+
   let ws = null;
   let session = null;
   let reconnectTimer = null;
@@ -118,118 +186,20 @@
     return (select.value || '').trim();
   }
 
-  function fmtOdds(v) {
-    const n = Number(v);
-    return Number.isFinite(n) && n > 1 ? n.toFixed(2) : '—';
-  }
-
-  function renderShopped(shopped) {
-    if (!shopped || typeof shopped !== 'object' || !Object.keys(shopped).length) {
-      linesTable.innerHTML = '<p class="lt-empty">No shopped lines yet — worker may still be ingesting.</p>';
-      return;
-    }
-    const markets = ['Home', 'Draw', 'Away'];
-    const channels = ['soft', 'exchange', 'sharp', 'all'];
-    let html = '<table class="lt-table"><thead><tr><th>Market</th>';
-    channels.forEach((c) => { html += '<th>' + c + '</th>'; });
-    html += '</tr></thead><tbody>';
-    markets.forEach((m) => {
-      if (!shopped[m]) return;
-      html += '<tr><td>' + m + '</td>';
-      channels.forEach((ch) => {
-        const o = shopped[m] && shopped[m][ch] ? shopped[m][ch].odds : null;
-        html += '<td class="num">' + fmtOdds(o) + '</td>';
-      });
-      html += '</tr>';
-    });
-    html += '</tbody></table>';
-    linesTable.innerHTML = html;
-  }
-
-  function edgeClass(bps) {
-    const n = Number(bps);
-    if (!Number.isFinite(n)) return 'lt-edge-flat';
-    if (n >= 25) return 'lt-edge-pos';
-    if (n <= -25) return 'lt-edge-neg';
-    return 'lt-edge-flat';
-  }
-
-  function fmtBps(v) {
-    const n = Number(v);
-    return Number.isFinite(n) ? (n >= 0 ? '+' : '') + n.toFixed(0) + ' bps' : '—';
-  }
-
-  function bestFveOdds(shopped) {
-    const out = { home: null, draw: null, away: null };
-    if (!shopped || typeof shopped !== 'object') return out;
-    const map = { Home: 'home', Draw: 'draw', Away: 'away' };
-    Object.keys(map).forEach((mkt) => {
-      const row = shopped[mkt];
-      if (!row) return;
-      let best = null;
-      ['all', 'sharp', 'exchange', 'soft'].forEach((ch) => {
-        const o = row[ch] && row[ch].odds != null ? Number(row[ch].odds) : null;
-        if (o != null && o > 1 && (best == null || o > best)) best = o;
-      });
-      out[map[mkt]] = best;
-    });
-    return out;
-  }
-
-  function renderEdgeOverlay(hibsPayload, shopped) {
-    if (!edgeTable) return;
-    const model = (hibsPayload && hibsPayload.model_probabilities_1x2) || {};
-    const serverEdge = (hibsPayload && hibsPayload.hibs_edge_bps) || {};
-    const fveBest = bestFveOdds(shopped);
-    const markets = [
-      ['Home', 'home'],
-      ['Draw', 'draw'],
-      ['Away', 'away'],
-    ];
-    let html = '<table class="lt-table" style="margin-top:10px;"><thead><tr>'
-      + '<th>Edge vs FVE best</th><th>Model</th><th>Hibs best</th><th>FVE best</th><th>Δ bps</th></tr></thead><tbody>';
-    markets.forEach(([label, key]) => {
-      const mp = model[key];
-      const hb = hibsPayload && hibsPayload.best_odds_1x2 ? hibsPayload.best_odds_1x2[key] : null;
-      const fb = fveBest[key];
-      let bps = serverEdge[key];
-      if (bps == null && mp != null && fb != null) {
-        bps = (Number(mp) * Number(fb) - 1) * 10000;
-      }
-      html += '<tr><td>' + label + '</td><td class="num">' + (mp != null ? (Number(mp) * 100).toFixed(1) + '%' : '—') + '</td>'
-        + '<td class="num">' + fmtOdds(hb) + '</td><td class="num">' + fmtOdds(fb) + '</td>'
-        + '<td class="num ' + edgeClass(bps) + '">' + fmtBps(bps) + '</td></tr>';
-    });
-    html += '</tbody></table>';
-    edgeTable.innerHTML = html;
-  }
-
-  function renderHibs(best, payload) {
-    lastHibsPayload = payload || lastHibsPayload;
-    if (!best || typeof best !== 'object') {
-      hibsTable.innerHTML = '<p class="lt-empty">No hibs best odds in cache for this fixture.</p>';
-      renderEdgeOverlay(lastHibsPayload, null);
-      return;
-    }
-    hibsTable.innerHTML = '<table class="lt-table"><thead><tr><th>Home</th><th>Draw</th><th>Away</th></tr></thead><tbody><tr>'
-      + '<td class="num">' + fmtOdds(best.home) + '</td>'
-      + '<td class="num">' + fmtOdds(best.draw) + '</td>'
-      + '<td class="num">' + fmtOdds(best.away) + '</td></tr></tbody></table>';
-    renderEdgeOverlay(lastHibsPayload, null);
+  function setFeedPill(el, label, tone) {
+    if (!el) return;
+    const cls = tone === 'ok' ? 'ok' : tone === 'warn' ? 'warn' : 'muted';
+    el.innerHTML = '<span class="' + cls + '">' + label + '</span>';
   }
 
   function onLinesMessage(msg) {
     const lines = msg.lines || {};
-    renderShopped(lines.shopped);
-    renderEdgeOverlay(lastHibsPayload, lines.shopped);
-    const parts = [];
-    if (msg.type) parts.push('type=' + msg.type);
-    if (msg.mode) parts.push('mode=' + msg.mode);
-    if (lines.tick_count != null) parts.push('ticks=' + lines.tick_count);
-    if (lines.sharp_fair_probs) parts.push('sharp_fair=yes');
-    linesMeta.textContent = parts.join(' · ');
+    shop.ingestLines(lines, msg);
+    setFeedPill(feedWs, 'WS tick · ' + (msg.mode || msg.type || 'update'), 'ok');
+    shopMount.dataset.feedState = 'live';
     if (msg.type === 'waiting') {
-      linesTable.innerHTML = '<p class="lt-empty">FVE waiting for ingest — check worker is live.</p>';
+      shop.showSkeleton('FVE waiting for ingest — worker may still be starting.');
+      setFeedPill(feedWs, 'WS waiting', 'warn');
     }
   }
 
@@ -239,6 +209,7 @@
     if (ws) { try { ws.close(); } catch (e) {} ws = null; }
     session = null;
     document.getElementById('lt-chip-ws').innerHTML = '<span class="muted">WS disconnected</span>';
+    setFeedPill(feedWs, 'WS idle', 'muted');
   }
 
   function connectWs(manual) {
@@ -246,15 +217,17 @@
     if (!key) { log('pick_fixture'); return; }
     disconnect();
     reconnectAttempts = manual ? 0 : reconnectAttempts;
+    shop.showSkeleton('Connecting WebSocket line feed…');
     session = createFveLinesSession(onLinesMessage);
     const url = wsBase.replace(/\/$/, '') + '/ws/lines/' + encodeURIComponent(key);
-    log({ action: 'connect', url });
+    log({ action: 'ws_connect', url });
     try {
       ws = new WebSocket(url);
       ws.onopen = () => {
         reconnectAttempts = 0;
         document.getElementById('lt-chip-ws').innerHTML = '<span class="ok">● WS live</span>';
-        log('connected');
+        setFeedPill(feedWs, 'WS connected', 'ok');
+        log('ws_connected');
       };
       ws.onmessage = (ev) => {
         try { session.onMessage(JSON.parse(ev.data)); }
@@ -263,10 +236,11 @@
       ws.onerror = () => log({ error: 'websocket_error', url });
       ws.onclose = () => {
         document.getElementById('lt-chip-ws').innerHTML = '<span class="warn">WS closed</span>';
+        setFeedPill(feedWs, 'WS closed', 'warn');
         if (reconnectAttempts < MAX_RECONNECT) {
           const delay = Math.min(8000, 1000 * Math.pow(2, reconnectAttempts));
           reconnectAttempts += 1;
-          log('reconnect in ' + delay + 'ms (' + reconnectAttempts + '/' + MAX_RECONNECT + ')');
+          log('ws_reconnect in ' + delay + 'ms (' + reconnectAttempts + '/' + MAX_RECONNECT + ')');
           reconnectTimer = setTimeout(() => connectWs(false), delay);
         }
       };
@@ -278,17 +252,22 @@
   async function fetchRest() {
     const key = fixtureKey();
     if (!key) { log('pick_fixture'); return; }
+    setFeedPill(feedRest, 'REST loading…', 'warn');
     try {
       const resp = await fetch('/api/fve/lines/' + encodeURIComponent(key), { headers: { Accept: 'application/json' } });
       const data = await resp.json();
       log({ rest: resp.status, ok: data.ok });
       if (data.ok) {
-        renderHibs(data.best_odds_1x2, data);
+        shop.ingestRestBook(data.best_odds_1x2);
         if (data.fixture_key) input.value = data.fixture_key;
+        setFeedPill(feedRest, 'REST ' + resp.status + ' · cached book', 'ok');
+        shopMount.dataset.feedState = 'rest';
       } else {
-        hibsTable.innerHTML = '<p class="lt-empty">' + (data.error || 'not_found') + '</p>';
+        setFeedPill(feedRest, 'REST ' + (data.error || 'miss'), 'warn');
+        shop.showSkeleton(data.error || 'Fixture not in cache');
       }
     } catch (e) {
+      setFeedPill(feedRest, 'REST error', 'warn');
       log({ rest_error: String(e) });
     }
   }
@@ -312,7 +291,7 @@
       if (s.ws_clients != null) {
         document.getElementById('lt-chip-url').textContent = (s.ws_base || wsBase) + ' · clients ' + s.ws_clients;
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) { /* status probe optional */ }
   }
 
   async function loadFixtures() {
@@ -337,12 +316,15 @@
 
   select.addEventListener('change', () => {
     if (select.value) input.value = select.value;
+    shop.showSkeleton('Loading REST book snapshot…');
     fetchRest();
   });
 
   document.getElementById('btn-connect').addEventListener('click', () => connectWs(true));
   document.getElementById('btn-disconnect').addEventListener('click', disconnect);
   document.getElementById('btn-rest').addEventListener('click', fetchRest);
+
+  window.addEventListener('beforeunload', () => shop.stopDecayWatch());
 
   loadFixtures();
   pollStatus();
