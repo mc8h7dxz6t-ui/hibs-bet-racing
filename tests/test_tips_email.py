@@ -153,6 +153,80 @@ def test_real_tipster_schedule_format():
     assert by_horse["Havana Blue"].course == "Beverley"
 
 
+def test_group_real_tipster_combinations():
+    from hibs_racing.tips.group_combinations import group_tips_from_text
+
+    grouped = group_tips_from_text(REAL_TIPSTER_PASTE.strip(), default_card_date="2026-05-31")
+    combos = grouped["combinations"]
+    singles = grouped["singles"]
+
+    assert len(combos) == 2
+    trixie = combos[0]
+    assert trixie["type"] == "trixie"
+    assert trixie["stake_units"] == 0.25
+    assert trixie["bet_count"] == 4
+    assert len(trixie["legs"]) == 2
+    assert trixie["legs"][0]["selection"] == "Archer Royal"
+    assert trixie["legs"][1]["selection"] == "Havana Blue"
+
+    ew_double = combos[1]
+    assert ew_double["type"] == "ew_double"
+    assert ew_double["stake_units"] == 0.5
+    assert ew_double["bet_count"] == 1
+    assert len(ew_double["legs"]) == 0
+
+    assert len(singles) == 3
+    single_names = {s["selection"] for s in singles}
+    assert single_names == {"Realign", "Washington Heights", "Palmar Bay"}
+
+
+def test_group_friday_reviews_ew_double():
+    from pathlib import Path
+
+    from hibs_racing.tips.group_combinations import group_tips_from_text
+
+    text = Path(__file__).parent.joinpath("fixtures", "tipster_friday_reviews.txt").read_text()
+    grouped = group_tips_from_text(text, default_card_date="2026-06-06")
+    combos = grouped["combinations"]
+    assert len(combos) == 1
+    assert combos[0]["type"] == "ew_double"
+    assert combos[0]["stake_units"] == 0.5
+    assert len(combos[0]["legs"]) == 2
+    names = {leg["selection"] for leg in combos[0]["legs"]}
+    assert names == {"Midnight Lir", "Gallant Lion"}
+    assert grouped["singles"] == []
+
+
+def test_parse_combination_header_lucky_15():
+    from hibs_racing.tips.group_combinations import parse_combination_header
+
+    header = parse_combination_header("1pt Lucky 15")
+    assert header is not None
+    assert header.type == "lucky_15"
+    assert header.bet_count == 15
+    assert header.selection_count == 4
+
+
+def test_api_tips_combinations_route(tmp_path, monkeypatch):
+    from hibs_racing.features.store import init_db
+    from hibs_racing.tips.ingest import ingest_pasted_text
+    from hibs_racing.web import create_app
+
+    db = tmp_path / "tips.sqlite"
+    monkeypatch.setenv("HIBS_RACING_DB_PATH", str(db))
+    init_db(db)
+    ingest_pasted_text(REAL_TIPSTER_PASTE.strip(), default_date="2026-05-31", match=False)
+
+    client = create_app().test_client()
+    r = client.get("/api/tips/combinations?date=2026-05-31")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["ok"] is True
+    assert data["card_date"] == "2026-05-31"
+    assert len(data["combinations"]) == 2
+    assert len(data["singles"]) == 3
+
+
 def test_ingest_dedup(tmp_path, monkeypatch):
     db = tmp_path / "tips.sqlite"
     monkeypatch.setenv("HIBS_RACING_DB_PATH", str(db))

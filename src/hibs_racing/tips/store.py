@@ -174,15 +174,39 @@ def load_tips(
     *,
     unsettled_only: bool = False,
     limit: int = 500,
+    card_date: str | None = None,
 ) -> list[dict[str, Any]]:
     ensure_tipster_schema(db)
     sql = "SELECT * FROM tipster_tips"
+    clauses: list[str] = []
+    params: list[Any] = []
     if unsettled_only:
-        sql += " WHERE settled_at IS NULL"
-    sql += " ORDER BY card_date DESC, received_at DESC LIMIT ?"
+        clauses.append("settled_at IS NULL")
+    if card_date:
+        clauses.append("card_date = ?")
+        params.append(card_date)
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    sql += " ORDER BY card_date DESC, received_at DESC, off_time ASC LIMIT ?"
+    params.append(limit)
     with connect(db) as conn:
-        rows = conn.execute(sql, (limit,)).fetchall()
+        rows = conn.execute(sql, params).fetchall()
     return [dict(r) for r in rows]
+
+
+def load_email_bodies_for_date(db: Path, card_date: str) -> list[str]:
+    """Distinct raw email bodies ingested for a card date."""
+    ensure_tipster_schema(db)
+    with connect(db) as conn:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT raw_email_body FROM tipster_tips
+            WHERE card_date = ? AND raw_email_body IS NOT NULL AND TRIM(raw_email_body) != ''
+            ORDER BY received_at DESC
+            """,
+            (card_date,),
+        ).fetchall()
+    return [str(r[0]) for r in rows if r[0]]
 
 
 def tipster_summary(db: Path) -> dict[str, Any]:
