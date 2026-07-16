@@ -133,9 +133,23 @@ def test_line_trader_page_loads():
         sess["user"] = "test"
     resp = client.get("/line-trader")
     assert resp.status_code == 200
-    assert b"Line Trader" in resp.data
+    assert b"Line Shop" in resp.data
     assert b"fve_ws_lines.js" in resp.data
+    assert b"line_trader_shop.js" in resp.data
     assert b"hibs-product-bar" in resp.data
     assert b"fixture-select" in resp.data
     assert b"btn-rest" in resp.data
-    assert b"Shopped lines" in resp.data
+    assert b"lt-shop-mount" in resp.data
+    assert b"hibs-deferred-loading" in resp.data
+    assert b"Zero-margin true line" in resp.data
+    assert b"no order routing" in resp.data
+
+
+def test_fve_line_shop_config_defaults(monkeypatch):
+    from hibs_predictor.fve_status import fve_line_shop_config
+
+    monkeypatch.delenv("HIBS_FVE_DECAY_TIMEOUT_SECS", raising=False)
+    monkeypatch.delenv("HIBS_FVE_ARB_DELTA_BPS", raising=False)
+    cfg = fve_line_shop_config()
+    assert cfg["decay_timeout_secs"] == 120
+    assert cfg["arb_delta_bps"] == 50
