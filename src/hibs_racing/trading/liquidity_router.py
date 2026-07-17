@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -20,6 +22,13 @@ from hibs_racing.trading.config import (
     min_hedge_delta_bps,
 )
 from hibs_racing.trading.delta_cache import MarketDeltaCache
+from hibs_racing.trading.order_ttl import (
+    INPLAY_ORDER_TIMED_OUT_ABORT,
+    INPLAY_ORDER_TTL_MS,
+    InPlayOrderTracker,
+    default_cancel_fn,
+    log_timed_out_abort_to_ledger,
+)
 from hibs_racing.trading.runner_disarm_registry import is_disarmed
 from hibs_racing.trading.store import ensure_trading_schema
 
@@ -77,6 +86,9 @@ class LiquidityRouter:
     commission_by_channel: dict[str, float] = field(default_factory=commission_by_channel)
     _processed_trades: set[str] = field(default_factory=set)
     _hedged_trades: set[str] = field(default_factory=set)
+    order_tracker: InPlayOrderTracker = field(default_factory=InPlayOrderTracker)
+    _inplay_queue: list[dict[str, Any]] = field(default_factory=list)
+    _ttl_aborts: int = 0
 
     def _db(self) -> Path:
         return ensure_trading_schema(self.database or db_path(load_config()))
@@ -143,7 +155,117 @@ class LiquidityRouter:
             "hedged": hedged,
             "drift_blocked": drift_blocked,
             "processed_trades": len(self._processed_trades),
+            "inplay_queue_depth": len(self._inplay_queue),
+            "ttl_aborts": self._ttl_aborts,
+            "order_ttl_ms": INPLAY_ORDER_TTL_MS,
         }
+
+    def build_venue_request(self, row: dict[str, Any], *, channel: str, odds: float) -> dict[str, Any]:
+        base = {
+            "trade_id": row["trade_id"],
+            "runner_id": row.get("runner_id"),
+            "market_id": row.get("market_id"),
+            "odds": odds,
+            "stake": row.get("stake"),
+            "channel": channel,
+            "created_at_ms": int(time.time() * 1000),
+        }
+        return self.order_tracker.attach_expiry(base)
+
+    def _venue_submit(self, request: dict[str, Any]) -> dict[str, Any]:
+        channel = str(request.get("channel") or "")
+        negotiate_secondary_venue(
+            channel=channel,
+            payload=request,
+        )
+        return {"ok": True, "authoritative": True, "channel": channel}
+
+    async def process_inplay_execution_loop(self) -> dict[str, Any]:
+        """Drain queued live routes under strict 450ms TTL cancel contract."""
+        if not self._inplay_queue:
+            return {"processed": 0, "ttl_aborts": self._ttl_aborts}
+        processed = 0
+        queue = list(self._inplay_queue)
+        self._inplay_queue.clear()
+        for item in queue:
+            channel = str(item["channel"])
+            request = dict(item["request"])
+            row = item["row"]
+            if self.order_tracker.is_muted(channel):
+                self._record_route_decision(
+                    row,
+                    channel=channel,
+                    quotes=item.get("quotes") or [],
+                    status=INPLAY_ORDER_TIMED_OUT_ABORT,
+                    outbound_blocked=1,
+                )
+                continue
+            try:
+                result = await self.order_tracker.submit_with_ttl(
+                    channel=channel,
+                    request=request,
+                    submit_fn=self._venue_submit,
+                    cancel_fn=default_cancel_fn,
+                    confirm_fn=lambda ack: bool(ack.get("authoritative")),
+                    log_abort=log_timed_out_abort_to_ledger,
+                )
+            except Exception as exc:
+                logger.warning("inplay execution loop error: %s", exc)
+                continue
+            processed += 1
+            if result.get("status") == INPLAY_ORDER_TIMED_OUT_ABORT:
+                self._ttl_aborts += 1
+                self._record_route_decision(
+                    row,
+                    channel=channel,
+                    quotes=item.get("quotes") or [],
+                    status=INPLAY_ORDER_TIMED_OUT_ABORT,
+                    outbound_blocked=1,
+                )
+            else:
+                self._record_route_decision(
+                    row,
+                    channel=channel,
+                    quotes=item.get("quotes") or [],
+                    status="LIVE_ROUTED",
+                    outbound_blocked=0,
+                )
+        return {"processed": processed, "ttl_aborts": self._ttl_aborts}
+
+    def _record_route_decision(
+        self,
+        row: dict[str, Any],
+        *,
+        channel: str,
+        quotes: list[VenueQuote],
+        status: str,
+        outbound_blocked: int,
+    ) -> None:
+        best = quotes[0] if quotes else VenueQuote(channel=channel, gross_odds=0.0, commission_bps=0.0, net_odds=0.0)
+        db = self._db()
+        with connect(db) as conn:
+            conn.execute(
+                """
+                INSERT INTO routing_decisions (
+                    decision_id, trade_id, runner_id, market_id, chosen_channel,
+                    gross_odds, net_odds, commission_bps, status, outbound_blocked, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(uuid.uuid4()),
+                    row["trade_id"],
+                    row.get("runner_id"),
+                    row.get("market_id"),
+                    channel,
+                    best.gross_odds,
+                    best.net_odds,
+                    best.commission_bps,
+                    status,
+                    outbound_blocked,
+                    _utc_now(),
+                ),
+            )
+            conn.commit()
 
     def _route_trade(self, conn, row: dict[str, Any]) -> bool:
         runner_id = str(row.get("runner_id") or "")
@@ -165,16 +287,11 @@ class LiquidityRouter:
         outbound_blocked = 1
         status = "SIMULATED_ROUTE"
         if liquidity_router_active():
-            try:
-                negotiate_secondary_venue(
-                    channel=best.channel,
-                    payload={"trade_id": row["trade_id"], "odds": odds, "stake": row["stake"]},
-                )
-            except OutboundBrokerBlocked:
-                status = "OUTBOUND_BLOCKED"
-            except Exception as exc:
-                status = "ROUTE_ERROR"
-                logger.warning("router outbound error: %s", exc)
+            request = self.build_venue_request(row, channel=best.channel, odds=odds)
+            self._inplay_queue.append(
+                {"channel": best.channel, "request": request, "row": row, "quotes": quotes}
+            )
+            return True
         conn.execute(
             """
             INSERT INTO routing_decisions (

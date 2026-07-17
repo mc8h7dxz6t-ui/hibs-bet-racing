@@ -45,7 +45,21 @@ class TradingDaemon:
         self._tasks = [
             asyncio.create_task(self.listener.run(), name="hibs-stream-listener"),
             asyncio.create_task(self._liquidity_router_loop(), name="hibs-liquidity-router"),
+            asyncio.create_task(self._inplay_execution_loop(), name="hibs-inplay-execution"),
         ]
+
+    async def _inplay_execution_loop(self) -> None:
+        while True:
+            try:
+                assert self.router is not None
+                report = await self.router.process_inplay_execution_loop()
+                if report.get("processed"):
+                    logger.info("inplay execution loop: %s", report)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning("inplay execution loop failed: %s", exc)
+            await asyncio.sleep(0.05)
 
     async def _liquidity_router_loop(self) -> None:
         interval = liquidity_router_poll_seconds()
