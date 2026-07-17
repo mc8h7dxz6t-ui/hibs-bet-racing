@@ -120,3 +120,101 @@ def test_recent_routing_decisions_helper(trading_db, monkeypatch):
     rows = recent_routing_decisions(database=trading_db, limit=5)
     assert len(rows) == 1
     assert rows[0]["chosen_channel"]
+
+
+def test_router_forensic_disarm_zero_stake(trading_db, monkeypatch):
+    import json
+
+    from hibs_racing.gate_alignment_matrix import DISARMED_TRACE
+    from hibs_racing.trading.liquidity_router import LiquidityRouter
+
+    monkeypatch.setenv("HIBS_LIQUIDITY_ROUTER_ACTIVE", "false")
+    monkeypatch.setenv("HIBS_FORENSIC_ALIGNMENT_DISABLED", "0")
+
+    cache = MarketDeltaCache()
+    router = LiquidityRouter(cache=cache, database=trading_db)
+    payload = {
+        "runner_telemetry": {
+            "runner_id": "r-weak",
+            "race_name": "Class 6 Handicap",
+            "official_rating": 40,
+            "trainer_rtf": 5.0,
+            "field_size": 12,
+            "win_decimal": 15.0,
+            "place_ev": 0.01,
+            "combo_bayes_place": 0.12,
+            "model_place_prob": 0.10,
+        },
+    }
+    with connect(trading_db) as conn:
+        trade_id = record_simulated_trade(
+            conn,
+            payload_hash="forensic-reject",
+            runner_id="r-weak",
+            market_id="100",
+            odds=15.0,
+            stake=10.0,
+            status="SIMULATED",
+            payload=payload,
+        )
+        conn.commit()
+
+    report = router.process_tick()
+    assert report["routed"] == 0
+    with connect(trading_db) as conn:
+        row = conn.execute(
+            "SELECT stake, payload_json FROM simulated_trades WHERE trade_id = ?",
+            (trade_id,),
+        ).fetchone()
+    assert float(row["stake"]) == 0.0
+    body = json.loads(row["payload_json"])
+    assert body["order_trace"] == DISARMED_TRACE
+    assert body["allocated_cap"] == 0.0
+
+
+def test_router_forensic_pass_sets_allocated_cap(trading_db, monkeypatch):
+    import json
+
+    from hibs_racing.trading.liquidity_router import LiquidityRouter
+
+    monkeypatch.setenv("HIBS_LIQUIDITY_ROUTER_ACTIVE", "false")
+    monkeypatch.setenv("HIBS_FORENSIC_ALIGNMENT_DISABLED", "0")
+
+    cache = MarketDeltaCache()
+    router = LiquidityRouter(cache=cache, database=trading_db)
+    payload = {
+        "runner_telemetry": {
+            "runner_id": "r-strong",
+            "race_name": "Class 4 Handicap",
+            "official_rating": 68,
+            "trainer_rtf": 22.0,
+            "field_size": 10,
+            "win_decimal": 6.0,
+            "place_ev": 0.10,
+            "combo_bayes_place": 0.30,
+            "model_place_prob": 0.40,
+            "ew_combined_ev": 0.12,
+        },
+    }
+    with connect(trading_db) as conn:
+        trade_id = record_simulated_trade(
+            conn,
+            payload_hash="forensic-pass",
+            runner_id="r-strong",
+            market_id="100",
+            odds=6.0,
+            stake=10.0,
+            status="SIMULATED",
+            payload=payload,
+        )
+        conn.commit()
+
+    router.process_tick()
+    with connect(trading_db) as conn:
+        row = conn.execute(
+            "SELECT stake, payload_json FROM simulated_trades WHERE trade_id = ?",
+            (trade_id,),
+        ).fetchone()
+    body = json.loads(row["payload_json"])
+    assert body.get("allocated_cap", 0) > 0.0
+    assert float(row["stake"]) <= float(body["allocated_cap"]) + 1e-9

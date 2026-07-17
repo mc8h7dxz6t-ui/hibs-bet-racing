@@ -11,6 +11,12 @@ from pathlib import Path
 from typing import Any
 
 from hibs_racing.config import db_path, load_config
+from hibs_racing.gate_alignment_matrix import (
+    DISARMED_TRACE,
+    GateAlignmentMatrix,
+    forensic_alignment_enabled,
+    telemetry_actionable,
+)
 from hibs_racing.features.store import connect
 from hibs_racing.trading.broker_outbound import OutboundBrokerBlocked, negotiate_secondary_venue
 from hibs_racing.trading.config import (
@@ -78,6 +84,76 @@ class LiquidityRouter:
     commission_by_channel: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_COMMISSION_BPS))
     _processed_trades: set[str] = field(default_factory=set)
     _hedged_trades: set[str] = field(default_factory=set)
+    _gate_matrix: GateAlignmentMatrix | None = field(default=None, repr=False)
+
+    def _alignment_engine(self) -> GateAlignmentMatrix:
+        if self._gate_matrix is None:
+            self._gate_matrix = GateAlignmentMatrix()
+        return self._gate_matrix
+
+    def _runner_telemetry_from_row(self, row: dict[str, Any]) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        raw = row.get("payload_json")
+        if raw:
+            try:
+                payload = json.loads(raw) if isinstance(raw, str) else dict(raw)
+            except (TypeError, json.JSONDecodeError):
+                payload = {}
+        telemetry = dict(payload.get("runner_telemetry") or payload.get("telemetry") or payload)
+        telemetry.setdefault("runner_id", row.get("runner_id"))
+        telemetry.setdefault("win_decimal", row.get("odds"))
+        telemetry.setdefault("stake", row.get("stake"))
+        return telemetry
+
+    def _finalize_pre_route(self, conn, row: dict[str, Any]) -> dict[str, Any]:
+        """Pre-route forensic alignment — disarm or cap stake before venue routing."""
+        if not forensic_alignment_enabled():
+            return row
+
+        telemetry = self._runner_telemetry_from_row(row)
+        if not telemetry_actionable(telemetry):
+            return row
+
+        report = self._alignment_engine().evaluate_runner_against_blends(telemetry)
+
+        payload: dict[str, Any] = {}
+        raw = row.get("payload_json")
+        if raw:
+            try:
+                payload = json.loads(raw) if isinstance(raw, str) else dict(raw)
+            except (TypeError, json.JSONDecodeError):
+                payload = {}
+
+        payload["forensic_alignment"] = report.to_dict()
+
+        if report.verdict == "REJECT":
+            row["stake"] = 0.0
+            payload["allocated_cap"] = 0.0
+            payload["order_trace"] = DISARMED_TRACE
+            row["payload_json"] = json.dumps(payload, default=str)
+            conn.execute(
+                "UPDATE simulated_trades SET stake = 0, payload_json = ? WHERE trade_id = ?",
+                (row["payload_json"], row["trade_id"]),
+            )
+            logger.info(
+                "forensic alignment disarmed trade=%s runner=%s reason=%s",
+                str(row["trade_id"])[:8],
+                report.runner_id,
+                report.reason,
+            )
+            return row
+
+        cap = float(report.allocated_cap)
+        original = float(row.get("stake") or 0)
+        row["stake"] = min(original, cap) if cap > 0 else original
+        payload["allocated_cap"] = cap
+        payload["order_trace"] = report.order_trace
+        row["payload_json"] = json.dumps(payload, default=str)
+        conn.execute(
+            "UPDATE simulated_trades SET stake = ?, payload_json = ? WHERE trade_id = ?",
+            (row["stake"], row["payload_json"], row["trade_id"]),
+        )
+        return row
 
     def _db(self) -> Path:
         return ensure_trading_schema(self.database or db_path(load_config()))
@@ -149,6 +225,9 @@ class LiquidityRouter:
     def _route_trade(self, conn, row: dict[str, Any]) -> bool:
         runner_id = str(row.get("runner_id") or "")
         if runner_id and is_disarmed(runner_id):
+            return False
+        row = self._finalize_pre_route(conn, row)
+        if float(row.get("stake") or 0) <= 0:
             return False
         odds = float(row["odds"] or 0)
         if odds <= 1.0:

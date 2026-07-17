@@ -180,3 +180,84 @@ def test_update_brier_on_result_persists_race_field_brier(tmp_path):
     assert row["field_size"] == 2
     assert row["market_race_brier"] is not None
     assert math.isfinite(float(row["race_field_brier"]))
+
+
+# --- Forensic gate alignment validations (liquidity routing telemetry) ---
+
+
+def _strong_runner_telemetry() -> dict:
+    return {
+        "runner_id": "r-strong",
+        "race_id": "race-1",
+        "card_date": "2026-06-01",
+        "course": "Ascot",
+        "race_name": "Class 4 Handicap",
+        "official_rating": 68,
+        "trainer_rtf": 22.0,
+        "field_size": 10,
+        "win_decimal": 6.0,
+        "place_ev": 0.10,
+        "combo_bayes_place": 0.30,
+        "model_place_prob": 0.40,
+        "ew_combined_ev": 0.12,
+        "stake": 10.0,
+    }
+
+
+def _weak_runner_telemetry() -> dict:
+    return {
+        "runner_id": "r-weak",
+        "race_name": "Class 6 Handicap",
+        "official_rating": 40,
+        "trainer_rtf": 5.0,
+        "field_size": 12,
+        "win_decimal": 15.0,
+        "place_ev": 0.01,
+        "combo_bayes_place": 0.12,
+        "model_place_prob": 0.10,
+        "stake": 10.0,
+    }
+
+
+def test_gate_alignment_matrix_encodes_three_standards():
+    from hibs_racing.gate_alignment_matrix import GateAlignmentMatrix
+
+    matrix = GateAlignmentMatrix()
+    assert len(matrix.INDUSTRY_STANDARDS) == 3
+    assert len(matrix.ALIGNED_OVERLAYS) == 3
+    assert len(matrix.FORENSIC_BLENDS) == 2
+
+
+def test_evaluate_runner_against_blends_pass_strong_runner():
+    from hibs_racing.gate_alignment_matrix import GateAlignmentMatrix, PASS_TRACE
+
+    report = GateAlignmentMatrix().evaluate_runner_against_blends(_strong_runner_telemetry())
+    assert report.verdict == "PASS"
+    assert report.allocated_cap > 0.0
+    assert report.order_trace == PASS_TRACE
+    assert report.blend_id is not None or report.aligned_overlay is not None
+
+
+def test_evaluate_runner_against_blends_reject_weak_runner():
+    from hibs_racing.gate_alignment_matrix import DISARMED_TRACE, GateAlignmentMatrix
+
+    report = GateAlignmentMatrix().evaluate_runner_against_blends(_weak_runner_telemetry())
+    assert report.verdict == "REJECT"
+    assert report.allocated_cap == 0.0
+    assert report.order_trace == DISARMED_TRACE
+
+
+def test_evaluate_runner_array_any_reject_disarms_batch():
+    from hibs_racing.gate_alignment_matrix import GateAlignmentMatrix
+
+    report = GateAlignmentMatrix().evaluate_runner_against_blends(
+        [_strong_runner_telemetry(), _weak_runner_telemetry()]
+    )
+    assert report.verdict == "REJECT"
+
+
+def test_telemetry_actionable_requires_ev_fields():
+    from hibs_racing.gate_alignment_matrix import telemetry_actionable
+
+    assert telemetry_actionable(_strong_runner_telemetry()) is True
+    assert telemetry_actionable({"runner_id": "x", "odds": 5.0}) is False
