@@ -236,6 +236,64 @@ def cmd_gate_impact(args: argparse.Namespace) -> int:
     return 0 if report.get("runners", 0) > 0 else 1
 
 
+def cmd_sniper_overlay_sweep(args: argparse.Namespace) -> int:
+    from hibs_racing.config import ROOT
+    from hibs_racing.backtest.sniper_overlay_sweep import run_sniper_overlay_sweep
+
+    out = getattr(args, "output", None) or (ROOT / "exports" / "sniper_overlay_sweep.json")
+    progress = out.with_name("sniper_overlay_sweep_progress.json")
+    report = run_sniper_overlay_sweep(
+        start=getattr(args, "start", None),
+        end=getattr(args, "end", None),
+        snapshot_config_hash=getattr(args, "snapshot_config_hash", None),
+        progress_path=progress,
+    )
+    payload = dict(report)
+    if not report.get("error"):
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        Path(out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        payload["output_path"] = str(out)
+        payload["progress_path"] = str(progress)
+    print(json.dumps(payload, indent=2))
+    if report.get("error"):
+        return 1
+    has_picks = any(
+        int((row.get("aggregate") or {}).get("overlay", {}).get("picks") or 0) > 0
+        for row in report.get("overlays", {}).values()
+    )
+    return 0 if has_picks else 1
+
+
+def cmd_gate_alignment_matrix(args: argparse.Namespace) -> int:
+    from hibs_racing.config import ROOT
+    from hibs_racing.backtest.gate_config_alignment import (
+        merge_walkforward_reference,
+        run_gate_alignment_matrix,
+    )
+
+    out = getattr(args, "output", None) or (ROOT / "exports" / "gate_alignment_matrix.json")
+    md_out = out.with_suffix(".md")
+    report = run_gate_alignment_matrix(
+        start=getattr(args, "start", None),
+        end=getattr(args, "end", None),
+        snapshot_config_hash=getattr(args, "snapshot_config_hash", None),
+    )
+    wf_path = getattr(args, "walkforward_ref", None) or (ROOT / "exports" / "gate_lane_walkforward.json")
+    report = merge_walkforward_reference(report, Path(wf_path))
+    payload = dict(report)
+    if not report.get("error"):
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        md_out.write_text(report.get("matrix_table_markdown", ""), encoding="utf-8")
+        payload["output_path"] = str(out)
+        payload["markdown_path"] = str(md_out)
+    print(json.dumps(payload, indent=2))
+    if report.get("error"):
+        return 1
+    has_picks = any(int(r.get("picks") or 0) > 0 for r in report.get("matrix", []))
+    return 0 if has_picks else 1
+
+
 def cmd_data_integrity_check(args: argparse.Namespace) -> int:
     from hibs_racing.cards.ui_frame import prune_orphan_card_scores
     from hibs_racing.monitoring.nan_alert import run_nan_integrity_check
@@ -1268,6 +1326,47 @@ def main(argv: list[str] | None = None) -> int:
         help="Write walk-forward JSON (default: exports/gate_lane_walkforward.json)",
     )
     p_gi.set_defaults(func=cmd_gate_impact)
+
+    p_sos = sub.add_parser(
+        "sniper-overlay-sweep",
+        help="Walk-forward sweep of 8 tweaked sniper gate overlays vs gate3/gate7",
+    )
+    p_sos.add_argument("--start", help="Start date YYYY-MM-DD")
+    p_sos.add_argument("--end", help="End date YYYY-MM-DD")
+    p_sos.add_argument(
+        "--snapshot-config-hash",
+        metavar="HASH",
+        help="Snapshot config_hash (prefix OK). Use 'best' for largest backfill.",
+    )
+    p_sos.add_argument(
+        "--output",
+        type=Path,
+        help="Write sweep JSON (default: exports/sniper_overlay_sweep.json)",
+    )
+    p_sos.set_defaults(func=cmd_sniper_overlay_sweep)
+
+    p_gam = sub.add_parser(
+        "gate-alignment-matrix",
+        help="Forensic matrix: 3 industry anchors + 3 aligned overlays + 2 blends + all gate lanes",
+    )
+    p_gam.add_argument("--start", help="Start date YYYY-MM-DD")
+    p_gam.add_argument("--end", help="End date YYYY-MM-DD")
+    p_gam.add_argument(
+        "--snapshot-config-hash",
+        metavar="HASH",
+        help="Snapshot config_hash (prefix OK). Use 'best' for largest backfill.",
+    )
+    p_gam.add_argument(
+        "--output",
+        type=Path,
+        help="Write matrix JSON (default: exports/gate_alignment_matrix.json)",
+    )
+    p_gam.add_argument(
+        "--walkforward-ref",
+        type=Path,
+        help="Prior walkforward JSON for forensic cross-check",
+    )
+    p_gam.set_defaults(func=cmd_gate_alignment_matrix)
 
     p_gca = sub.add_parser(
         "gate-coverage-audit",
