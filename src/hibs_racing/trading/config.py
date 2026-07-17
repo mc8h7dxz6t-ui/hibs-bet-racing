@@ -68,8 +68,12 @@ def min_hedge_delta_bps() -> int:
 
 
 def allowed_routing_channels() -> tuple[str, ...]:
-    raw = (os.environ.get("HIBS_ALLOWED_ROUTING_CHANNELS") or "matchbook,betfair_stub").strip()
-    return tuple(ch.strip().lower() for ch in raw.split(",") if ch.strip())
+    from hibs_racing.utils.monetization import routing_channels
+
+    env_raw = (os.environ.get("HIBS_ALLOWED_ROUTING_CHANNELS") or "").strip()
+    if env_raw:
+        return tuple(ch.strip().lower() for ch in env_raw.split(",") if ch.strip())
+    return routing_channels()
 
 
 def liquidity_router_poll_seconds() -> float:

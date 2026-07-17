@@ -353,6 +353,12 @@ def create_app() -> Flask:
         except OSError as exc:
             return jsonify({"ok": False, "error": str(exc)}), 500
 
+    @app.route("/api/monetization/venues")
+    def api_monetization_venues():
+        from hibs_racing.utils.monetization import public_monetization_payload
+
+        return jsonify(public_monetization_payload())
+
     @app.route("/status")
     def status_page():
         hs = health_status()
