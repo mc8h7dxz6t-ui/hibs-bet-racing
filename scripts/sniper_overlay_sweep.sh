@@ -8,6 +8,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# shellcheck source=lib_backtest_db.sh
+source "${ROOT}/scripts/lib_backtest_db.sh"
+pick_backtest_db || true
+
 if [[ ! -f "${ROOT}/src/hibs_racing/backtest/sniper_overlay_sweep.py" ]]; then
   echo "ERROR: sniper_overlay_sweep.py missing — sync racing from GitHub first:" >&2
   echo "  sudo HIBS_RACING_SYNC_REF=cursor/gate-config-alignment-12e0 \\" >&2

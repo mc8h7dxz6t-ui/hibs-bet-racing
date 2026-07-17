@@ -10,6 +10,7 @@ from typing import Any
 
 import pandas as pd
 
+from hibs_racing.backtest.db_resolve import resolve_backtest_database
 from hibs_racing.backtest.gate_benchmark import (
     _apply_gate_flags,
     _delta,
@@ -27,7 +28,7 @@ from hibs_racing.backtest.gate_impact import (
     gate7_config,
 )
 from hibs_racing.backtest.snapshot_store import load_snapshots, resolve_snapshot_config_hash
-from hibs_racing.config import db_path, load_config
+from hibs_racing.config import load_config
 
 _PAPER_LEVEL_KEYS: frozenset[str] = frozenset(
     {
@@ -265,7 +266,10 @@ def run_sniper_overlay_sweep(
 ) -> dict:
     """Run walk-forward backtest for each sniper overlay variant; rank by promotion + ROI."""
     cfg = load_config()
-    db = database or db_path(cfg)
+    try:
+        db = database or resolve_backtest_database(cfg)[0]
+    except FileNotFoundError as exc:
+        return {"error": str(exc), "start": start, "end": end}
     paper_cfg = cfg.get("paper", {})
     max_start, max_end = _historical_bounds(db)
     start_s = start or max_start

@@ -10,6 +10,7 @@ from typing import Any, Callable
 
 import pandas as pd
 
+from hibs_racing.backtest.db_resolve import resolve_backtest_database
 from hibs_racing.backtest.gate_benchmark import (
     _apply_gate_flags,
     _delta,
@@ -26,7 +27,7 @@ from hibs_racing.backtest.gate_impact import (
 )
 from hibs_racing.backtest.snapshot_store import load_snapshots, resolve_snapshot_config_hash
 from hibs_racing.cards.actionability import _gate2_confidence
-from hibs_racing.config import db_path, load_config
+from hibs_racing.config import load_config
 
 # --- Three evidence-backed industry standards (forensic anchors) ---
 
@@ -383,7 +384,10 @@ def run_gate_alignment_matrix(
 ) -> dict:
     """Run all canonical lanes + 3 aligned overlays + 2 blends; return ranked matrix."""
     cfg = load_config()
-    db = database or db_path(cfg)
+    try:
+        db = database or resolve_backtest_database(cfg)[0]
+    except FileNotFoundError as exc:
+        return {"error": str(exc), "start": start, "end": end}
     paper_cfg = cfg.get("paper", {})
     max_start, max_end = _historical_bounds(db)
     start_s = start or max_start
