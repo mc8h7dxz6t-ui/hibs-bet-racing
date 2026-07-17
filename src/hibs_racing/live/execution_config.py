@@ -14,8 +14,10 @@ def execution_disabled() -> bool:
 
 
 def betfair_enabled(cfg: dict | None = None) -> bool:
-    """Legacy — always off in analytics-only product."""
-    return False
+    """True when Betfair monetization is armed (credentials + enable flag)."""
+    from hibs_racing.utils.monetization import betfair_monetization_armed
+
+    return betfair_monetization_armed()
 
 
 def betfair_configured() -> bool:
@@ -27,7 +29,11 @@ def betfair_configured() -> bool:
 
 
 def preferred_execution_venues(cfg: dict | None = None) -> list[str]:
-    return []
+    from hibs_racing.utils.monetization import active_venues
+
+    if execution_disabled():
+        return []
+    return active_venues()
 
 
 def execution_summary(cfg: dict | None = None) -> dict:
@@ -36,9 +42,9 @@ def execution_summary(cfg: dict | None = None) -> dict:
         "mode": "analytics",
         "message": EXECUTION_DISABLED_MSG if execution_disabled() else "",
         "dry_run": True,
-        "betfair_enabled": False,
+        "betfair_enabled": betfair_enabled(),
         "betfair_configured": betfair_configured(),
-        "preferred_venues": [],
+        "preferred_venues": preferred_execution_venues(cfg),
         "max_stake": 0.0,
         "sub_100ms_exchange": False,
         "co_location": False,

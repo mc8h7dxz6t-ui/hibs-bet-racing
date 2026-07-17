@@ -12,11 +12,17 @@ from hibs_racing.config import ROOT
 SETTINGS_PATH = ROOT / "data" / "ui_monetization.json"
 
 MONETIZATION_FIELDS: tuple[tuple[str, str, bool], ...] = (
-    ("HIBS_AFFILIATE_VENUE", "Affiliate venue (matchbook | betfair | oddschecker)", False),
+    ("HIBS_AFFILIATE_VENUE", "Affiliate venue (matchbook | betfair | smarkets | betdaq)", False),
     ("HIBS_AFFILIATE_UTM_SOURCE", "UTM source tag on partner links", False),
     ("HIBS_AFFILIATE_TRACKING_ID", "Matchbook / partner tracking ID", False),
+    ("HIBS_BETFAIR_MONETIZATION_ENABLED", "Enable Betfair monetization once account is ready (0|1)", False),
     ("AFFILIATE_MATCHBOOK_BASE_URL", "Matchbook affiliate landing URL", False),
     ("AFFILIATE_BETFAIR_BASE_URL", "Betfair affiliate landing URL", False),
+    ("AFFILIATE_SMARKETS_BASE_URL", "Smarkets affiliate landing URL", False),
+    ("AFFILIATE_BETDAQ_BASE_URL", "Betdaq affiliate landing URL", False),
+    ("BETFAIR_APP_KEY", "Betfair app key (required when Betfair armed)", False),
+    ("BETFAIR_USERNAME", "Betfair username", False),
+    ("BETFAIR_PASSWORD", "Betfair password", True),
     ("MATCHBOOK_USERNAME", "Matchbook API username", True),
     ("MATCHBOOK_PASSWORD", "Matchbook API password", True),
     ("TELEGRAM_BOT_TOKEN", "Telegram bot token (06:01 digest)", True),

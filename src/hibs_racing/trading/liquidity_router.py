@@ -25,10 +25,9 @@ from hibs_racing.trading.store import ensure_trading_schema
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_COMMISSION_BPS: dict[str, float] = {
-    "matchbook": 200.0,
-    "betfair_stub": 250.0,
-}
+from hibs_racing.utils.monetization import VENUE_COMMISSION_BPS, commission_by_channel
+
+DEFAULT_COMMISSION_BPS: dict[str, float] = dict(VENUE_COMMISSION_BPS)
 
 
 def _utc_now() -> str:
@@ -75,7 +74,7 @@ class VenueQuote:
 class LiquidityRouter:
     cache: MarketDeltaCache
     database: Path | None = None
-    commission_by_channel: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_COMMISSION_BPS))
+    commission_by_channel: dict[str, float] = field(default_factory=commission_by_channel)
     _processed_trades: set[str] = field(default_factory=set)
     _hedged_trades: set[str] = field(default_factory=set)
 
