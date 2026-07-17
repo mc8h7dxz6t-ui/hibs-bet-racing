@@ -2,12 +2,13 @@
 <html lang="en" data-hibs-theme="pastel" data-hibs-density="compact">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{% block title %}{{ product_name }}{% endblock %}</title>
     <link rel="icon" href="{{ static_v(hibs_harvested_logo|default(hibs_badge_harp)) }}" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ static_v('hibs_theme.css') }}">
+    <link rel="stylesheet" href="{{ static_v('hibs_mobile.css') }}">
     <style id="hibs-launch-critical">
         html.hibs-launch-boot,body.hibs-launch-active{overflow:hidden;}
         #hibs-launch-overlay{position:fixed;inset:0;z-index:100010;display:flex;align-items:center;justify-content:center;background:#0b1220;}
