@@ -180,3 +180,75 @@ def test_update_brier_on_result_persists_race_field_brier(tmp_path):
     assert row["field_size"] == 2
     assert row["market_race_brier"] is not None
     assert math.isfinite(float(row["race_field_brier"]))
+
+
+def test_henery_exponential_second_place_reference_tolerance():
+    from hibs_racing.place.hpl_combinatorial import institutional_reference_second_place
+
+    probs = [0.5, 0.3, 0.2]
+    gamma = 0.88
+    got = institutional_reference_second_place(probs, runner_idx=1, gamma=gamma)
+    g = [p**gamma for p in probs]
+    total_g = sum(g)
+    expected = (probs[0] * (g[1] / (total_g - g[0]))) + (probs[2] * (g[1] / (total_g - g[2])))
+    assert got == pytest.approx(expected, abs=1e-5)
+
+
+def test_place_liquidity_floor_mutes_execution_signals():
+    import pandas as pd
+
+    from hibs_racing.place.hpl_combinatorial import apply_place_alpha_and_liquidity
+
+    frame = pd.DataFrame(
+        [
+            {
+                "runner_id": "R1:a",
+                "model_place_prob": 0.42,
+                "offered_place_decimal": 2.5,
+                "matchbook_place_liquidity": 1200.0,
+                "value_flag": 1,
+            }
+        ]
+    )
+    out = apply_place_alpha_and_liquidity(frame)
+    assert int(out.loc[0, "place_execution_muted"]) == 1
+    assert int(out.loc[0, "value_flag"]) == 0
+    assert out.loc[0, "value_gate_reason"] == "place_liquidity_floor"
+    assert out.loc[0, "place_alpha_target"] is None
+
+
+def test_place_alpha_target_emitted_above_edge_threshold():
+    import pandas as pd
+
+    from hibs_racing.place.hpl_combinatorial import apply_place_alpha_and_liquidity
+
+    frame = pd.DataFrame(
+        [
+            {
+                "runner_id": "R2:b",
+                "model_place_prob": 0.50,
+                "offered_place_decimal": 2.2,
+                "matchbook_place_liquidity": 5000.0,
+                "value_flag": 0,
+            }
+        ]
+    )
+    out = apply_place_alpha_and_liquidity(frame)
+    assert out.loc[0, "place_alpha_target"] is not None
+    assert "PLACE_ALPHA_TARGET" in str(out.loc[0, "place_alpha_target"])
+    assert int(out.loc[0, "place_value_chip_active"]) == 1
+
+
+def test_place_picker_config_tuple_sanitization(monkeypatch):
+    from hibs_racing.place.place_picker_config import (
+        liquidity_floor_gbp,
+        min_place_edge_bps,
+        place_henery_gamma_base,
+    )
+
+    monkeypatch.setenv("HIBS_PLACE_HENERY_GAMMA_BASE", "(0.91,)")
+    monkeypatch.setenv("HIBS_PLACE_PICKER_MIN_EDGE_BPS", "(300,)")
+    monkeypatch.setenv("HIBS_PLACE_LIQUIDITY_FLOOR_GBP", "(1750.5,)")
+    assert place_henery_gamma_base() == pytest.approx(0.91, abs=1e-9)
+    assert min_place_edge_bps() == 300
+    assert liquidity_floor_gbp() == pytest.approx(1750.5, abs=1e-9)

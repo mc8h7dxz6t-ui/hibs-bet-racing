@@ -5,6 +5,37 @@ import pandas as pd
 from hibs_racing.config import db_path, load_config
 from hibs_racing.features.store import connect, init_db
 from hibs_racing.cards.ui_frame import sanitize_scored_frame
+from hibs_racing.place.hpl_combinatorial import apply_place_alpha_and_liquidity
+
+
+def _inject_offered_place_decimal(frame: pd.DataFrame) -> pd.DataFrame:
+    """Derive place back price from win + EW terms when not already on the row."""
+    if frame.empty or "win_decimal" not in frame.columns:
+        return frame
+    out = frame.copy()
+    if "offered_place_decimal" not in out.columns:
+        out["offered_place_decimal"] = pd.NA
+    cfg = load_config().get("paper", {})
+    default_frac = float(cfg.get("default_place_fraction", 0.25))
+    for idx, row in out.iterrows():
+        if pd.notna(row.get("offered_place_decimal")):
+            continue
+        win = row.get("win_decimal")
+        if win is None or (isinstance(win, float) and pd.isna(win)):
+            continue
+        try:
+            win_f = float(win)
+        except (TypeError, ValueError):
+            continue
+        if win_f <= 1.0:
+            continue
+        frac = row.get("place_fraction")
+        try:
+            pf = float(frac) if frac is not None and not (isinstance(frac, float) and pd.isna(frac)) else default_frac
+        except (TypeError, ValueError):
+            pf = default_frac
+        out.at[idx, "offered_place_decimal"] = round(1.0 + (win_f - 1.0) * pf, 2)
+    return out
 
 
 def load_scored_cards(*, sanitize: bool = True) -> pd.DataFrame:
@@ -27,4 +58,7 @@ def load_scored_cards(*, sanitize: bool = True) -> pd.DataFrame:
             """,
             conn,
         )
-    return sanitize_scored_frame(frame) if sanitize else frame
+    if sanitize:
+        frame = sanitize_scored_frame(frame)
+    frame = _inject_offered_place_decimal(frame)
+    return apply_place_alpha_and_liquidity(frame)
