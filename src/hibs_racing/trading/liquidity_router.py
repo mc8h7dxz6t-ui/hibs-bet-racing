@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -14,7 +15,9 @@ from hibs_racing.config import db_path, load_config
 from hibs_racing.features.store import connect
 from hibs_racing.trading.broker_outbound import OutboundBrokerBlocked, negotiate_secondary_venue
 from hibs_racing.trading.config import (
+    adverse_selection_volume_drop_pct,
     allowed_routing_channels,
+    flight_latency_max_ms,
     liquidity_router_active,
     max_venue_commission_bps,
     min_hedge_delta_bps,
@@ -28,6 +31,66 @@ logger = logging.getLogger(__name__)
 from hibs_racing.utils.monetization import VENUE_COMMISSION_BPS, commission_by_channel
 
 DEFAULT_COMMISSION_BPS: dict[str, float] = dict(VENUE_COMMISSION_BPS)
+
+DISARMED_BY_ADVERSE_SELECTION = "DISARMED_BY_ADVERSE_SELECTION"
+
+
+def _parse_payload_json(row: dict[str, Any]) -> dict[str, Any]:
+    raw = row.get("payload_json")
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _matchbook_back_volume(row: dict[str, Any], cache: MarketDeltaCache, *, prefer_cache: bool = False) -> float | None:
+    market_id = str(row.get("market_id") or "")
+    runner_id = str(row.get("runner_id") or "")
+    if prefer_cache and market_id and runner_id:
+        tick = cache.get(market_id, runner_id)
+        if tick and tick.back_volume is not None:
+            return float(tick.back_volume)
+    payload = _parse_payload_json(row)
+    raw = payload.get("matchbook_back_volume")
+    if raw is None:
+        raw = payload.get("back_volume")
+    if raw is not None:
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            pass
+    if market_id and runner_id:
+        tick = cache.get(market_id, runner_id)
+        if tick and tick.back_volume is not None:
+            return float(tick.back_volume)
+    return None
+
+
+def flight_latency_ms(start_ns: int, end_ns: int) -> float:
+    return (end_ns - start_ns) / 1_000_000.0
+
+
+def volume_drop_exceeded(pre: float | None, post: float | None, *, threshold: float | None = None) -> bool:
+    if pre is None or post is None or pre <= 0:
+        return False
+    drop = threshold if threshold is not None else adverse_selection_volume_drop_pct()
+    return post <= pre * (1.0 - drop)
+
+
+def adverse_selection_abort(
+    *,
+    flight_ms: float,
+    pre_volume: float | None,
+    post_volume: float | None,
+    max_latency_ms: int | None = None,
+) -> bool:
+    cap = max_latency_ms if max_latency_ms is not None else flight_latency_max_ms()
+    if flight_ms > cap:
+        return True
+    return volume_drop_exceeded(pre_volume, post_volume)
 
 
 def _utc_now() -> str:
@@ -164,23 +227,47 @@ class LiquidityRouter:
             return False
         outbound_blocked = 1
         status = "SIMULATED_ROUTE"
+        stake = float(row.get("stake") or 0)
+        routed_stake = stake
+        pre_volume = _matchbook_back_volume(row, self.cache, prefer_cache=False)
+        flight_start_ns = time.perf_counter_ns()
         if liquidity_router_active():
             try:
                 negotiate_secondary_venue(
                     channel=best.channel,
-                    payload={"trade_id": row["trade_id"], "odds": odds, "stake": row["stake"]},
+                    payload={
+                        "trade_id": row["trade_id"],
+                        "odds": odds,
+                        "stake": routed_stake,
+                        "matchbook_back_volume": pre_volume,
+                    },
                 )
             except OutboundBrokerBlocked:
                 status = "OUTBOUND_BLOCKED"
             except Exception as exc:
                 status = "ROUTE_ERROR"
                 logger.warning("router outbound error: %s", exc)
+        flight_end_ns = time.perf_counter_ns()
+        flight_ms = flight_latency_ms(flight_start_ns, flight_end_ns)
+        post_volume = _matchbook_back_volume(row, self.cache, prefer_cache=True)
+        if adverse_selection_abort(flight_ms=flight_ms, pre_volume=pre_volume, post_volume=post_volume):
+            status = DISARMED_BY_ADVERSE_SELECTION
+            routed_stake = 0.0
+            logger.warning(
+                "adverse selection abort trade=%s flight_ms=%.1f pre_vol=%s post_vol=%s",
+                str(row["trade_id"])[:8],
+                flight_ms,
+                pre_volume,
+                post_volume,
+            )
         conn.execute(
             """
             INSERT INTO routing_decisions (
                 decision_id, trade_id, runner_id, market_id, chosen_channel,
-                gross_odds, net_odds, commission_bps, status, outbound_blocked, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                gross_odds, net_odds, commission_bps, status, outbound_blocked,
+                flight_latency_ms, routed_stake, matchbook_back_volume_pre,
+                matchbook_back_volume_post, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 str(uuid.uuid4()),
@@ -193,6 +280,10 @@ class LiquidityRouter:
                 best.commission_bps,
                 status,
                 outbound_blocked,
+                round(flight_ms, 3),
+                routed_stake,
+                pre_volume,
+                post_volume,
                 _utc_now(),
             ),
         )

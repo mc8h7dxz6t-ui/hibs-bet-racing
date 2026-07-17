@@ -16,6 +16,7 @@ class PriceTick:
     lay_odds: float | None
     updated_at_ms: int
     seq: int | None = None
+    back_volume: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -25,6 +26,8 @@ class PriceTick:
             "lay_odds": self.lay_odds,
             "updated_at_ms": self.updated_at_ms,
             "seq": self.seq,
+            "back_volume": self.back_volume,
+            "matchbook_back_volume": self.back_volume,
         }
 
 
@@ -47,6 +50,7 @@ class MarketDeltaCache:
             return None
         back = delta.get("back_odds", delta.get("back-odds"))
         lay = delta.get("lay_odds", delta.get("lay-odds"))
+        vol = delta.get("matchbook_back_volume", delta.get("back_volume", delta.get("back_liquidity")))
         ts_ms = int(delta.get("ts_ms") or delta.get("timestamp_ms") or time.time() * 1000)
         seq_raw = delta.get("seq")
         seq = int(seq_raw) if seq_raw is not None else None
@@ -57,6 +61,7 @@ class MarketDeltaCache:
             lay_odds=float(lay) if lay is not None else None,
             updated_at_ms=ts_ms,
             seq=seq,
+            back_volume=float(vol) if vol is not None else None,
         )
         key = self._key(market_id, runner_id)
         with self._lock:

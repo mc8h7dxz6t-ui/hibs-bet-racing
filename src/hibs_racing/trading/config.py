@@ -78,3 +78,11 @@ def allowed_routing_channels() -> tuple[str, ...]:
 
 def liquidity_router_poll_seconds() -> float:
     return _env_float("HIBS_LIQUIDITY_ROUTER_POLL_SEC", 5.0)
+
+
+def flight_latency_max_ms() -> int:
+    return _env_int("HIBS_FLIGHT_LATENCY_MAX_MS", 450)
+
+
+def adverse_selection_volume_drop_pct() -> float:
+    return _env_float("HIBS_ADVERSE_SELECTION_VOLUME_DROP_PCT", 0.40)

@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+import json
+import time
+
 import pytest
 
 from hibs_racing.trading.config import liquidity_router_active
 from hibs_racing.trading.delta_cache import MarketDeltaCache
 from hibs_racing.trading.liquidity_router import (
+    DISARMED_BY_ADVERSE_SELECTION,
     LiquidityRouter,
+    adverse_selection_abort,
+    flight_latency_ms,
     hedge_delta_bps,
     lay_stake_for_lock,
     net_odds_after_commission,
+    volume_drop_exceeded,
 )
 from hibs_racing.trading.broker_outbound import OutboundBrokerBlocked, negotiate_secondary_venue
 from hibs_racing.features.store import connect, init_db
@@ -120,3 +127,95 @@ def test_recent_routing_decisions_helper(trading_db, monkeypatch):
     rows = recent_routing_decisions(database=trading_db, limit=5)
     assert len(rows) == 1
     assert rows[0]["chosen_channel"]
+
+
+def test_flight_latency_abort_threshold():
+    assert adverse_selection_abort(flight_ms=451.0, pre_volume=100.0, post_volume=100.0) is True
+    assert adverse_selection_abort(flight_ms=200.0, pre_volume=100.0, post_volume=100.0) is False
+
+
+def test_volume_drop_abort_threshold():
+    assert volume_drop_exceeded(100.0, 50.0, threshold=0.40) is True
+    assert volume_drop_exceeded(100.0, 70.0, threshold=0.40) is False
+
+
+def test_router_disarms_on_latency(trading_db, monkeypatch):
+    monkeypatch.setenv("HIBS_LIQUIDITY_ROUTER_ACTIVE", "true")
+    monkeypatch.setenv("HIBS_FLIGHT_LATENCY_MAX_MS", "10")
+
+    def slow_negotiate(**kwargs):
+        time.sleep(0.02)
+        raise OutboundBrokerBlocked("simulated")
+
+    monkeypatch.setattr(
+        "hibs_racing.trading.liquidity_router.negotiate_secondary_venue",
+        slow_negotiate,
+    )
+    cache = MarketDeltaCache()
+    router = LiquidityRouter(cache=cache, database=trading_db)
+    with connect(trading_db) as conn:
+        trade_id = record_simulated_trade(
+            conn,
+            payload_hash="latency-abort",
+            runner_id="200",
+            market_id="100",
+            odds=5.0,
+            stake=10.0,
+            status="SIMULATED",
+            payload={"matchbook_back_volume": 500.0},
+        )
+        conn.commit()
+    router.process_tick()
+    with connect(trading_db) as conn:
+        row = conn.execute(
+            "SELECT status, routed_stake, flight_latency_ms FROM routing_decisions WHERE trade_id = ?",
+            (trade_id,),
+        ).fetchone()
+    assert row is not None
+    assert row["status"] == DISARMED_BY_ADVERSE_SELECTION
+    assert float(row["routed_stake"]) == pytest.approx(0.0)
+    assert float(row["flight_latency_ms"]) > 10
+
+
+def test_router_disarms_on_volume_drop(trading_db, monkeypatch):
+    monkeypatch.setenv("HIBS_LIQUIDITY_ROUTER_ACTIVE", "true")
+    monkeypatch.setenv("HIBS_FLIGHT_LATENCY_MAX_MS", "5000")
+    cache = MarketDeltaCache()
+
+    def dropping_negotiate(**kwargs):
+        cache.apply_delta(
+            {
+                "market_id": "100",
+                "runner_id": "201",
+                "back_odds": 5.0,
+                "matchbook_back_volume": 50.0,
+                "ts_ms": 2,
+            }
+        )
+        raise OutboundBrokerBlocked("simulated")
+
+    monkeypatch.setattr(
+        "hibs_racing.trading.liquidity_router.negotiate_secondary_venue",
+        dropping_negotiate,
+    )
+    router = LiquidityRouter(cache=cache, database=trading_db)
+    with connect(trading_db) as conn:
+        trade_id = record_simulated_trade(
+            conn,
+            payload_hash="volume-drop",
+            runner_id="201",
+            market_id="100",
+            odds=5.0,
+            stake=8.0,
+            status="SIMULATED",
+            payload={"matchbook_back_volume": 100.0},
+        )
+        conn.commit()
+    router.process_tick()
+    with connect(trading_db) as conn:
+        row = conn.execute(
+            "SELECT status, routed_stake FROM routing_decisions WHERE trade_id = ?",
+            (trade_id,),
+        ).fetchone()
+    assert row["status"] == DISARMED_BY_ADVERSE_SELECTION
+    assert float(row["routed_stake"]) == pytest.approx(0.0)

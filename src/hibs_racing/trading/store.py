@@ -57,6 +57,10 @@ CREATE TABLE IF NOT EXISTS routing_decisions (
     commission_bps      REAL,
     status              TEXT NOT NULL,
     outbound_blocked    INTEGER NOT NULL DEFAULT 1,
+    flight_latency_ms   REAL,
+    routed_stake        REAL,
+    matchbook_back_volume_pre  REAL,
+    matchbook_back_volume_post REAL,
     created_at          TEXT NOT NULL
 );
 
@@ -103,7 +107,20 @@ def _seed_wallet_row(conn: sqlite3.Connection) -> None:
 
 def apply_trading_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(TRADING_SCHEMA_SQL)
+    _migrate_routing_decisions(conn)
     _seed_wallet_row(conn)
+
+
+def _migrate_routing_decisions(conn: sqlite3.Connection) -> None:
+    cols = {str(r[1]) for r in conn.execute("PRAGMA table_info(routing_decisions)").fetchall()}
+    for col, ddl in (
+        ("flight_latency_ms", "ALTER TABLE routing_decisions ADD COLUMN flight_latency_ms REAL"),
+        ("routed_stake", "ALTER TABLE routing_decisions ADD COLUMN routed_stake REAL"),
+        ("matchbook_back_volume_pre", "ALTER TABLE routing_decisions ADD COLUMN matchbook_back_volume_pre REAL"),
+        ("matchbook_back_volume_post", "ALTER TABLE routing_decisions ADD COLUMN matchbook_back_volume_post REAL"),
+    ):
+        if col not in cols:
+            conn.execute(ddl)
 
 
 def ensure_trading_schema(database: Path | None = None) -> Path:
