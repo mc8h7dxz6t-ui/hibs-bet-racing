@@ -43,6 +43,8 @@ def test_product_switcher_urls_local(monkeypatch):
     html = resp.data.decode("utf-8", errors="replace")
     assert 'href="/cards"' in html
     assert "hibs_theme.css?v=" in html
+    assert "hibs_mobile.css?v=" in html
+    assert 'content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"' in html
     assert "racing_ui.js?v=" in html
     assert "hibs_harvested_logo.png?v=" in html
     assert "Trading" in html
