@@ -392,8 +392,62 @@ def load_snapshots(
     odds_source: str | None = "sp",
     config_hash: str | None = None,
 ) -> pd.DataFrame:
-    init_db(db)
+    from hibs_racing.backtest.db_resolve import open_backtest_connection
+
     cfg_hash = config_hash or scoring_config_hash()
+    conn = None
+    try:
+        conn = open_backtest_connection(db)
+        if odds_source is None:
+            frame = pd.read_sql_query(
+                """
+                SELECT s.*
+                FROM scored_runner_snapshots s
+                INNER JOIN (
+                    SELECT runner_id, card_date, config_hash,
+                           MAX(CASE odds_source WHEN 'live' THEN 2 WHEN 'sp' THEN 1 ELSE 0 END) AS src_rank
+                    FROM scored_runner_snapshots
+                    WHERE card_date >= ? AND card_date <= ? AND config_hash = ?
+                    GROUP BY runner_id, card_date, config_hash
+                ) pick ON pick.runner_id = s.runner_id
+                    AND pick.card_date = s.card_date
+                    AND pick.config_hash = s.config_hash
+                    AND (
+                        (pick.src_rank = 2 AND s.odds_source = 'live')
+                        OR (pick.src_rank = 1 AND s.odds_source = 'sp')
+                        OR (pick.src_rank = 0 AND s.odds_source = (
+                            SELECT odds_source FROM scored_runner_snapshots s2
+                            WHERE s2.runner_id = s.runner_id AND s2.card_date = s.card_date
+                              AND s2.config_hash = s.config_hash LIMIT 1
+                        ))
+                    )
+                WHERE s.card_date >= ? AND s.card_date <= ? AND s.config_hash = ?
+                ORDER BY s.card_date, s.race_id, s.runner_id
+                """,
+                conn,
+                params=(start, end, cfg_hash, start, end, cfg_hash),
+            )
+        else:
+            frame = pd.read_sql_query(
+                """
+                SELECT *
+                FROM scored_runner_snapshots
+                WHERE card_date >= ? AND card_date <= ?
+                  AND odds_source = ?
+                  AND config_hash = ?
+                ORDER BY card_date, race_id, runner_id
+                """,
+                conn,
+                params=(start, end, odds_source, cfg_hash),
+            )
+        return _expand_gates_json(frame)
+    except Exception:
+        pass
+    finally:
+        if conn is not None:
+            conn.close()
+
+    init_db(db)
     with connect(db) as conn:
         if odds_source is None:
             frame = pd.read_sql_query(

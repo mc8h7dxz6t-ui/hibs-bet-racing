@@ -11,6 +11,14 @@ from pathlib import Path
 from hibs_racing.config import ROOT, db_path, load_config
 
 
+def open_backtest_connection(db: Path) -> sqlite3.Connection:
+    """Read-only SQLite open — no init_db, no WAL write (safe for CLI backtests)."""
+    uri = f"file:{db.resolve()}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True, timeout=30.0)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
 def _probe_db(path: Path, *, writable: bool = False) -> bool:
     if not path.is_file() or path.stat().st_size <= 0:
         return False

@@ -15,6 +15,7 @@ from hibs_racing.backtest.gate_config_alignment import (  # noqa: E402
     merge_walkforward_reference,
     run_gate_alignment_matrix,
 )
+from hibs_racing.backtest.db_resolve import resolve_backtest_database  # noqa: E402
 
 
 def _table_from_walkforward_only(wf_path: Path) -> dict:
@@ -79,7 +80,18 @@ def main() -> int:
     )
     args = p.parse_args()
 
-    report = run_gate_alignment_matrix(start=args.start, end=args.end)
+    try:
+        db, db_reason = resolve_backtest_database()
+        print(f"==> Using database: {db} ({db_reason})", file=sys.stderr)
+    except FileNotFoundError as exc:
+        print(str(exc), file=sys.stderr)
+        db = None
+
+    report = run_gate_alignment_matrix(
+        start=args.start,
+        end=args.end,
+        database=db,
+    )
     if report.get("error"):
         wf = args.walkforward_ref
         if wf.is_file():

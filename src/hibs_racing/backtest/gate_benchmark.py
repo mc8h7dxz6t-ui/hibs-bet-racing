@@ -79,8 +79,27 @@ class GateBenchmarkReport:
 
 
 def _historical_bounds(db: Path) -> tuple[str | None, str | None]:
-    init_db(db)
-    with connect(db) as conn:
+    """Date bounds without init_db — read-only, ramdisk-safe."""
+    from hibs_racing.backtest.db_resolve import open_backtest_connection
+
+    try:
+        conn = open_backtest_connection(db)
+    except sqlite3.Error:
+        try:
+            init_db(db)
+            conn = sqlite3.connect(str(db), timeout=30.0)
+        except sqlite3.Error:
+            return None, None
+    try:
+        row = conn.execute(
+            """
+            SELECT MIN(card_date), MAX(card_date)
+            FROM scored_runner_snapshots
+            WHERE card_date IS NOT NULL
+            """
+        ).fetchone()
+        if row and row[0] and row[1]:
+            return str(row[0]), str(row[1])
         row = conn.execute(
             """
             SELECT MIN(race_date), MAX(race_date)
@@ -90,9 +109,13 @@ def _historical_bounds(db: Path) -> tuple[str | None, str | None]:
               AND sp_decimal IS NOT NULL
             """
         ).fetchone()
-    if not row:
+        if not row:
+            return None, None
+        return row[0], row[1]
+    except sqlite3.Error:
         return None, None
-    return row[0], row[1]
+    finally:
+        conn.close()
 
 
 def _gate_configs(paper_cfg: dict, *, gate2_caps: bool = True) -> tuple[dict, dict]:

@@ -271,9 +271,12 @@ def run_sniper_overlay_sweep(
     except FileNotFoundError as exc:
         return {"error": str(exc), "start": start, "end": end}
     paper_cfg = cfg.get("paper", {})
-    max_start, max_end = _historical_bounds(db)
-    start_s = start or max_start
-    end_s = end or max_end
+    if start and end:
+        start_s, end_s = start, end
+    else:
+        max_start, max_end = _historical_bounds(db)
+        start_s = start or max_start
+        end_s = end or max_end
     if not start_s or not end_s:
         return {"error": "no historical settled data", "start": start_s, "end": end_s}
 
