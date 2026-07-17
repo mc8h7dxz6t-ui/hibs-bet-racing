@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
 # Forensic gate alignment: 3 industry standards → 3 aligned overlays → 2 blends → full table.
+# VPS: sync first — /opt/hibs-racing is NOT a git repo.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+
+if [[ ! -f "${ROOT}/scripts/gate_alignment_matrix.py" ]]; then
+  echo "ERROR: gate_alignment_matrix.py missing — sync racing from GitHub first:" >&2
+  echo "  sudo HIBS_RACING_SYNC_REF=cursor/gate-config-alignment-12e0 \\" >&2
+  echo "    bash /opt/hibs-bet/deploy/vps-sync-racing-from-github.sh" >&2
+  echo "  Or: sudo bash ${ROOT}/scripts/vps_gate_backtests.sh" >&2
+  exit 1
+fi
 
 export HIBS_HARVILLE_CORRECTION="${HIBS_HARVILLE_CORRECTION:-1}"
 export HIBS_RACING_DB_PATH="${HIBS_RACING_DB_PATH:-/mnt/hibs-ramdisk/feature_store.sqlite}"
