@@ -26,12 +26,14 @@ _NUMERIC_UI_COLS = (
     "ew_combined_ev",
     "win_decimal",
     "offered_place_decimal",
+    "place_value_edge_pct",
+    "place_edge_bps",
     "official_rating",
     "draw",
     "distance_f",
 )
 
-_FLAG_COLS = ("value_flag", "flag_raw")
+_FLAG_COLS = ("value_flag", "flag_raw", "place_value_chip_active", "place_execution_muted")
 
 
 def _is_missing(val: Any) -> bool:

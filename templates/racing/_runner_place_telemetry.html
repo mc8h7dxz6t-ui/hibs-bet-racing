@@ -1,0 +1,18 @@
+{# High-density place picker telemetry strip — include beneath horse name on racecards. #}
+<div class="place-telemetry-strip" data-place-telemetry-for="{{ r.runner_id }}">
+  <span class="place-telemetry-item" data-telemetry="r8">
+    R8 {{ (r.model_score or 0)|fmt_num(3) }}
+  </span>
+  <span class="place-telemetry-item" data-telemetry="plc">
+    PLC: {{ ((r.model_place_prob or 0) * 100)|round(1) }}%
+  </span>
+  <span class="place-value-chip {% if r.place_value_chip_active %}is-pass{% else %}is-muted{% endif %}"
+        data-telemetry="edge"
+        data-runner-id="{{ r.runner_id }}">
+    {% if r.place_value_chip_active and r.place_value_edge_pct is not none %}
+      +{{ '%.1f'|format(r.place_value_edge_pct) }}% EDGE
+    {% else %}
+      NO EDGE
+    {% endif %}
+  </span>
+</div>

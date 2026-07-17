@@ -701,6 +701,43 @@
     input.addEventListener('change', sync);
   }
 
+  function updatePlaceTelemetryStrip(runnerId, payload) {
+    if (!runnerId || !payload) return;
+    const strip = document.querySelector('[data-place-telemetry-for="' + runnerId + '"]');
+    if (!strip) return;
+    const r8 = strip.querySelector('[data-telemetry="r8"]');
+    const plc = strip.querySelector('[data-telemetry="plc"]');
+    const chip = strip.querySelector('[data-telemetry="edge"]');
+    if (r8 && payload.modelScore != null) {
+      r8.textContent = 'R8 ' + Number(payload.modelScore).toFixed(3);
+    }
+    if (plc && payload.modelPlaceProb != null) {
+      plc.textContent = 'PLC: ' + (Number(payload.modelPlaceProb) * 100).toFixed(1) + '%';
+    }
+    if (chip) {
+      const active = payload.placeChipActive === true || payload.placeChipActive === 1 || payload.placeChipActive === '1';
+      const edge = payload.placeEdgePct != null ? Number(payload.placeEdgePct) : null;
+      chip.className = 'place-value-chip ' + (active ? 'is-pass' : 'is-muted');
+      chip.textContent = active && edge != null ? '+' + edge.toFixed(1) + '% EDGE' : 'NO EDGE';
+    }
+  }
+
+  function refreshPlaceTelemetryFromRow(row) {
+    if (!row || !row.dataset) return;
+    const runnerId = row.dataset.runnerId;
+    if (!runnerId) return;
+    updatePlaceTelemetryStrip(runnerId, {
+      modelScore: row.dataset.modelScore,
+      modelPlaceProb: row.dataset.modelPlaceProb,
+      placeEdgePct: row.dataset.placeEdgePct,
+      placeChipActive: row.dataset.placeChipActive,
+    });
+  }
+
+  function refreshAllPlaceTelemetry() {
+    document.querySelectorAll('tr[data-runner-id]').forEach(refreshPlaceTelemetryFromRow);
+  }
+
   function init() {
     bindBankroll();
     bindSlipCopy();
@@ -708,7 +745,14 @@
     renderChannelDigest();
     applyRiskBadges();
     applyStakeHints();
+    refreshAllPlaceTelemetry();
   }
+
+  global.HibsPlaceTelemetry = {
+    updatePlaceTelemetryStrip,
+    refreshPlaceTelemetryFromRow,
+    refreshAllPlaceTelemetry,
+  };
 
   global.HibsNoviceUX = {
     init,

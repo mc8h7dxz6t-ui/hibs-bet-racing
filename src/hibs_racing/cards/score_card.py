@@ -8,12 +8,16 @@ import pandas as pd
 
 from hibs_racing.backtest.snapshot_store import scoring_config_hash, upsert_snapshots
 from hibs_racing.cards.actionability import apply_value_gates, cap_place_prob
-from hibs_racing.cards.harville_config import harville_longshot_discount
 from hibs_racing.config import db_path, load_config
 from hibs_racing.features.ranker_matrix import build_card_feature_frame
 from hibs_racing.features.store import connect, init_db
 from hibs_racing.place.ew_ev import EachWayQuote, each_way_ev
-from hibs_racing.place.harville import harville_place_probs
+from hibs_racing.place.hpl_combinatorial import (
+    apply_place_alpha_and_liquidity,
+    hpl_place_probabilities,
+    resolve_place_positions,
+    resolve_race_win_probabilities,
+)
 from hibs_racing.place.paper_ledger import record_paper_bet
 from hibs_racing.racing_engine.score_card import apply_scoring
 
@@ -38,10 +42,6 @@ def score_upcoming_cards(
     paper_cfg = apply_sale_gate_overrides(cfg.get("paper", {}))
     min_place_ev = paper_cfg.get("min_place_ev", 0.05)
     min_combo_place = paper_cfg.get("min_combo_bayes_place", 0.22)
-    longshot_threshold = float(paper_cfg.get("harville_longshot_win_prob_threshold", 0.03))
-    longshot_discount = harville_longshot_discount(
-        float(paper_cfg.get("harville_longshot_discount", 1.0))
-    )
 
     frame = build_card_feature_frame(
         cards,
@@ -60,19 +60,24 @@ def score_upcoming_cards(
     frame = apply_win_prob_calibration(frame)
 
     place_probs: list[float] = []
+    place_positions: list[int] = []
     for _, group in frame.groupby("race_id", sort=False):
-        wp = group["model_win_prob"].tolist()
-        places = min(3, len(wp))
-        hp = harville_place_probs(
-            wp,
-            places=places,
-            longshot_win_prob_threshold=longshot_threshold,
-            longshot_discount=longshot_discount,
-        )
-        fs = group["field_size"].iloc[0] if "field_size" in group.columns else len(group)
-        place_probs.extend(cap_place_prob(p, field_size=fs) for p in hp)
+        wp = resolve_race_win_probabilities(group, database=db)
+        fs = int(group["field_size"].iloc[0]) if "field_size" in group.columns else len(group)
+        configured = None
+        if "places" in group.columns and group["places"].notna().any():
+            try:
+                configured = int(group["places"].dropna().iloc[0])
+            except (TypeError, ValueError):
+                configured = None
+        places = resolve_place_positions(fs, configured_places=configured)
+        hp = hpl_place_probabilities(wp, places=places, field_size=fs)
+        for p in hp:
+            place_probs.append(cap_place_prob(float(p), field_size=fs))
+            place_positions.append(places)
 
     frame["model_place_prob"] = place_probs
+    frame["hpl_place_positions"] = place_positions
     frame["place_ev"] = np.nan
     frame["ew_combined_ev"] = np.nan
     frame["value_flag"] = 0
@@ -113,6 +118,7 @@ def score_upcoming_cards(
             )
 
     frame = apply_value_gates(frame, paper_cfg)
+    frame = apply_place_alpha_and_liquidity(frame)
 
     scored_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     if persist:

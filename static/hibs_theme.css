@@ -36,6 +36,52 @@
     --hibs-mint-soft: rgba(167, 243, 208, 0.14);
     --hibs-success-text: #86efac;
     --hibs-slate-card: rgba(15, 23, 42, 0.96);
+    --state-pass: #4ade80;
+    --state-pass-glow: rgba(74, 222, 128, 0.45);
+    --state-muted: #64748b;
+}
+
+.place-telemetry-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin-top: 4px;
+    font-size: 0.72em;
+    line-height: 1.25;
+    letter-spacing: 0.02em;
+}
+
+.place-telemetry-item {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.place-value-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.95em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    border: 1px solid transparent;
+    transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.place-value-chip.is-muted {
+    color: var(--state-muted);
+    background: rgba(100, 116, 139, 0.14);
+    border-color: rgba(100, 116, 139, 0.28);
+}
+
+.place-value-chip.is-pass {
+    color: #052e16;
+    background: var(--state-pass);
+    border-color: rgba(74, 222, 128, 0.85);
+    box-shadow: 0 0 10px var(--state-pass-glow);
 }
 
 body {

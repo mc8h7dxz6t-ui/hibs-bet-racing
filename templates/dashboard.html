@@ -413,13 +413,19 @@
                                     data-off="{{ race.off_time or '' }}"
                                     data-win-odds="{{ r.win_decimal if r.win_decimal is not none else '' }}"
                                     data-model-win-prob="{{ r.model_win_prob if r.model_win_prob is not none else '' }}"
+                                    data-model-place-prob="{{ r.model_place_prob if r.model_place_prob is not none else '' }}"
+                                    data-model-score="{{ r.model_score if r.model_score is not none else '' }}"
+                                    data-place-edge-pct="{{ r.place_value_edge_pct if r.place_value_edge_pct is not none else '' }}"
+                                    data-place-chip-active="{{ 1 if r.place_value_chip_active else 0 }}"
                                     data-value-flag="{{ 1 if r.value_flag else 0 }}"
                                     data-steam-gate="{{ g.gate if g else 'proceed' }}"
                                     data-kelly-mult="{{ g.kelly_multiplier if g and g.kelly_multiplier is not none else 1 }}"
                                     data-stake-units="1"
                                     data-bet-type="each_way">
                                     <td class="num">{{ loop.index }}</td>
-                                    <td class="strong horse-cell">{{ r.horse_name }}{% if r.draw %} <span class="pill" style="font-size:0.7em;">({{ r.draw }})</span>{% endif %}{% if r.value_flag %} <span class="value-flag">VALUE</span>{% endif %}{% if r.paper_ledger %} <span class="paper-ledger-badge pill" title="Paper ledger {{ r.paper_ledger.status }}">{% if r.paper_ledger.status == 'settled' %}✓{% else %}●{% endif %}</span>{% endif %}{% if r.value_gate_label %}<span class="gate-reason" title="Value not flagged">{{ r.value_gate_label }}</span>{% endif %}<span class="risk-badge-slot"></span></td>
+                                    <td class="strong horse-cell">{{ r.horse_name }}{% if r.draw %} <span class="pill" style="font-size:0.7em;">({{ r.draw }})</span>{% endif %}{% if r.value_flag %} <span class="value-flag">VALUE</span>{% endif %}{% if r.paper_ledger %} <span class="paper-ledger-badge pill" title="Paper ledger {{ r.paper_ledger.status }}">{% if r.paper_ledger.status == 'settled' %}✓{% else %}●{% endif %}</span>{% endif %}{% if r.value_gate_label %}<span class="gate-reason" title="Value not flagged">{{ r.value_gate_label }}</span>{% endif %}<span class="risk-badge-slot"></span>
+                                    {% include 'racing/_runner_place_telemetry.html' %}
+                                    </td>
                                     <td>{{ r.jockey or '—' }}</td>
                                     <td>{{ r.trainer or '—' }}</td>
                                     <td class="num">{% if r.official_rating is not none and r.official_rating == r.official_rating %}{{ r.official_rating|int }}{% else %}—{% endif %}</td>
