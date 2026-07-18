@@ -471,7 +471,20 @@
                                         {% if g and g.drift_delta is not none %}{{ '%+.2f'|format(g.drift_delta) }}{% else %}—{% endif %}
                                     </td>
                                     <td class="rp-comment" title="{{ r.card_comment or '' }}">{{ r.rp_comment_short or '—' }}</td>
-                                    <td class="engine-opinion" title="{% for reason in r.engine_reasons or [] %}{{ reason }} {% endfor %}">{{ r.engine_opinion or '—' }}</td>
+                                    <td class="engine-opinion">
+                                        {% if r.engine_reasons %}
+                                        <details class="pick-reason-drawer">
+                                            <summary class="pick-reason-sum">{{ r.engine_opinion or 'Why this horse' }}</summary>
+                                            <ul class="pick-reason-list">
+                                                {% for reason in r.engine_reasons[:4] %}
+                                                <li>{{ reason }}</li>
+                                                {% endfor %}
+                                            </ul>
+                                        </details>
+                                        {% else %}
+                                        {{ r.engine_opinion or '—' }}
+                                        {% endif %}
+                                    </td>
                                     <td class="num">{{ (r.model_place_prob or 0)|fmt_pct }}</td>
                                     <td class="num">{{ r.combo_bayes_place|fmt_pct }}</td>
                                     <td class="num">{{ r.ew_combined_ev|fmt_num }}</td>
