@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -23,6 +24,13 @@ from hibs_racing.trading.config import (
     min_hedge_delta_bps,
 )
 from hibs_racing.trading.delta_cache import MarketDeltaCache
+from hibs_racing.trading.order_ttl import (
+    INPLAY_ORDER_TIMED_OUT_ABORT,
+    INPLAY_ORDER_TTL_MS,
+    InPlayOrderTracker,
+    default_cancel_fn,
+    log_timed_out_abort_to_ledger,
+)
 from hibs_racing.trading.runner_disarm_registry import is_disarmed
 from hibs_racing.trading.store import ensure_trading_schema
 
@@ -140,6 +148,9 @@ class LiquidityRouter:
     commission_by_channel: dict[str, float] = field(default_factory=commission_by_channel)
     _processed_trades: set[str] = field(default_factory=set)
     _hedged_trades: set[str] = field(default_factory=set)
+    order_tracker: InPlayOrderTracker = field(default_factory=InPlayOrderTracker)
+    _inplay_queue: list[dict[str, Any]] = field(default_factory=list)
+    _ttl_aborts: int = 0
 
     def _db(self) -> Path:
         return ensure_trading_schema(self.database or db_path(load_config()))
@@ -206,7 +217,154 @@ class LiquidityRouter:
             "hedged": hedged,
             "drift_blocked": drift_blocked,
             "processed_trades": len(self._processed_trades),
+            "inplay_queue_depth": len(self._inplay_queue),
+            "ttl_aborts": self._ttl_aborts,
+            "order_ttl_ms": INPLAY_ORDER_TTL_MS,
         }
+
+    def build_venue_request(self, row: dict[str, Any], *, channel: str, odds: float) -> dict[str, Any]:
+        pre_volume = _matchbook_back_volume(row, self.cache, prefer_cache=False)
+        base = {
+            "trade_id": row["trade_id"],
+            "runner_id": row.get("runner_id"),
+            "market_id": row.get("market_id"),
+            "odds": odds,
+            "stake": row.get("stake"),
+            "channel": channel,
+            "created_at_ms": int(time.time() * 1000),
+            "matchbook_back_volume": pre_volume,
+        }
+        return self.order_tracker.attach_expiry(base)
+
+    def _venue_submit(self, request: dict[str, Any]) -> dict[str, Any]:
+        channel = str(request.get("channel") or "")
+        stake = float(request.get("stake") or 0)
+        payload = dict(request)
+        payload["stake"] = stake
+        negotiate_secondary_venue(channel=channel, payload=payload)
+        return {"ok": True, "authoritative": True, "channel": channel, "routed_stake": stake}
+
+    async def process_inplay_execution_loop(self) -> dict[str, Any]:
+        """Drain queued live routes under strict TTL + adverse-selection flight guard."""
+        if not self._inplay_queue:
+            return {"processed": 0, "ttl_aborts": self._ttl_aborts}
+        processed = 0
+        queue = list(self._inplay_queue)
+        self._inplay_queue.clear()
+        for item in queue:
+            channel = str(item["channel"])
+            request = dict(item["request"])
+            row = item["row"]
+            quotes = item.get("quotes") or []
+            pre_volume = item.get("pre_volume")
+            if pre_volume is None:
+                pre_volume = _matchbook_back_volume(row, self.cache, prefer_cache=False)
+            if self.order_tracker.is_muted(channel):
+                self._record_route_decision(
+                    row,
+                    channel=channel,
+                    quotes=quotes,
+                    status=INPLAY_ORDER_TIMED_OUT_ABORT,
+                    outbound_blocked=1,
+                    routed_stake=0.0,
+                )
+                continue
+            flight_start_ns = time.perf_counter_ns()
+            try:
+                result = await self.order_tracker.submit_with_ttl(
+                    channel=channel,
+                    request=request,
+                    submit_fn=self._venue_submit,
+                    cancel_fn=default_cancel_fn,
+                    confirm_fn=lambda ack: bool(ack.get("authoritative")),
+                    log_abort=log_timed_out_abort_to_ledger,
+                )
+            except Exception as exc:
+                logger.warning("inplay execution loop error: %s", exc)
+                continue
+            flight_end_ns = time.perf_counter_ns()
+            flight_ms = flight_latency_ms(flight_start_ns, flight_end_ns)
+            post_volume = _matchbook_back_volume(row, self.cache, prefer_cache=True)
+            routed_stake = float(row.get("stake") or 0)
+            status = "LIVE_ROUTED"
+            outbound_blocked = 0
+            if result.get("status") == INPLAY_ORDER_TIMED_OUT_ABORT:
+                self._ttl_aborts += 1
+                status = INPLAY_ORDER_TIMED_OUT_ABORT
+                outbound_blocked = 1
+                routed_stake = 0.0
+            elif adverse_selection_abort(
+                flight_ms=flight_ms, pre_volume=pre_volume, post_volume=post_volume
+            ):
+                status = DISARMED_BY_ADVERSE_SELECTION
+                outbound_blocked = 1
+                routed_stake = 0.0
+                logger.warning(
+                    "adverse selection abort trade=%s flight_ms=%.1f pre_vol=%s post_vol=%s",
+                    str(row["trade_id"])[:8],
+                    flight_ms,
+                    pre_volume,
+                    post_volume,
+                )
+            processed += 1
+            self._record_route_decision(
+                row,
+                channel=channel,
+                quotes=quotes,
+                status=status,
+                outbound_blocked=outbound_blocked,
+                flight_latency_ms=flight_ms,
+                routed_stake=routed_stake,
+                matchbook_back_volume_pre=pre_volume,
+                matchbook_back_volume_post=post_volume,
+            )
+        return {"processed": processed, "ttl_aborts": self._ttl_aborts}
+
+    def _record_route_decision(
+        self,
+        row: dict[str, Any],
+        *,
+        channel: str,
+        quotes: list[VenueQuote],
+        status: str,
+        outbound_blocked: int,
+        flight_latency_ms: float | None = None,
+        routed_stake: float | None = None,
+        matchbook_back_volume_pre: float | None = None,
+        matchbook_back_volume_post: float | None = None,
+    ) -> None:
+        best = quotes[0] if quotes else VenueQuote(channel=channel, gross_odds=0.0, commission_bps=0.0, net_odds=0.0)
+        db = self._db()
+        stake = routed_stake if routed_stake is not None else float(row.get("stake") or 0)
+        with connect(db) as conn:
+            conn.execute(
+                """
+                INSERT INTO routing_decisions (
+                    decision_id, trade_id, runner_id, market_id, chosen_channel,
+                    gross_odds, net_odds, commission_bps, status, outbound_blocked,
+                    flight_latency_ms, routed_stake, matchbook_back_volume_pre,
+                    matchbook_back_volume_post, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(uuid.uuid4()),
+                    row["trade_id"],
+                    row.get("runner_id"),
+                    row.get("market_id"),
+                    channel,
+                    best.gross_odds,
+                    best.net_odds,
+                    best.commission_bps,
+                    status,
+                    outbound_blocked,
+                    round(flight_latency_ms, 3) if flight_latency_ms is not None else None,
+                    stake,
+                    matchbook_back_volume_pre,
+                    matchbook_back_volume_post,
+                    _utc_now(),
+                ),
+            )
+            conn.commit()
 
     def _route_trade(self, conn, row: dict[str, Any]) -> bool:
         runner_id = str(row.get("runner_id") or "")
@@ -227,47 +385,25 @@ class LiquidityRouter:
             return False
         outbound_blocked = 1
         status = "SIMULATED_ROUTE"
-        stake = float(row.get("stake") or 0)
-        routed_stake = stake
-        pre_volume = _matchbook_back_volume(row, self.cache, prefer_cache=False)
-        flight_start_ns = time.perf_counter_ns()
         if liquidity_router_active():
-            try:
-                negotiate_secondary_venue(
-                    channel=best.channel,
-                    payload={
-                        "trade_id": row["trade_id"],
-                        "odds": odds,
-                        "stake": routed_stake,
-                        "matchbook_back_volume": pre_volume,
-                    },
-                )
-            except OutboundBrokerBlocked:
-                status = "OUTBOUND_BLOCKED"
-            except Exception as exc:
-                status = "ROUTE_ERROR"
-                logger.warning("router outbound error: %s", exc)
-        flight_end_ns = time.perf_counter_ns()
-        flight_ms = flight_latency_ms(flight_start_ns, flight_end_ns)
-        post_volume = _matchbook_back_volume(row, self.cache, prefer_cache=True)
-        if adverse_selection_abort(flight_ms=flight_ms, pre_volume=pre_volume, post_volume=post_volume):
-            status = DISARMED_BY_ADVERSE_SELECTION
-            routed_stake = 0.0
-            logger.warning(
-                "adverse selection abort trade=%s flight_ms=%.1f pre_vol=%s post_vol=%s",
-                str(row["trade_id"])[:8],
-                flight_ms,
-                pre_volume,
-                post_volume,
+            request = self.build_venue_request(row, channel=best.channel, odds=odds)
+            pre_volume = _matchbook_back_volume(row, self.cache, prefer_cache=False)
+            self._inplay_queue.append(
+                {
+                    "channel": best.channel,
+                    "request": request,
+                    "row": row,
+                    "quotes": quotes,
+                    "pre_volume": pre_volume,
+                }
             )
+            return True
         conn.execute(
             """
             INSERT INTO routing_decisions (
                 decision_id, trade_id, runner_id, market_id, chosen_channel,
-                gross_odds, net_odds, commission_bps, status, outbound_blocked,
-                flight_latency_ms, routed_stake, matchbook_back_volume_pre,
-                matchbook_back_volume_post, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                gross_odds, net_odds, commission_bps, status, outbound_blocked, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 str(uuid.uuid4()),
@@ -280,10 +416,6 @@ class LiquidityRouter:
                 best.commission_bps,
                 status,
                 outbound_blocked,
-                round(flight_ms, 3),
-                routed_stake,
-                pre_volume,
-                post_volume,
                 _utc_now(),
             ),
         )

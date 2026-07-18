@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 
@@ -145,7 +146,7 @@ def test_router_disarms_on_latency(trading_db, monkeypatch):
 
     def slow_negotiate(**kwargs):
         time.sleep(0.02)
-        raise OutboundBrokerBlocked("simulated")
+        return {"ok": True}
 
     monkeypatch.setattr(
         "hibs_racing.trading.liquidity_router.negotiate_secondary_venue",
@@ -166,6 +167,7 @@ def test_router_disarms_on_latency(trading_db, monkeypatch):
         )
         conn.commit()
     router.process_tick()
+    asyncio.run(router.process_inplay_execution_loop())
     with connect(trading_db) as conn:
         row = conn.execute(
             "SELECT status, routed_stake, flight_latency_ms FROM routing_decisions WHERE trade_id = ?",
@@ -192,7 +194,7 @@ def test_router_disarms_on_volume_drop(trading_db, monkeypatch):
                 "ts_ms": 2,
             }
         )
-        raise OutboundBrokerBlocked("simulated")
+        return {"ok": True}
 
     monkeypatch.setattr(
         "hibs_racing.trading.liquidity_router.negotiate_secondary_venue",
@@ -212,6 +214,7 @@ def test_router_disarms_on_volume_drop(trading_db, monkeypatch):
         )
         conn.commit()
     router.process_tick()
+    asyncio.run(router.process_inplay_execution_loop())
     with connect(trading_db) as conn:
         row = conn.execute(
             "SELECT status, routed_stake FROM routing_decisions WHERE trade_id = ?",
