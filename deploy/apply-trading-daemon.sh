@@ -25,6 +25,8 @@ upsert "HIBS_LIVE_TRADING_ENABLED" "false"
 upsert "HIBS_LIQUIDITY_ROUTER_ACTIVE" "false"
 upsert "HIBS_EXECUTION_LATENCY_MAX_MS" "250"
 upsert "HIBS_SLIPPAGE_MAX_TICKS" "2"
+upsert "HIBS_FLIGHT_LATENCY_MAX_MS" "450"
+upsert "HIBS_ADVERSE_SELECTION_VOLUME_DROP_PCT" "0.40"
 
 if [[ "${ENABLE}" -eq 1 ]]; then
   systemctl enable --now hibs-trading-daemon
