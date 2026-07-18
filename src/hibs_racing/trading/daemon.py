@@ -24,6 +24,7 @@ class TradingDaemon:
     governor: ExecutionGovernor | None = None
     router: LiquidityRouter | None = None
     _tasks: list[asyncio.Task] = field(default_factory=list, repr=False)
+    _last_router_report: dict[str, Any] = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
         if self.governor is None:
@@ -49,12 +50,23 @@ class TradingDaemon:
         ]
 
     async def _inplay_execution_loop(self) -> None:
+        from hibs_racing.trading.status_plane import write_heartbeat
+
         while True:
             try:
                 assert self.router is not None
                 report = await self.router.process_inplay_execution_loop()
                 if report.get("processed"):
                     logger.info("inplay execution loop: %s", report)
+                write_heartbeat(
+                    payload={
+                        "component": "trading_daemon",
+                        "live_trading_enabled": live_trading_enabled(),
+                        "liquidity_router_active": liquidity_router_active(),
+                        "stream": self.listener.stats.to_dict(),
+                        "inplay_last": report,
+                    }
+                )
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -62,13 +74,25 @@ class TradingDaemon:
             await asyncio.sleep(0.05)
 
     async def _liquidity_router_loop(self) -> None:
+        from hibs_racing.trading.status_plane import write_heartbeat
+
         interval = liquidity_router_poll_seconds()
         while True:
             try:
                 assert self.router is not None
                 report = await asyncio.to_thread(self.router.process_tick)
+                self._last_router_report = report
                 if report.get("routed") or report.get("hedged"):
                     logger.info("liquidity router tick: %s", report)
+                write_heartbeat(
+                    payload={
+                        "component": "trading_daemon",
+                        "live_trading_enabled": live_trading_enabled(),
+                        "liquidity_router_active": liquidity_router_active(),
+                        "stream": self.listener.stats.to_dict(),
+                        "liquidity_router_last": report,
+                    }
+                )
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -98,16 +122,19 @@ class TradingDaemon:
         return self.governor.dispatch(payload).to_dict()
 
     def status(self) -> dict[str, Any]:
+        from hibs_racing.trading.status_plane import read_status
+
+        plane = read_status()
         assert self.governor is not None
-        assert self.router is not None
-        router_report = self.router.process_tick()
         return {
             "live_trading_enabled": live_trading_enabled(),
             "liquidity_router_active": liquidity_router_active(),
+            "daemon_active": plane.get("active"),
+            "daemon_status": plane,
             "stream": self.listener.stats.to_dict(),
             "cache_size": self.listener.cache.size(),
             "wallet_id": self.governor.wallet_id,
-            "liquidity_router_last": router_report,
+            "liquidity_router_last": self._last_router_report or plane.get("liquidity_router_last") or {},
         }
 
 

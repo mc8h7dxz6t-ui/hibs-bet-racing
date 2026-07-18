@@ -121,6 +121,12 @@ def _migrate_routing_decisions(conn: sqlite3.Connection) -> None:
     ):
         if col not in cols:
             conn.execute(ddl)
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_routing_decisions_trade_dedup
+        ON routing_decisions (trade_id)
+        """
+    )
 
 
 def ensure_trading_schema(database: Path | None = None) -> Path:

@@ -462,15 +462,15 @@ def create_app() -> Flask:
     @app.route("/api/trading/sandbox")
     def api_trading_sandbox():
         """Read-only racing execution sandbox — no order dispatch."""
-        from hibs_racing.trading.daemon import TradingDaemon
+        from hibs_racing.trading.status_plane import read_status
         from hibs_racing.trading.liquidity_router import recent_hedged_events, recent_routing_decisions
         from hibs_racing.trading.store import recent_simulated_trades
 
         limit = min(int(request.args.get("limit", 20)), 50)
-        daemon = TradingDaemon()
+        status = read_status()
         return jsonify(
             {
-                **daemon.status(),
+                **status,
                 "recent_simulated_trades": recent_simulated_trades(limit=limit),
                 "recent_routing_decisions": recent_routing_decisions(limit=limit),
                 "recent_hedged_events": recent_hedged_events(limit=limit),
@@ -478,18 +478,22 @@ def create_app() -> Flask:
         )
 
     @app.route("/api/trading/dispatch", methods=["POST"])
+    @require_api_key(methods=("POST",))
     def api_trading_dispatch():
         """Workspace order dispatch — routes through execution governor (simulated when live disabled)."""
-        from hibs_racing.trading.daemon import TradingDaemon
-        from hibs_racing.trading.execution_governor import build_order_payload
+        from hibs_racing.trading.delta_cache import MarketDeltaCache
+        from hibs_racing.trading.execution_governor import ExecutionGovernor, build_order_payload
+        from hibs_racing.trading.status_plane import daemon_active
 
+        if not daemon_active():
+            return jsonify({"ok": False, "error": "trading_daemon_inactive"}), 503
         body = request.get_json(silent=True) or {}
         selection = str(body.get("selection") or "").strip()
         odds = float(body.get("odds") or 2.0)
         stake = float(body.get("stake") or 2.0)
         market_id = str(body.get("market_id") or body.get("runner_id") or selection or "ws")
         runner_id = str(body.get("runner_id") or selection or "ws")
-        daemon = TradingDaemon()
+        governor = ExecutionGovernor(cache=MarketDeltaCache())
         payload = build_order_payload(
             market_id=market_id,
             runner_id=runner_id,
@@ -498,12 +502,47 @@ def create_app() -> Flask:
         )
         payload["selection"] = selection
         payload["source"] = str(body.get("source") or "api_trading_dispatch")
-        result = daemon.submit_order(payload)
+        result = governor.dispatch(payload).to_dict()
         return jsonify({"ok": bool(result.get("allowed")), "verdict": result})
 
     @app.route("/api/ping")
     def api_ping():
         return jsonify({"ok": True, "product": "hibs-racing"})
+
+    @app.route("/api/live")
+    def api_live():
+        from hibs_racing.config import db_path, load_config
+        from hibs_racing.features.store import connect
+
+        try:
+            with connect(db_path(load_config())) as conn:
+                conn.execute("SELECT 1").fetchone()
+            return jsonify({"ok": True, "tier": "liveness"})
+        except Exception as exc:
+            return jsonify({"ok": False, "error": str(exc)[:120]}), 503
+
+    @app.route("/api/ready")
+    def api_ready():
+        from hibs_racing.config import db_path, load_config
+        from hibs_racing.features.store import connect
+        from hibs_racing.trading.status_plane import daemon_active
+
+        try:
+            with connect(db_path(load_config())) as conn:
+                conn.execute("SELECT 1").fetchone()
+        except Exception as exc:
+            return jsonify({"ok": False, "tier": "readiness", "error": str(exc)[:120]}), 503
+        ram_ok = Path("/mnt/hibs-ramdisk").is_mount() if Path("/mnt/hibs-ramdisk").exists() else True
+        daemon_ok = daemon_active()
+        ok = ram_ok and daemon_ok
+        return jsonify(
+            {
+                "ok": ok,
+                "tier": "readiness",
+                "ramdisk_mounted": ram_ok,
+                "trading_daemon_active": daemon_ok,
+            }
+        ), (200 if ok else 503)
 
     @app.route("/api/scrapers/catalog")
     def api_scrapers_catalog():

@@ -31,7 +31,7 @@ from hibs_racing.trading.order_ttl import (
     default_cancel_fn,
     log_timed_out_abort_to_ledger,
 )
-from hibs_racing.trading.runner_disarm_registry import is_disarmed
+from hibs_racing.trading.runner_disarm_registry import disarm_runner, is_disarmed
 from hibs_racing.trading.store import ensure_trading_schema
 
 logger = logging.getLogger(__name__)
@@ -146,8 +146,6 @@ class LiquidityRouter:
     cache: MarketDeltaCache
     database: Path | None = None
     commission_by_channel: dict[str, float] = field(default_factory=commission_by_channel)
-    _processed_trades: set[str] = field(default_factory=set)
-    _hedged_trades: set[str] = field(default_factory=set)
     order_tracker: InPlayOrderTracker = field(default_factory=InPlayOrderTracker)
     _inplay_queue: list[dict[str, Any]] = field(default_factory=list)
     _ttl_aborts: int = 0
@@ -202,25 +200,33 @@ class LiquidityRouter:
                         pass
                     except Exception as exc:
                         logger.debug("drift_gate skipped trade=%s: %s", trade_id[:8], exc)
-                if trade_id not in self._processed_trades:
+                if not self._trade_already_routed(conn, trade_id):
                     if self._route_trade(conn, rec):
                         routed += 1
-                    self._processed_trades.add(trade_id)
-                if trade_id not in self._hedged_trades:
+                if trade_id not in self._hedged_trade_ids(conn):
                     if self._maybe_hedge(conn, rec):
                         hedged += 1
-                        self._hedged_trades.add(trade_id)
             conn.commit()
         return {
             "liquidity_router_active": liquidity_router_active(),
             "routed": routed,
             "hedged": hedged,
             "drift_blocked": drift_blocked,
-            "processed_trades": len(self._processed_trades),
             "inplay_queue_depth": len(self._inplay_queue),
             "ttl_aborts": self._ttl_aborts,
             "order_ttl_ms": INPLAY_ORDER_TTL_MS,
         }
+
+    def _hedged_trade_ids(self, conn) -> set[str]:
+        rows = conn.execute("SELECT source_trade_id FROM hedged_ledger_events").fetchall()
+        return {str(r["source_trade_id"]) for r in rows}
+
+    def _trade_already_routed(self, conn, trade_id: str) -> bool:
+        row = conn.execute(
+            "SELECT 1 FROM routing_decisions WHERE trade_id = ? LIMIT 1",
+            (trade_id,),
+        ).fetchone()
+        return row is not None
 
     def build_venue_request(self, row: dict[str, Any], *, channel: str, odds: float) -> dict[str, Any]:
         pre_volume = _matchbook_back_volume(row, self.cache, prefer_cache=False)
@@ -299,6 +305,9 @@ class LiquidityRouter:
                 status = DISARMED_BY_ADVERSE_SELECTION
                 outbound_blocked = 1
                 routed_stake = 0.0
+                runner_id = str(row.get("runner_id") or "")
+                if runner_id:
+                    disarm_runner(runner_id, reason="adverse_selection")
                 logger.warning(
                     "adverse selection abort trade=%s flight_ms=%.1f pre_vol=%s post_vol=%s",
                     str(row["trade_id"])[:8],
