@@ -3,13 +3,20 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
 _LOCK = threading.Lock()
 _DISARMED: dict[str, str] = {}
-_DISARM_FILE = Path("/var/run/hibs/drift_disarmed_runners.json")
+
+
+def _disarm_file() -> Path:
+    raw = os.environ.get("HIBS_RUNNER_DISARM_FILE", "").strip()
+    if raw:
+        return Path(raw)
+    return Path("/var/run/hibs/drift_disarmed_runners.json")
 
 
 def _utc_now() -> str:
@@ -17,10 +24,11 @@ def _utc_now() -> str:
 
 
 def _load_file() -> dict[str, str]:
-    if not _DISARM_FILE.exists():
+    disarm_file = _disarm_file()
+    if not disarm_file.exists():
         return {}
     try:
-        data = json.loads(_DISARM_FILE.read_text(encoding="utf-8"))
+        data = json.loads(disarm_file.read_text(encoding="utf-8"))
         if isinstance(data, dict):
             return {str(k): str(v) for k, v in data.items()}
     except (OSError, json.JSONDecodeError, TypeError):
@@ -30,8 +38,9 @@ def _load_file() -> dict[str, str]:
 
 def _persist_file() -> None:
     try:
-        _DISARM_FILE.parent.mkdir(parents=True, exist_ok=True)
-        _DISARM_FILE.write_text(json.dumps(_DISARMED, indent=2), encoding="utf-8")
+        disarm_file = _disarm_file()
+        disarm_file.parent.mkdir(parents=True, exist_ok=True)
+        disarm_file.write_text(json.dumps(_DISARMED, indent=2), encoding="utf-8")
     except OSError:
         pass
 
