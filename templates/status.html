@@ -72,6 +72,15 @@
     </div>
 </section>
 
+<section class="card" id="racing-evidence-gates">
+    <div class="card-head"><h2>Evidence gates (R1–R8)</h2></div>
+    <div class="card-body" style="padding:16px;">
+        <p id="evidence-grade-headline" class="fi-hint">Loading evidence gates…</p>
+        <div id="evidence-gates-strip" class="stat-grid" style="margin-top:10px;"></div>
+        <ul id="evidence-next-actions" class="fi-hint" style="margin-top:12px;"></ul>
+    </div>
+</section>
+
 {% set truth = evidence_truth %}
 {% if truth %}
 <section class="card">
@@ -361,6 +370,31 @@
     }
 
     refresh();
+})();
+
+(function(){
+    const headline = document.getElementById('evidence-grade-headline');
+    const strip = document.getElementById('evidence-gates-strip');
+    const actions = document.getElementById('evidence-next-actions');
+    if (!headline || !strip) return;
+    const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    fetch('/api/evidence', {cache:'no-store'})
+        .then(r => r.json())
+        .then(rep => {
+            const grade = rep.evidence_grade || '—';
+            const ready = rep.buyer_ready ? 'buyer_ready' : 'building evidence';
+            headline.innerHTML = `Grade <strong>${esc(grade)}</strong> · ${esc(ready)} · score ${esc(rep.buyer_readiness_score ?? '—')}`;
+            strip.innerHTML = (rep.gates || []).map(g => {
+                const cls = g.pass ? 'ok' : (g.critical ? 'fail' : 'warn');
+                const label = esc(g.id || g.label || 'gate');
+                return `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value ${cls}">${g.pass ? 'PASS' : 'FAIL'}</div></div>`;
+            }).join('');
+            const next = rep.next_actions || [];
+            actions.innerHTML = next.length
+                ? next.map(a => `<li>${esc(a)}</li>`).join('')
+                : '<li>All gates nominal.</li>';
+        })
+        .catch(() => { headline.textContent = 'Evidence gates unavailable — check /api/evidence'; });
 })();
 </script>
 {% endblock %}

@@ -86,8 +86,10 @@ fi
 log "7/7 verify"
 systemctl restart hibs-racing 2>/dev/null || true
 sleep 4
-RC="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 http://127.0.0.1:5003/api/ping 2>/dev/null || echo 000)"
-echo "  hibs-racing ping: ${RC}"
+# shellcheck source=lib-racing-unix-socket.sh
+source "${RACING}/deploy/lib-racing-unix-socket.sh"
+RC="$(racing_ping_code 15)"
+echo "  hibs-racing ping (unix): ${RC}"
 if [[ -f "${RACING}/scripts/verify_win_engine_deploy.sh" ]]; then
   HIBS_PRODUCTION_URL="${HIBS_PRODUCTION_URL:-http://127.0.0.1:8000}" \
     HIBS_RACING_DB_PATH="${RACING}/data/feature_store.sqlite" \
