@@ -97,6 +97,9 @@
     .runner-mobile-card .rm-bars{display:flex;gap:4px;margin-top:5px;}
     .runner-mobile-card .rm-bar{flex:1;height:4px;border-radius:3px;background:rgba(255,255,255,0.08);overflow:hidden;}
     .runner-mobile-card .rm-bar > span{display:block;height:100%;background:linear-gradient(90deg,#007A33,#B7F7C8);}
+    .runner-mobile-card .rm-reason{margin-top:6px;font-size:0.7em;color:var(--green);line-height:1.35;}
+    .runner-mobile-card .rm-reason ul{margin:4px 0 0;padding-left:14px;color:var(--text);}
+    .runner-mobile-card .rm-reason li{margin-bottom:2px;}
 }
 .rp-verdict-block{
     margin:0 0 14px;padding:12px 14px;border-radius:10px;
@@ -434,6 +437,8 @@
                                     data-place-chip-active="{{ 1 if r.place_value_chip_active else 0 }}"
                                     data-value-flag="{{ 1 if r.value_flag else 0 }}"
                                     data-steam-gate="{{ g.gate if g else 'proceed' }}"
+                                    data-engine-opinion="{{ r.engine_opinion or '' }}"
+                                    data-engine-reasons="{{ (r.engine_reasons or [])|join('||')|e }}"
                                     data-kelly-mult="{{ g.kelly_multiplier if g and g.kelly_multiplier is not none else 1 }}"
                                     data-stake-units="1"
                                     data-bet-type="each_way">
