@@ -57,6 +57,21 @@
 }
 .meeting-drawer[open] > summary::after,.race-drawer[open] > summary::after{transform:rotate(-135deg);margin-top:4px;}
 .race-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+/* Compact runner rows — ~50% vertical footprint; horse / jockey / trainer unchanged */
+.race-table-wrap table{font-size:0.72em;}
+.race-table-wrap th{padding:4px 6px;font-size:0.62em;line-height:1.2;white-space:nowrap;}
+.race-table-wrap td{padding:4px 6px;line-height:1.25;vertical-align:top;}
+.race-table-wrap .horse-cell{max-width:11em;line-height:1.2;}
+.race-table-wrap .runner-jockey,
+.race-table-wrap .runner-trainer{max-width:8.5em;font-size:0.95em;line-height:1.2;word-break:break-word;}
+.race-table-wrap .enrich-panel{font-size:0.72em;min-width:96px;max-width:128px;padding:4px 6px;}
+.race-table-wrap .enrich-row{margin-bottom:2px;}
+.race-table-wrap .enrich-row-label{font-size:0.68em;}
+.race-table-wrap .rp-comment{font-size:0.72em;max-width:200px;line-height:1.3;}
+.race-table-wrap .engine-opinion{font-size:0.72em;max-width:220px;line-height:1.3;}
+.race-table-wrap .place-telemetry-strip{font-size:0.65em;gap:3px 6px;margin-top:2px;}
+.race-table-wrap .place-value-chip{padding:1px 5px;font-size:0.9em;}
+.race-table-wrap .gate-reason,.race-table-wrap .steam-badge{font-size:0.58em;}
 @media(max-width:720px){
     .meetings-toolbar{position:relative;top:0;}
     .toolbar-actions{width:100%;margin-left:0;}
@@ -73,14 +88,14 @@
 .off-countdown{font-size:0.72em;color:var(--gold);font-weight:600;margin-left:6px;}
 @media(max-width:720px){
     .runner-mobile-card{
-        display:block;padding:12px 14px;margin:8px 0;border-radius:12px;
+        display:block;padding:7px 10px;margin:5px 0;border-radius:10px;
         border:1px solid var(--border);background:rgba(0,0,0,0.28);
     }
     .runner-mobile-card.has-value{border-color:rgba(246,216,137,0.45);}
-    .runner-mobile-card .rm-name{font-weight:700;font-size:1em;}
-    .runner-mobile-card .rm-meta{font-size:0.78em;color:var(--muted);margin-top:4px;}
-    .runner-mobile-card .rm-bars{display:flex;gap:6px;margin-top:8px;}
-    .runner-mobile-card .rm-bar{flex:1;height:6px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden;}
+    .runner-mobile-card .rm-name{font-weight:700;font-size:0.88em;line-height:1.2;}
+    .runner-mobile-card .rm-meta{font-size:0.72em;color:var(--muted);margin-top:2px;line-height:1.3;}
+    .runner-mobile-card .rm-bars{display:flex;gap:4px;margin-top:5px;}
+    .runner-mobile-card .rm-bar{flex:1;height:4px;border-radius:3px;background:rgba(255,255,255,0.08);overflow:hidden;}
     .runner-mobile-card .rm-bar > span{display:block;height:100%;background:linear-gradient(90deg,#007A33,#B7F7C8);}
 }
 .rp-verdict-block{
@@ -426,8 +441,8 @@
                                     <td class="strong horse-cell">{{ r.horse_name }}{% if r.draw %} <span class="pill" style="font-size:0.7em;">({{ r.draw }})</span>{% endif %}{% if r.value_flag %} <span class="value-flag">VALUE</span>{% endif %}{% if r.paper_ledger %} <span class="paper-ledger-badge pill" title="Paper ledger {{ r.paper_ledger.status }}">{% if r.paper_ledger.status == 'settled' %}✓{% else %}●{% endif %}</span>{% endif %}{% if r.value_gate_label %}<span class="gate-reason" title="Value not flagged">{{ r.value_gate_label }}</span>{% endif %}<span class="risk-badge-slot"></span>
                                     {% include 'racing/_runner_place_telemetry.html' %}
                                     </td>
-                                    <td>{{ r.jockey or '—' }}</td>
-                                    <td>{{ r.trainer or '—' }}</td>
+                                    <td class="runner-jockey">{{ r.jockey or '—' }}</td>
+                                    <td class="runner-trainer">{{ r.trainer or '—' }}</td>
                                     <td class="num">{% if r.official_rating is not none and r.official_rating == r.official_rating %}{{ r.official_rating|int }}{% else %}—{% endif %}</td>
                                     <td class="num" title="RP form figures">{{ r.form_string or '—' }}</td>
                                     <td class="enrich-cell">
