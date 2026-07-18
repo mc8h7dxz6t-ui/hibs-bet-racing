@@ -8,13 +8,17 @@ from typing import Any
 COVERAGE_PASS_OBS_PCT = 35.0
 COVERAGE_PASS_PROD_PCT = 50.0
 MIN_PAPER_ROWS = 25
+PLACE_BRIER_PASS_MAX = 0.25
 
 
 def _place_brier_pass_max() -> float:
+    raw = os.getenv("HIBS_RACING_PLACE_BRIER_PASS_MAX")
+    if raw is None or not str(raw).strip():
+        return PLACE_BRIER_PASS_MAX
     try:
-        return float(os.getenv("HIBS_RACING_PLACE_BRIER_PASS_MAX", "0.25"))
+        return float(raw)
     except ValueError:
-        return 0.25
+        return PLACE_BRIER_PASS_MAX
 
 
 def _min_place_calibration_n() -> int:

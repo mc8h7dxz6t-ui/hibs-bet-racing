@@ -587,6 +587,12 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "error": "runner_not_found", "runner_id": runner_id}), 404
         return jsonify({"ok": True, **payload})
 
+    @app.route("/api/evidence")
+    def api_racing_evidence():
+        from hibs_racing.evidence_gates import racing_evidence_gates
+
+        return jsonify(racing_evidence_gates())
+
     @app.route("/api/health")
     def api_health():
         import time as _time
