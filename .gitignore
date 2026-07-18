@@ -5,13 +5,19 @@ __pycache__/
 *.pyc
 .pytest_cache/
 *.egg-info/
+.mypy_cache/
+.ruff_cache/
 
 # Credentials & local IDE
 .env
-.env.instpp
+.env.*
+!.env.example
 .DS_Store
 .idea/
 .vscode/
+
+# macOS / local runtime trees
+Library/
 
 # Feature store & heavy data (never commit live DB)
 data/*.sqlite
@@ -19,7 +25,16 @@ data/*.sqlite-journal
 data/ui_monetization.json
 data/parquet/
 data/raw/
+data/batch_*
+data/demo/
+data/*.wal
+data/*.genesis.json
 *.parquet
+
+# Local scratch databases (any path)
+*.db
+*.sqlite
+raceform.db
 
 # Generated model weights (keep lgbm_ranker_features.json tracked)
 data/models/*.txt
@@ -34,35 +49,18 @@ vendor/rpscrape/.git/
 vendor/rpscrape/data/
 vendor/rpscrape/.cache/
 
-# Optional: large local raceform copy
-raceform.db
-
-# Local caches & scratch DBs
-*.sqlite-journal
-*.db-journal
+# Local caches & scratch
 .cache/
 tmp/
 *.tmp
+.demo/
 
-# Data room exports (generate locally; do not commit transaction logs)
+# Data room exports (generate locally)
 exports/*.csv
+exports/*.json
+exports/*.log
 
 # Secrets & tokens (never commit)
 *.pem
 credentials.json
 secrets/
-
-# Institutional++ Local Containment Rules
-.env
-.env.save
-*.db
-*.sqlite
-Library/
-.venv/
-exports/*.json
-exports/*.log
-data/batch_*
-data/demo/
-data/*.wal
-data/*.genesis.json
-.demo/
