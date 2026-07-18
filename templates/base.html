@@ -374,8 +374,8 @@
             </nav>
         </div>
         <div class="site-top-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <a href="{{ url_for('status_page') }}" id="racing-inst-chip" class="pill" title="Racing Inst++ lane — card freshness and paper ledger">
-                Inst++ <span id="racing-inst-card">—</span>
+            <a href="{{ url_for('status_page') }}" id="racing-inst-chip" class="pill" title="Racing lane — card freshness and paper ledger">
+                Ops <span id="racing-inst-card">—</span>
             </a>
             {% if ranker_loaded %}<span class="pill ok">Ranker live</span>{% else %}<span class="pill warn">No ranker</span>{% endif %}
             <button type="button" class="btn" id="btn-refresh" title="Fetch next 24h GB+IRE cards, score with LightGBM, pull odds">Refresh 24h</button>
