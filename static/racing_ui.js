@@ -675,11 +675,17 @@
       const oddsHtml = p.win_decimal && p.monetized_link
         ? `<a class="odds-affiliate-link" href="${encodeURI(p.monetized_link)}" target="_blank" rel="noopener sponsored" title="Open partner odds">win ${p.win_decimal}</a>`
         : (p.win_decimal ? ' · win ' + p.win_decimal : '');
+      const reasons = (p.pick_reasons || []).slice(0, 3);
+      const summary = p.pick_summary || '';
+      const reasonsHtml = reasons.length
+        ? `<ul class="sp-reasons">${reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>`
+        : (summary ? `<p class="sp-summary">${esc(summary)}</p>` : '');
       return `
         <div class="smart-pick-card" data-horse="${esc(p.horse_name)}" data-course="${esc(p.course)}" data-off="${esc(p.off_time)}" data-win-odds="${p.win_decimal || ''}" data-bet-type="each_way" data-monetized-link="${esc(p.monetized_link || '')}">
           <div class="sp-horse">#${i + 1} ${esc(p.horse_name)} ${riskHtml}</div>
           <div class="sp-meta">${esc(p.off_time)} · ${esc(p.course)} · DQ ${p.data_quality_pct}% · gate ${esc(p.steam_gate)}</div>
           <div class="sp-meta">Place ${Math.round((parseFloat(p.model_place_prob) || 0) * 100)}% · EV ${p.ew_combined_ev != null ? Number(p.ew_combined_ev).toFixed(2) : '—'}${oddsHtml ? ' · ' + oddsHtml : ''}</div>
+          ${reasonsHtml}
           ${cashHtml}
           <button type="button" class="slip-copy-btn" data-slip-copy style="margin-top:8px;">📋 Copy slip</button>
         </div>`;

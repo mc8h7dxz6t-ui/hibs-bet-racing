@@ -36,52 +36,6 @@
     --hibs-mint-soft: rgba(167, 243, 208, 0.14);
     --hibs-success-text: #86efac;
     --hibs-slate-card: rgba(15, 23, 42, 0.96);
-    --state-pass: #4ade80;
-    --state-pass-glow: rgba(74, 222, 128, 0.45);
-    --state-muted: #64748b;
-}
-
-.place-telemetry-strip {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 10px;
-    margin-top: 4px;
-    font-size: 0.72em;
-    line-height: 1.25;
-    letter-spacing: 0.02em;
-}
-
-.place-telemetry-item {
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-.place-value-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 0.95em;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.04em;
-    border: 1px solid transparent;
-    transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
-}
-
-.place-value-chip.is-muted {
-    color: var(--state-muted);
-    background: rgba(100, 116, 139, 0.14);
-    border-color: rgba(100, 116, 139, 0.28);
-}
-
-.place-value-chip.is-pass {
-    color: #052e16;
-    background: var(--state-pass);
-    border-color: rgba(74, 222, 128, 0.85);
-    box-shadow: 0 0 10px var(--state-pass-glow);
 }
 
 body {
@@ -301,5 +255,408 @@ header,
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         padding-bottom: 4px;
+    }
+}
+
+/* -------------------------------------------------------------------------
+   Institutional workstation shell — high-density fixed-sidebar layout
+   ------------------------------------------------------------------------- */
+:root {
+    --canvas-bg: #090d16;
+    --surface-base: #111827;
+    --surface-elevated: #1f293d;
+    --border-subtle: #1e293b;
+    --border-muted: #334155;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #475569;
+    --state-pass: #10b981;
+    --state-gate: #f59e0b;
+    --state-fail: #ef4444;
+    --state-info: #3b82f6;
+    --line-accent: #3b82f6;
+    --line-glow: rgba(59, 130, 246, 0.15);
+    --color-football: #3b82f6;
+    --color-racing: #8b5cf6;
+    --color-trading: #14b8a6;
+    --color-lines: #38bdf8;
+    --workspace-sidebar-w: 380px;
+}
+
+[data-active-line="football"] {
+    --line-accent: var(--color-football);
+    --line-glow: rgba(59, 130, 246, 0.12);
+}
+
+[data-active-line="racing"] {
+    --line-accent: var(--color-racing);
+    --line-glow: rgba(139, 92, 246, 0.12);
+}
+
+[data-active-line="trading"] {
+    --line-accent: var(--color-trading);
+    --line-glow: rgba(20, 184, 166, 0.12);
+}
+
+[data-active-line="lines"] {
+    --line-accent: var(--color-lines);
+    --line-glow: rgba(56, 189, 248, 0.12);
+}
+
+body.hibs-workspace-active {
+    background-color: var(--canvas-bg);
+    background-image: none;
+    height: 100vh;
+    overflow: hidden;
+    padding: 0;
+}
+
+body.hibs-workspace-active::before {
+    display: none;
+}
+
+.hibs-workspace-shell.app-container {
+    display: grid;
+    grid-template-rows: 48px minmax(0, 1fr);
+    height: 100vh;
+    max-width: none;
+    margin: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.hibs-workspace-shell .control-bar {
+    background: var(--surface-base);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    min-height: 48px;
+}
+
+.hibs-workspace-shell .brand-zone {
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+}
+
+.hibs-workspace-shell .line-tabs {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.hibs-workspace-shell .line-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.12s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    font-family: inherit;
+}
+
+.hibs-workspace-shell .line-tab:hover {
+    color: var(--text-primary);
+    background: var(--border-subtle);
+}
+
+.hibs-workspace-shell .line-tab.active {
+    color: var(--text-primary);
+    background: var(--surface-elevated);
+    box-shadow: inset 0 -2px 0 var(--line-accent);
+}
+
+.hibs-workspace-shell .telemetry-tray {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.hibs-workspace-shell .gate-chip {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.hibs-workspace-shell .gate-chip.pass {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.2);
+    color: var(--state-pass);
+}
+
+.hibs-workspace-shell .gate-chip.gate {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.2);
+    color: var(--state-gate);
+}
+
+.hibs-workspace-shell .gate-chip.fail {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.2);
+    color: var(--state-fail);
+}
+
+.hibs-workspace-shell .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--workspace-sidebar-w);
+    height: 100%;
+    overflow: hidden;
+}
+
+.hibs-workspace-shell .matrix-pane {
+    padding: 16px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: var(--canvas-bg);
+    -webkit-overflow-scrolling: touch;
+}
+
+.hibs-workspace-shell .matrix-pane > footer {
+    margin-top: 24px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+    font-size: 0.72em;
+    color: var(--text-muted);
+}
+
+.hibs-workspace-shell .filter-strip {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    background: var(--surface-base);
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.hibs-workspace-shell .clean-select,
+.hibs-workspace-shell .clean-input {
+    background: var(--canvas-bg);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    outline: none;
+}
+
+.hibs-workspace-shell .clean-select:focus,
+.hibs-workspace-shell .clean-input:focus {
+    border-color: var(--line-accent);
+}
+
+.hibs-workspace-shell .data-card {
+    background: var(--surface-base);
+    border: 1px solid var(--border-subtle);
+    border-left: 3px solid var(--line-accent);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 8px;
+    transition: all 0.12s ease;
+}
+
+.hibs-workspace-shell .data-card:hover {
+    border-color: var(--line-accent);
+    box-shadow: 0 0 12px var(--line-glow);
+}
+
+.hibs-workspace-shell .grid-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    gap: 8px;
+}
+
+.hibs-workspace-shell .metric-pill {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.hibs-workspace-shell .metric-pill strong {
+    color: var(--text-primary);
+}
+
+.hibs-workspace-shell .reasoning-panel {
+    margin-top: 8px;
+    background: var(--canvas-bg);
+    border-radius: 4px;
+    padding: 8px;
+    border: 1px solid var(--border-subtle);
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+}
+
+.hibs-workspace-shell .execution-drawer {
+    background: var(--surface-base);
+    border-left: 1px solid var(--border-subtle);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    overflow: hidden;
+}
+
+.hibs-workspace-shell .drawer-header {
+    padding: 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+}
+
+.hibs-workspace-shell .drawer-content {
+    padding: 12px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.hibs-workspace-shell .drawer-footer {
+    padding: 12px;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--canvas-bg);
+}
+
+.hibs-workspace-shell .odds-button {
+    background: var(--surface-elevated);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.hibs-workspace-shell .odds-button:hover {
+    border-color: var(--line-accent);
+    color: var(--line-accent);
+}
+
+.hibs-workspace-shell .pl-strip {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    background: var(--canvas-bg);
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-subtle);
+    gap: 8px;
+}
+
+.hibs-workspace-shell .pl-widget {
+    font-size: 11px;
+    color: var(--text-secondary);
+    flex: 1;
+}
+
+.hibs-workspace-shell .pl-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+.hibs-workspace-shell .pl-value.positive {
+    color: var(--state-pass);
+}
+
+.hibs-workspace-shell .pl-value.negative {
+    color: var(--state-fail);
+}
+
+.hibs-workspace-shell .execute-btn {
+    width: 100%;
+    background: var(--line-accent);
+    color: #ffffff;
+    border: none;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.hibs-workspace-shell .execute-btn:disabled {
+    background: var(--border-subtle);
+    color: var(--text-muted);
+    cursor: not-allowed;
+}
+
+.hibs-workspace-shell .hibs-product-bar {
+    display: none;
+}
+
+body.hibs-workspace-active .betslip-fab,
+body.hibs-workspace-active .betslip-drawer,
+body.hibs-workspace-active .betslip-backdrop {
+    display: none !important;
+}
+
+.hibs-workspace-shell .hibs-portfolio-bar {
+    margin: 0 0 12px;
+    padding: 8px;
+    border-radius: 6px;
+    background: var(--canvas-bg);
+    border: 1px solid var(--border-subtle);
+    font-size: 0.75em;
+}
+
+.hibs-workspace-shell .hibs-portfolio-inner {
+    gap: 6px 8px;
+}
+
+.hibs-workspace-shell .domain-view {
+    display: none;
+}
+
+.hibs-workspace-shell .domain-view.active {
+    display: block;
+}
+
+@media (max-width: 960px) {
+    .hibs-workspace-shell .workspace {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) auto;
+    }
+
+    .hibs-workspace-shell .execution-drawer {
+        border-left: none;
+        border-top: 1px solid var(--border-subtle);
+        max-height: 42vh;
+    }
+
+    .hibs-workspace-shell .brand-zone {
+        display: none;
     }
 }
