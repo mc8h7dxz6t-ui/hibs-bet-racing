@@ -16,7 +16,9 @@ from hibs_racing.config import db_path, load_config
 from hibs_racing.features.store import connect
 from hibs_racing.trading.broker_outbound import OutboundBrokerBlocked, negotiate_secondary_venue
 from hibs_racing.trading.config import (
+    adverse_selection_volume_drop_pct,
     allowed_routing_channels,
+    flight_latency_max_ms,
     liquidity_router_active,
     max_venue_commission_bps,
     min_hedge_delta_bps,
@@ -37,6 +39,66 @@ logger = logging.getLogger(__name__)
 from hibs_racing.utils.monetization import VENUE_COMMISSION_BPS, commission_by_channel
 
 DEFAULT_COMMISSION_BPS: dict[str, float] = dict(VENUE_COMMISSION_BPS)
+
+DISARMED_BY_ADVERSE_SELECTION = "DISARMED_BY_ADVERSE_SELECTION"
+
+
+def _parse_payload_json(row: dict[str, Any]) -> dict[str, Any]:
+    raw = row.get("payload_json")
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _matchbook_back_volume(row: dict[str, Any], cache: MarketDeltaCache, *, prefer_cache: bool = False) -> float | None:
+    market_id = str(row.get("market_id") or "")
+    runner_id = str(row.get("runner_id") or "")
+    if prefer_cache and market_id and runner_id:
+        tick = cache.get(market_id, runner_id)
+        if tick and tick.back_volume is not None:
+            return float(tick.back_volume)
+    payload = _parse_payload_json(row)
+    raw = payload.get("matchbook_back_volume")
+    if raw is None:
+        raw = payload.get("back_volume")
+    if raw is not None:
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            pass
+    if market_id and runner_id:
+        tick = cache.get(market_id, runner_id)
+        if tick and tick.back_volume is not None:
+            return float(tick.back_volume)
+    return None
+
+
+def flight_latency_ms(start_ns: int, end_ns: int) -> float:
+    return (end_ns - start_ns) / 1_000_000.0
+
+
+def volume_drop_exceeded(pre: float | None, post: float | None, *, threshold: float | None = None) -> bool:
+    if pre is None or post is None or pre <= 0:
+        return False
+    drop = threshold if threshold is not None else adverse_selection_volume_drop_pct()
+    return post <= pre * (1.0 - drop)
+
+
+def adverse_selection_abort(
+    *,
+    flight_ms: float,
+    pre_volume: float | None,
+    post_volume: float | None,
+    max_latency_ms: int | None = None,
+) -> bool:
+    cap = max_latency_ms if max_latency_ms is not None else flight_latency_max_ms()
+    if flight_ms > cap:
+        return True
+    return volume_drop_exceeded(pre_volume, post_volume)
 
 
 def _utc_now() -> str:
@@ -161,6 +223,7 @@ class LiquidityRouter:
         }
 
     def build_venue_request(self, row: dict[str, Any], *, channel: str, odds: float) -> dict[str, Any]:
+        pre_volume = _matchbook_back_volume(row, self.cache, prefer_cache=False)
         base = {
             "trade_id": row["trade_id"],
             "runner_id": row.get("runner_id"),
@@ -169,19 +232,20 @@ class LiquidityRouter:
             "stake": row.get("stake"),
             "channel": channel,
             "created_at_ms": int(time.time() * 1000),
+            "matchbook_back_volume": pre_volume,
         }
         return self.order_tracker.attach_expiry(base)
 
     def _venue_submit(self, request: dict[str, Any]) -> dict[str, Any]:
         channel = str(request.get("channel") or "")
-        negotiate_secondary_venue(
-            channel=channel,
-            payload=request,
-        )
-        return {"ok": True, "authoritative": True, "channel": channel}
+        stake = float(request.get("stake") or 0)
+        payload = dict(request)
+        payload["stake"] = stake
+        negotiate_secondary_venue(channel=channel, payload=payload)
+        return {"ok": True, "authoritative": True, "channel": channel, "routed_stake": stake}
 
     async def process_inplay_execution_loop(self) -> dict[str, Any]:
-        """Drain queued live routes under strict 450ms TTL cancel contract."""
+        """Drain queued live routes under strict TTL + adverse-selection flight guard."""
         if not self._inplay_queue:
             return {"processed": 0, "ttl_aborts": self._ttl_aborts}
         processed = 0
@@ -191,15 +255,21 @@ class LiquidityRouter:
             channel = str(item["channel"])
             request = dict(item["request"])
             row = item["row"]
+            quotes = item.get("quotes") or []
+            pre_volume = item.get("pre_volume")
+            if pre_volume is None:
+                pre_volume = _matchbook_back_volume(row, self.cache, prefer_cache=False)
             if self.order_tracker.is_muted(channel):
                 self._record_route_decision(
                     row,
                     channel=channel,
-                    quotes=item.get("quotes") or [],
+                    quotes=quotes,
                     status=INPLAY_ORDER_TIMED_OUT_ABORT,
                     outbound_blocked=1,
+                    routed_stake=0.0,
                 )
                 continue
+            flight_start_ns = time.perf_counter_ns()
             try:
                 result = await self.order_tracker.submit_with_ttl(
                     channel=channel,
@@ -212,24 +282,42 @@ class LiquidityRouter:
             except Exception as exc:
                 logger.warning("inplay execution loop error: %s", exc)
                 continue
-            processed += 1
+            flight_end_ns = time.perf_counter_ns()
+            flight_ms = flight_latency_ms(flight_start_ns, flight_end_ns)
+            post_volume = _matchbook_back_volume(row, self.cache, prefer_cache=True)
+            routed_stake = float(row.get("stake") or 0)
+            status = "LIVE_ROUTED"
+            outbound_blocked = 0
             if result.get("status") == INPLAY_ORDER_TIMED_OUT_ABORT:
                 self._ttl_aborts += 1
-                self._record_route_decision(
-                    row,
-                    channel=channel,
-                    quotes=item.get("quotes") or [],
-                    status=INPLAY_ORDER_TIMED_OUT_ABORT,
-                    outbound_blocked=1,
+                status = INPLAY_ORDER_TIMED_OUT_ABORT
+                outbound_blocked = 1
+                routed_stake = 0.0
+            elif adverse_selection_abort(
+                flight_ms=flight_ms, pre_volume=pre_volume, post_volume=post_volume
+            ):
+                status = DISARMED_BY_ADVERSE_SELECTION
+                outbound_blocked = 1
+                routed_stake = 0.0
+                logger.warning(
+                    "adverse selection abort trade=%s flight_ms=%.1f pre_vol=%s post_vol=%s",
+                    str(row["trade_id"])[:8],
+                    flight_ms,
+                    pre_volume,
+                    post_volume,
                 )
-            else:
-                self._record_route_decision(
-                    row,
-                    channel=channel,
-                    quotes=item.get("quotes") or [],
-                    status="LIVE_ROUTED",
-                    outbound_blocked=0,
-                )
+            processed += 1
+            self._record_route_decision(
+                row,
+                channel=channel,
+                quotes=quotes,
+                status=status,
+                outbound_blocked=outbound_blocked,
+                flight_latency_ms=flight_ms,
+                routed_stake=routed_stake,
+                matchbook_back_volume_pre=pre_volume,
+                matchbook_back_volume_post=post_volume,
+            )
         return {"processed": processed, "ttl_aborts": self._ttl_aborts}
 
     def _record_route_decision(
@@ -240,16 +328,23 @@ class LiquidityRouter:
         quotes: list[VenueQuote],
         status: str,
         outbound_blocked: int,
+        flight_latency_ms: float | None = None,
+        routed_stake: float | None = None,
+        matchbook_back_volume_pre: float | None = None,
+        matchbook_back_volume_post: float | None = None,
     ) -> None:
         best = quotes[0] if quotes else VenueQuote(channel=channel, gross_odds=0.0, commission_bps=0.0, net_odds=0.0)
         db = self._db()
+        stake = routed_stake if routed_stake is not None else float(row.get("stake") or 0)
         with connect(db) as conn:
             conn.execute(
                 """
                 INSERT INTO routing_decisions (
                     decision_id, trade_id, runner_id, market_id, chosen_channel,
-                    gross_odds, net_odds, commission_bps, status, outbound_blocked, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    gross_odds, net_odds, commission_bps, status, outbound_blocked,
+                    flight_latency_ms, routed_stake, matchbook_back_volume_pre,
+                    matchbook_back_volume_post, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     str(uuid.uuid4()),
@@ -262,6 +357,10 @@ class LiquidityRouter:
                     best.commission_bps,
                     status,
                     outbound_blocked,
+                    round(flight_latency_ms, 3) if flight_latency_ms is not None else None,
+                    stake,
+                    matchbook_back_volume_pre,
+                    matchbook_back_volume_post,
                     _utc_now(),
                 ),
             )
@@ -288,8 +387,15 @@ class LiquidityRouter:
         status = "SIMULATED_ROUTE"
         if liquidity_router_active():
             request = self.build_venue_request(row, channel=best.channel, odds=odds)
+            pre_volume = _matchbook_back_volume(row, self.cache, prefer_cache=False)
             self._inplay_queue.append(
-                {"channel": best.channel, "request": request, "row": row, "quotes": quotes}
+                {
+                    "channel": best.channel,
+                    "request": request,
+                    "row": row,
+                    "quotes": quotes,
+                    "pre_volume": pre_volume,
+                }
             )
             return True
         conn.execute(
