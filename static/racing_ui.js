@@ -257,12 +257,18 @@
         card.className = 'runner-mobile-card' + (value ? ' has-value' : '');
         const name = row.dataset.horse || row.querySelector('.horse-cell')?.textContent?.trim() || '?';
         const gate = row.dataset.steamGate || 'proceed';
-        const placePct = row.querySelector('td.num')?.textContent || '';
+        const cells = row.querySelectorAll('td');
+        const jockey = row.querySelector('.runner-jockey')?.textContent?.trim()
+          || (cells[2] ? cells[2].textContent.trim() : '');
+        const trainer = row.querySelector('.runner-trainer')?.textContent?.trim()
+          || (cells[3] ? cells[3].textContent.trim() : '');
         const win = row.dataset.winOdds || '';
         const mwp = row.dataset.modelWinProb || '';
         const barPct = Math.min(100, Math.max(0, Math.round(parseFloat(mwp || '0') * 100)));
+        const connections = [jockey, trainer].filter((s) => s && s !== '—').join(' · ');
         card.innerHTML =
           '<div class="rm-name">' + name + ' <span class="steam-badge ' + steamBadgeClass(gate) + '">' + gate + '</span></div>'
+          + (connections ? '<div class="rm-meta">' + connections + '</div>' : '')
           + '<div class="rm-meta">Win ' + (win || '—') + ' · model win ' + (barPct || '—') + '%</div>'
           + '<div class="rm-bars"><div class="rm-bar" title="Model win%"><span style="width:' + barPct + '%"></span></div></div>';
         card.addEventListener('click', () => {
