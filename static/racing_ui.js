@@ -266,11 +266,20 @@
         const mwp = row.dataset.modelWinProb || '';
         const barPct = Math.min(100, Math.max(0, Math.round(parseFloat(mwp || '0') * 100)));
         const connections = [jockey, trainer].filter((s) => s && s !== '—').join(' · ');
+        const opinion = row.dataset.engineOpinion || '';
+        const reasons = (row.dataset.engineReasons || '').split('||').filter(Boolean).slice(0, 3);
+        let reasonHtml = '';
+        if (reasons.length) {
+          reasonHtml = '<ul>' + reasons.map((r) => '<li>' + esc(r) + '</li>').join('') + '</ul>';
+        } else if (opinion) {
+          reasonHtml = esc(opinion);
+        }
         card.innerHTML =
           '<div class="rm-name">' + name + ' <span class="steam-badge ' + steamBadgeClass(gate) + '">' + gate + '</span></div>'
           + (connections ? '<div class="rm-meta">' + connections + '</div>' : '')
           + '<div class="rm-meta">Win ' + (win || '—') + ' · model win ' + (barPct || '—') + '%</div>'
-          + '<div class="rm-bars"><div class="rm-bar" title="Model win%"><span style="width:' + barPct + '%"></span></div></div>';
+          + '<div class="rm-bars"><div class="rm-bar" title="Model win%"><span style="width:' + barPct + '%"></span></div></div>'
+          + (reasonHtml ? '<div class="rm-reason">' + reasonHtml + '</div>' : '');
         card.addEventListener('click', () => {
           row.scrollIntoView({ behavior: 'smooth', block: 'center' });
           row.classList.add('runner-highlight');
