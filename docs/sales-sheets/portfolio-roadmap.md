@@ -104,8 +104,8 @@ Full compare: [INST_PLUS_PLATFORM_COMPARE.md](../INST_PLUS_PLATFORM_COMPARE.md)
 ```bash
 make plug                          # 12/12 offline verify
 make proof                         # smoke + rigorous + portfolio
-./scripts/instpp_governor_tier.sh  # INST_GOVERNOR=finance INST_TIER=1
-INST_TEST_POSTGRES_DSN=postgresql://... INST_GOVERNOR=finance INST_TIER=2 ./scripts/instpp_governor_tier.sh
+./scripts/governor_tier_ci.sh  # INST_GOVERNOR=finance INST_TIER=1
+INST_TEST_POSTGRES_DSN=postgresql://... INST_GOVERNOR=finance INST_TIER=2 ./scripts/governor_tier_ci.sh
 ```
 
 ---
