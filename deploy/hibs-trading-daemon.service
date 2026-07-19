@@ -16,6 +16,10 @@ EnvironmentFile=-/opt/hibs-racing/.env
 ExecStart=/opt/hibs-racing/.venv/bin/hibs-racing trading-daemon
 Restart=on-failure
 RestartSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+MemoryMax=512M
+CPUQuota=50%
 
 [Install]
 WantedBy=multi-user.target
