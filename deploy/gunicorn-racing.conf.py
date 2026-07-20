@@ -17,4 +17,5 @@ keepalive = 5
 accesslog = "-"
 errorlog = "-"
 loglevel = os.getenv("HIBS_RACING_GUNICORN_LOGLEVEL", "info")
+control_socket_disable = True
 wsgi_app = os.getenv("HIBS_RACING_GUNICORN_APP", "hibs_racing.web:create_app()")
