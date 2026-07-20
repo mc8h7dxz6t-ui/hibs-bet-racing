@@ -86,6 +86,8 @@
 
 {% include 'racing/_value_lane_panel.html' %}
 
+{% include '_system_bets_panel.html' %}
+
 {% if not top_picks and not picks_by_day %}
 <div class="banner error">No qualifying picks in the next {{ window_hours or 24 }}h window. Run <strong>Refresh 24h</strong> once cards and scores are loaded.</div>
 {% else %}
@@ -159,4 +161,5 @@
 {% endif %}
 
 <p class="data-note">Picks require min field size 3, combo place ≥35% and model place ≥45% (see ingest/config.yaml monitor). No synthetic runners or odds — empty fields mean the feed or refresh has not loaded yet.</p>
+<script src="{{ static_v('hibs_system_bets.js') }}" defer></script>
 {% endblock %}
