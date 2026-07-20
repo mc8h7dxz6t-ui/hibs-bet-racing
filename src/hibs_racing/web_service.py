@@ -180,6 +180,63 @@ def _health_light_mode() -> bool:
     return os.environ.get("HIBS_PRODUCTION", "").strip().lower() in ("1", "true", "yes", "on")
 
 
+def shell_health_status() -> HealthStatus:
+    """Fast health for HTML nav — COUNT queries only (no full runner frame)."""
+    from hibs_racing.features.db_repair import integrity_check, value_lane_blockers
+
+    cfg = load_config()
+    db = db_path(cfg)
+    db_integrity_ok = bool(integrity_check(db).get("ok"))
+    runners_loaded = 0
+    scores_loaded = 0
+    sync = {"unscored_on_card": 0, "in_sync": True}
+    if db_integrity_ok:
+        try:
+            init_db(db)
+            with connect(db) as conn:
+                runners_loaded = int(conn.execute("SELECT COUNT(*) FROM upcoming_runners").fetchone()[0] or 0)
+                scores_loaded = int(conn.execute("SELECT COUNT(*) FROM card_scores").fetchone()[0] or 0)
+            from hibs_racing.cards.ui_frame import db_ui_sync_report
+
+            sync = db_ui_sync_report(database=db)
+        except Exception:
+            db_integrity_ok = False
+
+    raceform = os.environ.get("RACEFORM_DB_PATH", "").strip() or None
+    if raceform:
+        raceform = str(Path(raceform).expanduser())
+        if not Path(raceform).exists():
+            raceform = None
+    mb_creds = _env_ok("MATCHBOOK_USERNAME", "MATCHBOOK_PASSWORD")
+    partial = {
+        "db_ok": db.exists() and db_integrity_ok,
+        "db_integrity_ok": db_integrity_ok,
+        "card_fresh": None,
+        "unscored_runners": int(sync.get("unscored_on_card") or 0),
+        "nan_integrity_passed": None,
+        "runners_loaded": runners_loaded,
+    }
+    blockers = value_lane_blockers(partial)
+    return HealthStatus(
+        db_ok=db.exists() and db_integrity_ok,
+        runners_loaded=runners_loaded,
+        scores_loaded=scores_loaded,
+        racing_api=_env_ok("RACING_API_USERNAME", "RACING_API_PASSWORD"),
+        racing_post=_env_ok("EMAIL", "ACCESS_TOKEN"),
+        matchbook=mb_creds,
+        raceform_path=raceform,
+        betfair_enabled=betfair_enabled(),
+        betfair_configured=betfair_configured(),
+        analytics_mode=True,
+        db_integrity_ok=db_integrity_ok,
+        matchbook_credentials_configured=mb_creds,
+        value_lane_ready=len(blockers) == 0,
+        value_lane_blockers=blockers,
+        db_ui_in_sync=bool(sync.get("in_sync")),
+        unscored_runners=int(sync.get("unscored_on_card") or 0),
+    )
+
+
 def _paper_health_summary(database) -> dict:
     """Fast COUNT-only paper ledger summary for R7 parity."""
     from hibs_racing.features.store import connect, init_db

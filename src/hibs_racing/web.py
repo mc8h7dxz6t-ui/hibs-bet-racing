@@ -25,7 +25,13 @@ from hibs_racing.portfolio.racing import build_racing_portfolio
 from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.config import db_path, load_config
 from hibs_racing.web_format import fmt_num, fmt_pct
-from hibs_racing.web_service import cards_deep_link_context, dashboard_context, health_status, insights_context
+from hibs_racing.web_service import (
+    cards_deep_link_context,
+    dashboard_context,
+    health_status,
+    insights_context,
+    shell_health_status,
+)
 from hibs_racing.middleware.auth import require_api_key, validate_auth_config
 from hibs_racing.utils.ui_settings import (
     apply_saved_ui_env,
@@ -38,6 +44,8 @@ FAQ_PATH = ROOT / "docs" / "TECHNICAL_DUE_DILIGENCE_FAQ.md"
 
 _HEALTH_CACHE: dict = {"t": 0.0, "payload": None}
 _HEALTH_TTL_SEC = float(os.environ.get("HIBS_RACING_HEALTH_TTL_SEC", "20"))
+_SHELL_HEALTH_CACHE: dict = {"t": 0.0, "status": None}
+_SHELL_HEALTH_TTL_SEC = float(os.environ.get("HIBS_SHELL_HEALTH_TTL_SEC", "30"))
 
 
 def _safe_portfolio_payload(*, racing_limit: int = 200, history_days: int | None = None) -> dict:
@@ -157,6 +165,20 @@ def create_app() -> Flask:
 
     app.jinja_env.globals["static_v"] = static_v
 
+    def _cached_shell_health():
+        import time as _time
+
+        now = _time.monotonic()
+        if (
+            _SHELL_HEALTH_CACHE["status"] is not None
+            and (now - float(_SHELL_HEALTH_CACHE["t"])) < _SHELL_HEALTH_TTL_SEC
+        ):
+            return _SHELL_HEALTH_CACHE["status"]
+        hs = shell_health_status()
+        _SHELL_HEALTH_CACHE["t"] = now
+        _SHELL_HEALTH_CACHE["status"] = hs
+        return hs
+
     @app.context_processor
     def inject_brand() -> dict:
         from hibs_racing.ui_shell import ui_shell_context
@@ -165,7 +187,7 @@ def create_app() -> Flask:
         ctx.update(ui_shell_context())
         ctx.update(product_bar_context(active="racing"))
         ctx["portfolio_full_url"] = "/portfolio"
-        ctx["health"] = health_status()
+        ctx["health"] = _cached_shell_health()
         return ctx
 
     def _cors_summary(resp):
