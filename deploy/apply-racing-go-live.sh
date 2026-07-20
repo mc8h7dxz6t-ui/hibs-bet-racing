@@ -95,6 +95,11 @@ if [[ -f "${RACING}/scripts/verify_win_engine_deploy.sh" ]]; then
     HIBS_RACING_DB_PATH="${RACING}/data/feature_store.sqlite" \
     bash "${RACING}/scripts/verify_win_engine_deploy.sh" || warn "win engine verify issues"
 fi
+if [[ -f "${BET}/scripts/verify_value_lane_roi_deploy.sh" ]]; then
+  HIBS_PRODUCTION_URL="${HIBS_PRODUCTION_URL:-http://127.0.0.1:8000}" \
+    HIBS_RACING_PUBLIC_URL="${HIBS_RACING_PUBLIC_URL:-http://127.0.0.1:8000/racing}" \
+    bash "${BET}/scripts/verify_value_lane_roi_deploy.sh" || warn "value-lane ROI UI verify"
+fi
 
 echo ""
 echo "========== RACING GO-LIVE APPLIED =========="

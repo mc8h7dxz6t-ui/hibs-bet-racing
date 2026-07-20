@@ -5,7 +5,10 @@ on:
     paths:
       - "src/**"
       - "tests/**"
+      - "templates/**"
       - "scripts/governor_tier_ci.sh"
+      - "scripts/ci_release_gate.sh"
+      - "scripts/verify_win_engine_deploy.sh"
       - "docs/sales-sheets/**"
       - ".github/workflows/ci.yml"
   push:
@@ -13,7 +16,10 @@ on:
     paths:
       - "src/**"
       - "tests/**"
+      - "templates/**"
       - "scripts/governor_tier_ci.sh"
+      - "scripts/ci_release_gate.sh"
+      - "scripts/verify_win_engine_deploy.sh"
       - "docs/sales-sheets/**"
       - ".github/workflows/ci.yml"
 
