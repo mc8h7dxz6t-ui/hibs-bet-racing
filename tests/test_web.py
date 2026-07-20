@@ -110,3 +110,36 @@ def test_status_page_ranker_attribution():
     payload = api.get_json()
     assert "matrix" in payload
     assert "checks" in payload
+
+
+def test_runner_price_ticks_api(monkeypatch):
+    from hibs_racing.web import create_app
+
+    monkeypatch.setattr(
+        "hibs_racing.odds.exchange_quotes.load_runner_price_ticks",
+        lambda runner_id, **kw: [
+            {"runner_id": runner_id, "timestamp": "2026-07-20T12:00:00+00:00", "back_price": 4.2},
+        ],
+    )
+    app = create_app()
+    client = app.test_client()
+    resp = client.get("/api/runner/R1/price-ticks?limit=3&window_sec=45")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload["ok"] is True
+    assert payload["runner_id"] == "R1"
+    assert len(payload["ticks"]) == 1
+
+
+def test_trading_disarm_api(monkeypatch, tmp_path):
+    from hibs_racing.web import create_app
+
+    monkeypatch.setenv("HIBS_RUNNER_DISARM_FILE", str(tmp_path / "disarmed.json"))
+    app = create_app()
+    client = app.test_client()
+    resp = client.post("/api/trading/disarm", json={"runner_id": "R9", "reason": "test_jerk"})
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload["ok"] is True
+    assert payload["runner_id"] == "R9"
+    assert "R9" in payload["disarmed"]

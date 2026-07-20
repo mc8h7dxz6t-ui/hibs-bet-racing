@@ -693,6 +693,56 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "error": "runner_not_found", "runner_id": runner_id}), 404
         return jsonify({"ok": True, **payload})
 
+    @app.route("/api/runner/<runner_id>/price-ticks")
+    def api_runner_price_ticks(runner_id: str):
+        """Last N exchange_quotes ticks — HTTP boundary for hibs-bet drift_gate."""
+        from hibs_racing.odds.exchange_quotes import load_runner_price_ticks
+
+        try:
+            limit = max(1, min(20, int(request.args.get("limit", "3"))))
+        except (TypeError, ValueError):
+            limit = 3
+        try:
+            window_sec = max(1.0, min(600.0, float(request.args.get("window_sec", "45"))))
+        except (TypeError, ValueError):
+            window_sec = 45.0
+        ticks = load_runner_price_ticks(
+            str(runner_id),
+            limit=limit,
+            max_age_seconds=window_sec,
+        )
+        return jsonify(
+            {
+                "ok": True,
+                "runner_id": str(runner_id),
+                "limit": limit,
+                "window_sec": window_sec,
+                "ticks": ticks,
+            }
+        )
+
+    @app.route("/api/trading/disarm", methods=["POST"])
+    def api_trading_disarm():
+        """Fail-closed runner disarm — HTTP boundary for hibs-bet drift_gate."""
+        from hibs_racing.trading.runner_disarm_registry import disarm_runner, disarmed_snapshot
+
+        data = request.get_json(silent=True) if request.is_json else {}
+        if not isinstance(data, dict):
+            data = {}
+        runner_id = (data.get("runner_id") or request.args.get("runner_id") or "").strip()
+        reason = str(data.get("reason") or request.args.get("reason") or "drift_gate")
+        if not runner_id:
+            return jsonify({"ok": False, "error": "missing_runner_id"}), 400
+        disarm_runner(runner_id, reason=reason)
+        return jsonify(
+            {
+                "ok": True,
+                "runner_id": runner_id,
+                "reason": reason,
+                "disarmed": disarmed_snapshot(),
+            }
+        )
+
     @app.route("/api/evidence")
     def api_racing_evidence():
         from hibs_racing.evidence_gates import racing_evidence_gates
