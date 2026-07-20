@@ -558,22 +558,31 @@ def create_app() -> Flask:
     def api_ready():
         from hibs_racing.config import db_path, load_config
         from hibs_racing.features.store import connect
-        from hibs_racing.trading.status_plane import daemon_active
 
+        db_ok = False
+        db_err = ""
         try:
             with connect(db_path(load_config())) as conn:
                 conn.execute("SELECT 1").fetchone()
+            db_ok = True
         except Exception as exc:
-            return jsonify({"ok": False, "tier": "readiness", "error": str(exc)[:120]}), 503
-        ram_ok = Path("/mnt/hibs-ramdisk").is_mount() if Path("/mnt/hibs-ramdisk").exists() else True
-        daemon_ok = daemon_active()
-        ok = ram_ok and daemon_ok
+            db_err = str(exc)[:120]
+
+        cfg_db = str(db_path(load_config()))
+        using_ram_db = cfg_db.startswith("/mnt/hibs-ramdisk")
+        ram_ok = True
+        if using_ram_db and Path("/mnt/hibs-ramdisk").exists():
+            ram_ok = Path("/mnt/hibs-ramdisk").is_mount()
+
+        ok = db_ok and ram_ok
         return jsonify(
             {
                 "ok": ok,
                 "tier": "readiness",
-                "ramdisk_mounted": ram_ok,
-                "trading_daemon_active": daemon_ok,
+                "db_ok": db_ok,
+                "db_path": cfg_db,
+                "ramdisk_mounted": ram_ok if using_ram_db else None,
+                "error": db_err or None,
             }
         ), (200 if ok else 503)
 
