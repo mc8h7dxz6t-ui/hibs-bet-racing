@@ -22,6 +22,7 @@ from hibs_racing.place.public_tracker import (
     public_tracker_enabled,
 )
 from hibs_racing.portfolio.racing import build_racing_portfolio
+from hibs_racing.portfolio.ledger_summary import build_ledger_summary_payload
 from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.config import db_path, load_config
 from hibs_racing.web_format import fmt_num, fmt_pct
@@ -335,6 +336,21 @@ def create_app() -> Flask:
         if payload.get("error"):
             summary["error"] = payload["error"]
         return _cors_summary(jsonify(summary))
+
+    @app.route("/api/portfolio/ledger-summary")
+    def api_portfolio_ledger_summary():
+        days_raw = request.args.get("days", "").strip()
+        history_days: int | None = None
+        if days_raw:
+            try:
+                history_days = max(7, min(90, int(days_raw)))
+            except ValueError:
+                return jsonify({"status": "error", "error": "invalid days parameter"}), 400
+        backtest = request.args.get("backtest", "0").strip().lower() in ("1", "true", "yes")
+        payload = build_ledger_summary_payload(history_days=history_days, backtest=backtest)
+        if payload.get("status") != "ok":
+            return jsonify(payload), 503
+        return _cors_summary(jsonify(payload))
 
     @app.route("/api/market-steam")
     def api_market_steam():
