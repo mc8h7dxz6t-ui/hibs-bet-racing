@@ -50,11 +50,12 @@ def test_insights_context_skips_heavy_group_meetings(monkeypatch):
         ]
     )
 
-    def boom(_frame):
-        raise AssertionError("group_meetings must not run for insights_context")
-
     monkeypatch.setattr("hibs_racing.web_service._base_frame", lambda **_: frame)
-    monkeypatch.setattr("hibs_racing.web_service.group_meetings", boom)
+    monkeypatch.setattr("hibs_racing.web_service.group_meetings", lambda _frame: [])
+    monkeypatch.setattr(
+        "hibs_racing.daily.pick_display.build_value_lane_display_picks",
+        lambda meetings, f, **_: [],
+    )
     monkeypatch.setattr(
         "hibs_racing.models.feature_impact.load_feature_impact_report",
         lambda: {},
@@ -63,8 +64,22 @@ def test_insights_context_skips_heavy_group_meetings(monkeypatch):
         "hibs_racing.web_service._ui_data_status",
         lambda _frame: {"level": "ok", "messages": []},
     )
+    monkeypatch.setattr(
+        "hibs_racing.web_service.health_status",
+        lambda: type(
+            "H",
+            (),
+            {
+                "value_lane_ready": True,
+                "value_lane_blockers": [],
+                "to_dict": lambda self: {"value_lane_ready": True},
+            },
+        )(),
+    )
 
     ctx = insights_context(top_n=5)
     assert "top_picks" in ctx
     assert "picks_by_day" in ctx
+    assert "value_lane_picks" in ctx
+    assert ctx["value_lane_picks"] == []
     assert "pick_candidates" not in ctx

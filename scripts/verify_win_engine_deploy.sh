@@ -128,6 +128,25 @@ else
 fi
 
 echo
+echo "==> 5) Racing cards — value lane + system bets"
+RACING_URL="${HIBS_RACING_PUBLIC_URL:-${FOOTBALL}/racing}"
+rc_code="$(curl -sS -o "${TMP}/rcards.html" -w '%{http_code}' --max-time 120 "${RACING_URL}/cards" || echo 000)"
+if [[ "${rc_code}" == "200" ]]; then
+  if grep -q 'id="system-bets-mount"' "${TMP}/rcards.html"; then
+    pass "racing cards: system-bets-mount present"
+  else
+    warn "racing cards: system-bets-mount missing"
+  fi
+  if grep -qE 'value-lane-hero|value-lane-blocked' "${TMP}/rcards.html"; then
+    pass "racing cards: value-lane panel present"
+  else
+    warn "racing cards: value-lane panel absent"
+  fi
+else
+  warn "racing cards ${RACING_URL}/cards -> ${rc_code}"
+fi
+
+echo
 if [[ "${fail}" -eq 0 ]]; then
   echo "Win engine deploy audit: GREEN"
   exit 0

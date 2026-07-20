@@ -44,6 +44,7 @@ def test_insights_page_loads():
     resp = client.get("/insights")
     assert resp.status_code == 200
     assert b"Best 10 picks" in resp.data
+    assert b"value-lane-hero" in resp.data or b"value-lane-blocked" in resp.data
 
 
 def test_tracker_page_public():
