@@ -514,18 +514,69 @@ def group_meetings(frame: pd.DataFrame) -> list[dict]:
             }
         )
 
+    _finalize_meeting_slugs(meetings)
+    _attach_market_gauges(meetings)
+    return meetings
+
+
+def _finalize_meeting_slugs(meetings: list[dict], *, label_fields: bool = True) -> None:
     meetings.sort(key=lambda m: (m.get("card_date", ""), m.get("first_off_minutes") or 9999, str(m.get("course") or "")))
     for idx, meeting in enumerate(meetings):
         base = f"{meeting.get('card_date', '')}-{meeting.get('course') or 'meeting'}".lower()
         slug = "".join(ch if ch.isalnum() or ch == "-" else "-" for ch in base.replace(" ", "-"))
         slug = "-".join(part for part in slug.split("-") if part)[:48] or "meeting"
         meeting["slug"] = f"{idx + 1}-{slug}"
-        off_times = [str(r.get("off_time") or "") for r in meeting["races"] if r.get("off_time")]
+        if not label_fields:
+            continue
+        off_times = [str(r.get("off_time") or "") for r in meeting.get("races") or [] if r.get("off_time")]
         meeting["first_off"] = off_times[0] if off_times else "—"
         meeting["last_off"] = off_times[-1] if off_times else "—"
         region_tag = meeting.get("region") or ""
         meeting["label"] = f"{meeting['course']}" + (f" ({region_tag})" if region_tag else "")
-    _attach_market_gauges(meetings)
+
+
+def race_deep_link_index(frame: pd.DataFrame) -> list[dict]:
+    """Race/meeting slugs for deep links — no per-runner enrichment or race insights."""
+    if frame.empty:
+        return []
+    meetings: list[dict] = []
+    group_cols = ["card_date", "course"]
+    if "region" in frame.columns and frame["region"].notna().any():
+        group_cols = ["card_date", "course", "region"]
+
+    for keys, course_df in frame.groupby(group_cols, sort=False):
+        if len(group_cols) == 3:
+            card_date, course, region = keys
+        else:
+            card_date, course = keys
+            region = course_df["region"].iloc[0] if "region" in course_df.columns else ""
+
+        races: list[dict] = []
+        for race_id, race_df in course_df.groupby("race_id", sort=False):
+            first = race_df.iloc[0]
+            races.append(
+                {
+                    "race_id": race_id,
+                    "race_slug": "",
+                    "off_time": first.get("off_time"),
+                    "off_minutes": off_minutes(first.get("off_time")),
+                }
+            )
+        races.sort(key=lambda r: (r.get("off_minutes") or 9999,))
+        for idx, race in enumerate(races):
+            race["race_slug"] = f"r{idx + 1}"
+        meetings.append(
+            {
+                "course": course,
+                "card_date": str(card_date),
+                "region": str(region or "").upper(),
+                "slug": "",
+                "races": races,
+                "first_off_minutes": races[0]["off_minutes"] if races else 9999,
+            }
+        )
+
+    _finalize_meeting_slugs(meetings, label_fields=False)
     return meetings
 
 
@@ -550,13 +601,24 @@ def group_meetings_by_day(meetings: list[dict], *, now: datetime | None = None) 
     for meeting in meetings:
         d = str(meeting.get("card_date") or "")[:10]
         buckets.setdefault(d, []).append(meeting)
+    return meeting_days_from_card_dates(list(buckets.keys()), now=now, meetings_by_date=buckets)
+
+
+def meeting_days_from_card_dates(
+    card_dates: list[str],
+    *,
+    now: datetime | None = None,
+    meetings_by_date: dict[str, list[dict]] | None = None,
+) -> list[dict]:
+    """Day headers for templates — optional meeting lists per date."""
+    buckets = meetings_by_date or {}
     return [
         {
             "card_date": card_date,
             "label": day_label(card_date, now=now),
-            "meetings": buckets[card_date],
+            "meetings": buckets.get(card_date, []),
         }
-        for card_date in sorted(buckets.keys())
+        for card_date in sorted({str(d)[:10] for d in card_dates if d})
     ]
 
 
@@ -746,23 +808,25 @@ def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
     from hibs_racing.monitor import top_places_of_day
 
     frame = _base_frame(window_hours=window_hours)
-    meetings = group_meetings(frame) if not frame.empty else []
-    picks = attach_deep_links_to_picks(top_places_of_day(frame, top_n=top_n), meetings)
+    link_index = race_deep_link_index(frame) if not frame.empty else []
+    picks = attach_deep_links_to_picks(top_places_of_day(frame, top_n=top_n), link_index)
+    picks_by_day = top_picks_by_day(frame, link_index, top_n=top_n)
+    card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else []
+    pick_dates = sorted(picks_by_day.keys())
+    day_dates = sorted(set(card_dates) | set(pick_dates))
     feature_impact = load_feature_impact_report()
-    pick_candidates = novice_pick_candidates(meetings)
     scoring_method = None
     if not frame.empty and "scoring_method" in frame.columns:
         modes = frame["scoring_method"].dropna().unique().tolist()
         scoring_method = modes[0] if len(modes) == 1 else "mixed"
     return {
         "top_picks": picks,
-        "picks_by_day": top_picks_by_day(frame, meetings, top_n=top_n),
-        "meeting_days": group_meetings_by_day(meetings),
-        "pick_candidates": pick_candidates,
+        "picks_by_day": picks_by_day,
+        "meeting_days": meeting_days_from_card_dates(day_dates),
         "pick_count": len(picks),
         "runner_count": len(frame),
         "race_count": int(frame["race_id"].nunique()) if not frame.empty else 0,
-        "card_dates": sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else [],
+        "card_dates": card_dates,
         "scoring_method": scoring_method,
         "feature_impact": feature_impact,
         "window_hours": window_hours,

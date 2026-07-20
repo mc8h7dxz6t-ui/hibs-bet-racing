@@ -194,9 +194,7 @@ def create_app() -> Flask:
 
     @app.route("/insights")
     def insights_page():
-        ctx = dashboard_context()
-        ctx.update(insights_context(top_n=10))
-        return render_template("insights.html", **ctx)
+        return render_template("insights.html", **insights_context(top_n=10))
 
     @app.route("/api/picks")
     def api_picks():
