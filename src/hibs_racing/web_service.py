@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -51,6 +52,11 @@ class HealthStatus:
     unscored_runners: int | None = None
     nan_integrity_passed: bool | None = None
     production_value_count: int | None = None
+    db_integrity_ok: bool | None = None
+    matchbook_credentials_configured: bool | None = None
+    value_lane_ready: bool | None = None
+    value_lane_blockers: list[str] | None = None
+    health_notes: list[str] | None = None
     paper: dict | None = None
     cron: dict | None = None
     reliability: dict | None = None
@@ -94,6 +100,20 @@ class HealthStatus:
             out["unscored_runners"] = self.unscored_runners
         if self.nan_integrity_passed is not None:
             out["nan_integrity_passed"] = self.nan_integrity_passed
+        if self.db_integrity_ok is not None:
+            out["db_integrity_ok"] = self.db_integrity_ok
+        if self.matchbook_credentials_configured is not None:
+            out["matchbook_credentials_configured"] = self.matchbook_credentials_configured
+        if self.value_lane_ready is not None:
+            out["value_lane_ready"] = self.value_lane_ready
+        if self.value_lane_blockers is not None:
+            out["value_lane_blockers"] = self.value_lane_blockers
+        if self.health_notes is not None:
+            out["health_notes"] = self.health_notes
+        out["matchbook_note"] = (
+            "matchbook=false means exchange API credentials are not set in .env — "
+            "not 'no odds on card'. Value lane blockers: unscored_runners, nan_integrity_passed."
+        )
         if self.production_value_count is not None:
             out["production_value_count"] = self.production_value_count
         if self.paper is not None:
@@ -205,17 +225,35 @@ def health_status() -> HealthStatus:
 
     from hibs_racing.backtest.snapshot_store import scoring_config_hash, snapshot_coverage
     from hibs_racing.cards.engine_profile import build_engine_profile
+    from hibs_racing.features.db_repair import integrity_check, value_lane_blockers
     from hibs_racing.institutional.paper_reconciliation import reconcile_paper_ledger
     from hibs_racing.institutional.run_manifest import latest_manifest_for_date
 
     cfg = load_config()
     db = db_path(cfg)
-    init_db(db)
-    runners = load_upcoming_runners(db)
+    db_integrity = integrity_check(db)
+    db_integrity_ok = bool(db_integrity.get("ok"))
+    runners = pd.DataFrame()
     scores = 0
-    with connect(db) as conn:
-        row = conn.execute("SELECT COUNT(*) FROM card_scores").fetchone()
-        scores = int(row[0]) if row else 0
+    sync = {"unscored_on_card": 0, "in_sync": True}
+    nan_report = None
+    if db_integrity_ok:
+        try:
+            init_db(db)
+            runners = load_upcoming_runners(db)
+            with connect(db) as conn:
+                row = conn.execute("SELECT COUNT(*) FROM card_scores").fetchone()
+                scores = int(row[0]) if row else 0
+            from hibs_racing.cards.ui_frame import db_ui_sync_report
+
+            sync = db_ui_sync_report(database=db)
+            if not _health_light_mode():
+                from hibs_racing.monitoring.nan_alert import run_nan_integrity_check
+
+                nan_report = run_nan_integrity_check(database=db, strict=False)
+        except sqlite3.DatabaseError:
+            db_integrity_ok = False
+
     raceform = os.environ.get("RACEFORM_DB_PATH", "").strip() or None
     if raceform:
         raceform = str(Path(raceform).expanduser())
@@ -224,8 +262,14 @@ def health_status() -> HealthStatus:
     today = datetime.now(timezone.utc).date().isoformat()
     end_dt = datetime.now(timezone.utc).date()
     start_dt = (end_dt - timedelta(days=7)).isoformat()
-    cov = snapshot_coverage(db, start_dt, end_dt.isoformat())
-    manifest = latest_manifest_for_date(today, database=db)
+    cov: dict = {}
+    manifest = None
+    if db_integrity_ok:
+        try:
+            cov = snapshot_coverage(db, start_dt, end_dt.isoformat())
+            manifest = latest_manifest_for_date(today, database=db)
+        except Exception:
+            pass
     telemetry_balance = None
     if manifest:
         from hibs_racing.institutional.telemetry_balance import evaluate_telemetry_balance
@@ -243,18 +287,14 @@ def health_status() -> HealthStatus:
             recon_clean = recon.is_clean
         except Exception:
             recon_clean = None
-    sync = db_ui_sync_report(database=db)
-    from hibs_racing.monitoring.nan_alert import run_nan_integrity_check
-
     light = _health_light_mode()
-    scored = load_scored_cards() if not light else pd.DataFrame()
+    scored = load_scored_cards() if not light and db_integrity_ok else pd.DataFrame()
     prod_n = int(safe_value_mask(scored).sum()) if not scored.empty else 0
-    nan_report = run_nan_integrity_check(database=db, strict=False) if not light else None
-    paper_summary = _paper_health_summary(db)
-    cron_summary = _cron_health_summary(db)
+    paper_summary = _paper_health_summary(db) if db_integrity_ok else {"n_rows": 0, "open": 0, "settled": 0}
+    cron_summary = _cron_health_summary(db) if db_integrity_ok else {"steps": 0, "ok": 0, "healthy": False}
     reliability_summary = None
     place_reliability = None
-    if not light:
+    if not light and db_integrity_ok:
         try:
             from hibs_racing.analytics.reliability_bins import (
                 place_reliability_from_ledger,
@@ -314,13 +354,24 @@ def health_status() -> HealthStatus:
             data_producer = build_data_producer_snapshot()
         except Exception:
             data_producer = None
+    mb_creds = _env_ok("MATCHBOOK_USERNAME", "MATCHBOOK_PASSWORD")
+    partial = {
+        "db_ok": db.exists() and db_integrity_ok,
+        "db_integrity_ok": db_integrity_ok,
+        "card_fresh": card_fresh,
+        "unscored_runners": int(sync.get("unscored_on_card") or 0),
+        "nan_integrity_passed": nan_report.passed if nan_report is not None else None,
+        "runners_loaded": len(runners),
+    }
+    blockers = value_lane_blockers(partial)
+    lane_ready = len(blockers) == 0
     return HealthStatus(
-        db_ok=db.exists(),
+        db_ok=db.exists() and db_integrity_ok,
         runners_loaded=len(runners),
         scores_loaded=scores,
         racing_api=_env_ok("RACING_API_USERNAME", "RACING_API_PASSWORD"),
         racing_post=_env_ok("EMAIL", "ACCESS_TOKEN"),
-        matchbook=_env_ok("MATCHBOOK_USERNAME", "MATCHBOOK_PASSWORD"),
+        matchbook=mb_creds,
         raceform_path=raceform,
         betfair_enabled=betfair_enabled(),
         betfair_configured=betfair_configured(),
@@ -335,6 +386,14 @@ def health_status() -> HealthStatus:
         unscored_runners=int(sync.get("unscored_on_card") or 0),
         nan_integrity_passed=nan_report.passed if nan_report is not None else None,
         production_value_count=prod_n,
+        db_integrity_ok=db_integrity_ok,
+        matchbook_credentials_configured=mb_creds,
+        value_lane_ready=lane_ready,
+        value_lane_blockers=blockers,
+        health_notes=[
+            "matchbook=false means MATCHBOOK_USERNAME/PASSWORD unset — not missing card odds",
+            "value lane blockers: unscored_runners, nan_integrity_passed, card_fresh",
+        ],
         paper=paper_summary,
         cron=cron_summary,
         reliability=reliability_summary,

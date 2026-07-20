@@ -392,7 +392,10 @@
     <div class="sys-strip" id="sys-strip">
         {% if health is defined %}
         <span class="pill ok">Analytics</span>
-        <span class="pill {% if health.matchbook %}ok{% else %}warn{% endif %}">Matchbook {% if health.matchbook %}batch odds{% else %}no creds{% endif %}</span>
+        <span class="pill {% if health.matchbook %}ok{% else %}warn{% endif %}">Matchbook {% if health.matchbook %}creds{% else %}no creds{% endif %}</span>
+        {% if health.value_lane_ready is defined and health.value_lane_ready is not none %}
+        <span class="pill {% if health.value_lane_ready %}ok{% else %}warn{% endif %}" title="{% if health.value_lane_blockers %}{{ health.value_lane_blockers | join(', ') }}{% endif %}">Value lane {% if health.value_lane_ready %}ready{% else %}blocked{% endif %}</span>
+        {% endif %}
         <span class="pill {% if health.racing_api %}ok{% else %}warn{% endif %}">Racing API</span>
         {% endif %}
         {% if scoring_method is defined and scoring_method %}
