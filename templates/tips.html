@@ -102,7 +102,7 @@
         const btn = document.getElementById('btn-tips-ingest');
         btn.disabled = true;
         try {
-            const r = await fetch('/api/tips/paste', {
+            const r = await fetch({{ racing_api_path('tips/paste')|tojson }}, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
@@ -131,7 +131,7 @@
         btn.disabled = true;
         try {
             const settle = document.getElementById('tips-settle')?.checked ? '1' : '0';
-            const r = await fetch('/api/tips/fetch-imap?settle=' + settle, {method: 'POST'});
+            const r = await fetch({{ racing_api_path('tips/fetch-imap')|tojson }} + '?settle=' + settle, {method: 'POST'});
             const j = await r.json();
             if (j.ok) {
                 showResult(true, `Fetched ${j.emails_fetched} email(s), ingested ${j.inserted} tip(s)`);

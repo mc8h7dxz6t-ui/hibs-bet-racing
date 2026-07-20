@@ -221,12 +221,21 @@
     });
   }
 
+  function normalizeRacingApiUrl(url) {
+    if (!url) return "/api/racing/tips/combinations";
+    if (/^https?:\/\//i.test(url)) return url;
+    if (url.indexOf("/api/racing/") === 0) return url;
+    if (url.indexOf("/racing/api/") === 0) return url.replace("/racing/api/", "/api/racing/");
+    if (url.indexOf("/api/") === 0) return "/api/racing" + url.slice(4);
+    return url;
+  }
+
   function loadPanel(mount, opts) {
     if (!mount) return;
     if (!opts || !opts.force) {
       if (mount.dataset.hibsSysBetsLoaded === "1") return;
     }
-    var url = mount.getAttribute("data-fetch-url") || "/api/tips/combinations";
+    var url = normalizeRacingApiUrl(mount.getAttribute("data-fetch-url"));
     var sep = url.indexOf("?") >= 0 ? "&" : "?";
     if (url.indexOf("date=") < 0) {
       url += sep + "date=" + new Date().toISOString().slice(0, 10);

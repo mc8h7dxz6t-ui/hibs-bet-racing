@@ -32,6 +32,28 @@ def prefix_path(path: str, prefix: str) -> str:
     return prefix + path
 
 
+def racing_api_path(subpath: str) -> str:
+    """Browser-facing racing API path (respects /racing production prefix)."""
+    sub = (subpath or "").lstrip("/")
+    path = f"/api/{sub}"
+    pref = url_prefix()
+    if pref:
+        return prefix_path(path, pref)
+    return path
+
+
+def racing_page_path(subpath: str = "") -> str:
+    """Browser-facing racing HTML path."""
+    sub = (subpath or "").lstrip("/")
+    pref = url_prefix()
+    if not sub:
+        return pref or "/"
+    path = f"/{sub}"
+    if pref:
+        return prefix_path(path, pref)
+    return path
+
+
 def rewrite_html_paths(html: str, prefix: str) -> str:
     """Rewrite root-relative href/src/fetch/url() paths for subpath deploy."""
     if not prefix:
@@ -52,6 +74,10 @@ def rewrite_html_paths(html: str, prefix: str) -> str:
         r"(src=')(/[^']*)(')",
         r'(action=")(/[^"]*)(")',
         r"(action=')(/[^']*)(')",
+        r'(data-fetch-url=")(/[^"]*)(")',
+        r"(data-fetch-url=')(/[^']*)(')",
+        r'(data-tips-url=")(/[^"]*)(")',
+        r"(data-tips-url=')(/[^']*)(')",
         r"(fetch\(')(/[^']*)(')",
         r'(fetch\(")(/[^"]*)(")',
         r"(url\(')(/[^']*)(')",
@@ -77,7 +103,11 @@ def apply_url_prefix(app: Flask) -> None:
 
     @app.context_processor
     def _hibs_subpath_product_links():  # noqa: ANN202
-        return product_bar_context(active="racing")
+        return {
+            **product_bar_context(active="racing"),
+            "racing_api_path": racing_api_path,
+            "racing_page_path": racing_page_path,
+        }
 
     if not prefix:
         return
