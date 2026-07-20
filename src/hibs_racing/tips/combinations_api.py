@@ -63,6 +63,7 @@ def combinations_for_date(db: Path, card_date: str | None = None) -> dict[str, A
         source = "tipster"
         singles = _tips_as_singles(rows)
 
+    engine_payload: dict[str, Any] = {}
     if not combinations:
         from hibs_racing.tips.suggested_combinations import build_engine_combinations
 
@@ -76,14 +77,17 @@ def combinations_for_date(db: Path, card_date: str | None = None) -> dict[str, A
             elif not singles:
                 singles = engine_payload.get("singles") or []
 
-    return attach_win_engine_to_combinations(
-        {
-            "ok": True,
-            "card_date": target_date,
-            "combinations": combinations,
-            "singles": singles,
-            "tip_count": len(rows),
-            "source": source,
-        },
-        db,
-    )
+    payload: dict[str, Any] = {
+        "ok": True,
+        "card_date": target_date,
+        "combinations": combinations,
+        "singles": singles,
+        "tip_count": len(rows),
+        "source": source,
+    }
+    if engine_payload.get("pick_source"):
+        payload["pick_source"] = engine_payload["pick_source"]
+    if engine_payload.get("message") and not combinations:
+        payload["message"] = engine_payload["message"]
+
+    return attach_win_engine_to_combinations(payload, db)

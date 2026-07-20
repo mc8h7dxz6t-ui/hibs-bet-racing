@@ -100,6 +100,7 @@
       '<div class="vsc-odds sys-bets-market">' +
       esc((leg.market || "win").replace(/_/g, " ")) +
       (leg.odds_decimal ? " · " + formatOdds(leg.odds_decimal) : "") +
+      (leg.ew_combined_ev != null ? ' · EV ' + esc(leg.ew_combined_ev) : "") +
       "</div>" +
       renderDualInsight(leg, insight) +
       "</div>"
@@ -171,9 +172,9 @@
         'Parsed from today&apos;s tipster email. Paste or refresh on <a href="' +
         esc(intro.querySelector("a") ? intro.querySelector("a").getAttribute("href") || "/tips" : "/tips") +
         '">Tips</a> (include lines like <code>0.25pt Win Trixie</code>).';
-    } else if (source === "engine") {
+    } else if (source === "engine" || data.pick_source === "value_lane") {
       intro.textContent =
-        "Model-suggested doubles, Trixies and Lucky 15 from today\u2019s top place picks (one runner per race). Not from a tipster email.";
+        "Value-lane system bets — doubles, Trixies and Lucky 15 built from ROI-ranked EV picks (value_flag, one per race). Where paper success signal is strongest.";
     }
   }
 
@@ -187,11 +188,14 @@
     updateIntro(source);
 
     if (!combos.length && !singles.length) {
-      if (source === "engine") {
+      if (data.message) {
+        return '<p class="sys-bets-empty">' + esc(data.message) + "</p>";
+      }
+      if (source === "engine" || data.pick_source === "value_lane") {
         return (
-          '<p class="sys-bets-empty">No engine system-bet legs yet for ' +
+          '<p class="sys-bets-empty">No value-lane system-bet legs yet for ' +
           esc(data.card_date || "today") +
-          " \u2014 need at least two qualifying top picks. Run <strong>Refresh 24h</strong> once cards are loaded.</p>"
+          " \u2014 need at least two <strong>value_flag</strong> runners with positive EV. Check the Value lane panel above and run <strong>Refresh 24h</strong>.</p>"
         );
       }
       return (
@@ -207,7 +211,7 @@
         '<p class="sys-bets-date">' +
         esc(data.card_date) +
         (source === "tipster" && data.tip_count != null ? " · " + data.tip_count + " tips ingested" : "") +
-        (source === "engine" ? " · engine-suggested" : "") +
+        (data.pick_source === "value_lane" || source === "engine" ? " · value-lane EV ranked" : "") +
         (insights ? " · win engine overlay" : "") +
         "</p>";
     }
