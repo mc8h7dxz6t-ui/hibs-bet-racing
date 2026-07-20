@@ -27,6 +27,24 @@ from hibs_racing.place.paper_ledger import record_paper_bet
 from hibs_racing.racing_engine.score_card import apply_scoring
 
 
+def _odds_int(val: object, default: int) -> int:
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return default
+    try:
+        return int(float(val))
+    except (TypeError, ValueError):
+        return default
+
+
+def _odds_float(val: object, default: float) -> float:
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return default
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return default
+
+
 def score_upcoming_cards(
     cards: pd.DataFrame,
     *,
@@ -121,8 +139,11 @@ def score_upcoming_cards(
                 continue
             quote = EachWayQuote(
                 win_decimal=float(row["win_decimal"]),
-                place_fraction=float(row.get("place_fraction") or paper_cfg.get("default_place_fraction", 0.25)),
-                places=int(row.get("places") or paper_cfg.get("default_places", 3)),
+                place_fraction=_odds_float(
+                    row.get("place_fraction"),
+                    float(paper_cfg.get("default_place_fraction", 0.25)),
+                ),
+                places=_odds_int(row.get("places"), int(paper_cfg.get("default_places", 3))),
             )
             ev = each_way_ev(float(row["model_win_prob"]), float(row["model_place_prob"]), quote)
             frame.at[idx, "place_ev"] = ev.place_ev
@@ -253,8 +274,8 @@ def _persist_runner_odds(db: Path, frame: pd.DataFrame) -> None:
                 """,
                 (
                     float(win) if win is not None and not (isinstance(win, float) and pd.isna(win)) else None,
-                    float(frac) if frac is not None and not (isinstance(frac, float) and pd.isna(frac)) else None,
-                    int(places) if places is not None and not (isinstance(places, float) and pd.isna(places)) else None,
+                    _odds_float(frac, default_frac) if frac is not None and not (isinstance(frac, float) and pd.isna(frac)) else None,
+                    _odds_int(places, 3) if places is not None and not (isinstance(places, float) and pd.isna(places)) else None,
                     offered_place,
                     rec["runner_id"],
                 ),
