@@ -5,6 +5,9 @@ on:
     paths:
       - "src/hibs_racing/**"
       - "tests/**"
+      - "templates/**"
+      - "scripts/ci_release_gate.sh"
+      - "scripts/verify_win_engine_deploy.sh"
       - "data/schema.sql"
       - "ingest/config.yaml"
       - ".github/workflows/gate-regression.yml"
