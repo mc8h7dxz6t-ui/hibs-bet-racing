@@ -6,8 +6,15 @@
 set -euo pipefail
 
 DATE="${1:-$(date -u +%F)}"
-SOCK="/var/run/hibs/racing_execution.sock"
+BET="${HIBS_BET_DEPLOY_PATH:-/opt/hibs-bet}"
 PUBLIC="${HIBS_PUBLIC_HOST:-hibs-bet.co.uk}"
+SOCK="/opt/hibs-racing/run/racing_execution.sock"
+SOCK_LEGACY="/var/run/hibs/racing_execution.sock"
+
+if [[ -f "${BET}/deploy/lib-racing-unix-socket.sh" ]]; then
+  # shellcheck source=lib-racing-unix-socket.sh
+  source "${BET}/deploy/lib-racing-unix-socket.sh"
+fi
 
 probe() {
   local label="$1"
@@ -44,12 +51,22 @@ PY
   echo ""
 }
 
-if [[ -S "${SOCK}" ]]; then
+SOCK_USE=""
+if sock="$(racing_unix_socket_visible 2>/dev/null)"; then
+  SOCK_USE="${sock}"
+elif [[ -S "${SOCK}" ]]; then
+  SOCK_USE="${SOCK}"
+elif [[ -S "${SOCK_LEGACY}" ]]; then
+  SOCK_USE="${SOCK_LEGACY}"
+fi
+
+if [[ -n "${SOCK_USE}" ]]; then
   probe "racing unix socket" \
     "http://localhost/api/tips/combinations?date=${DATE}" \
-    --unix-socket "${SOCK}"
+    --unix-socket "${SOCK_USE}"
 else
-  echo "WARN: ${SOCK} missing"
+  echo "WARN: racing unix socket missing (${SOCK} and ${SOCK_LEGACY})"
+  echo "      sudo bash ${BET}/scripts/vps_racing_hard_recovery.sh"
   echo ""
 fi
 

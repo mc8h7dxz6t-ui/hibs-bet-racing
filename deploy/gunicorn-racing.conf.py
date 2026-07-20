@@ -2,9 +2,10 @@
 import multiprocessing
 import os
 
+_sock_dir = os.getenv("HIBS_RACING_SOCKET_DIR", "/opt/hibs-racing/run")
 _unix_sock = os.getenv(
     "HIBS_RACING_UNIX_SOCKET",
-    "unix:/var/run/hibs/racing_execution.sock",
+    f"unix:{_sock_dir}/racing_execution.sock",
 )
 bind = _unix_sock
 umask = int(os.getenv("HIBS_RACING_GUNICORN_UMASK", "0o007"), 0)
