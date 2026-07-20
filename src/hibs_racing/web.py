@@ -561,27 +561,22 @@ def create_app() -> Flask:
 
         db_ok = False
         db_err = ""
+        cfg_db = ""
         try:
+            cfg_db = str(db_path(load_config()))
             with connect(db_path(load_config())) as conn:
                 conn.execute("SELECT 1").fetchone()
             db_ok = True
         except Exception as exc:
             db_err = str(exc)[:120]
 
-        cfg_db = str(db_path(load_config()))
-        using_ram_db = cfg_db.startswith("/mnt/hibs-ramdisk")
-        ram_ok = True
-        if using_ram_db and Path("/mnt/hibs-ramdisk").exists():
-            ram_ok = Path("/mnt/hibs-ramdisk").is_mount()
-
-        ok = db_ok and ram_ok
+        ok = db_ok
         return jsonify(
             {
                 "ok": ok,
                 "tier": "readiness",
                 "db_ok": db_ok,
                 "db_path": cfg_db,
-                "ramdisk_mounted": ram_ok if using_ram_db else None,
                 "error": db_err or None,
             }
         ), (200 if ok else 503)
@@ -647,7 +642,10 @@ def create_app() -> Flask:
             and (now - float(_HEALTH_CACHE["t"])) < _HEALTH_TTL_SEC
         ):
             return jsonify(_HEALTH_CACHE["payload"])
-        payload = health_status().to_dict()
+        try:
+            payload = health_status().to_dict()
+        except Exception as exc:
+            return jsonify({"ok": False, "tier": "deep", "error": str(exc)[:120]}), 503
         _HEALTH_CACHE["t"] = now
         _HEALTH_CACHE["payload"] = payload
         return jsonify(payload)

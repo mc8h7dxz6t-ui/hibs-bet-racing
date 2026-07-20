@@ -51,8 +51,8 @@ def _candidate_backups(db: Path) -> List[Path]:
     names = [
         db.with_suffix(db.suffix + ".bak"),
         db.parent / "feature_store.sqlite.bak",
-        Path("/mnt/hibs-racing-data/data/feature_store.sqlite"),
         Path("/opt/hibs-racing/data/feature_store.sqlite"),
+        Path("/mnt/hibs-racing-data/data/feature_store.sqlite"),
         db.parent.parent / "data" / "feature_store.sqlite",
     ]
     out: List[Path] = []
