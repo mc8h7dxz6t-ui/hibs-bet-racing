@@ -26,6 +26,8 @@
     </div>
 </section>
 
+{% include '_system_bets_panel.html' %}
+
 <div class="tips-layout">
 <section class="card">
     <div class="card-head"><h2>Paste today's email</h2></div>
@@ -112,7 +114,13 @@
             const j = await r.json();
             if (j.ok) {
                 showResult(true, `Ingested ${j.inserted} tip(s), ${j.skipped_duplicate} duplicate(s) skipped`);
-                setTimeout(() => location.reload(), 800);
+                const mount = document.getElementById('system-bets-mount');
+                if (mount && window.HibsSystemBets) {
+                    mount.dataset.hibsSysBetsLoaded = '0';
+                    window.HibsSystemBets.loadPanel(mount, { force: true });
+                } else {
+                    setTimeout(() => location.reload(), 800);
+                }
             } else showResult(false, j.error || 'Failed');
         } catch (e) { showResult(false, 'Request failed'); }
         finally { btn.disabled = false; }
@@ -127,11 +135,18 @@
             const j = await r.json();
             if (j.ok) {
                 showResult(true, `Fetched ${j.emails_fetched} email(s), ingested ${j.inserted} tip(s)`);
-                setTimeout(() => location.reload(), 800);
+                const mount = document.getElementById('system-bets-mount');
+                if (mount && window.HibsSystemBets) {
+                    mount.dataset.hibsSysBetsLoaded = '0';
+                    window.HibsSystemBets.loadPanel(mount, { force: true });
+                } else {
+                    setTimeout(() => location.reload(), 800);
+                }
             } else showResult(false, j.error || 'Failed');
         } catch (e) { showResult(false, 'IMAP fetch failed'); }
         finally { btn.disabled = false; }
     });
 })();
 </script>
+<script src="{{ static_v('hibs_system_bets.js') }}" defer></script>
 {% endblock %}

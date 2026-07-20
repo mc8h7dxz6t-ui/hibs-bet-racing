@@ -231,6 +231,8 @@
 </section>
 {% endif %}
 
+{% include '_system_bets_panel.html' %}
+
 <details class="dash-fold">
     <summary>Racecards · next {{ window_hours or 24 }}h{% if card_dates %} · {{ card_dates|join(' · ') }}{% endif %}</summary>
     <div class="dash-fold-body">
@@ -512,4 +514,8 @@
 {% endif %}
 
 <p class="data-note">Scores use ingested history + live card feed + Matchbook odds. RP enrich fills when credentials are set.</p>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ static_v('hibs_system_bets.js') }}" defer></script>
 {% endblock %}
