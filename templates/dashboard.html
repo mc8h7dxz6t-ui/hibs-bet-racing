@@ -201,6 +201,14 @@
 .day-pick-chip strong{display:block;color:var(--text);margin-bottom:4px;}
 .day-pick-chip .meta{color:var(--muted);font-size:0.9em;line-height:1.4;}
 .day-picks-link{align-self:center;font-size:0.82em;color:var(--hibs-neon);text-decoration:none;white-space:nowrap;}
+.picks-glossary{margin:0 0 12px;border:1px solid rgba(148,163,184,0.18);border-radius:10px;background:rgba(2,6,23,0.35);}
+.picks-glossary-sum{cursor:pointer;font-size:0.78em;font-weight:700;color:var(--hibs-neon);padding:8px 12px;list-style:none;}
+.picks-glossary-sum::-webkit-details-marker{display:none;}
+.picks-glossary-body{padding:0 12px 10px;font-size:0.76em;line-height:1.5;color:var(--muted);}
+.picks-glossary-body p{margin:0 0 8px;}
+.picks-glossary-body strong{color:var(--text);}
+.picks-glossary-note{margin-top:6px;font-size:0.95em;}
+.place-telemetry-item[title]{cursor:help;}
 {% endblock %}
 
 {% block content %}
@@ -226,10 +234,11 @@
     <div class="smart-portfolio-row" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
         <div>
             <h2>Place Picker</h2>
-            <p class="section-hint" style="margin:0;font-size:0.78em;color:var(--muted);max-width:40rem;">Top place angles from the engine · paper lane noted on each card</p>
+            <p class="section-hint" style="margin:0;font-size:0.78em;color:var(--muted);max-width:40rem;">Shortlist of place angles — read <strong>Place %</strong> as top-3 chance and the summary line for why. Paper-ready picks are noted on each card.</p>
         </div>
         <span class="pill ok">Engine output</span>
     </div>
+    {% include 'racing/_picks_glossary.html' %}
     <div id="smart-picks-grid" class="smart-picks-grid" role="list" aria-live="polite"></div>
 </section>
 {% endif %}
@@ -416,13 +425,13 @@
                                 <tr>
                                     <th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>OR</th>
                                     <th>Form</th>
-                                    <th><span class="tip-term" tabindex="0" data-tip="Racing Post course, trip and going record for this horse (when RP credentials are set).">Course fit</span></th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="Course, trip and going record from Racing Post when credentials are set.">Course fit</span></th>
                                     <th>Win</th><th>Place</th>
-                                    <th><span class="tip-term" tabindex="0" data-tip="Δ = odds change vs 20 minutes ago. Green steam can mean market confidence; red drift means caution.">Δ</span></th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="Odds change vs ~20 minutes ago. Green = shortening (steam); red = drifting.">Δ</span></th>
                                     <th>RP comment</th><th>Engine view</th>
-                                    <th><span class="tip-term" tabindex="0" data-tip="Place %: estimated chance of finishing in the places (usually top 3) based on our ranker + Harville formula.">Place%</span></th>
-                                    <th><span class="tip-term" tabindex="0" data-tip="Combo: jockey+trainer Bayesian place rate from historical results — how often this pair places.">Combo</span></th>
-                                    <th><span class="tip-term" tabindex="0" data-tip="EV (Expected Value): long-run profit edge on an each-way bet at these odds if the model is accurate.">EV</span></th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="Estimated chance of a place finish (usually top 3). Not the same as win chance.">Place%</span></th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="How often this jockey and trainer place together in past runs.">Combo</span></th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="Expected profit on an each-way bet at these odds if the model is right — paper edge, not a guarantee.">EV</span></th>
                                     <th>Stake</th>
                                 </tr>
                             </thead>

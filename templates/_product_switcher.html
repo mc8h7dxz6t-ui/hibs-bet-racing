@@ -1,19 +1,32 @@
 {# Cross-platform nav — styles in static/hibs_theme.css (cache-busted). #}
 <div class="hibs-product-bar" role="navigation" aria-label="HIBS products">
     {% from '_hibs_brand.html' import harvested_logo_link %}
-    {{ harvested_logo_link(home_url=hibs_football_home_url|default('/'), height=64) }}
-    <div class="hibs-product-switch">
+    {{ harvested_logo_link(home_url=hibs_football_home_url|default('/'), height=76) }}
+    <div class="hibs-product-switch" data-hibs-product-switch role="tablist" aria-label="Platform">
+        <span class="hibs-product-switch-indicator" aria-hidden="true"></span>
         <a href="{{ hibs_football_home_url|default('/') }}"
            class="hibs-product-pill {% if hibs_product_active == 'football' %}active{% endif %}"
+           role="tab"
+           data-product-nav="football"
+           data-product-label="Opening Football…"
            rel="noopener">⚽ Football</a>
         <a href="{{ hibs_racing_cards_url|default(hibs_racing_base_url|default('/racing') ~ '/cards') }}"
            class="hibs-product-pill {% if hibs_product_active == 'racing' %}active{% endif %}"
+           role="tab"
+           data-product-nav="racing"
+           data-product-label="Opening Racing…"
            rel="noopener">🏇 Racing</a>
         <a href="{{ hibs_trading_status_url|default('/harvested-execution') }}"
            class="hibs-product-pill {% if hibs_product_active == 'trading' %}active{% endif %}"
+           role="tab"
+           data-product-nav="trading"
+           data-product-label="Opening Trading…"
            rel="noopener">📈 Trading</a>
         <a href="{{ hibs_line_trader_url|default('/line-trader') }}"
            class="hibs-product-pill {% if hibs_product_active in ('lines', 'fve') %}active{% endif %}"
+           role="tab"
+           data-product-nav="lines"
+           data-product-label="Opening Lines…"
            rel="noopener">📊 Lines</a>
     </div>
 </div>

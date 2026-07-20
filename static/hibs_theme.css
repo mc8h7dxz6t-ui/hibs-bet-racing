@@ -73,39 +73,80 @@ body::before {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 10px 14px;
-    padding: 8px 14px;
+    gap: 12px 18px;
+    padding: 10px 16px;
     margin-bottom: 12px;
     background: var(--hibs-slate-card);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
 }
 
 .hibs-product-switch {
+    position: relative;
     display: inline-flex;
-    border: 1px solid rgba(148, 163, 184, 0.25);
+    align-items: stretch;
+    gap: 0;
+    padding: 4px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
     border-radius: 999px;
-    overflow: hidden;
-    flex-wrap: wrap;
+    background: rgba(2, 6, 23, 0.55);
+    flex-wrap: nowrap;
+    isolation: isolate;
+}
+
+.hibs-product-switch-indicator {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    height: calc(100% - 8px);
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--hibs-green), #0f766e);
+    box-shadow:
+        0 2px 10px rgba(13, 148, 136, 0.38),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    transition:
+        transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+        width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.2s ease;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0;
+}
+
+.hibs-product-switch.is-ready .hibs-product-switch-indicator {
+    opacity: 1;
 }
 
 .hibs-product-pill {
-    padding: 6px 14px;
-    font-size: 0.82em;
+    position: relative;
+    z-index: 1;
+    padding: 8px 16px;
+    font-size: 0.84em;
     font-weight: 700;
+    letter-spacing: 0.01em;
     text-decoration: none;
     color: #cbd5e1;
-    background: rgba(0, 0, 0, 0.25);
-    transition: background 0.15s, color 0.15s;
+    background: transparent;
+    border-radius: 999px;
+    transition: color 0.22s ease;
     white-space: nowrap;
 }
 
 .hibs-product-pill:hover {
-    background: var(--hibs-green-soft);
-    color: #e2e8f0;
+    color: #f1f5f9;
 }
 
-.hibs-product-pill.active,
+.hibs-product-pill.active {
+    color: #fff;
+    background: transparent;
+    box-shadow: none;
+}
+
+.hibs-product-pill:not(.active):hover {
+    background: rgba(13, 148, 136, 0.1);
+}
+
 .tab-btn.active,
 .sub-tab.active,
 .chip.active,
@@ -133,8 +174,97 @@ body::before {
 }
 
 .hibs-product-bar .hibs-harvested-logo {
-    height: 64px;
-    max-width: min(480px, 62vw);
+    height: 76px;
+    max-width: min(520px, 64vw);
+}
+
+html.hibs-product-navigating .hibs-app-shell,
+html.hibs-product-navigating .ref-page {
+    opacity: 0.55;
+    transform: scale(0.992);
+    transition: opacity 0.28s ease, transform 0.28s ease;
+    pointer-events: none;
+    filter: blur(1px);
+}
+
+.hibs-product-transition {
+    position: fixed;
+    inset: 0;
+    z-index: 100008;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.26s ease, visibility 0.26s ease;
+}
+
+.hibs-product-transition.is-visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.hibs-product-transition-backdrop {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse at 50% 42%, rgba(13, 148, 136, 0.14) 0%, transparent 58%),
+        rgba(6, 14, 24, 0.78);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.hibs-product-transition-panel {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 28px 36px;
+    border-radius: 20px;
+    border: 1px solid rgba(94, 234, 212, 0.22);
+    background: rgba(15, 23, 42, 0.55);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+    text-align: center;
+    animation: hibs-product-transition-in 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hibs-product-transition-panel .hibs-launch-crest {
+    width: auto;
+    height: 128px;
+    filter: drop-shadow(0 0 28px rgba(13, 148, 136, 0.35));
+    animation: hibs-product-logo-pulse 1.2s ease-in-out infinite;
+}
+
+.hibs-product-transition-label {
+    margin: 4px 0 0;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.82em;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--neon-value);
+    text-transform: uppercase;
+}
+
+.hibs-product-transition-tagline {
+    margin: 0;
+    font-size: 0.72em;
+    color: var(--muted);
+    max-width: 280px;
+    line-height: 1.45;
+}
+
+@keyframes hibs-product-transition-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes hibs-product-logo-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
 }
 
 .hibs-portfolio-bar {

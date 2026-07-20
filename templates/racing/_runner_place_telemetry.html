@@ -1,18 +1,19 @@
 {# High-density place picker telemetry strip — include beneath horse name on racecards. #}
 <div class="place-telemetry-strip" data-place-telemetry-for="{{ r.runner_id }}">
-  <span class="place-telemetry-item" data-telemetry="r8">
-    R8 {{ (r.model_score or 0)|fmt_num(3) }}
+  <span class="place-telemetry-item" data-telemetry="r8" title="Ranker score — higher = stronger in the model field">
+    Score {{ (r.model_score or 0)|fmt_num(3) }}
   </span>
-  <span class="place-telemetry-item" data-telemetry="plc">
-    PLC: {{ ((r.model_place_prob or 0) * 100)|round(1) }}%
+  <span class="place-telemetry-item" data-telemetry="plc" title="Estimated chance of a place finish (usually top 3)">
+    Place {{ ((r.model_place_prob or 0) * 100)|round(1) }}%
   </span>
   <span class="place-value-chip {% if r.place_value_chip_active %}is-pass{% else %}is-muted{% endif %}"
         data-telemetry="edge"
-        data-runner-id="{{ r.runner_id }}">
+        data-runner-id="{{ r.runner_id }}"
+        title="{% if r.place_value_chip_active and r.place_value_edge_pct is not none %}Place model is {{ '%.1f'|format(r.place_value_edge_pct) }} points above what the place odds imply{% else %}No place edge vs offered odds{% endif %}">
     {% if r.place_value_chip_active and r.place_value_edge_pct is not none %}
-      +{{ '%.1f'|format(r.place_value_edge_pct) }}% EDGE
+      +{{ '%.1f'|format(r.place_value_edge_pct) }}% edge
     {% else %}
-      NO EDGE
+      no edge
     {% endif %}
   </span>
 </div>

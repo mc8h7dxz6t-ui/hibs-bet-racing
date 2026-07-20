@@ -1,0 +1,10 @@
+{# Light brand flash when switching Football / Racing / Trading / Lines #}
+<div id="hibs-product-transition" class="hibs-product-transition" hidden aria-hidden="true" aria-live="polite">
+    <div class="hibs-product-transition-backdrop" aria-hidden="true"></div>
+    <div class="hibs-product-transition-panel" role="status">
+        {% from '_hibs_brand.html' import launch_crest %}
+        {{ launch_crest(height=128) }}
+        <p class="hibs-product-transition-label" id="hibs-product-transition-label">Switching…</p>
+        <p class="hibs-product-transition-tagline">{{ hibs_tagline_short|default('HIBS') }} · {{ hibs_tagline|default('Harvested Intelligent Betting Systems') }}</p>
+    </div>
+</div>

@@ -187,7 +187,7 @@
         "</p>";
     }
     if (insights) {
-      html += '<p class="sys-bets-dual-hint">Overlay: live vs fair win odds · R8 place % (advisory).</p>';
+      html += '<p class="sys-bets-dual-hint">Win % = model chance to win · Place % = chance of a place (usually top 3). VALUE = price looks better than our model.</p>';
     }
 
     mount._sysBetGroups = combos;
