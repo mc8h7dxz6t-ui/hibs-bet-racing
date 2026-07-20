@@ -503,7 +503,40 @@ def create_app() -> Flask:
         payload["selection"] = selection
         payload["source"] = str(body.get("source") or "api_trading_dispatch")
         result = governor.dispatch(payload).to_dict()
+        try:
+            from hibs_racing.trading.execution_intent_ledger import append_execution_intent
+
+            append_execution_intent(verdict=result, source="api_trading_dispatch", trace_id=str(body.get("trace_id") or ""))
+        except Exception:
+            pass
         return jsonify({"ok": bool(result.get("allowed")), "verdict": result})
+
+    @app.route("/api/stream/deltas")
+    def api_stream_deltas():
+        """SSE trading status stream — low-latency UI feed from daemon heartbeat."""
+        import json
+        import time as _time
+
+        from flask import Response
+
+        from hibs_racing.trading.status_plane import read_status
+
+        def generate():
+            last_ts = 0.0
+            while True:
+                status = read_status(max_age_sec=60.0)
+                ts = float(status.get("ts") or 0)
+                if ts != last_ts:
+                    last_ts = ts
+                    yield f"data: {json.dumps({'type': 'trading_status', 'status': status}, default=str)}\n\n"
+                yield ": keepalive\n\n"
+                _time.sleep(1.0)
+
+        return Response(
+            generate(),
+            mimetype="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @app.route("/api/ping")
     def api_ping():
