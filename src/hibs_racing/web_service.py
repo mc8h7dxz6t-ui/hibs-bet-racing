@@ -861,13 +861,17 @@ def _ui_data_status(frame: pd.DataFrame) -> dict:
 
 
 def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
+    from hibs_racing.daily.pick_display import build_value_lane_display_picks
     from hibs_racing.models.feature_impact import load_feature_impact_report
     from hibs_racing.monitor import top_places_of_day
 
     frame = _base_frame(window_hours=window_hours)
     link_index = race_deep_link_index(frame) if not frame.empty else []
+    meetings = group_meetings(frame) if not frame.empty else []
+    health = health_status()
     picks = attach_deep_links_to_picks(top_places_of_day(frame, top_n=top_n), link_index)
     picks_by_day = top_picks_by_day(frame, link_index, top_n=top_n)
+    value_lane_picks = build_value_lane_display_picks(meetings, frame, top_n=8)
     card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else []
     pick_dates = sorted(picks_by_day.keys())
     day_dates = sorted(set(card_dates) | set(pick_dates))
@@ -878,6 +882,7 @@ def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
         scoring_method = modes[0] if len(modes) == 1 else "mixed"
     return {
         "top_picks": picks,
+        "value_lane_picks": value_lane_picks,
         "picks_by_day": picks_by_day,
         "meeting_days": meeting_days_from_card_dates(day_dates),
         "pick_count": len(picks),
@@ -888,6 +893,7 @@ def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
         "feature_impact": feature_impact,
         "window_hours": window_hours,
         "ui_data_status": _ui_data_status(frame),
+        "health": health,
     }
 
 
@@ -985,6 +991,7 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
     from hibs_racing.daily.pick_display import build_engine_display_picks
 
     engine_top_picks = build_engine_display_picks(meetings, frame, top_n=6)
+    value_lane_picks = build_value_lane_display_picks(meetings, frame, top_n=8)
     try:
         gate_summary = compare_value_gates(days=14).to_dict()
     except Exception:
@@ -1003,6 +1010,7 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
         "top_picks": [],
         "pick_candidates": pick_candidates,
         "engine_top_picks": engine_top_picks,
+        "value_lane_picks": value_lane_picks,
         "monitor": monitor,
         "backtest": backtest,
         "scoring_method": scoring_method,

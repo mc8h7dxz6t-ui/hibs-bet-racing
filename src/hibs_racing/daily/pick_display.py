@@ -227,6 +227,42 @@ def build_engine_display_picks(
     return out
 
 
+def build_value_lane_display_picks(
+    meetings: list[dict],
+    frame,
+    *,
+    top_n: int = 8,
+) -> list[dict[str, Any]]:
+    """ROI-ranked value-lane angles — value_flag + positive EV, surfaced for promotion."""
+    from hibs_racing.monitor import top_value_lane_picks
+    from hibs_racing.utils.monetization import attach_monetized_links
+    from hibs_racing.web_service import attach_deep_links_to_picks, novice_pick_candidates
+
+    if frame is None or getattr(frame, "empty", True):
+        return []
+
+    cfg = _paper_cfg()
+    holdout = load_holdout_accuracy()
+    picks = top_value_lane_picks(frame, top_n=int(cfg.get("value_lane_top_n") or top_n))
+    if not picks:
+        return []
+
+    picks = attach_deep_links_to_picks(picks, meetings)
+    picks = attach_monetized_links(picks)
+    by_runner = {str(c.get("runner_id") or ""): c for c in novice_pick_candidates(meetings)}
+
+    out: list[dict[str, Any]] = []
+    for rank, pick in enumerate(picks, start=1):
+        rid = str(pick.get("runner_id") or "")
+        merged = {**(by_runner.get(rid) or {}), **pick}
+        merged["display_rank"] = rank
+        merged["value_lane_rank"] = rank
+        enriched = enrich_pick_display(merged, paper_cfg=cfg, holdout=holdout)
+        enriched["roi_ev"] = enriched.get("ew_combined_ev")
+        out.append(enriched)
+    return out
+
+
 def format_engine_digest_lines(picks: list[dict[str, Any]], *, limit: int = 3) -> list[str]:
     lines: list[str] = []
     for pick in picks[:limit]:
