@@ -1,0 +1,47 @@
+{% if sniper_lane_picks is defined and sniper_lane_picks %}
+<section class="sniper-lane-hero card" id="sniper-lane-hero" aria-label="Sniper lane picks">
+    <div class="value-lane-hd">
+        <div>
+            <h2>Sniper lane</h2>
+            <p class="section-hint">Ultra-selective each-way angles — <strong>Gate7</strong> overlay on value_flag (OR≥65, RTF≥20, high confidence, stressed EV). Max <strong>one per meeting</strong>; ranked by EV.</p>
+        </div>
+        <span class="pill ok">{{ sniper_lane_picks|length }} sniper{% if sniper_lane_picks|length != 1 %}s{% endif %}</span>
+    </div>
+    <div class="value-lane-grid" role="list">
+        {% for p in sniper_lane_picks %}
+        <article class="value-lane-card sniper-lane-card{% if p.paper_ready %} is-paper-ready{% endif %}" role="listitem"
+            data-horse="{{ p.horse_name }}"
+            data-course="{{ p.course }}"
+            data-off="{{ p.off_time or '' }}"
+            data-win-odds="{{ p.win_decimal if p.win_decimal is not none else '' }}"
+            data-bet-type="each_way"
+            data-lane="sniper">
+            <div class="vlc-rank">#{{ p.sniper_lane_rank or p.display_rank or loop.index }}</div>
+            <div class="vlc-body">
+                <div class="vlc-title">
+                    <strong>{{ p.horse_name }}</strong>
+                    <span class="sniper-flag">SNIPER</span>
+                    {% if p.display_tier_label %}<span class="pick-tier-pill {{ p.display_tier or 'engine_lead' }}">{{ p.display_tier_label }}</span>{% endif %}
+                </div>
+                <div class="vlc-meta">{{ p.off_time or '—' }} · {{ p.course or '' }}</div>
+                {% if p.ew_combined_ev is not none %}
+                <div class="vlc-roi" title="Each-way expected value">
+                    EV <strong>{{ p.ew_combined_ev|fmt_num }}</strong>
+                </div>
+                {% endif %}
+                <div class="vlc-stats">
+                    <span>Place {{ (p.model_place_prob or 0)|fmt_pct }}</span>
+                    {% if p.official_rating %}<span>OR {{ p.official_rating|int }}</span>{% endif %}
+                    {% if p.trainer_rtf is not none %}<span>RTF {{ p.trainer_rtf|fmt_num(0) }}%</span>{% endif %}
+                </div>
+                {% if p.pick_summary %}<p class="vlc-summary">{{ p.pick_summary }}</p>{% endif %}
+                {% if p.deep_link and p.deep_link.meeting %}
+                <a href="{{ url_for('index', race_id=p.race_id, runner_id=p.runner_id) }}#racecard-shell" class="vlc-link">Racecard →</a>
+                {% endif %}
+            </div>
+            <button type="button" class="slip-copy-btn vlc-copy" data-slip-copy aria-label="Copy bet slip">📋</button>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}

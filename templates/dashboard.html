@@ -227,6 +227,10 @@
 .vlc-link{font-size:0.72em;color:var(--hibs-neon);font-weight:600;}
 .vlc-copy{align-self:flex-start;padding:4px 8px;font-size:0.72em;}
 .value-lane-blocked{border-color:rgba(251,191,36,0.25);}
+.sniper-lane-hero{margin-bottom:14px;border:1px solid rgba(94,234,212,0.42);background:linear-gradient(135deg,rgba(13,148,136,0.16),rgba(15,23,42,0.94));box-shadow:0 0 24px rgba(13,148,136,0.1);}
+.sniper-lane-hero h2{font-family:'Orbitron',monospace;color:var(--hibs-neon);font-size:1em;margin:0 0 4px;}
+.sniper-lane-card{border-color:rgba(94,234,212,0.35)!important;}
+.sniper-flag{font-size:0.62em;font-weight:900;letter-spacing:0.08em;padding:2px 6px;border-radius:4px;background:rgba(13,148,136,0.35);color:var(--hibs-neon);border:1px solid rgba(94,234,212,0.45);}
 {% endblock %}
 
 {% block content %}
@@ -251,6 +255,7 @@
 {% endif %}
 
 {% include 'racing/_value_lane_panel.html' %}
+{% include 'racing/_sniper_lane_panel.html' %}
 
 {% if pick_candidates is defined and runner_count > 0 %}
 <section class="smart-picks-hero card place-picker-top" id="place-picker-hero" aria-label="Place Picker">

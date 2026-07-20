@@ -206,6 +206,8 @@ rate_limits:
   oddschecker_pause_sec: 1.5
 monitor:
   top_n: 10
+  value_lane_top_n: 8
+  sniper_lane_top_n: 6
   min_field_size: 3
   min_combo_place: 0.35
   min_model_place_prob: 0.45
