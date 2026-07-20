@@ -56,6 +56,11 @@ paper:
   harville_longshot_discount: 0.85
   default_place_fraction: 0.25
   default_places: 3
+  exchange_commission: 0.02
+  kelly_fraction: 0.25
+  max_runner_risk_pct: 0.02
+  exchange_ev_min_coverage_pct: 50
+  exchange_ev_min_settled: 100
   default_stake: 1.0
   sync_ledger_on_score: true
   log_on_refresh: true

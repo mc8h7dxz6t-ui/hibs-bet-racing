@@ -11,7 +11,12 @@ from hibs_racing.cards.actionability import apply_value_gates, cap_place_prob
 from hibs_racing.config import db_path, load_config
 from hibs_racing.features.ranker_matrix import build_card_feature_frame
 from hibs_racing.features.store import connect, init_db
-from hibs_racing.place.ew_ev import EachWayQuote, each_way_ev
+from hibs_racing.place.ew_ev import EachWayQuote, each_way_ev, exchange_place_ev
+from hibs_racing.place.exchange_config import (
+    exchange_ev_production_enabled,
+    exchange_runtime_config,
+)
+from hibs_racing.place.portfolio_kelly import apply_portfolio_place_kelly
 from hibs_racing.place.hpl_combinatorial import (
     apply_place_alpha_and_liquidity,
     hpl_place_probabilities,
@@ -40,6 +45,7 @@ def score_upcoming_cards(
     from hibs_racing.sale_gates import apply_sale_gate_overrides
 
     paper_cfg = apply_sale_gate_overrides(cfg.get("paper", {}))
+    exchange_cfg = exchange_runtime_config(paper_cfg)
     min_place_ev = paper_cfg.get("min_place_ev", 0.05)
     min_combo_place = paper_cfg.get("min_combo_bayes_place", 0.22)
 
@@ -79,12 +85,38 @@ def score_upcoming_cards(
     frame["model_place_prob"] = place_probs
     frame["hpl_place_positions"] = place_positions
     frame["place_ev"] = np.nan
+    frame["place_ev_exchange"] = np.nan
     frame["ew_combined_ev"] = np.nan
+    frame["kelly_place_pct"] = np.nan
     frame["value_flag"] = 0
+    frame["flag_exchange_raw"] = 0
+
+    commission = float(exchange_cfg["exchange_commission"])
+    use_exchange_production = exchange_ev_production_enabled(paper_cfg)
 
     if odds is not None and not odds.empty:
         frame = _merge_odds(frame, odds)
         for idx, row in frame.iterrows():
+            place_dec = row.get("place_decimal")
+            if place_dec is not None and not (isinstance(place_dec, float) and pd.isna(place_dec)):
+                try:
+                    p_dec = float(place_dec)
+                    if p_dec > 1.0:
+                        ex_ev = exchange_place_ev(
+                            float(row["model_place_prob"]),
+                            p_dec,
+                            commission=commission,
+                        )
+                        frame.at[idx, "place_ev_exchange"] = ex_ev
+                        if (
+                            not pd.isna(ex_ev)
+                            and ex_ev >= min_place_ev
+                            and float(row["combo_bayes_place"]) >= min_combo_place
+                        ):
+                            frame.at[idx, "flag_exchange_raw"] = 1
+                except (TypeError, ValueError):
+                    pass
+
             if pd.isna(row.get("win_decimal")):
                 continue
             quote = EachWayQuote(
@@ -95,11 +127,24 @@ def score_upcoming_cards(
             ev = each_way_ev(float(row["model_win_prob"]), float(row["model_place_prob"]), quote)
             frame.at[idx, "place_ev"] = ev.place_ev
             frame.at[idx, "ew_combined_ev"] = ev.combined_ev
-            if (
+            ew_value = (
                 ev.place_ev >= min_place_ev
                 and float(row["combo_bayes_place"]) >= min_combo_place
-            ):
+            )
+            ex_value = int(row.get("flag_exchange_raw") or 0) == 1
+            if use_exchange_production and ex_value:
                 frame.at[idx, "value_flag"] = 1
+            elif use_exchange_production and place_dec is not None and not pd.isna(place_dec):
+                frame.at[idx, "value_flag"] = 0
+            elif ew_value:
+                frame.at[idx, "value_flag"] = 1
+
+        frame = apply_portfolio_place_kelly(
+            frame,
+            commission=commission,
+            kelly_fraction=float(exchange_cfg["kelly_fraction"]),
+            max_runner_risk_pct=float(exchange_cfg["max_runner_risk_pct"]),
+        )
 
     frame["flag_raw"] = frame["value_flag"].astype(int)
 
@@ -160,7 +205,7 @@ def _merge_odds(frame: pd.DataFrame, odds: pd.DataFrame) -> pd.DataFrame:
         if "horse_name" not in odds.columns:
             raise ValueError("odds needs runner_id or horse_name")
         merged = frame.merge(odds, on="horse_name", how="left", suffixes=("", "_odds"))
-    for base in ("win_decimal", "place_fraction", "places", "best_book"):
+    for base in ("win_decimal", "place_decimal", "place_fraction", "places", "best_book"):
         odds_col = f"{base}_odds"
         if odds_col in merged.columns:
             if base in merged.columns:
@@ -182,7 +227,14 @@ def _persist_runner_odds(db: Path, frame: pd.DataFrame) -> None:
             frac = rec.get("place_fraction")
             places = rec.get("places")
             offered_place = None
-            if win is not None and not (isinstance(win, float) and pd.isna(win)):
+            place_ex = rec.get("place_decimal")
+            if place_ex is not None and not (isinstance(place_ex, float) and pd.isna(place_ex)):
+                try:
+                    if float(place_ex) > 1.0:
+                        offered_place = round(float(place_ex), 2)
+                except (TypeError, ValueError):
+                    pass
+            if offered_place is None and win is not None and not (isinstance(win, float) and pd.isna(win)):
                 try:
                     win_f = float(win)
                     pf = float(frac) if frac is not None and not (isinstance(frac, float) and pd.isna(frac)) else default_frac
@@ -235,8 +287,9 @@ def _persist_scores(db: Path, frame: pd.DataFrame, scored_at: str) -> None:
                     runner_id, race_id, model_score, model_win_prob, model_place_prob,
                     combo_bayes_place, hidden_potential, nlp_pace_rank,
                     jockey_bayes_place, trainer_bayes_place, jockey_place_90d, trainer_place_90d,
-                    place_ev, ew_combined_ev, value_flag, value_gate_reason, scoring_method, scored_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    place_ev, place_ev_exchange, ew_combined_ev, kelly_place_pct,
+                    value_flag, value_gate_reason, scoring_method, scored_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     rec["runner_id"],
@@ -252,7 +305,9 @@ def _persist_scores(db: Path, frame: pd.DataFrame, scored_at: str) -> None:
                     rec.get("jockey_place_90d"),
                     rec.get("trainer_place_90d"),
                     rec.get("place_ev") if pd.notna(rec.get("place_ev")) else None,
+                    rec.get("place_ev_exchange") if pd.notna(rec.get("place_ev_exchange")) else None,
                     rec.get("ew_combined_ev") if pd.notna(rec.get("ew_combined_ev")) else None,
+                    rec.get("kelly_place_pct") if pd.notna(rec.get("kelly_place_pct")) else None,
                     int(rec.get("value_flag") or 0),
                     _normalize_gate_reason_for_db(rec.get("value_gate_reason")),
                     rec.get("scoring_method"),

@@ -260,11 +260,26 @@ def _apply_lane_from_none(frame: pd.DataFrame, paper_cfg: dict, flag_col: str, r
 
 def apply_experimental_lanes(frame: pd.DataFrame, paper_cfg: dict, full_cfg: dict | None = None) -> pd.DataFrame:
     """Attach flag_gate3..8 in-memory via standard value-gate pipeline (no DB write)."""
+    from hibs_racing.place.exchange_config import exchange_ev_shadow_enabled
+
     merged_cfg = full_cfg if full_cfg is not None else {"paper": paper_cfg}
     builders = _lane_config_builders(merged_cfg)
 
     out = frame.copy()
+    if exchange_ev_shadow_enabled(paper_cfg) and "flag_exchange_raw" in out.columns:
+        out["flag_none"] = pd.to_numeric(out["flag_exchange_raw"], errors="coerce").fillna(0).astype(int)
+    elif "flag_none" not in out.columns:
+        out["flag_none"] = pd.to_numeric(out.get("flag_raw", 0), errors="coerce").fillna(0).astype(int)
+
     for lane in EXPERIMENTAL_LANES:
+        if lane == "gate3" and exchange_ev_shadow_enabled(paper_cfg):
+            lane_in = out.copy()
+            lane_in["value_flag"] = lane_in["flag_none"]
+            lane_in = lane_in.drop(columns=["value_gate_reason"], errors="ignore")
+            gated = apply_value_gates(lane_in, builders[lane]())
+            out["flag_gate3"] = pd.to_numeric(gated["value_flag"], errors="coerce").fillna(0).astype(int)
+            out["gate3_reason"] = gated.get("value_gate_reason")
+            continue
         out = _apply_lane_from_none(out, builders[lane](), f"flag_{lane}", f"{lane}_reason")
     out = _apply_gate8_regime_blend(out, paper_cfg, merged_cfg)
     return out

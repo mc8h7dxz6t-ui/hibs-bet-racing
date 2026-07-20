@@ -76,6 +76,8 @@ CARD_SCORES_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("jockey_place_90d", "REAL"),
     ("trainer_place_90d", "REAL"),
     ("value_gate_reason", "TEXT"),
+    ("place_ev_exchange", "REAL"),
+    ("kelly_place_pct", "REAL"),
 )
 
 RUNNER_NATURAL_MIGRATIONS: tuple[tuple[str, str], ...] = (
