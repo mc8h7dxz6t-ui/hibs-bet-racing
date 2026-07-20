@@ -22,7 +22,7 @@ log() { echo "    $*"; }
 if [[ -f "${APP}/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
-  source "${APP}/.env"
+  source "${APP}/.env" 2>/dev/null || true
   set +a
 fi
 
@@ -30,15 +30,52 @@ DB_PATH="${HIBS_RACING_DB_PATH:-${APP}/data/feature_store.sqlite}"
 CLI="${APP}/.venv/bin/hibs-racing"
 PY="${APP}/.venv/bin/python"
 
+run_python_repair() {
+  local mode="$1"
+  sudo -u www-data env HOME="${APP}" PYTHONPATH=src HIBS_RACING_DB_PATH="${DB_PATH}" \
+    "${PY}" - <<PY
+import json, os, sys
+from pathlib import Path
+sys.path.insert(0, "src")
+from hibs_racing.features.db_repair import integrity_check, repair_feature_store
+
+db = Path(os.environ.get("HIBS_RACING_DB_PATH", "${DB_PATH}"))
+check_only = ${mode}
+if check_only:
+    report = integrity_check(db)
+    print(json.dumps(report, indent=2))
+    sys.exit(0 if report.get("ok") else 1)
+report = repair_feature_store(db)
+print(json.dumps(report, indent=2))
+sys.exit(0 if report.get("ok") else 1)
+PY
+}
+
+run_cli_repair() {
+  local mode="$1"
+  local extra=()
+  [[ "${mode}" -eq 1 ]] && extra+=(--check-only)
+  sudo -u www-data env HOME="${APP}" PYTHONPATH=src HIBS_RACING_DB_PATH="${DB_PATH}" \
+    "${CLI}" repair-feature-store "${extra[@]}"
+}
+
+has_cli_repair() {
+  [[ -x "${CLI}" ]] && "${CLI}" repair-feature-store --help >/dev/null 2>&1
+}
+
 step "feature_store integrity (${DB_PATH})"
-if [[ ! -x "${CLI}" ]]; then
-  echo "ERROR: ${CLI} missing — run vps_racing_bootstrap.sh" >&2
+if [[ ! -x "${PY}" ]]; then
+  echo "ERROR: ${PY} missing — run vps_racing_bootstrap.sh" >&2
   exit 1
 fi
 
 if [[ "${CHECK_ONLY}" -eq 1 ]]; then
-  sudo -u www-data env HOME="${APP}" PYTHONPATH=src HIBS_RACING_DB_PATH="${DB_PATH}" \
-    "${CLI}" repair-feature-store --check-only
+  if has_cli_repair; then
+    run_cli_repair 1
+  else
+    log "CLI repair-feature-store missing — using Python module"
+    run_python_repair 1
+  fi
   exit $?
 fi
 
@@ -47,11 +84,15 @@ systemctl stop hibs-racing 2>/dev/null || true
 sleep 2
 
 step "repair feature_store"
-sudo -u www-data env HOME="${APP}" PYTHONPATH=src HIBS_RACING_DB_PATH="${DB_PATH}" \
-  "${CLI}" repair-feature-store
+if has_cli_repair; then
+  run_cli_repair 0
+else
+  log "CLI repair-feature-store missing — using Python module (old deploy)"
+  run_python_repair 0
+fi
 rc=$?
 if [[ "${rc}" -ne 0 ]]; then
-  echo "ERROR: repair-feature-store failed (exit ${rc})" >&2
+  echo "ERROR: feature_store repair failed (exit ${rc})" >&2
   exit "${rc}"
 fi
 
