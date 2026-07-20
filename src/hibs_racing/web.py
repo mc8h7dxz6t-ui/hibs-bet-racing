@@ -22,7 +22,6 @@ from hibs_racing.place.public_tracker import (
     public_tracker_enabled,
 )
 from hibs_racing.portfolio.racing import build_racing_portfolio
-from hibs_racing.portfolio.summary_bar import portfolio_summary_dict
 from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.config import db_path, load_config
 from hibs_racing.web_format import fmt_num, fmt_pct
@@ -39,6 +38,27 @@ FAQ_PATH = ROOT / "docs" / "TECHNICAL_DUE_DILIGENCE_FAQ.md"
 
 _HEALTH_CACHE: dict = {"t": 0.0, "payload": None}
 _HEALTH_TTL_SEC = float(os.environ.get("HIBS_RACING_HEALTH_TTL_SEC", "20"))
+
+
+def _safe_portfolio_payload(*, racing_limit: int = 200, history_days: int | None = None) -> dict:
+    try:
+        return build_racing_portfolio(racing_limit=racing_limit, history_days=history_days)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "mode": "analytics",
+            "error": str(exc)[:200],
+            "summary": {
+                "total_rows": 0,
+                "racing_rows": 0,
+                "racing_pnl_units": 0.0,
+                "combined_pnl_units": 0.0,
+                "racing_settled": 0,
+                "open_bets": 0,
+            },
+            "ledger": [],
+            "links": {"racing_tracker": "/tracker"},
+        }
 
 
 def _channel_digest_preview(ctx: dict | None = None) -> str:
@@ -264,16 +284,32 @@ def create_app() -> Flask:
     @app.route("/portfolio")
     def portfolio_page():
         ctx = dashboard_context()
-        ctx["portfolio"] = build_racing_portfolio()
+        ctx["portfolio"] = _safe_portfolio_payload()
         return render_template("portfolio.html", **ctx)
 
     @app.route("/api/portfolio")
     def api_portfolio():
-        return jsonify(build_racing_portfolio())
+        return jsonify(_safe_portfolio_payload())
 
     @app.route("/api/portfolio/summary")
     def api_portfolio_summary():
-        return _cors_summary(jsonify(portfolio_summary_dict()))
+        payload = _safe_portfolio_payload(racing_limit=100)
+        s = payload.get("summary") or {}
+        racing_stats = payload.get("racing_stats") or {}
+        pnl = s.get("racing_pnl_units")
+        summary = {
+            "ok": payload.get("ok", True),
+            "mode": "analytics",
+            "updated_at": payload.get("updated_at"),
+            "combined_pnl_units": pnl,
+            "racing_pnl_units": pnl,
+            "racing_settled": s.get("racing_settled"),
+            "racing_open": racing_stats.get("open_bets", 0),
+            "links": payload.get("links") or {},
+        }
+        if payload.get("error"):
+            summary["error"] = payload["error"]
+        return _cors_summary(jsonify(summary))
 
     @app.route("/api/market-steam")
     def api_market_steam():

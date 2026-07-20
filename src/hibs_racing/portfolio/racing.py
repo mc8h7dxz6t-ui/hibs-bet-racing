@@ -17,6 +17,12 @@ def _normalize_racing_row(row: dict) -> dict[str, Any]:
     elif status == "lost":
         result = "L"
     event_at = f"{row.get('card_date') or ''}T{row.get('off_time') or '00:00'}:00"
+    edge_pct = None
+    if row.get("model_ev") is not None:
+        try:
+            edge_pct = float(row["model_ev"]) * 100
+        except (TypeError, ValueError):
+            edge_pct = None
     return {
         "source": "hibs-racing",
         "sport": "racing",
@@ -30,7 +36,7 @@ def _normalize_racing_row(row: dict) -> dict[str, Any]:
         "stake": row.get("stake_units"),
         "result": result,
         "pnl": pnl,
-        "edge_pct": (float(row["model_ev"]) * 100 if row.get("model_ev") is not None else None),
+        "edge_pct": edge_pct,
         "clv_pp": None,
         "cohort": "paper",
         "meta": {
