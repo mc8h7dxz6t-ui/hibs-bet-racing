@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "scripts/governor_tier_ci.sh"
+      - "docs/sales-sheets/**"
+      - ".github/workflows/ci.yml"
+  push:
+    branches: [main, master, "cursor/**"]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "scripts/governor_tier_ci.sh"
+      - "docs/sales-sheets/**"
+      - ".github/workflows/ci.yml"
+
+jobs:
+  governor-tier:
+    name: ${{ matrix.governor }} — ${{ matrix.tier_label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - governor: Finance Governor
+            tier_label: Tier 1 institutional
+            slug: finance
+            tier_num: 1
+          - governor: Finance Governor
+            tier_label: Tier 2 Postgres
+            slug: finance
+            tier_num: 2
+          - governor: Insurance Governor
+            tier_label: Tier 1 institutional
+            slug: insurance
+            tier_num: 1
+          - governor: Insurance Governor
+            tier_label: Tier 2 Postgres
+            slug: insurance
+            tier_num: 2
+          - governor: Model Governor
+            tier_label: Tier 1 institutional
+            slug: model
+            tier_num: 1
+          - governor: Model Governor
+            tier_label: Tier 2 Postgres
+            slug: model
+            tier_num: 2
+          - governor: Cyber Governor
+            tier_label: Tier 1 institutional
+            slug: cyber
+            tier_num: 1
+          - governor: Cyber Governor
+            tier_label: Tier 2 Postgres
+            slug: cyber
+            tier_num: 2
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: instpp
+          POSTGRES_PASSWORD: instpp
+          POSTGRES_DB: instpp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U instpp -d instpp_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    env:
+      INST_GOVERNOR: ${{ matrix.slug }}
+      INST_TIER: ${{ matrix.tier_num }}
+      INST_TEST_POSTGRES_DSN: postgresql://instpp:instpp@localhost:5432/instpp_test
+      INST_P99_THRESHOLD_MS: "75"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Institutional++
+        run: pip install -e ".[dev,instpp]"
+
+      - name: Governor tier tests
+        run: chmod +x ./scripts/governor_tier_ci.sh && ./scripts/governor_tier_ci.sh
