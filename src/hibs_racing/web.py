@@ -557,26 +557,34 @@ def create_app() -> Flask:
     @app.route("/api/ready")
     def api_ready():
         from hibs_racing.config import db_path, load_config
-        from hibs_racing.features.store import connect
 
         db_ok = False
         db_err = ""
         cfg_db = ""
+        runners = 0
         try:
             cfg_db = str(db_path(load_config()))
-            with connect(db_path(load_config())) as conn:
+            import sqlite3
+
+            conn = sqlite3.connect(f"file:{cfg_db}?mode=ro", uri=True, timeout=5.0)
+            try:
                 conn.execute("SELECT 1").fetchone()
-            db_ok = True
+                row = conn.execute("SELECT COUNT(*) FROM upcoming_runners").fetchone()
+                runners = int(row[0] or 0) if row else 0
+                db_ok = True
+            finally:
+                conn.close()
         except Exception as exc:
             db_err = str(exc)[:120]
 
-        ok = db_ok
+        ok = db_ok and runners > 0
         return jsonify(
             {
                 "ok": ok,
                 "tier": "readiness",
                 "db_ok": db_ok,
                 "db_path": cfg_db,
+                "runners_loaded": runners,
                 "error": db_err or None,
             }
         ), (200 if ok else 503)
