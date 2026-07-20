@@ -163,13 +163,37 @@
     );
   }
 
+  function updateIntro(source) {
+    var intro = document.getElementById("system-bets-intro");
+    if (!intro) return;
+    if (source === "tipster") {
+      intro.innerHTML =
+        'Parsed from today&apos;s tipster email. Paste or refresh on <a href="' +
+        esc(intro.querySelector("a") ? intro.querySelector("a").getAttribute("href") || "/tips" : "/tips") +
+        '">Tips</a> (include lines like <code>0.25pt Win Trixie</code>).';
+    } else if (source === "engine") {
+      intro.textContent =
+        "Model-suggested doubles, Trixies and Lucky 15 from today\u2019s top place picks (one runner per race). Not from a tipster email.";
+    }
+  }
+
   function renderPayload(data, mount) {
     var combos = data.combinations || [];
     var singles = data.singles || [];
     var insights = data.win_engine && data.win_engine.insights ? data.win_engine.insights : null;
     var tipsUrl = (mount && mount.getAttribute("data-tips-url")) || "/tips";
+    var source = data.source || (data.tip_count > 0 ? "tipster" : "engine");
+
+    updateIntro(source);
 
     if (!combos.length && !singles.length) {
+      if (source === "engine") {
+        return (
+          '<p class="sys-bets-empty">No engine system-bet legs yet for ' +
+          esc(data.card_date || "today") +
+          " \u2014 need at least two qualifying top picks. Run <strong>Refresh 24h</strong> once cards are loaded.</p>"
+        );
+      }
       return (
         '<p class="sys-bets-empty">No Trixie / double / Lucky 15 combos for ' +
         esc(data.card_date || "today") +
@@ -182,7 +206,8 @@
       html +=
         '<p class="sys-bets-date">' +
         esc(data.card_date) +
-        (data.tip_count != null ? " · " + data.tip_count + " tips ingested" : "") +
+        (source === "tipster" && data.tip_count != null ? " · " + data.tip_count + " tips ingested" : "") +
+        (source === "engine" ? " · engine-suggested" : "") +
         (insights ? " · win engine overlay" : "") +
         "</p>";
     }
