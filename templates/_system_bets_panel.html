@@ -1,0 +1,12 @@
+<details class="dash-fold card sys-bets-fold" id="system-bets-fold" open>
+    <summary>Tip combinations · Trixie · doubles · Lucky 15</summary>
+    <div class="dash-fold-body">
+        <p class="sys-bets-intro">Parsed from today&apos;s tipster email — not model-generated. Paste the email on <a href="{{ url_for('tips_page') }}">Tips</a> to refresh.</p>
+        <div id="system-bets-mount"
+             data-fetch-url="{{ racing_api_path('tips/combinations') }}"
+             data-tips-url="{{ racing_page_path('tips') }}"
+             aria-busy="true">
+            <p class="hibs-deferred-loading">Loading tip combinations…</p>
+        </div>
+    </div>
+</details>

@@ -211,6 +211,9 @@
     {% if highlight_runner %}data-highlight-runner="{{ highlight_runner }}"{% endif %}></div>
 {% endif %}
 
+{% if engine_top_picks is defined %}
+<script id="engine-top-picks-data" type="application/json">{{ engine_top_picks|tojson }}</script>
+{% endif %}
 {% if pick_candidates is defined %}
 <script id="pick-candidates-data" type="application/json">{{ pick_candidates|tojson }}</script>
 {% endif %}
@@ -223,13 +226,15 @@
     <div class="smart-portfolio-row" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
         <div>
             <h2>Place Picker</h2>
-            <p class="section-hint" style="margin:0;font-size:0.78em;color:var(--muted);max-width:40rem;">Each-way value · DQ ≥75% · steam gate</p>
+            <p class="section-hint" style="margin:0;font-size:0.78em;color:var(--muted);max-width:40rem;">Top place angles from the engine · paper lane noted on each card</p>
         </div>
-        <span class="pill ok">Top picks</span>
+        <span class="pill ok">Engine output</span>
     </div>
     <div id="smart-picks-grid" class="smart-picks-grid" role="list" aria-live="polite"></div>
 </section>
 {% endif %}
+
+{% include '_system_bets_panel.html' %}
 
 <details class="dash-fold">
     <summary>Racecards · next {{ window_hours or 24 }}h{% if card_dates %} · {{ card_dates|join(' · ') }}{% endif %}</summary>
@@ -512,4 +517,8 @@
 {% endif %}
 
 <p class="data-note">Scores use ingested history + live card feed + Matchbook odds. RP enrich fills when credentials are set.</p>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ static_v('hibs_system_bets.js') }}" defer></script>
 {% endblock %}

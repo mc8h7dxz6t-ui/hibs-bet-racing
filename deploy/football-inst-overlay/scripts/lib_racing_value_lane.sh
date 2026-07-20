@@ -145,7 +145,8 @@ racing_value_lane_rescore() {
     echo "WARN: ingest-raceform failed — continuing" >&2
 
   local day
-  for day in 0 1; do
+  # rpscrape / fetch-cards: --day 1 = today, --day 2 = tomorrow (not 0-indexed)
+  for day in 1 2; do
     echo "==> fetch-cards --day ${day} --score"
     if racing_value_lane_www_data_exec "${app}" \
       "RACEFORM_DB_PATH='${rf}' HIBS_ODDS_SOURCE=auto ${cli} fetch-cards --source racing_api --day ${day} --score --odds-source auto"; then
@@ -160,7 +161,7 @@ racing_value_lane_rescore() {
   if [[ "${paid_ok}" -eq 0 && -f "${bet}/scripts/vps_racing_fetch_free_tier.sh" ]]; then
     echo "==> free-tier card fetch fallback"
     bash "${bet}/scripts/vps_racing_fetch_free_tier.sh" || true
-    for day in 0 1; do
+    for day in 1 2; do
       racing_value_lane_www_data_exec "${app}" "${cli} score-cards --day ${day}" 2>/dev/null || true
     done
   fi

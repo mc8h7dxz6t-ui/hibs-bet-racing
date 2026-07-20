@@ -11,11 +11,11 @@ def test_filter_smart_picks_value_dq_gate():
     from hibs_racing.daily.smart_picks import filter_smart_picks
 
     candidates = [
-        {"value_flag": True, "data_quality_pct": 80, "steam_gate": "proceed", "place_score": 0.9, "horse_name": "A"},
-        {"value_flag": False, "data_quality_pct": 90, "steam_gate": "proceed", "place_score": 0.95},
-        {"value_flag": True, "data_quality_pct": 70, "steam_gate": "proceed", "place_score": 0.99},
-        {"value_flag": True, "data_quality_pct": 85, "steam_gate": "abort", "place_score": 0.88},
-        {"value_flag": True, "data_quality_pct": 76, "steam_gate": "scale_up", "place_score": 0.85, "horse_name": "B"},
+        {"value_flag": True, "data_quality_pct": 96, "steam_gate": "proceed", "place_score": 0.9, "horse_name": "A", "flag_gate3": 1},
+        {"value_flag": False, "data_quality_pct": 96, "steam_gate": "proceed", "place_score": 0.95, "flag_gate3": 1},
+        {"value_flag": True, "data_quality_pct": 70, "steam_gate": "proceed", "place_score": 0.99, "flag_gate3": 1},
+        {"value_flag": True, "data_quality_pct": 96, "steam_gate": "abort", "place_score": 0.88, "flag_gate3": 1},
+        {"value_flag": True, "data_quality_pct": 96, "steam_gate": "scale_up", "place_score": 0.85, "horse_name": "B", "flag_gate3": 1},
     ]
     picks = filter_smart_picks(candidates, limit=3)
     assert len(picks) == 2
@@ -27,8 +27,24 @@ def test_format_digest_message_no_picks():
     from hibs_racing.daily.smart_picks import format_digest_message
 
     text = format_digest_message({"picks": [], "card_dates": ["2026-05-29"]})
-    assert "No value picks" in text
+    assert "Engine refresh pending" in text
     assert "2026-05-29" in text
+
+    engine = [
+        {
+            "display_rank": 1,
+            "horse_name": "Alpha",
+            "course": "York",
+            "off_time": "14:00",
+            "display_tier_label": "Engine lead",
+            "pick_summary": "Top place blend.",
+            "pick_reasons": ["Top place blend."],
+            "pick_accuracy": {"accuracy_summary": "Blended place score 48%."},
+        }
+    ]
+    text2 = format_digest_message({"picks": [], "engine_top_picks": engine, "card_dates": ["2026-05-29"]})
+    assert "Alpha" in text2
+    assert "Engine lead" in text2
 
 
 def test_format_pick_line_includes_partner_link():

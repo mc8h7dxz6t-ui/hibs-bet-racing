@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 export HIBS_HARVILLE_CORRECTION="${HIBS_HARVILLE_CORRECTION:-1}"
-export HIBS_RACING_DB_PATH="${HIBS_RACING_DB_PATH:-/mnt/hibs-ramdisk/feature_store.sqlite}"
+export HIBS_RACING_DB_PATH="${HIBS_RACING_DB_PATH:-/opt/hibs-racing/data/feature_store.sqlite}"
 
 START="${1:-2025-11-01}"
 END="${2:-$(date -u +%Y-%m-%d)}"

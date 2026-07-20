@@ -113,6 +113,18 @@ class ExecutionGovernor:
     def _db(self) -> Path:
         return ensure_trading_schema(self.database or db_path(load_config()))
 
+    def _record_intent(self, payload: dict[str, Any], verdict: GovernorVerdict) -> None:
+        try:
+            from hibs_racing.trading.execution_intent_ledger import append_execution_intent
+
+            append_execution_intent(
+                verdict=verdict.to_dict(),
+                source="execution_governor",
+                trace_id=str(payload.get("trace_id") or payload.get("client_order_id") or ""),
+            )
+        except Exception:
+            pass
+
     def pre_commit(self, payload: dict[str, Any], *, received_at_ms: float | None = None) -> GovernorVerdict:
         sig = payload_signature(payload)
         now_ms = received_at_ms if received_at_ms is not None else time.time() * 1000
@@ -214,6 +226,11 @@ class ExecutionGovernor:
         )
 
     def dispatch(self, payload: dict[str, Any], *, received_at_ms: float | None = None) -> GovernorVerdict:
+        verdict = self._dispatch_impl(payload, received_at_ms=received_at_ms)
+        self._record_intent(payload, verdict)
+        return verdict
+
+    def _dispatch_impl(self, payload: dict[str, Any], *, received_at_ms: float | None = None) -> GovernorVerdict:
         verdict = self.pre_commit(payload, received_at_ms=received_at_ms)
         stake = float(payload.get("stake") or 0)
         db = self._db()

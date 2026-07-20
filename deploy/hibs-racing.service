@@ -5,9 +5,8 @@
 
 [Unit]
 Description=HIBS Racing cards and portfolio (gunicorn unix socket)
-After=network-online.target hibs-ramdisk.service
+After=network-online.target
 Wants=network-online.target
-Requires=hibs-ramdisk.service
 StartLimitIntervalSec=300
 StartLimitBurst=5
 
@@ -23,13 +22,16 @@ Environment=PYTHONPATH=/opt/hibs-racing/src:/opt/hibs-bet/src
 Environment=HIBS_RACING_GUNICORN_APP=hibs_racing.web:create_app()
 Environment=HIBS_RACING_UNIX_SOCKET=unix:/var/run/hibs/racing_execution.sock
 Environment=HIBS_RACING_GUNICORN_UMASK=0o007
+Environment=HIBS_RACING_FORCE_DISK=1
+Environment=HIBS_RACING_DB_PATH=/opt/hibs-racing/data/feature_store.sqlite
+Environment=HIBS_RACING_DATA_DIR=/opt/hibs-racing/data
 EnvironmentFile=-/opt/hibs-racing/.env
 
 RuntimeDirectory=hibs
 RuntimeDirectoryMode=0750
 UMask=0007
 
-ExecStartPre=/bin/mkdir -p /var/run/hibs
+ExecStartPre=/bin/mkdir -p /var/run/hibs /opt/hibs-racing/data
 ExecStartPre=/bin/chown www-data:www-data /var/run/hibs
 ExecStartPre=/bin/chmod 0750 /var/run/hibs
 ExecStart=/opt/hibs-racing/.venv/bin/python -m gunicorn \
@@ -47,7 +49,7 @@ SyslogIdentifier=hibs-racing
 
 NoNewPrivileges=true
 PrivateTmp=true
-ReadWritePaths=/opt/hibs-racing /var/log/hibs-racing /var/run/hibs /mnt/hibs-ramdisk
+ReadWritePaths=/opt/hibs-racing /var/log/hibs-racing /var/run/hibs
 
 LimitNOFILE=65535
 

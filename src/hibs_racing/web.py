@@ -22,11 +22,16 @@ from hibs_racing.place.public_tracker import (
     public_tracker_enabled,
 )
 from hibs_racing.portfolio.racing import build_racing_portfolio
-from hibs_racing.portfolio.summary_bar import portfolio_summary_dict
 from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.config import db_path, load_config
 from hibs_racing.web_format import fmt_num, fmt_pct
-from hibs_racing.web_service import cards_deep_link_context, dashboard_context, health_status, insights_context
+from hibs_racing.web_service import (
+    cards_deep_link_context,
+    dashboard_context,
+    health_status,
+    insights_context,
+    shell_health_status,
+)
 from hibs_racing.middleware.auth import require_api_key, validate_auth_config
 from hibs_racing.utils.ui_settings import (
     apply_saved_ui_env,
@@ -39,6 +44,29 @@ FAQ_PATH = ROOT / "docs" / "TECHNICAL_DUE_DILIGENCE_FAQ.md"
 
 _HEALTH_CACHE: dict = {"t": 0.0, "payload": None}
 _HEALTH_TTL_SEC = float(os.environ.get("HIBS_RACING_HEALTH_TTL_SEC", "20"))
+_SHELL_HEALTH_CACHE: dict = {"t": 0.0, "status": None}
+_SHELL_HEALTH_TTL_SEC = float(os.environ.get("HIBS_SHELL_HEALTH_TTL_SEC", "30"))
+
+
+def _safe_portfolio_payload(*, racing_limit: int = 200, history_days: int | None = None) -> dict:
+    try:
+        return build_racing_portfolio(racing_limit=racing_limit, history_days=history_days)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "mode": "analytics",
+            "error": str(exc)[:200],
+            "summary": {
+                "total_rows": 0,
+                "racing_rows": 0,
+                "racing_pnl_units": 0.0,
+                "combined_pnl_units": 0.0,
+                "racing_settled": 0,
+                "open_bets": 0,
+            },
+            "ledger": [],
+            "links": {"racing_tracker": "/tracker"},
+        }
 
 
 def _channel_digest_preview(ctx: dict | None = None) -> str:
@@ -51,14 +79,19 @@ def _channel_digest_preview(ctx: dict | None = None) -> str:
             ctx = dashboard_context()
         candidates = novice_pick_candidates(ctx.get("meetings") or [])
         picks = filter_smart_picks(candidates, limit=3)
+        engine = ctx.get("engine_top_picks") or []
         return format_digest_message(
-            {"picks": picks, "card_dates": ctx.get("card_dates") or []},
+            {
+                "picks": picks,
+                "engine_top_picks": engine,
+                "card_dates": ctx.get("card_dates") or [],
+            },
         )
     except Exception:
         return (
             "🏇 Hibs Racing Intelligence — Daily Value Sheet\n"
             "Cards: today\n\n"
-            "No value picks passed filters today (value + DQ≥75% + steam gate).\n"
+            "Engine refresh pending — cards loading for today's meeting window.\n"
             "Tracker: /tracker"
         )
 
@@ -137,6 +170,20 @@ def create_app() -> Flask:
 
     app.jinja_env.globals["static_v"] = static_v
 
+    def _cached_shell_health():
+        import time as _time
+
+        now = _time.monotonic()
+        if (
+            _SHELL_HEALTH_CACHE["status"] is not None
+            and (now - float(_SHELL_HEALTH_CACHE["t"])) < _SHELL_HEALTH_TTL_SEC
+        ):
+            return _SHELL_HEALTH_CACHE["status"]
+        hs = shell_health_status()
+        _SHELL_HEALTH_CACHE["t"] = now
+        _SHELL_HEALTH_CACHE["status"] = hs
+        return hs
+
     @app.context_processor
     def inject_brand() -> dict:
         from hibs_racing.ui_shell import ui_shell_context
@@ -145,7 +192,7 @@ def create_app() -> Flask:
         ctx.update(ui_shell_context())
         ctx.update(product_bar_context(active="racing"))
         ctx["portfolio_full_url"] = "/portfolio"
-        ctx["health"] = health_status()
+        ctx["health"] = _cached_shell_health()
         return ctx
 
     def _cors_summary(resp):
@@ -174,9 +221,7 @@ def create_app() -> Flask:
 
     @app.route("/insights")
     def insights_page():
-        ctx = dashboard_context()
-        ctx.update(insights_context(top_n=10))
-        return render_template("insights.html", **ctx)
+        return render_template("insights.html", **insights_context(top_n=10))
 
     @app.route("/api/picks")
     def api_picks():
@@ -264,16 +309,32 @@ def create_app() -> Flask:
     @app.route("/portfolio")
     def portfolio_page():
         ctx = dashboard_context()
-        ctx["portfolio"] = build_racing_portfolio()
+        ctx["portfolio"] = _safe_portfolio_payload()
         return render_template("portfolio.html", **ctx)
 
     @app.route("/api/portfolio")
     def api_portfolio():
-        return jsonify(build_racing_portfolio())
+        return jsonify(_safe_portfolio_payload())
 
     @app.route("/api/portfolio/summary")
     def api_portfolio_summary():
-        return _cors_summary(jsonify(portfolio_summary_dict()))
+        payload = _safe_portfolio_payload(racing_limit=100)
+        s = payload.get("summary") or {}
+        racing_stats = payload.get("racing_stats") or {}
+        pnl = s.get("racing_pnl_units")
+        summary = {
+            "ok": payload.get("ok", True),
+            "mode": "analytics",
+            "updated_at": payload.get("updated_at"),
+            "combined_pnl_units": pnl,
+            "racing_pnl_units": pnl,
+            "racing_settled": s.get("racing_settled"),
+            "racing_open": racing_stats.get("open_bets", 0),
+            "links": payload.get("links") or {},
+        }
+        if payload.get("error"):
+            summary["error"] = payload["error"]
+        return _cors_summary(jsonify(summary))
 
     @app.route("/api/market-steam")
     def api_market_steam():
@@ -557,23 +618,35 @@ def create_app() -> Flask:
     @app.route("/api/ready")
     def api_ready():
         from hibs_racing.config import db_path, load_config
-        from hibs_racing.features.store import connect
-        from hibs_racing.trading.status_plane import daemon_active
 
+        db_ok = False
+        db_err = ""
+        cfg_db = ""
+        runners = 0
         try:
-            with connect(db_path(load_config())) as conn:
+            cfg_db = str(db_path(load_config()))
+            import sqlite3
+
+            conn = sqlite3.connect(f"file:{cfg_db}?mode=ro", uri=True, timeout=5.0)
+            try:
                 conn.execute("SELECT 1").fetchone()
+                row = conn.execute("SELECT COUNT(*) FROM upcoming_runners").fetchone()
+                runners = int(row[0] or 0) if row else 0
+                db_ok = True
+            finally:
+                conn.close()
         except Exception as exc:
-            return jsonify({"ok": False, "tier": "readiness", "error": str(exc)[:120]}), 503
-        ram_ok = Path("/mnt/hibs-ramdisk").is_mount() if Path("/mnt/hibs-ramdisk").exists() else True
-        daemon_ok = daemon_active()
-        ok = ram_ok and daemon_ok
+            db_err = str(exc)[:120]
+
+        ok = db_ok and runners > 0
         return jsonify(
             {
                 "ok": ok,
                 "tier": "readiness",
-                "ramdisk_mounted": ram_ok,
-                "trading_daemon_active": daemon_ok,
+                "db_ok": db_ok,
+                "db_path": cfg_db,
+                "runners_loaded": runners,
+                "error": db_err or None,
             }
         ), (200 if ok else 503)
 
@@ -638,7 +711,10 @@ def create_app() -> Flask:
             and (now - float(_HEALTH_CACHE["t"])) < _HEALTH_TTL_SEC
         ):
             return jsonify(_HEALTH_CACHE["payload"])
-        payload = health_status().to_dict()
+        try:
+            payload = health_status().to_dict()
+        except Exception as exc:
+            return jsonify({"ok": False, "tier": "deep", "error": str(exc)[:120]}), 503
         _HEALTH_CACHE["t"] = now
         _HEALTH_CACHE["payload"] = payload
         return jsonify(payload)
