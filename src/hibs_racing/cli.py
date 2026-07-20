@@ -314,6 +314,25 @@ def cmd_data_integrity_check(args: argparse.Namespace) -> int:
     return 0 if report.passed else 1
 
 
+def cmd_repair_feature_store(args: argparse.Namespace) -> int:
+    from hibs_racing.config import db_path, load_config
+    from hibs_racing.features.db_repair import integrity_check, repair_feature_store
+
+    cfg = load_config()
+    db = db_path(cfg)
+    if getattr(args, "check_only", False):
+        report = integrity_check(db)
+        print(json.dumps(report, indent=2))
+        return 0 if report.get("ok") else 1
+
+    report = repair_feature_store(
+        db,
+        allow_reinit=not getattr(args, "no_reinit", False),
+    )
+    print(json.dumps(report, indent=2))
+    return 0 if report.get("ok") else 1
+
+
 def cmd_institutional_check(args: argparse.Namespace) -> int:
     from hibs_racing.institutional.check import run_institutional_check
 
@@ -1410,6 +1429,18 @@ def main(argv: list[str] | None = None) -> int:
     p_dic.add_argument("--no-strict", action="store_false", dest="strict")
     p_dic.add_argument("--repair", action="store_true", help="Prune orphan card_scores before check")
     p_dic.set_defaults(func=cmd_data_integrity_check)
+
+    p_rfs = sub.add_parser(
+        "repair-feature-store",
+        help="Repair malformed feature_store.sqlite (backup corrupt, restore or re-init)",
+    )
+    p_rfs.add_argument("--check-only", action="store_true", help="PRAGMA integrity_check only")
+    p_rfs.add_argument(
+        "--no-reinit",
+        action="store_true",
+        help="Do not create empty DB if no valid backup/recover",
+    )
+    p_rfs.set_defaults(func=cmd_repair_feature_store)
 
     p_ic = sub.add_parser(
         "institutional-check",

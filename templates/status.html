@@ -41,7 +41,10 @@
             <span class="pill {% if health.racing_api %}ok{% else %}warn{% endif %}">Racing API</span>
             <span class="pill {% if health.racing_post %}ok{% else %}warn{% endif %}">Racing Post</span>
             <span class="pill ok">Analytics mode</span>
-            <span class="pill {% if health.matchbook %}ok{% else %}warn{% endif %}">Matchbook (batch odds)</span>
+            <span class="pill {% if health.matchbook %}ok{% else %}warn{% endif %}">Matchbook creds</span>
+            {% if health.value_lane_ready is defined and health.value_lane_ready is not none %}
+            <span class="pill {% if health.value_lane_ready %}ok{% else %}warn{% endif %}">Value lane</span>
+            {% endif %}
             {% if health.betfair_enabled %}
             <span class="pill {% if health.betfair_configured %}ok{% else %}warn{% endif %}">Betfair</span>
             {% else %}
@@ -54,7 +57,19 @@
             <div class="stat-card"><div class="stat-label">DB</div><div class="stat-value">{% if health.db_ok %}OK{% else %}Missing{% endif %}</div></div>
             <div class="stat-card"><div class="stat-label">Card runners</div><div class="stat-value">{{ health.runners_loaded }}</div></div>
             <div class="stat-card"><div class="stat-label">Scored</div><div class="stat-value">{{ health.scores_loaded }}</div></div>
+            {% if health.unscored_runners is defined and health.unscored_runners is not none %}
+            <div class="stat-card"><div class="stat-label">Unscored</div><div class="stat-value">{{ health.unscored_runners }}</div></div>
+            {% endif %}
+            {% if health.value_lane_ready is defined and health.value_lane_ready is not none %}
+            <div class="stat-card"><div class="stat-label">Value lane</div><div class="stat-value">{% if health.value_lane_ready %}Ready{% else %}Blocked{% endif %}</div></div>
+            {% endif %}
         </div>
+        {% if health.matchbook_note is defined %}
+        <p class="fi-hint" style="margin-top:12px;">{{ health.matchbook_note }}</p>
+        {% endif %}
+        {% if health.value_lane_blockers %}
+        <p class="fi-hint" style="margin-top:8px;"><strong>Value lane blockers:</strong> {{ health.value_lane_blockers | join(', ') }}</p>
+        {% endif %}
     </div>
 </section>
 

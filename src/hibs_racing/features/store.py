@@ -147,7 +147,16 @@ def _configure_connection(conn: sqlite3.Connection) -> sqlite3.Connection:
     """Institutional++ SQLite defaults — WAL readers, writer busy wait, FK enforcement."""
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = WAL")
+    try:
+        conn.execute("PRAGMA journal_mode = WAL")
+    except sqlite3.DatabaseError as exc:
+        msg = str(exc).lower()
+        if "malformed" in msg or "not a database" in msg:
+            raise sqlite3.DatabaseError(
+                f"{exc}. Run: hibs-racing repair-feature-store "
+                "(or deploy/repair-feature-store-sqlite.sh on VPS)"
+            ) from exc
+        raise
     conn.execute("PRAGMA busy_timeout = 30000")
     conn.execute("PRAGMA synchronous = NORMAL")
     if _env_flag("HIBS_RACING_SQLITE_BEEFY"):
