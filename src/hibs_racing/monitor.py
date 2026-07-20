@@ -58,6 +58,44 @@ def top_places_of_day(frame: pd.DataFrame | None = None, *, top_n: int | None = 
     return attach_pick_explanations(picks, frame)
 
 
+def top_value_lane_picks(frame: pd.DataFrame | None = None, *, top_n: int | None = None) -> list[dict]:
+    """
+    Value-lane runners — value_flag=1, one per race, ranked by each-way EV (ROI proxy).
+    """
+    from hibs_racing.cards.ui_frame import safe_value_mask
+
+    cfg = _monitor_cfg()
+    top_n = top_n or int(cfg.get("value_lane_top_n", 8))
+    min_field = int(cfg.get("min_field_size", 3))
+
+    if frame is None:
+        frame = load_scored_cards()
+    if frame.empty:
+        return []
+
+    work = frame[safe_value_mask(frame)].copy()
+    if work.empty:
+        return []
+
+    work["field_size"] = pd.to_numeric(work.get("field_size"), errors="coerce")
+    work = work[work["field_size"].fillna(0) >= min_field]
+    if work.empty:
+        return []
+
+    work["ew_combined_ev"] = pd.to_numeric(work.get("ew_combined_ev"), errors="coerce")
+    work = work.sort_values(["race_id", "ew_combined_ev"], ascending=[True, False], na_position="last")
+    work = work.groupby("race_id", sort=False).head(1)
+    work = work.sort_values("ew_combined_ev", ascending=False, na_position="last").head(top_n)
+
+    picks: list[dict] = []
+    for rank, (_, row) in enumerate(work.iterrows(), start=1):
+        rec = row.to_dict()
+        rec["day_rank"] = rank
+        rec["value_lane_rank"] = rank
+        picks.append(rec)
+    return attach_pick_explanations(picks, frame)
+
+
 def monitor_snapshot(*, refresh: bool = False, settle: bool = True) -> dict:
     """Full monitor payload for UI / API auto-poll."""
     cfg = _monitor_cfg()

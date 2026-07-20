@@ -209,6 +209,24 @@
 .picks-glossary-body strong{color:var(--text);}
 .picks-glossary-note{margin-top:6px;font-size:0.95em;}
 .place-telemetry-item[title]{cursor:help;}
+.value-lane-hero{margin-bottom:14px;border:1px solid rgba(252,211,77,0.35);background:linear-gradient(135deg,rgba(252,211,77,0.12),rgba(15,23,42,0.92));box-shadow:0 0 24px rgba(252,211,77,0.08);}
+.value-lane-hero h2{font-family:'Orbitron',monospace;color:var(--gold);font-size:1em;margin:0 0 4px;}
+.value-lane-hd{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;justify-content:space-between;margin-bottom:12px;}
+.value-lane-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;}
+.value-lane-card{display:flex;gap:10px;padding:12px;border-radius:12px;border:1px solid rgba(252,211,77,0.28);background:rgba(2,6,23,0.55);position:relative;}
+.value-lane-card.is-paper-ready{border-color:rgba(94,234,212,0.45);box-shadow:0 0 12px rgba(13,148,136,0.15);}
+.vlc-rank{font-family:'Orbitron',monospace;color:var(--gold);font-size:1.2em;font-weight:900;min-width:36px;}
+.vlc-body{flex:1;min-width:0;}
+.vlc-title{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px;}
+.vlc-meta{font-size:0.76em;color:var(--muted);margin-bottom:6px;}
+.vlc-roi{font-size:0.88em;color:var(--gold);margin-bottom:6px;}
+.vlc-roi strong{font-size:1.15em;color:var(--neon-value);}
+.vlc-roi-hint{font-size:0.72em;color:var(--muted);margin-left:6px;}
+.vlc-stats{display:flex;flex-wrap:wrap;gap:8px;font-size:0.72em;color:var(--accent);margin-bottom:6px;}
+.vlc-summary{font-size:0.76em;color:var(--neon-value);line-height:1.45;margin:0 0 6px;}
+.vlc-link{font-size:0.72em;color:var(--hibs-neon);font-weight:600;}
+.vlc-copy{align-self:flex-start;padding:4px 8px;font-size:0.72em;}
+.value-lane-blocked{border-color:rgba(251,191,36,0.25);}
 {% endblock %}
 
 {% block content %}
@@ -228,6 +246,11 @@
 {% if card_dates is defined %}
 <script id="card-dates-data" type="application/json">{{ card_dates|tojson }}</script>
 {% endif %}
+{% if value_lane_picks is defined and value_lane_picks %}
+<script id="value-lane-picks-data" type="application/json">{{ value_lane_picks|tojson }}</script>
+{% endif %}
+
+{% include 'racing/_value_lane_panel.html' %}
 
 {% if pick_candidates is defined and runner_count > 0 %}
 <section class="smart-picks-hero card place-picker-top" id="place-picker-hero" aria-label="Place Picker">

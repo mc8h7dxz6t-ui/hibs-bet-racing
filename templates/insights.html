@@ -32,6 +32,22 @@
     background:rgba(0,0,0,0.22);border:1px dashed var(--border);line-height:1.5;
 }
 .method-box strong{color:var(--neon-value);}
+.value-lane-hero{margin-bottom:18px;padding:16px;border-radius:14px;border:1px solid rgba(252,211,77,0.35);background:linear-gradient(135deg,rgba(252,211,77,0.14),rgba(6,14,24,0.95));}
+.value-lane-hero h2{font-family:'Orbitron',monospace;color:var(--gold);font-size:1em;margin:0 0 6px;}
+.value-lane-hd{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;justify-content:space-between;margin-bottom:12px;}
+.value-lane-hd .section-hint{font-size:0.82em;color:var(--muted);line-height:1.5;max-width:640px;margin:0;}
+.value-lane-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;}
+.value-lane-card{display:flex;gap:10px;padding:12px;border-radius:12px;border:1px solid rgba(252,211,77,0.28);background:rgba(2,6,23,0.5);}
+.value-lane-card.is-paper-ready{border-color:rgba(94,234,212,0.4);}
+.vlc-rank{font-family:'Orbitron',monospace;color:var(--gold);font-size:1.25em;font-weight:900;}
+.vlc-title{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px;}
+.vlc-meta{font-size:0.76em;color:var(--muted);}
+.vlc-roi{font-size:0.9em;color:var(--gold);margin:6px 0;}
+.vlc-roi strong{color:var(--neon-value);font-size:1.1em;}
+.vlc-roi-hint{font-size:0.7em;color:var(--muted);margin-left:6px;}
+.vlc-stats{display:flex;flex-wrap:wrap;gap:8px;font-size:0.72em;color:var(--accent);margin:6px 0;}
+.vlc-summary{font-size:0.78em;color:var(--neon-value);line-height:1.45;margin:0;}
+.vlc-link{font-size:0.72em;color:var(--accent);font-weight:600;}
 {% endblock %}
 
 {% block content %}
@@ -67,6 +83,8 @@
         {% endif %}
     </div>
 </section>
+
+{% include 'racing/_value_lane_panel.html' %}
 
 {% if not top_picks and not picks_by_day %}
 <div class="banner error">No qualifying picks in the next {{ window_hours or 24 }}h window. Run <strong>Refresh 24h</strong> once cards and scores are loaded.</div>
