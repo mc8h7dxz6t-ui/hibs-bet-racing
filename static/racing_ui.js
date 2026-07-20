@@ -789,3 +789,34 @@
     TIPS,
   };
 })(window);
+
+(function tradingStatusStream(global) {
+  const chip = document.getElementById('racing-inst-chip');
+  const label = document.getElementById('racing-inst-card');
+  if (!chip || !label || typeof EventSource === 'undefined') return;
+
+  let source = null;
+  function connect() {
+    if (source) return;
+    source = new EventSource('/api/stream/deltas');
+    source.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data || '{}');
+        if (msg.type !== 'trading_status' || !msg.status) return;
+        const active = msg.status.active === true;
+        const comp = (msg.status.payload || {}).component || 'daemon';
+        label.textContent = active ? `${comp} live` : 'daemon idle';
+        chip.classList.toggle('ok', active);
+        chip.classList.toggle('warn', !active);
+      } catch (_) {}
+    };
+    source.onerror = () => {
+      if (source) {
+        source.close();
+        source = null;
+      }
+      setTimeout(connect, 5000);
+    };
+  }
+  connect();
+})(window);

@@ -119,7 +119,8 @@ class TradingDaemon:
 
     def submit_order(self, payload: dict[str, Any]) -> dict[str, Any]:
         assert self.governor is not None
-        return self.governor.dispatch(payload).to_dict()
+        verdict = self.governor.dispatch(payload)
+        return verdict.to_dict()
 
     def status(self) -> dict[str, Any]:
         from hibs_racing.trading.status_plane import read_status
