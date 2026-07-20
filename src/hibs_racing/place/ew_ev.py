@@ -20,6 +20,22 @@ class EachWayEV:
     offered_place_decimal: float
 
 
+def exchange_place_ev(
+    model_place_prob: float,
+    place_decimal: float,
+    *,
+    commission: float = 0.02,
+) -> float:
+    """
+    Pure £1 place-bet EV vs exchange back price (commission on net winnings).
+    Returns NaN when inputs are invalid.
+    """
+    if place_decimal <= 1.0 or model_place_prob < 0.0 or model_place_prob > 1.0:
+        return float("nan")
+    net_return = 1.0 + (place_decimal - 1.0) * (1.0 - commission)
+    return model_place_prob * (net_return - 1.0) - (1.0 - model_place_prob)
+
+
 def each_way_ev(
     model_win_prob: float,
     model_place_prob: float,

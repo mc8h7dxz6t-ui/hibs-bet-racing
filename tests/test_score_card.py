@@ -1,7 +1,15 @@
+import math
+
 import pandas as pd
 
-from hibs_racing.cards.score_card import score_upcoming_cards
+from hibs_racing.cards.score_card import _odds_int, score_upcoming_cards
 from hibs_racing.place.harville import harville_place_probs
+
+
+def test_odds_int_handles_nan():
+    assert _odds_int(float("nan"), 3) == 3
+    assert _odds_int(None, 3) == 3
+    assert _odds_int(2, 3) == 2
 
 
 def test_harville_place_probs_sum():

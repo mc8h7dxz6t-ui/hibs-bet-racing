@@ -73,6 +73,13 @@ def cmd_backtest(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_exchange_ev_status(_: argparse.Namespace) -> int:
+    from hibs_racing.place.exchange_status import exchange_ev_status
+
+    print(json.dumps(exchange_ev_status(), indent=2))
+    return 0
+
+
 def cmd_compare_gates(args: argparse.Namespace) -> int:
     from hibs_racing.backtest.gate_compare import compare_value_gates
 
@@ -1245,6 +1252,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_cg.add_argument("--days", type=int, default=14, help="How many latest card dates to include")
     p_cg.set_defaults(func=cmd_compare_gates)
+
+    p_xev = sub.add_parser(
+        "exchange-ev-status",
+        help="Exchange place EV shadow rollout status (coverage + Gate3 settled sample)",
+    )
+    p_xev.set_defaults(func=cmd_exchange_ev_status)
 
     p_bg = sub.add_parser(
         "benchmark-gates",
