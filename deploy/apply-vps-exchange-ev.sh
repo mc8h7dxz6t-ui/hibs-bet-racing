@@ -43,5 +43,6 @@ chmod 640 "${ENV_FILE}" 2>/dev/null || true
 echo "==> Exchange EV shadow profile written to ${ENV_FILE}"
 echo "    Re-score:  cd ${APP_ROOT} && source .venv/bin/activate && set -a && source .env && set +a && hibs-racing score-card --odds-source matchbook"
 echo "    Status:    hibs-racing exchange-ev-status"
+echo "    Verify:    bash ${APP_ROOT}/scripts/verify_exchange_ev_shadow.sh"
 echo "    Production flip (manual after unlock): HIBS_EXCHANGE_EV_PRODUCTION=1"
 echo "    Restart:   systemctl restart hibs-racing"
