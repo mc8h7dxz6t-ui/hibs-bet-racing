@@ -982,6 +982,9 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
     meeting_days = group_meetings_by_day(meetings)
     pick_candidates = novice_pick_candidates(meetings)
     picks_by_day = top_picks_by_day(frame, meetings, top_n=6)
+    from hibs_racing.daily.pick_display import build_engine_display_picks
+
+    engine_top_picks = build_engine_display_picks(meetings, frame, top_n=6)
     try:
         gate_summary = compare_value_gates(days=14).to_dict()
     except Exception:
@@ -999,6 +1002,7 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
         "picks_by_day": picks_by_day,
         "top_picks": [],
         "pick_candidates": pick_candidates,
+        "engine_top_picks": engine_top_picks,
         "monitor": monitor,
         "backtest": backtest,
         "scoring_method": scoring_method,

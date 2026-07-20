@@ -614,20 +614,47 @@
       .slice(0, 3);
   }
 
+  function loadEngineTopPicks() {
+    const el = document.getElementById('engine-top-picks-data');
+    if (!el) return [];
+    try {
+      return JSON.parse(el.textContent || '[]');
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function tierPillClass(tier) {
+    const t = String(tier || 'engine_lead').toLowerCase();
+    if (t === 'paper_ready') return 'paper_ready';
+    if (t === 'watchlist') return 'watchlist';
+    return 'engine_lead';
+  }
+
+  function displayPicksForHero() {
+    const engine = loadEngineTopPicks();
+    if (engine.length) return engine.slice(0, 6);
+    return loadCandidates()
+      .sort((a, b) => parseFloat(b.place_score || b.model_place_prob || 0) - parseFloat(a.place_score || a.model_place_prob || 0))
+      .slice(0, 6);
+  }
+
   function formatPickLine(pick, index) {
     const horse = pick.horse_name || '?';
     const course = pick.course || '?';
     const off = pick.off_time || '?';
-    const dq = pick.data_quality_pct || 0;
-    const gate = pick.steam_gate || 'proceed';
+    const tier = pick.display_tier_label || 'Engine lead';
+    const acc = (pick.pick_accuracy && pick.pick_accuracy.accuracy_summary) || '';
+    const summary = pick.pick_summary || acc;
     const placePct = Math.round((parseFloat(pick.model_place_prob) || 0) * 100);
     const ev = pick.ew_combined_ev;
     const evS = ev != null ? Number(ev).toFixed(2) : '—';
     const winS = pick.win_decimal ? ` · win ${Number(pick.win_decimal).toFixed(2)}` : '';
     const linkS = pick.monetized_link ? `\n   Partner: ${pick.monetized_link}` : '';
     return (
-      `#${index} ${horse} (${off} ${course})\n` +
-      `   Place ${placePct}% · EV ${evS} · DQ ${dq}% · gate ${gate}${winS}${linkS}`
+      `#${index} ${horse} (${off} ${course}) · ${tier}\n` +
+      (summary ? `   ${summary}\n` : '') +
+      `   Place ${placePct}% · EV ${evS}${winS}${linkS}`
     );
   }
 
@@ -638,15 +665,18 @@
       `Cards: ${dates}`,
       '',
     ];
-    if (!picks.length) {
-      lines.push('No value picks passed filters today (value + DQ≥75% + steam gate).');
+    const engine = loadEngineTopPicks();
+    const paper = picks.filter((p) => p.paper_ready || p.display_tier === 'paper_ready');
+    const show = paper.length ? paper : (engine.length ? engine : picks);
+    if (!show.length) {
+      lines.push('Engine refresh pending — cards loading for today\'s meeting window.');
       lines.push('Tracker: /tracker');
     } else {
-      picks.forEach((pick, i) => {
+      show.slice(0, 3).forEach((pick, i) => {
         lines.push(formatPickLine(pick, i + 1));
         lines.push('');
       });
-      lines.push('Each-way paper picks logged to public SHA-256 ledger.');
+      lines.push('Each-way paper picks logged to public SHA-256 ledger when paper-ready.');
     }
     return lines.join('\n').trim();
   }
@@ -664,19 +694,23 @@
   function renderChannelDigest() {
     const el = document.getElementById('channel-digest-text');
     if (!el) return;
-    const picks = filterSmartPicks(loadCandidates());
+    const picks = displayPicksForHero();
     el.textContent = formatChannelDigest(picks, loadCardDates());
   }
 
   function renderSmartPicks() {
     const grid = document.getElementById('smart-picks-grid');
     if (!grid) return;
-    const picks = filterSmartPicks(loadCandidates());
+    const picks = displayPicksForHero();
     if (!picks.length) {
-      grid.innerHTML = '<div class="smart-pick-card"><span class="sp-meta">No picks pass all filters yet (value + data quality ≥75% + steam gate). Refresh cards after racing starts.</span></div>';
+      grid.innerHTML = '<div class="smart-pick-card"><span class="sp-meta">Engine refresh pending — load cards with Refresh 24h in the header.</span></div>';
       return;
     }
     grid.innerHTML = picks.map((p, i) => {
+      const rank = p.display_rank || i + 1;
+      const tier = p.display_tier || 'engine_lead';
+      const tierLabel = p.display_tier_label || 'Engine lead';
+      const tierHtml = `<span class="pick-tier-pill ${tierPillClass(tier)}">${esc(tierLabel)}</span>`;
       const cash = stakeCash(p.stake_units || 1, p.kelly_multiplier || 1);
       const risk = riskProfile(impliedProb(p));
       const riskHtml = risk ? `<span class="risk-badge ${risk.cls}">● ${esc(risk.label)}</span>` : '';
@@ -684,16 +718,21 @@
       const oddsHtml = p.win_decimal && p.monetized_link
         ? `<a class="odds-affiliate-link" href="${encodeURI(p.monetized_link)}" target="_blank" rel="noopener sponsored" title="Open partner odds">win ${p.win_decimal}</a>`
         : (p.win_decimal ? ' · win ' + p.win_decimal : '');
-      const reasons = (p.pick_reasons || []).slice(0, 3);
+      const acc = (p.pick_accuracy && p.pick_accuracy.accuracy_summary) || '';
+      const accHtml = acc ? `<p class="sp-accuracy">${esc(acc)}</p>` : '';
+      const reasons = (p.pick_reasons || []).slice(0, 4);
       const summary = p.pick_summary || '';
       const reasonsHtml = reasons.length
         ? `<ul class="sp-reasons">${reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>`
         : (summary ? `<p class="sp-summary">${esc(summary)}</p>` : '');
+      const notes = (p.gate_notes || []).slice(0, 4).join(' · ');
+      const notesHtml = notes ? `<div class="sp-meta">${esc(notes)}</div>` : '';
       return `
         <div class="smart-pick-card" data-horse="${esc(p.horse_name)}" data-course="${esc(p.course)}" data-off="${esc(p.off_time)}" data-win-odds="${p.win_decimal || ''}" data-bet-type="each_way" data-monetized-link="${esc(p.monetized_link || '')}">
-          <div class="sp-horse">#${i + 1} ${esc(p.horse_name)} ${riskHtml}</div>
-          <div class="sp-meta">${esc(p.off_time)} · ${esc(p.course)} · DQ ${p.data_quality_pct}% · gate ${esc(p.steam_gate)}</div>
-          <div class="sp-meta">Place ${Math.round((parseFloat(p.model_place_prob) || 0) * 100)}% · EV ${p.ew_combined_ev != null ? Number(p.ew_combined_ev).toFixed(2) : '—'}${oddsHtml ? ' · ' + oddsHtml : ''}</div>
+          <div class="sp-horse">#${rank} ${esc(p.horse_name)} ${tierHtml} ${riskHtml}</div>
+          ${accHtml}
+          <div class="sp-meta">${esc(p.off_time)} · ${esc(p.course)} · Place ${Math.round((parseFloat(p.model_place_prob) || 0) * 100)}%${p.win_decimal ? ' · ' : ''}${oddsHtml || ''}</div>
+          ${notesHtml}
           ${reasonsHtml}
           ${cashHtml}
           <button type="button" class="slip-copy-btn" data-slip-copy style="margin-top:8px;">📋 Copy slip</button>

@@ -16,6 +16,7 @@ from hibs_racing.cards.query import load_scored_cards
 from hibs_racing.cards.ui_frame import gate_reason_is_clear, is_value_pick
 from hibs_racing.config import ROOT, load_config
 from hibs_racing.pick_explain import attach_pick_explanations
+from hibs_racing.daily.pick_display import build_engine_display_picks
 from hibs_racing.web_service import dashboard_context, novice_pick_candidates
 
 SNAPSHOT_DIR = ROOT / "data" / "smart_picks"
@@ -31,6 +32,20 @@ def _lane_flag_col(lane: str) -> str | None:
     if lane in ("production", "default"):
         return None
     return f"flag_{lane}" if lane.startswith("gate") else f"flag_{lane}"
+
+
+def filter_smart_picks_loose(candidates: list[dict[str, Any]], *, limit: int = 3) -> list[dict[str, Any]]:
+    """Looser paper/watchlist tier — still ranked by engine place score."""
+    from hibs_racing.daily.pick_display import passes_loose_pick
+
+    ranked = sorted(
+        [c for c in candidates if passes_loose_pick(c)],
+        key=lambda c: float(c.get("place_score") or c.get("model_place_prob") or 0),
+        reverse=True,
+    )
+    if ranked:
+        return ranked[: max(1, int(limit))]
+    return filter_smart_picks(candidates, limit=limit)
 
 
 def filter_smart_picks(candidates: list[dict[str, Any]], *, limit: int = 3) -> list[dict[str, Any]]:
@@ -151,10 +166,12 @@ def build_morning_smart_picks(*, limit: int = 3, window_hours: int = 24) -> dict
 
     candidates = novice_pick_candidates(ctx.get("meetings") or [])
     picks = filter_smart_picks(candidates, limit=limit)
+    engine_top = build_engine_display_picks(ctx.get("meetings") or [], load_scored_cards(), top_n=limit + 3)
     return {
         "ok": True,
         "pick_count": len(picks),
         "picks": picks,
+        "engine_top_picks": engine_top,
         "card_dates": ctx.get("card_dates") or [],
         "scoring_method": ctx.get("scoring_method"),
         "candidate_count": len(candidates),
@@ -209,7 +226,10 @@ def format_pick_line(pick: dict[str, Any], index: int) -> str:
 
 
 def format_digest_message(payload: dict[str, Any], *, product_name: str = "Hibs Racing Intelligence") -> str:
+    from hibs_racing.daily.pick_display import format_engine_digest_lines
+
     picks = payload.get("picks") or []
+    engine = payload.get("engine_top_picks") or []
     dates = ", ".join(payload.get("card_dates") or []) or "today"
     lane = payload.get("lane") or "gate3"
     lines = [
@@ -217,12 +237,16 @@ def format_digest_message(payload: dict[str, Any], *, product_name: str = "Hibs 
         f"Cards: {dates} · lane {lane}",
         "",
     ]
-    if not picks:
-        lines.append("No value picks passed filters today (value + DQ + steam + lane gate).")
-    else:
+    if picks:
         for i, pick in enumerate(picks, start=1):
             lines.append(format_pick_line(pick, i))
             lines.append("")
+    elif engine:
+        lines.append("Top engine place angles today:")
+        lines.append("")
+        lines.extend(format_engine_digest_lines(engine, limit=3))
+    else:
+        lines.append("Engine refresh pending — cards loading for today's meeting window.")
     digest = payload.get("digest_hash")
     if digest:
         lines.append(f"Digest: {digest[:16]}…")

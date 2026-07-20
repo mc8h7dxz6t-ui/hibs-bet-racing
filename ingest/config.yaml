@@ -60,6 +60,13 @@ paper:
   sync_ledger_on_score: true
   log_on_refresh: true
   min_data_quality_pct: 95
+  display_loose_min_data_quality_pct: 60
+  display_loose_steam_gates:
+  - proceed
+  - scale_up
+  - scale_down
+  - unknown
+  display_top_n: 6
   enforce_steam_gate: true
   allowed_steam_gates:
   - proceed

@@ -79,14 +79,19 @@ def _channel_digest_preview(ctx: dict | None = None) -> str:
             ctx = dashboard_context()
         candidates = novice_pick_candidates(ctx.get("meetings") or [])
         picks = filter_smart_picks(candidates, limit=3)
+        engine = ctx.get("engine_top_picks") or []
         return format_digest_message(
-            {"picks": picks, "card_dates": ctx.get("card_dates") or []},
+            {
+                "picks": picks,
+                "engine_top_picks": engine,
+                "card_dates": ctx.get("card_dates") or [],
+            },
         )
     except Exception:
         return (
             "🏇 Hibs Racing Intelligence — Daily Value Sheet\n"
             "Cards: today\n\n"
-            "No value picks passed filters today (value + DQ≥75% + steam gate).\n"
+            "Engine refresh pending — cards loading for today's meeting window.\n"
             "Tracker: /tracker"
         )
 
