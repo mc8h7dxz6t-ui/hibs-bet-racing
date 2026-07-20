@@ -393,6 +393,7 @@
 </head>
 <body class="hibs-launch-active">
 {% include '_launch_wait_overlay.html' %}
+{% include '_product_transition_overlay.html' %}
 <div class="ref-page">
     {% include '_product_switcher.html' %}
     <header class="site-top">
@@ -489,6 +490,7 @@ document.getElementById('btn-refresh')?.addEventListener('click', async () => {
 });
 </script>
 <script src="{{ static_v('racing_ui.js') }}" defer></script>
+<script src="{{ static_v('hibs_product_switch.js') }}" defer></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => window.HibsBranding?.apply?.());
 </script>
