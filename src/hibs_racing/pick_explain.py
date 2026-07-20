@@ -101,10 +101,10 @@ def explain_pick(row: dict | pd.Series, *, race_peers: pd.DataFrame | None = Non
                 reasons.append(f"Top OR ({or_val}) in the race.")
 
     if place_p >= 55:
-        reasons.append(f"Top-3 chance {fmt_prob_phrase(place_p)} (combo + pace + ratings).")
+        reasons.append(f"About a {fmt_prob_phrase(place_p)} chance of placing (top 3) from combo, pace and ratings.")
     elif place_p >= 45:
         fs = f"{field}-runner" if field else "this"
-        reasons.append(f"Place chance {fmt_prob_phrase(place_p)} in a {fs} race.")
+        reasons.append(f"Place chance about {fmt_prob_phrase(place_p)} in a {fs} race.")
 
     if value_flag == 1:
         reasons.append("Passes value gates at logged each-way odds.")
