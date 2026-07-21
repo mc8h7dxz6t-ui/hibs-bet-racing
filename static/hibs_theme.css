@@ -790,3 +790,63 @@ body.hibs-workspace-active .betslip-backdrop {
         display: none;
     }
 }
+
+/* Theme variants — set data-hibs-theme on <html> (settings + lite shell default pastel) */
+html[data-hibs-theme="default"],
+html[data-hibs-theme="pastel"] {
+    --hibs-neon: #e2e8f0;
+    --green: #a7f3d0;
+    --neon-value: #5eead4;
+    --gold: #fde68a;
+    --accent: #cbd5e1;
+    --blue: #a5f3fc;
+    --card: rgba(30, 41, 59, 0.72);
+    --border: rgba(167, 243, 208, 0.14);
+    --glow: rgba(94, 234, 212, 0.08);
+    --text: #f8fafc;
+    --muted: #cbd5e1;
+}
+
+html[data-hibs-theme="bright-pitch"] {
+    --hibs-green: #14b8a6;
+    --hibs-green-dark: #0f172a;
+    --hibs-green-mid: #134e4a;
+    --hibs-green-soft: rgba(20, 184, 166, 0.22);
+    --hibs-green-glow: rgba(20, 184, 166, 0.14);
+    --hibs-neon: #e2e8f0;
+    --neon-value: #5eead4;
+    --green: #a7f3d0;
+    --accent: #94a3b8;
+    --card: rgba(15, 23, 42, 0.92);
+    --border: rgba(148, 163, 184, 0.22);
+    --glow: rgba(20, 184, 166, 0.14);
+}
+
+html[data-hibs-theme="deep-forest"] {
+    --hibs-green: #0d9488;
+    --hibs-green-dark: #0b1220;
+    --hibs-green-mid: #134e4a;
+    --hibs-navy: #0f172a;
+    --hibs-navy-deep: #020617;
+    --hibs-neon: #cbd5e1;
+    --neon-value: #5eead4;
+    --green: #a7f3d0;
+    --card: rgba(15, 23, 42, 0.94);
+    --border: rgba(148, 163, 184, 0.14);
+    --glow: rgba(13, 148, 136, 0.1);
+}
+
+html[data-hibs-theme="low-glow"] {
+    --hibs-neon: #e2e8f0;
+    --neon-value: #5eead4;
+    --glow: rgba(13, 148, 136, 0.06);
+    --border: rgba(148, 163, 184, 0.14);
+}
+
+html[data-hibs-ui="away"] {
+    --hibs-neon: #cbd5e1;
+    --neon-value: #5eead4;
+    --green: #a7f3d0;
+    --accent: #94a3b8;
+    --border: rgba(148, 163, 184, 0.22);
+}
