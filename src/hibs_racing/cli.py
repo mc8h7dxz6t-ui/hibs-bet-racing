@@ -692,17 +692,20 @@ def cmd_poll_odds(args: argparse.Namespace) -> int:
 
     milestone = getattr(args, "milestone", None) or "pre_race_30m"
     if args.once:
-        report = poll_matchbook_odds_once(poll_milestone=milestone)
+        report = poll_matchbook_odds_once(
+            poll_milestone=milestone,
+            force=getattr(args, "force", False),
+        )
         print(json.dumps({**report.to_dict(), "poll_milestone": milestone}, indent=2))
         return 0 if not report.errors or report.runners_priced > 0 else 1
     run_matchbook_poll_loop(interval_seconds=args.interval, max_cycles=args.max_cycles)
     return 0
 
 
-def cmd_dry_run_quotes(_: argparse.Namespace) -> int:
+def cmd_dry_run_quotes(args: argparse.Namespace) -> int:
     from hibs_racing.odds.exchange_quotes import dry_run_exchange_quotes
 
-    result = dry_run_exchange_quotes()
+    result = dry_run_exchange_quotes(force=getattr(args, "force", False))
     print(json.dumps(result, indent=2))
     return 0 if result.get("ok") else 1
 
@@ -1633,6 +1636,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_poll = sub.add_parser("poll-odds", help="Matchbook steam/drift polling loop (default 120s)")
     p_poll.add_argument("--once", action="store_true", help="Single poll cycle")
+    p_poll.add_argument("--force", action="store_true", help="Bypass matchbook poll interval / Mac-owner gate")
     p_poll.add_argument("--interval", type=int, default=120, help="Seconds between polls")
     p_poll.add_argument("--max-cycles", type=int, help="Stop after N cycles (default: infinite)")
     p_poll.add_argument(
@@ -1646,6 +1650,7 @@ def main(argv: list[str] | None = None) -> int:
         "dry-run-quotes",
         help="Fetch Matchbook quotes for upcoming cards and persist to exchange_quotes (no score)",
     )
+    p_drq.add_argument("--force", action="store_true", help="Bypass matchbook poll interval / Mac-owner gate")
     p_drq.set_defaults(func=cmd_dry_run_quotes)
 
     p_join = sub.add_parser(

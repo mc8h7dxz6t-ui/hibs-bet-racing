@@ -350,15 +350,20 @@ def join_sp_to_value_picks(
     return {"joined": joined}
 
 
-def dry_run_exchange_quotes(*, database: Path | None = None) -> dict:
+def dry_run_exchange_quotes(*, database: Path | None = None, force: bool | None = None) -> dict:
     """Fetch Matchbook quotes for upcoming cards and persist without scoring."""
+    import os
+
     from hibs_racing.cards.store import load_upcoming_runners
     from hibs_racing.odds.matchbook import fetch_matchbook_odds
 
     cards = load_upcoming_runners()
     if cards.empty:
         return {"ok": False, "error": "no upcoming cards"}
-    odds, report = fetch_matchbook_odds(cards)
+    poll_force = force
+    if poll_force is None:
+        poll_force = os.getenv("HIBS_MATCHBOOK_FORCE", "").strip().lower() in ("1", "true", "yes", "on")
+    odds, report = fetch_matchbook_odds(cards, force=poll_force)
     if odds.empty:
         return {"ok": False, "error": "no quotes", "report": report.to_dict()}
     if "card_date" not in odds.columns and "card_date" in cards.columns:
