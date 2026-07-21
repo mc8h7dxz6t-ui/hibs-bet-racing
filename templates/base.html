@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="{{ static_v('hibs_mobile.css') }}">
     <style id="hibs-launch-critical">
         html.hibs-launch-boot,body.hibs-launch-active{overflow:hidden;}
-        #hibs-launch-overlay{position:fixed;inset:0;z-index:100010;display:flex;align-items:center;justify-content:center;background:#0b1220;}
+        #hibs-launch-overlay{position:fixed;inset:0;z-index:100010;display:flex;align-items:center;justify-content:center;background:var(--hibs-navy-deep,#0f172a);}
         #hibs-launch-overlay.hibs-launch-hidden{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .35s ease;}
         .hibs-launch-panel{text-align:center;padding:28px;}
         .hibs-launch-crest{width:120px;height:auto;margin:0 auto 12px;display:block;}
@@ -20,37 +20,19 @@
     </style>
     <script>document.documentElement.classList.add('hibs-launch-boot');</script>
     <style>
+        /* Brand colours — static/hibs_theme.css (do not redefine tokens here) */
         :root {
-            --primary-brand-color:#0d9488;
-            --wordmark-font:'Inter',sans-serif;
-            --hibs-green:var(--primary-brand-color);
-            --hibs-green-dark:#0f172a;
-            --hibs-navy:#0f172a;
-            --hibs-navy-deep:#0b1220;
-            --hibs-neon:#e2e8f0;
-            --neon-value:#5eead4;
-            --card:rgba(15,23,42,0.92);
-            --border:rgba(148,163,184,0.18);
-            --gold:#fcd34d;
-            --accent:#94a3b8;
-            --text:#f1f5f9;
-            --muted:#94a3b8;
-            --radius-md:12px;
-            --shadow-md:0 10px 32px rgba(0,0,0,0.32);
+            --radius-md: 12px;
+            --shadow-md: 0 10px 32px rgba(0, 0, 0, 0.32);
         }
         *{box-sizing:border-box;margin:0;padding:0;}
         body{
             font-family:'Inter',sans-serif;
-            background:var(--hibs-navy-deep);
-            color:var(--text);
             min-height:100vh;
             padding:12px;
-            background-image:
-                radial-gradient(ellipse at 12% 40%,rgba(13,148,136,0.12) 0%,transparent 48%),
-                radial-gradient(ellipse at 88% 12%,rgba(13,148,136,0.16) 0%,transparent 42%);
         }
         body::before{
-            content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.03;
+            content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
             background:url('{{ static_v(hibs_harvested_logo|default('hibs_harvested_logo.png')) }}') repeat;
             background-size:min(320px, 50vw) auto;
         }
@@ -385,7 +367,9 @@
                 var raw = localStorage.getItem('hibs_user_settings_v1');
                 var s = raw ? JSON.parse(raw) : {};
                 var root = document.documentElement;
-                root.setAttribute('data-hibs-theme', s.theme || 'pastel');
+                var theme = String(s.theme || 'pastel').toLowerCase();
+                if (!theme || theme === 'default') theme = 'pastel';
+                root.setAttribute('data-hibs-theme', theme);
                 root.setAttribute('data-hibs-density', s.density || 'compact');
             } catch (e) {}
         })();

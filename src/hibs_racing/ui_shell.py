@@ -10,7 +10,7 @@ def ui_asset_version() -> str:
     raw = (os.getenv("HIBS_UI_ASSET_VERSION") or "").strip()
     if raw:
         return raw
-    return "20260714b"
+    return "20260721a"
 
 
 def static_v(filename: str, **kwargs: Any) -> str:

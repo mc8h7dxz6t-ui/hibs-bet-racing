@@ -30,6 +30,15 @@ def test_ui_asset_version_env_override(monkeypatch):
     assert "v=testver" in url
 
 
+def test_base_template_uses_theme_css_not_legacy_inline_tokens():
+    from pathlib import Path
+
+    text = Path("templates/base.html").read_text(encoding="utf-8")
+    assert "hibs_theme.css" in text
+    assert "--hibs-navy-deep:#0b1220" not in text.replace(" ", "")
+    assert 'data-hibs-theme="pastel"' in text
+
+
 def test_product_switcher_urls_local(monkeypatch):
     from hibs_racing.web import create_app
 
