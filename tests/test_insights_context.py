@@ -46,27 +46,18 @@ def test_insights_context_skips_heavy_group_meetings(monkeypatch):
                 "combo_bayes_place": 0.4,
                 "off_time": "14:00",
                 "course": "Ascot",
+                "value_flag": 0,
             }
         ]
     )
 
     monkeypatch.setattr("hibs_racing.web_service._base_frame", lambda **_: frame)
-    monkeypatch.setattr("hibs_racing.web_service.group_meetings", lambda _frame: [])
-    monkeypatch.setattr(
-        "hibs_racing.daily.pick_display.build_value_lane_display_picks",
-        lambda meetings, f, **_: [],
-    )
-    monkeypatch.setattr(
-        "hibs_racing.models.feature_impact.load_feature_impact_report",
-        lambda: {},
-    )
-    monkeypatch.setattr(
-        "hibs_racing.web_service._ui_data_status",
-        lambda _frame: {"level": "ok", "messages": []},
-    )
-    monkeypatch.setattr(
-        "hibs_racing.web_service.health_status",
-        lambda: type(
+
+    def _boom(_frame):
+        raise AssertionError("group_meetings must not run for insights")
+
+    monkeypatch.setattr("hibs_racing.web_service.group_meetings", _boom)
+    monkeypatch.setattr("hibs_racing.web_service.shell_health_status", lambda: type(
             "H",
             (),
             {
@@ -75,6 +66,14 @@ def test_insights_context_skips_heavy_group_meetings(monkeypatch):
                 "to_dict": lambda self: {"value_lane_ready": True},
             },
         )(),
+    )
+    monkeypatch.setattr(
+        "hibs_racing.models.feature_impact.load_feature_impact_report",
+        lambda: {},
+    )
+    monkeypatch.setattr(
+        "hibs_racing.web_service._ui_data_status",
+        lambda _frame: {"level": "ok", "messages": []},
     )
 
     ctx = insights_context(top_n=5)

@@ -16,7 +16,7 @@ from hibs_racing.cards.ui_frame import (
     is_value_pick,
     safe_value_mask,
 )
-from hibs_racing.cards.window import filter_next_hours, off_minutes
+from hibs_racing.cards.window import filter_next_hours, off_minutes, primary_card_date
 from hibs_racing.entity.timezone import LONDON
 from hibs_racing.backtest.place_signal import run_place_backtest
 from hibs_racing.cards.refresh import refresh_cards
@@ -839,6 +839,23 @@ def _base_frame(*, card_date: str | None = None, window_hours: int | None = 24) 
     return _backfill_win_decimal_from_cache(frame)
 
 
+def _cap_dashboard_frame(frame: pd.DataFrame, *, max_runners: int = 1200) -> pd.DataFrame:
+    """Keep the racecard UI bounded when the DB holds many future card_dates."""
+    if frame.empty or len(frame) <= max_runners:
+        return frame
+    dates = sorted(frame["card_date"].astype(str).str[:10].unique()) if "card_date" in frame.columns else []
+    if not dates:
+        return frame.head(max_runners).copy()
+    primary = primary_card_date(frame)
+    keep = [d for d in dates if d >= (primary or dates[0])][:3]
+    trimmed = frame[frame["card_date"].astype(str).str[:10].isin(keep)]
+    if trimmed.empty:
+        return frame.head(max_runners).copy()
+    if len(trimmed) > max_runners:
+        return trimmed.head(max_runners).copy()
+    return trimmed
+
+
 def _ui_data_status(frame: pd.DataFrame) -> dict:
     from hibs_racing.matchbook_guard import status_payload as matchbook_status
     from hibs_racing.scrapers.racing_scrape_api import odds_coverage_summary
@@ -878,13 +895,11 @@ def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
 
     frame = _base_frame(window_hours=window_hours)
     link_index = race_deep_link_index(frame) if not frame.empty else []
-    meetings = group_meetings(frame) if not frame.empty else []
-    health = health_status()
+    health = shell_health_status()
     picks = attach_deep_links_to_picks(top_places_of_day(frame, top_n=top_n), link_index)
     picks_by_day = top_picks_by_day(frame, link_index, top_n=top_n)
-    value_lane_picks = build_value_lane_display_picks(meetings, frame, top_n=8)
-    sniper_lane_picks = build_sniper_lane_display_picks(meetings, frame, top_n=6)
-    from hibs_racing.cards.actionability import safe_value_mask
+    value_lane_picks = build_value_lane_display_picks(None, frame, top_n=8, deep_links=link_index)
+    sniper_lane_picks = build_sniper_lane_display_picks(None, frame, top_n=6, deep_links=link_index)
     from hibs_racing.racing_lanes_status import build_racing_lanes_status
 
     value_n = int(safe_value_mask(frame).sum()) if not frame.empty else 0
@@ -990,24 +1005,26 @@ def novice_pick_candidates(meetings: list[dict]) -> list[dict]:
     return out
 
 
-def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -> dict:
-    frame = _base_frame(card_date=card_date, window_hours=window_hours)
-    health = health_status()
+def dashboard_context(*, card_date: str | None = None, window_hours: int = 24, heavy: bool = False) -> dict:
+    frame = _cap_dashboard_frame(_base_frame(card_date=card_date, window_hours=window_hours))
+    health = shell_health_status() if not heavy else health_status()
     value = frame[safe_value_mask(frame)] if not frame.empty else frame.iloc[0:0]
-    from hibs_racing.monitor import monitor_snapshot, top_places_of_day
+    from hibs_racing.monitor import monitor_snapshot
 
-    monitor = monitor_snapshot(refresh=False, settle=True)
-    try:
-        backtest = run_place_backtest().to_dict()
-    except Exception:
-        backtest = None
+    monitor = monitor_snapshot(refresh=False, settle=heavy)
+    backtest = None
+    gate_summary = None
+    if heavy:
+        try:
+            backtest = run_place_backtest().to_dict()
+        except Exception:
+            backtest = None
     scoring_method = None
     if not frame.empty and "scoring_method" in frame.columns:
         modes = frame["scoring_method"].dropna().unique().tolist()
         scoring_method = modes[0] if len(modes) == 1 else "mixed"
     from hibs_racing.odds.market_steam import latest_gauges
     from hibs_racing.ranker_features import ranker_feature_profile
-    from hibs_racing.backtest.gate_compare import compare_value_gates
 
     card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else []
     meetings = group_meetings(frame) if not frame.empty else []
@@ -1030,10 +1047,13 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
         runner_count=len(frame),
         ui_data_status=_ui_data_status(frame),
     )
-    try:
-        gate_summary = compare_value_gates(days=14).to_dict()
-    except Exception:
-        gate_summary = None
+    if heavy:
+        from hibs_racing.backtest.gate_compare import compare_value_gates
+
+        try:
+            gate_summary = compare_value_gates(days=14).to_dict()
+        except Exception:
+            gate_summary = None
     from hibs_racing.pick_quality import gate_filter_modes
 
     return {
