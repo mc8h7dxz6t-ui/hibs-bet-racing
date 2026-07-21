@@ -50,7 +50,15 @@
 }
 .race-tab:hover{background:rgba(13,148,136,0.15);}
 .race-tab.is-active{background:rgba(13,148,136,0.28);border-color:rgba(94,234,212,0.35);color:var(--hibs-neon);}
+.race-tab.has-gate-pick{border-color:rgba(94,234,212,0.55);}
 .race-tab.has-value{border-color:rgba(246,216,137,0.45);}
+tr.gate-filter-hidden,.runner-mobile-card.gate-filter-hidden{display:none!important;}
+.race-drawer.gate-filter-empty .race-body{position:relative;}
+.race-drawer.gate-filter-empty .race-table-wrap::before{
+    content:'No runners pass this pick-quality filter — try All runners or a looser gate.';
+    display:block;padding:10px 12px;margin-bottom:8px;border-radius:8px;
+    font-size:0.78em;color:var(--muted);border:1px dashed rgba(148,163,184,0.35);
+}
 .meeting-drawer > summary::after,.race-drawer > summary::after{
     content:'';width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);
     transform:rotate(45deg);margin-left:auto;transition:transform .2s;flex-shrink:0;
@@ -346,6 +354,15 @@
                 {% endfor %}
             </select>
         </div>
+        <div class="ctrl-group">
+            <label for="gate-filter-select">Pick quality</label>
+            <select id="gate-filter-select" class="ctrl-select" aria-label="Filter runners by gate quality"
+                data-default="{{ default_gate_filter|default('all') }}">
+                {% for mode in gate_filter_modes|default([]) %}
+                <option value="{{ mode.id }}" title="{{ mode.hint }}">{{ mode.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <div class="ctrl-group" style="flex:2 1 240px;">
             <label for="meeting-hint">Meeting insight</label>
             <div id="meeting-hint" class="pill" style="min-height:38px;align-items:center;">Select a meeting — full field odds, RP comments &amp; engine view below</div>
@@ -362,6 +379,7 @@
             {% if scoring_method %}
             <span class="method-badge {% if scoring_method != 'ranker' %}heuristic{% endif %}" title="Scoring engine">{{ scoring_method }}</span>
             {% endif %}
+            <span class="pill" id="gate-filter-count" hidden></span>
             <span class="pill">{{ runner_count }} runners</span>
             {% if value_count %}<span class="pill warn">{{ value_count }} value</span>{% endif %}
             <button type="button" class="btn btn-secondary" id="btn-expand-races">Expand all</button>
@@ -479,6 +497,13 @@
                                     data-place-edge-pct="{{ r.place_value_edge_pct if r.place_value_edge_pct is not none else '' }}"
                                     data-place-chip-active="{{ 1 if r.place_value_chip_active else 0 }}"
                                     data-value-flag="{{ 1 if r.value_flag else 0 }}"
+                                    data-pick-gate-tier="{{ r.pick_gate_tier|default('none') }}"
+                                    data-gate-watchlist="{{ 1 if r.pick_gate_watchlist else 0 }}"
+                                    data-gate-value="{{ 1 if r.pick_gate_value else 0 }}"
+                                    data-gate-value-lane="{{ 1 if r.pick_gate_value_lane else 0 }}"
+                                    data-gate-paper-ready="{{ 1 if r.pick_gate_paper_ready else 0 }}"
+                                    data-gate-sniper="{{ 1 if r.pick_gate_sniper else 0 }}"
+                                    data-data-quality="{{ r.data_quality_pct|default(0) }}"
                                     data-steam-gate="{{ g.gate if g else 'proceed' }}"
                                     data-engine-opinion="{{ r.engine_opinion or '' }}"
                                     data-engine-reasons="{{ (r.engine_reasons or [])|join('||')|e }}"

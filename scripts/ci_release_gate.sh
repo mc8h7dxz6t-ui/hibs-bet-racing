@@ -35,6 +35,7 @@ RACING_TESTS=(
   tests/test_institutional_hardening.py
   tests/test_api_auth.py
   tests/test_ui_shell.py
+  tests/test_pick_quality.py
   tests/test_product_links.py
   tests/test_url_prefix.py
   tests/test_value_lane_picks.py

@@ -77,3 +77,30 @@ def test_subpath_rewrites_internal_nav(monkeypatch):
     assert 'href="/racing/insights"' in html
     assert 'id="meeting-select"' in html or 'Racecards' in html
     assert 'data-api-url="/api/racing/portfolio/summary"' in html
+
+
+def test_dashboard_context_includes_gate_filter_modes():
+    from hibs_racing.web_service import dashboard_context
+
+    ctx = dashboard_context()
+    modes = ctx.get("gate_filter_modes") or []
+    ids = {m["id"] for m in modes}
+    assert "all" in ids
+    assert "sniper" in ids
+    assert "paper_ready" in ids
+
+
+def test_cards_url_gate_query_normalized(monkeypatch):
+    from hibs_racing.pick_quality import normalize_gate_filter_mode
+    from hibs_racing.web import create_app
+
+    monkeypatch.delenv("HIBS_RACING_PUBLIC_URL", raising=False)
+    app = create_app()
+    with app.test_request_context("/cards?gate=sniper"):
+        from flask import request
+
+        assert normalize_gate_filter_mode(request.args.get("gate")) == "sniper"
+    with app.test_request_context("/cards?gate=not-a-real-mode"):
+        from flask import request
+
+        assert normalize_gate_filter_mode(request.args.get("gate")) == "all"

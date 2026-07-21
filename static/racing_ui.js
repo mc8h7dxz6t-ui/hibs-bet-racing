@@ -69,6 +69,107 @@
   const STORAGE_MEETING = 'hibs_racing_meeting';
   const STORAGE_RACE = 'hibs_racing_race';
   const STORAGE_HERO = 'hibs_racing_hero_open';
+  const STORAGE_GATE = 'hibs_racing_gate_filter';
+
+  const GATE_ROW_ATTR = {
+    watchlist: 'gateWatchlist',
+    value: 'gateValue',
+    value_lane: 'gateValueLane',
+    paper_ready: 'gatePaperReady',
+    sniper: 'gateSniper',
+  };
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function rowPassesGateFilter(row, mode) {
+    if (!row || !mode || mode === 'all') return true;
+    const attr = GATE_ROW_ATTR[mode];
+    if (!attr) return true;
+    return row.dataset[attr] === '1';
+  }
+
+  function currentGateFilterMode() {
+    const sel = document.getElementById('gate-filter-select');
+    return (sel && sel.value) ? sel.value : 'all';
+  }
+
+  function readGateFilterMode() {
+    const sel = document.getElementById('gate-filter-select');
+    const urlMode = new URLSearchParams(window.location.search).get('gate');
+    const defaultMode = sel?.dataset.default || 'all';
+    let mode = defaultMode || 'all';
+    try {
+      const saved = localStorage.getItem(STORAGE_GATE);
+      if (saved) mode = saved;
+    } catch (_) { /* noop */ }
+    if (urlMode) mode = urlMode;
+    if (sel && !Array.from(sel.options).some((o) => o.value === mode)) {
+      mode = 'all';
+    }
+    return mode;
+  }
+
+  function applyGateFilter(mode, root) {
+    const shell = root || document.getElementById('racecard-shell') || document;
+    const filterMode = mode || currentGateFilterMode() || 'all';
+    let visible = 0;
+
+    shell.querySelectorAll('tr[data-runner-id]').forEach((row) => {
+      const show = rowPassesGateFilter(row, filterMode);
+      row.classList.toggle('gate-filter-hidden', !show);
+      row.hidden = !show;
+      if (show) visible += 1;
+    });
+
+    shell.querySelectorAll('.runner-mobile-card').forEach((card) => {
+      const rid = card.dataset.runnerId;
+      const row = rid ? shell.querySelector(`tr[data-runner-id="${CSS.escape(rid)}"]`) : null;
+      const show = row ? !row.hidden : false;
+      card.hidden = !show;
+      card.classList.toggle('gate-filter-hidden', !show);
+    });
+
+    shell.querySelectorAll('.race-drawer').forEach((drawer) => {
+      const raceRows = drawer.querySelectorAll('tr[data-runner-id]');
+      const anyVisible = Array.from(raceRows).some((r) => !r.hidden);
+      drawer.classList.toggle('gate-filter-empty', raceRows.length > 0 && !anyVisible);
+    });
+
+    const badge = document.getElementById('gate-filter-count');
+    if (badge) {
+      if (filterMode === 'all') {
+        badge.hidden = true;
+      } else {
+        badge.hidden = false;
+        badge.textContent = visible + ' shown';
+        badge.title = 'Runners matching pick quality filter';
+      }
+    }
+
+    shell.querySelectorAll('.race-tab').forEach((tab) => {
+      const drawer = document.getElementById(tab.dataset.target || '');
+      if (!drawer) return;
+      const any = Array.from(drawer.querySelectorAll('tr[data-runner-id]')).some((r) => !r.hidden);
+      tab.classList.toggle('has-gate-pick', filterMode !== 'all' && any);
+    });
+  }
+
+  function bindGateFilter() {
+    const sel = document.getElementById('gate-filter-select');
+    if (!sel) return;
+    const mode = readGateFilterMode();
+    sel.value = mode;
+    applyGateFilter(mode);
+    sel.addEventListener('change', () => {
+      const next = sel.value || 'all';
+      try {
+        localStorage.setItem(STORAGE_GATE, next);
+      } catch (_) { /* noop */ }
+      applyGateFilter(next);
+    });
+  }
 
   function activePanel() {
     return document.querySelector('.meeting-panel.is-active');
@@ -198,6 +299,7 @@
     const opt = meetingSel?.options[meetingSel.selectedIndex];
     const hint = document.getElementById('meeting-hint');
     if (hint && opt?.dataset.hint) hint.textContent = opt.dataset.hint;
+    applyGateFilter();
   }
 
   function applyDeepLink() {
@@ -280,6 +382,7 @@
           + '<div class="rm-meta">Win ' + (win || '—') + ' · model win ' + (barPct || '—') + '%</div>'
           + '<div class="rm-bars"><div class="rm-bar" title="Model win%"><span style="width:' + barPct + '%"></span></div></div>'
           + (reasonHtml ? '<div class="rm-reason">' + reasonHtml + '</div>' : '');
+        if (row.dataset.runnerId) card.dataset.runnerId = row.dataset.runnerId;
         card.addEventListener('click', () => {
           row.scrollIntoView({ behavior: 'smooth', block: 'center' });
           row.classList.add('runner-highlight');
@@ -293,6 +396,7 @@
   function enhanceRunnerPresentation() {
     applySteamBadges();
     buildMobileRunnerCards();
+    applyGateFilter();
   }
 
   function bindRacecard() {
@@ -340,6 +444,8 @@
         d.open = false;
       });
     });
+
+    bindGateFilter();
 
     const link = readDeepLink();
     if (link.meeting || link.raceId || link.race) {
