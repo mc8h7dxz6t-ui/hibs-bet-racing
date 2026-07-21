@@ -96,10 +96,13 @@ class MatchbookFetchReport:
 
 
 def _credentials() -> tuple[str, str]:
-    user = os.environ.get("MATCHBOOK_USERNAME", "").strip()
+    user = (
+        os.environ.get("MATCHBOOK_USERNAME", "").strip()
+        or os.environ.get("MATCHBOOK_USER", "").strip()
+    )
     password = os.environ.get("MATCHBOOK_PASSWORD", "").strip()
     if not user or not password:
-        raise ValueError("Set MATCHBOOK_USERNAME and MATCHBOOK_PASSWORD in .env")
+        raise ValueError("Set MATCHBOOK_USER/USERNAME and MATCHBOOK_PASSWORD in .env")
     return user, password
 
 

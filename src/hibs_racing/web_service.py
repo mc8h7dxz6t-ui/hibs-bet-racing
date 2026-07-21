@@ -171,6 +171,14 @@ def _env_ok(*keys: str) -> bool:
     return True
 
 
+def _matchbook_creds_ok() -> bool:
+    user = (
+        os.environ.get("MATCHBOOK_USERNAME", "").strip()
+        or os.environ.get("MATCHBOOK_USER", "").strip()
+    )
+    return bool(user and os.environ.get("MATCHBOOK_PASSWORD", "").strip())
+
+
 def _health_light_mode() -> bool:
     raw = os.environ.get("HIBS_HEALTH_LIGHT", "").strip().lower()
     if raw in ("0", "false", "no", "off"):
@@ -207,7 +215,7 @@ def shell_health_status() -> HealthStatus:
         raceform = str(Path(raceform).expanduser())
         if not Path(raceform).exists():
             raceform = None
-    mb_creds = _env_ok("MATCHBOOK_USERNAME", "MATCHBOOK_PASSWORD")
+    mb_creds = _matchbook_creds_ok()
     partial = {
         "db_ok": db.exists() and db_integrity_ok,
         "db_integrity_ok": db_integrity_ok,
@@ -411,7 +419,7 @@ def health_status() -> HealthStatus:
             data_producer = build_data_producer_snapshot()
         except Exception:
             data_producer = None
-    mb_creds = _env_ok("MATCHBOOK_USERNAME", "MATCHBOOK_PASSWORD")
+    mb_creds = _matchbook_creds_ok()
     partial = {
         "db_ok": db.exists() and db_integrity_ok,
         "db_integrity_ok": db_integrity_ok,
@@ -873,6 +881,18 @@ def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
     picks_by_day = top_picks_by_day(frame, link_index, top_n=top_n)
     value_lane_picks = build_value_lane_display_picks(meetings, frame, top_n=8)
     sniper_lane_picks = build_sniper_lane_display_picks(meetings, frame, top_n=6)
+    from hibs_racing.cards.actionability import safe_value_mask
+    from hibs_racing.racing_lanes_status import build_racing_lanes_status
+
+    value_n = int(safe_value_mask(frame).sum()) if not frame.empty else 0
+    racing_lanes_status = build_racing_lanes_status(
+        health=health,
+        value_lane_picks=value_lane_picks,
+        sniper_lane_picks=sniper_lane_picks,
+        value_count=value_n,
+        runner_count=len(frame),
+        ui_data_status=_ui_data_status(frame),
+    )
     card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else []
     pick_dates = sorted(picks_by_day.keys())
     day_dates = sorted(set(card_dates) | set(pick_dates))
@@ -885,6 +905,7 @@ def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
         "top_picks": picks,
         "value_lane_picks": value_lane_picks,
         "sniper_lane_picks": sniper_lane_picks,
+        "racing_lanes_status": racing_lanes_status,
         "picks_by_day": picks_by_day,
         "meeting_days": meeting_days_from_card_dates(day_dates),
         "pick_count": len(picks),
@@ -995,6 +1016,17 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
     engine_top_picks = build_engine_display_picks(meetings, frame, top_n=6)
     value_lane_picks = build_value_lane_display_picks(meetings, frame, top_n=8)
     sniper_lane_picks = build_sniper_lane_display_picks(meetings, frame, top_n=6)
+    from hibs_racing.racing_lanes_status import build_racing_lanes_status
+
+    racing_lanes_status = build_racing_lanes_status(
+        health=health,
+        value_lane_picks=value_lane_picks,
+        sniper_lane_picks=sniper_lane_picks,
+        engine_top_picks=engine_top_picks,
+        value_count=len(value),
+        runner_count=len(frame),
+        ui_data_status=_ui_data_status(frame),
+    )
     try:
         gate_summary = compare_value_gates(days=14).to_dict()
     except Exception:
@@ -1015,6 +1047,7 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
         "engine_top_picks": engine_top_picks,
         "value_lane_picks": value_lane_picks,
         "sniper_lane_picks": sniper_lane_picks,
+        "racing_lanes_status": racing_lanes_status,
         "monitor": monitor,
         "backtest": backtest,
         "scoring_method": scoring_method,

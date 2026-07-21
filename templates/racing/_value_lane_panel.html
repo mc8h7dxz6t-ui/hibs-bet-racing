@@ -49,4 +49,9 @@
     <h2>Value lane</h2>
     <p class="section-hint">No ROI picks right now{% if health.value_lane_blockers %} — blockers: {{ health.value_lane_blockers|join(', ') }}{% endif %}. Run <strong>Refresh 24h</strong> once cards and Matchbook odds are loaded.</p>
 </section>
+{% elif health is defined and health.value_lane_ready %}
+<section class="value-lane-empty card value-lane-empty-ready" id="value-lane-hero" aria-label="Value lane status">
+    <h2>Value lane</h2>
+    <p class="section-hint">Card healthy but no qualifying ROI picks{% if racing_lanes_status is defined and racing_lanes_status.raw_value_count %} ({{ racing_lanes_status.raw_value_count }} raw value flags gated){% endif %}. Check Matchbook coverage and gate block rate in Card stats.</p>
+</section>
 {% endif %}
