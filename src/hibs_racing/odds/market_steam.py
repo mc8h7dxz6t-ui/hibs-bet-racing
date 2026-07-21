@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -485,11 +486,16 @@ def detect_steam_drift(
     return triggers, current
 
 
+def _poll_force() -> bool:
+    return os.getenv("HIBS_MATCHBOOK_FORCE", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def poll_matchbook_odds_once(
     *,
     persist: bool = True,
     pre_race_only: bool = True,
     poll_milestone: str = "pre_race_30m",
+    force: bool | None = None,
 ) -> PollCycleReport:
     polled_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     report = PollCycleReport(polled_at=polled_at, runners_priced=0)
@@ -507,11 +513,17 @@ def poll_matchbook_odds_once(
         return report
 
     try:
-        odds, fetch_report = fetch_matchbook_odds(fetch_cards)
+        poll_force = _poll_force() if force is None else bool(force)
+        odds, fetch_report = fetch_matchbook_odds(fetch_cards, force=poll_force)
         report.runners_priced = fetch_report.runners_priced
         report.errors.extend(fetch_report.errors[:5])
     except Exception as exc:
         report.errors.append(str(exc))
+        return report
+
+    if odds is None or odds.empty:
+        if not report.errors:
+            report.errors.append("no matchbook quotes returned")
         return report
 
     if "card_date" not in odds.columns:

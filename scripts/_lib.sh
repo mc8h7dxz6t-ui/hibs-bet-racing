@@ -22,6 +22,9 @@ activate_venv() {
   fi
   # shellcheck disable=SC1091
   source .venv/bin/activate
+  if [[ "${HIBS_RACING_SKIP_PIP_REINSTALL:-0}" == "1" ]] || .venv/bin/pip show hibs-racing >/dev/null 2>&1; then
+    return 0
+  fi
   pip install -e ".[dev,ranker,web]" -q
 }
 
