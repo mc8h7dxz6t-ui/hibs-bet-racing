@@ -192,16 +192,100 @@ def enrich_pick_display(pick: dict[str, Any], *, paper_cfg: dict | None = None, 
     return out
 
 
+def _pick_merge_by_runner(
+    frame,
+    picks: list[dict[str, Any]],
+    deep_links: list[dict],
+) -> dict[str, dict[str, Any]]:
+    """Lightweight pick row merge — frame + deep-link index (no full group_meetings)."""
+    from hibs_racing.pick_quality import runner_to_pick_context
+    from hibs_racing.utils.monetization import generate_monetized_link
+    from hibs_racing.web_service import resolve_race_deep_link
+
+    if frame is None or getattr(frame, "empty", True) or not picks:
+        return {}
+
+    ids = {str(p.get("runner_id") or "") for p in picks} - {""}
+    if not ids:
+        return {}
+
+    subset = frame[frame["runner_id"].astype(str).isin(ids)]
+    out: dict[str, dict[str, Any]] = {}
+    for rec in subset.to_dict(orient="records"):
+        rid = str(rec.get("runner_id") or "")
+        if not rid:
+            continue
+        ctx = runner_to_pick_context(rec)
+        link = resolve_race_deep_link(deep_links, race_id=str(rec.get("race_id") or ""))
+        course = rec.get("course")
+        off_time = rec.get("off_time")
+        win = rec.get("win_decimal")
+        try:
+            win_f = float(win) if win is not None and not (isinstance(win, float) and math.isnan(win)) else None
+        except (TypeError, ValueError):
+            win_f = None
+        mwp = rec.get("model_win_prob")
+        try:
+            mwp_f = float(mwp) if mwp is not None and not (isinstance(mwp, float) and math.isnan(mwp)) else None
+        except (TypeError, ValueError):
+            mwp_f = None
+        implied = mwp_f if mwp_f else ((1.0 / win_f) if win_f and win_f > 1 else None)
+        out[rid] = {
+            **ctx,
+            "runner_id": rid,
+            "horse_name": rec.get("horse_name"),
+            "course": course,
+            "card_date": str(rec.get("card_date") or "")[:10],
+            "off_time": off_time,
+            "race_name": rec.get("race_name"),
+            "win_decimal": win_f,
+            "implied_prob": implied,
+            "model_place_prob": rec.get("model_place_prob"),
+            "place_score": rec.get("place_score") or rec.get("model_place_prob"),
+            "ew_combined_ev": rec.get("ew_combined_ev"),
+            "value_flag": rec.get("value_flag"),
+            "value_gate_reason": rec.get("value_gate_reason"),
+            "enrich_source": rec.get("enrich_source"),
+            "deep_link": {
+                **link,
+                "runner_id": rid,
+            },
+            "monetized_link": generate_monetized_link(
+                str(rec.get("horse_name") or ""),
+                str(course or ""),
+                str(off_time or ""),
+            ),
+        }
+    return out
+
+
+def _pick_row_lookup(
+    meetings: list[dict] | None,
+    frame,
+    picks: list[dict[str, Any]],
+    *,
+    deep_links: list[dict] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Prefer full meetings when present; otherwise merge from frame + deep-link index."""
+    if meetings:
+        from hibs_racing.web_service import novice_pick_candidates
+
+        return {str(c.get("runner_id") or ""): c for c in novice_pick_candidates(meetings)}
+    links = deep_links if deep_links is not None else (meetings or [])
+    return _pick_merge_by_runner(frame, picks, links)
+
+
 def build_engine_display_picks(
-    meetings: list[dict],
+    meetings: list[dict] | None,
     frame,
     *,
     top_n: int = 6,
+    deep_links: list[dict] | None = None,
 ) -> list[dict[str, Any]]:
     """Top model place angles — always returned when cards exist."""
     from hibs_racing.monitor import top_places_of_day
     from hibs_racing.utils.monetization import attach_monetized_links
-    from hibs_racing.web_service import attach_deep_links_to_picks, novice_pick_candidates
+    from hibs_racing.web_service import attach_deep_links_to_picks
 
     if frame is None or getattr(frame, "empty", True):
         return []
@@ -213,10 +297,11 @@ def build_engine_display_picks(
     if not picks:
         return []
 
+    links = deep_links if deep_links is not None else (meetings or [])
     picks = attach_pick_explanations(picks, frame)
-    picks = attach_deep_links_to_picks(picks, meetings)
+    picks = attach_deep_links_to_picks(picks, links)
     picks = attach_monetized_links(picks)
-    by_runner = {str(c.get("runner_id") or ""): c for c in novice_pick_candidates(meetings)}
+    by_runner = _pick_row_lookup(meetings, frame, picks, deep_links=deep_links)
 
     out: list[dict[str, Any]] = []
     for rank, pick in enumerate(picks, start=1):
@@ -228,15 +313,16 @@ def build_engine_display_picks(
 
 
 def build_value_lane_display_picks(
-    meetings: list[dict],
+    meetings: list[dict] | None,
     frame,
     *,
     top_n: int = 8,
+    deep_links: list[dict] | None = None,
 ) -> list[dict[str, Any]]:
     """ROI-ranked value-lane angles — value_flag + positive EV, surfaced for promotion."""
     from hibs_racing.monitor import top_value_lane_picks
     from hibs_racing.utils.monetization import attach_monetized_links
-    from hibs_racing.web_service import attach_deep_links_to_picks, novice_pick_candidates
+    from hibs_racing.web_service import attach_deep_links_to_picks
 
     if frame is None or getattr(frame, "empty", True):
         return []
@@ -247,9 +333,10 @@ def build_value_lane_display_picks(
     if not picks:
         return []
 
-    picks = attach_deep_links_to_picks(picks, meetings)
+    links = deep_links if deep_links is not None else (meetings or [])
+    picks = attach_deep_links_to_picks(picks, links)
     picks = attach_monetized_links(picks)
-    by_runner = {str(c.get("runner_id") or ""): c for c in novice_pick_candidates(meetings)}
+    by_runner = _pick_row_lookup(meetings, frame, picks, deep_links=deep_links)
 
     out: list[dict[str, Any]] = []
     for rank, pick in enumerate(picks, start=1):
@@ -264,15 +351,16 @@ def build_value_lane_display_picks(
 
 
 def build_sniper_lane_display_picks(
-    meetings: list[dict],
+    meetings: list[dict] | None,
     frame,
     *,
     top_n: int = 6,
+    deep_links: list[dict] | None = None,
 ) -> list[dict[str, Any]]:
     """Gate7 sniper overlay — tightest ROI angles on value_flag runners."""
     from hibs_racing.sniper_lane import top_sniper_lane_picks
     from hibs_racing.utils.monetization import attach_monetized_links
-    from hibs_racing.web_service import attach_deep_links_to_picks, novice_pick_candidates
+    from hibs_racing.web_service import attach_deep_links_to_picks
 
     if frame is None or getattr(frame, "empty", True):
         return []
@@ -283,9 +371,10 @@ def build_sniper_lane_display_picks(
     if not picks:
         return []
 
-    picks = attach_deep_links_to_picks(picks, meetings)
+    links = deep_links if deep_links is not None else (meetings or [])
+    picks = attach_deep_links_to_picks(picks, links)
     picks = attach_monetized_links(picks)
-    by_runner = {str(c.get("runner_id") or ""): c for c in novice_pick_candidates(meetings)}
+    by_runner = _pick_row_lookup(meetings, frame, picks, deep_links=deep_links)
 
     out: list[dict[str, Any]] = []
     for rank, pick in enumerate(picks, start=1):

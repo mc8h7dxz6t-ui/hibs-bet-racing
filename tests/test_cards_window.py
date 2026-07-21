@@ -9,6 +9,17 @@ def test_off_minutes():
     assert off_minutes("bad") == 9999
 
 
+def test_filter_next_hours_drops_rows_without_card_date():
+    frame = pd.DataFrame(
+        [
+            {"card_date": None, "off_time": "14:00", "runner_id": "bad"},
+            {"card_date": "2099-01-01", "off_time": "12:00", "runner_id": "far"},
+        ]
+    )
+    out = filter_next_hours(frame, hours=24)
+    assert out.empty
+
+
 def test_filter_next_hours_keeps_imminent_races():
     from datetime import datetime
     from zoneinfo import ZoneInfo

@@ -63,7 +63,7 @@ def filter_next_hours(frame: pd.DataFrame, *, hours: int = 24) -> pd.DataFrame:
     for _, row in frame.iterrows():
         off = runner_off_dt(row.get("card_date"), row.get("off_time"))
         if off is None:
-            keep.append(True)
+            keep.append(False)
         else:
             keep.append(now - timedelta(minutes=30) <= off <= cutoff)
     return frame.loc[keep].copy()

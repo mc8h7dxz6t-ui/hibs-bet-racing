@@ -233,7 +233,7 @@ def create_app() -> Flask:
 
     @app.route("/backtest")
     def backtest_page():
-        ctx = dashboard_context()
+        ctx = dashboard_context(heavy=True)
         return render_template("backtest.html", **ctx)
 
     def _tracker_days() -> int:
