@@ -201,8 +201,11 @@ def create_app() -> Flask:
         return resp
 
     def _render_cards():
+        from hibs_racing.pick_quality import normalize_gate_filter_mode
+
         ctx = dashboard_context()
         ctx["channel_digest"] = _channel_digest_preview(ctx)
+        ctx["default_gate_filter"] = normalize_gate_filter_mode(request.args.get("gate"))
         ctx.update(
             cards_deep_link_context(
                 ctx["meetings"],

@@ -581,6 +581,9 @@ def group_meetings(frame: pd.DataFrame) -> list[dict]:
 
     _finalize_meeting_slugs(meetings)
     _attach_market_gauges(meetings)
+    from hibs_racing.pick_quality import attach_pick_quality_flags
+
+    attach_pick_quality_flags(meetings)
     return meetings
 
 
@@ -1031,6 +1034,8 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
         gate_summary = compare_value_gates(days=14).to_dict()
     except Exception:
         gate_summary = None
+    from hibs_racing.pick_quality import gate_filter_modes
+
     return {
         "health": health,
         "card_date": card_date or (card_dates[0] if len(card_dates) == 1 else None),
@@ -1053,6 +1058,7 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
         "scoring_method": scoring_method,
         "ranker_profile": ranker_feature_profile(),
         "gate_summary": gate_summary,
+        "gate_filter_modes": gate_filter_modes(),
         "market_gauges": latest_gauges(limit=100),
         "parquet_path": str(Path(load_config()["paths"]["parquet_dir"]) / "card_scores.parquet"),
         "ui_data_status": _ui_data_status(frame),
