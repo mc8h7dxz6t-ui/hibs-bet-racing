@@ -44,4 +44,14 @@
         {% endfor %}
     </div>
 </section>
+{% elif health is defined and health.value_lane_ready is defined and not health.value_lane_ready %}
+<section class="sniper-lane-empty card sniper-lane-blocked" id="sniper-lane-hero" aria-label="Sniper lane status">
+    <h2>Sniper lane</h2>
+    <p class="section-hint">Waiting on card health{% if health.value_lane_blockers %} — {{ health.value_lane_blockers|join(', ') }}{% endif %}. Fix blockers then <strong>Refresh 24h</strong>.</p>
+</section>
+{% else %}
+<section class="sniper-lane-empty card" id="sniper-lane-hero" aria-label="Sniper lane status">
+    <h2>Sniper lane</h2>
+    <p class="section-hint">No Gate7 snipers today — need <strong>value_flag</strong> runners plus OR≥65, RTF≥20, high confidence, and stressed place EV.{% if racing_lanes_status is defined and racing_lanes_status.value_lane_count %} {{ racing_lanes_status.value_lane_count }} value lane pick(s) on card — none passed sniper overlay.{% endif %}</p>
+</section>
 {% endif %}
