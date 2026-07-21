@@ -5,7 +5,7 @@
     'use strict';
 
     var NAV_KEY = 'hibs-product-nav';
-    var NAV_DELAY_MS = 340;
+    var NAV_DELAY_MS = 120;
 
     function ready(fn) {
         if (document.readyState === 'loading') {
@@ -157,6 +157,12 @@
             showTransition(pending);
             window.setTimeout(hideTransition, 420);
         }
+
+        window.addEventListener('pageshow', function (evt) {
+            if (evt.persisted) {
+                hideTransition();
+            }
+        });
 
         var resizeTimer;
         window.addEventListener('resize', function () {
