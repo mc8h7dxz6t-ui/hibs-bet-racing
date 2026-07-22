@@ -338,12 +338,17 @@ def build_value_lane_display_picks(
     picks = attach_monetized_links(picks)
     by_runner = _pick_row_lookup(meetings, frame, picks, deep_links=deep_links)
 
+    from hibs_racing.web_service import day_label
+
     out: list[dict[str, Any]] = []
     for rank, pick in enumerate(picks, start=1):
         rid = str(pick.get("runner_id") or "")
         merged = {**(by_runner.get(rid) or {}), **pick}
         merged["display_rank"] = rank
         merged["value_lane_rank"] = rank
+        card_date = str(merged.get("card_date") or "")[:10] or None
+        if card_date:
+            merged["day_label"] = day_label(card_date)
         enriched = enrich_pick_display(merged, paper_cfg=cfg, holdout=holdout)
         enriched["roi_ev"] = enriched.get("ew_combined_ev")
         out.append(enriched)

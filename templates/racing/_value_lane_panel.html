@@ -3,46 +3,58 @@
     <div class="value-lane-hd">
         <div>
             <h2>Value lane</h2>
-            <p class="section-hint">ROI-ranked each-way angles — <strong>value_flag</strong> runners with positive <strong>EV</strong> (expected long-run edge at these odds). One pick per race; paper-ready tiers noted on each card.</p>
+            <p class="section-hint">ROI-ranked each-way angles — <strong>value_flag</strong> runners with positive <strong>EV</strong>. Grouped by racing day so you can match picks to today&apos;s or tomorrow&apos;s card.</p>
         </div>
         <span class="pill warn">{{ value_lane_picks|length }} ROI pick{% if value_lane_picks|length != 1 %}s{% endif %}</span>
     </div>
-    <div class="value-lane-grid" role="list">
-        {% for p in value_lane_picks %}
-        <article class="value-lane-card{% if p.paper_ready %} is-paper-ready{% endif %}" role="listitem"
-            data-horse="{{ p.horse_name }}"
-            data-course="{{ p.course }}"
-            data-off="{{ p.off_time or '' }}"
-            data-win-odds="{{ p.win_decimal if p.win_decimal is not none else '' }}"
-            data-bet-type="each_way">
-            <div class="vlc-rank">#{{ p.value_lane_rank or p.display_rank or loop.index }}</div>
-            <div class="vlc-body">
-                <div class="vlc-title">
-                    <strong>{{ p.horse_name }}</strong>
-                    <span class="value-flag">VALUE</span>
-                    {% if p.display_tier_label %}<span class="pick-tier-pill {{ p.display_tier or 'engine_lead' }}">{{ p.display_tier_label }}</span>{% endif %}
+    {% for day, day_picks in value_lane_picks|groupby('card_date') %}
+    <div class="value-lane-day" data-card-date="{{ day }}">
+        <h3 class="value-lane-day-title">
+            {{ day_picks[0].day_label or day }}
+            <span class="value-lane-day-date">{{ day }}</span>
+        </h3>
+        <div class="value-lane-grid" role="list">
+            {% for p in day_picks %}
+            <article class="value-lane-card{% if p.paper_ready %} is-paper-ready{% endif %}" role="listitem"
+                data-horse="{{ p.horse_name }}"
+                data-course="{{ p.course }}"
+                data-off="{{ p.off_time or '' }}"
+                data-card-date="{{ p.card_date or day }}"
+                data-win-odds="{{ p.win_decimal if p.win_decimal is not none else '' }}"
+                data-bet-type="each_way">
+                <div class="vlc-rank">#{{ p.value_lane_rank or p.display_rank or loop.index }}</div>
+                <div class="vlc-body">
+                    <div class="vlc-title">
+                        <strong>{{ p.horse_name }}</strong>
+                        <span class="value-flag">VALUE</span>
+                        {% if p.display_tier_label %}<span class="pick-tier-pill {{ p.display_tier or 'engine_lead' }}">{{ p.display_tier_label }}</span>{% endif %}
+                    </div>
+                    <div class="vlc-meta">
+                        <span class="vlc-day">{{ p.day_label or day }}</span>
+                        · {{ p.off_time or '—' }} · {{ p.course or '' }}
+                    </div>
+                    {% if p.ew_combined_ev is not none %}
+                    <div class="vlc-roi" title="Each-way expected value — positive means model edge vs price">
+                        EV <strong>{{ p.ew_combined_ev|fmt_num }}</strong>
+                        <span class="vlc-roi-hint">ROI signal</span>
+                    </div>
+                    {% endif %}
+                    <div class="vlc-stats">
+                        <span>Place {{ (p.model_place_prob or 0)|fmt_pct }}</span>
+                        {% if p.win_decimal %}<span>Win {{ p.win_decimal|fmt_num(1) }}</span>{% endif %}
+                        {% if p.data_quality_pct %}<span>Data {{ p.data_quality_pct }}%</span>{% endif %}
+                    </div>
+                    {% if p.pick_summary %}<p class="vlc-summary">{{ p.pick_summary }}</p>{% endif %}
+                    {% if p.deep_link and p.deep_link.meeting %}
+                    <a href="{{ url_for('index', race_id=p.race_id, runner_id=p.runner_id) }}#racecard-shell" class="vlc-link">Racecard →</a>
+                    {% endif %}
                 </div>
-                <div class="vlc-meta">{{ p.off_time or '—' }} · {{ p.course or '' }}</div>
-                {% if p.ew_combined_ev is not none %}
-                <div class="vlc-roi" title="Each-way expected value — positive means model edge vs price">
-                    EV <strong>{{ p.ew_combined_ev|fmt_num }}</strong>
-                    <span class="vlc-roi-hint">ROI signal</span>
-                </div>
-                {% endif %}
-                <div class="vlc-stats">
-                    <span>Place {{ (p.model_place_prob or 0)|fmt_pct }}</span>
-                    {% if p.win_decimal %}<span>Win {{ p.win_decimal|fmt_num(1) }}</span>{% endif %}
-                    {% if p.data_quality_pct %}<span>Data {{ p.data_quality_pct }}%</span>{% endif %}
-                </div>
-                {% if p.pick_summary %}<p class="vlc-summary">{{ p.pick_summary }}</p>{% endif %}
-                {% if p.deep_link and p.deep_link.meeting %}
-                <a href="{{ url_for('index', race_id=p.race_id, runner_id=p.runner_id) }}#racecard-shell" class="vlc-link">Racecard →</a>
-                {% endif %}
-            </div>
-            <button type="button" class="slip-copy-btn vlc-copy" data-slip-copy aria-label="Copy bet slip">📋</button>
-        </article>
-        {% endfor %}
+                <button type="button" class="slip-copy-btn vlc-copy" data-slip-copy aria-label="Copy bet slip">📋</button>
+            </article>
+            {% endfor %}
+        </div>
     </div>
+    {% endfor %}
 </section>
 {% elif health is defined and health.value_lane_ready is defined and not health.value_lane_ready %}
 <section class="value-lane-hero card value-lane-blocked" id="value-lane-hero" aria-label="Value lane status">

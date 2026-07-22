@@ -1,7 +1,7 @@
 <details class="dash-fold card sys-bets-fold" id="system-bets-fold" open>
     <summary>Tip combinations · Trixie · doubles · Lucky 15</summary>
     <div class="dash-fold-body">
-        <p class="sys-bets-intro" id="system-bets-intro">Tipster email combos when pasted on <a href="{{ url_for('tips_page') }}">Tips</a>; otherwise <strong>value-lane</strong> doubles, Trixies and Lucky 15 from ROI-ranked EV picks.</p>
+        <p class="sys-bets-intro" id="system-bets-intro">Tipster email combos when pasted on <a href="{{ url_for('tips_page') }}">Tips</a>; otherwise <strong>value-lane</strong> doubles, Trixies and Lucky 15 — split by racing day (today vs tomorrow) with course and off time on each leg.</p>
         <div id="system-bets-mount"
              data-fetch-url="{{ racing_api_path('tips/combinations') }}"
              data-tips-url="{{ racing_page_path('tips') }}"
