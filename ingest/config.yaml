@@ -167,6 +167,27 @@ experimental_replay_lanes:
     escalated_max_value_per_race: 1
     escalated_max_value_per_meeting: 2
     exempt_unrated_races: true
+  gate9_production_regime:
+    base_lane: production
+    description: Live production stack + confidence-tiered caps (forward blend)
+    trigger_confidence: 0.7
+    default_max_value_per_race: 2
+    default_max_value_per_meeting: 4
+    escalated_max_value_per_race: 1
+    escalated_max_value_per_meeting: 2
+  gate10_market_regime:
+    base_lane: gate6
+    description: Gate6 SP band (2-10) + regime caps (forward blend)
+    trigger_confidence: 0.7
+    default_max_value_per_race: 2
+    default_max_value_per_meeting: 4
+    escalated_max_value_per_race: 1
+    escalated_max_value_per_meeting: 2
+  gate11_gate3_gate6_intersect:
+    base_lanes:
+    - gate3
+    - gate6
+    description: Institutional gate3 core intersected with gate6 price band
   gate3:
     exempt_unrated_races: true
 institutional:
