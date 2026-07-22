@@ -22,8 +22,20 @@ touch "${ENV_FILE}"
 strip_block() {
   local m="$1"
   grep -qF "${m}" "${ENV_FILE}" 2>/dev/null || return 0
-  awk -v m="${m}" '$0 == m {skip=1; next} skip && /^HIBS_/ {next} skip && /^RACING_/ {next} skip && /^$/ {skip=0; next} {print}' \
-    "${ENV_FILE}" >"${ENV_FILE}.tmp" && mv "${ENV_FILE}.tmp" "${ENV_FILE}"
+  local bet="${HIBS_BET_DEPLOY_PATH:-/opt/hibs-bet}"
+  local awk_prog='BEGIN { skip=0 }
+$0 == m { skip=1; next }
+skip && /^RACING_API_(USERNAME|PASSWORD|KEY)=/ { print; next }
+skip && /^HIBS_/ { next }
+skip && /^RACING_/ { next }
+skip && /^$/ { skip=0; next }
+{ print }'
+  if [[ -f "${bet}/scripts/lib_racing_api_env.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${bet}/scripts/lib_racing_api_env.sh"
+    awk_prog="$(racing_api_env_strip_protected_awk)"
+  fi
+  awk -v m="${m}" "${awk_prog}" "${ENV_FILE}" >"${ENV_FILE}.tmp" && mv "${ENV_FILE}.tmp" "${ENV_FILE}"
 }
 
 strip_block "${MARKER}"
@@ -51,6 +63,13 @@ upsert() {
 upsert HIBS_RACING_PRODUCTION 1
 upsert HIBS_OBSERVATION_LANE 0
 upsert HIBS_HEALTH_LIGHT 0
+
+BET_ROOT="${HIBS_BET_DEPLOY_PATH:-/opt/hibs-bet}"
+if [[ -f "${BET_ROOT}/scripts/lib_racing_api_env.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "${BET_ROOT}/scripts/lib_racing_api_env.sh"
+  racing_api_restore_secrets_into_env "${ENV_FILE}" 2>/dev/null || true
+fi
 
 chown www-data:www-data "${ENV_FILE}" 2>/dev/null || true
 chmod 640 "${ENV_FILE}" 2>/dev/null || true

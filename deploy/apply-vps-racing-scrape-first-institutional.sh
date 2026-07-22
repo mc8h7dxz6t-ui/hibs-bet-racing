@@ -17,8 +17,20 @@ fi
 touch "${ENV_FILE}"
 
 if grep -qF "${MARKER}" "${ENV_FILE}" 2>/dev/null; then
-  awk -v m="${MARKER}" '$0 == m {skip=1; next} skip && /^HIBS_/ {next} skip && /^RACING_/ {next} skip && /^$/ {skip=0; next} {print}' \
-    "${ENV_FILE}" >"${ENV_FILE}.tmp" && mv "${ENV_FILE}.tmp" "${ENV_FILE}"
+  bet="${HIBS_BET_DEPLOY_PATH:-/opt/hibs-bet}"
+  awk_prog='BEGIN { skip=0 }
+$0 == m { skip=1; next }
+skip && /^RACING_API_(USERNAME|PASSWORD|KEY)=/ { print; next }
+skip && /^HIBS_/ { next }
+skip && /^RACING_/ { next }
+skip && /^$/ { skip=0; next }
+{ print }'
+  if [[ -f "${bet}/scripts/lib_racing_api_env.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${bet}/scripts/lib_racing_api_env.sh"
+    awk_prog="$(racing_api_env_strip_protected_awk)"
+  fi
+  awk -v m="${MARKER}" "${awk_prog}" "${ENV_FILE}" >"${ENV_FILE}.tmp" && mv "${ENV_FILE}.tmp" "${ENV_FILE}"
 fi
 
 cat >>"${ENV_FILE}" <<EOF
@@ -41,6 +53,13 @@ HIBS_RACING_PRESERVE_BEST_DQ=1
 HIBS_RACING_CACHE_DIR=${APP_ROOT}/data/.cache
 LOG_DIR=/var/log/hibs-racing
 EOF
+
+BET_ROOT="${HIBS_BET_DEPLOY_PATH:-/opt/hibs-bet}"
+if [[ -f "${BET_ROOT}/scripts/lib_racing_api_env.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "${BET_ROOT}/scripts/lib_racing_api_env.sh"
+  racing_api_restore_secrets_into_env "${ENV_FILE}" 2>/dev/null || true
+fi
 
 chown www-data:www-data "${ENV_FILE}" 2>/dev/null || true
 chmod 640 "${ENV_FILE}" 2>/dev/null || true
