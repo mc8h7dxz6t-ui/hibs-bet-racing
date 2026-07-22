@@ -396,7 +396,7 @@ def _experimental_lane_stats(frame: pd.DataFrame) -> dict[str, dict]:
         "gate2": _settle(frame, "flag_gate2"),
         "production": _settle(frame, "flag_production"),
     }
-    for lane in (*EXPERIMENTAL_LANES, *BLEND_LANES):
+    for lane in (*EXPERIMENTAL_LANES, "gate8", *BLEND_LANES):
         stats[lane] = _settle(frame, f"flag_{lane}")
     return stats
 
