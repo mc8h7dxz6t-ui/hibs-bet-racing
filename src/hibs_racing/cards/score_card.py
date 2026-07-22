@@ -357,6 +357,14 @@ def paper_log_value_picks(
 
     picks = frame[safe_value_mask(frame)]
     for rec in picks.to_dict(orient="records"):
+        cd = rec.get("card_date")
+        course = rec.get("course")
+        off_time = rec.get("off_time")
+        race_natural_key = rec.get("race_natural_key")
+        if not race_natural_key and cd and course and off_time:
+            from hibs_racing.entity.natural_key import generate_natural_key
+
+            race_natural_key = generate_natural_key(str(cd), str(course), str(off_time))
         bet_id = record_paper_bet(
             rec["race_id"],
             rec["runner_id"],
@@ -368,6 +376,11 @@ def paper_log_value_picks(
             is_value_pick=True,
             backtest=backtest,
             created_at=created_at,
+            card_date=str(cd) if cd else None,
+            course=str(course) if course else None,
+            off_time=str(off_time) if off_time else None,
+            horse_name=str(rec.get("horse_name")) if rec.get("horse_name") else None,
+            race_natural_key=str(race_natural_key) if race_natural_key else None,
             audit_extra={
                 "odds_source": odds_source or rec.get("odds_source"),
                 "data_quality_pct": rec.get("data_quality_pct"),

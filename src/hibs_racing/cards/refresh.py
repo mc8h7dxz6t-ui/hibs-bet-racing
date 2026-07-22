@@ -268,7 +268,7 @@ def refresh_cards(
         )
     )
 
-    from hibs_racing.cards.lane_paper import attach_lane_flags, sync_lane_paper_ledger
+    from hibs_racing.cards.lane_paper import attach_lane_flags, sync_parallel_lane_ledgers
 
     scored = attach_lane_flags(scored)
 
@@ -307,6 +307,7 @@ def refresh_cards(
     paper_bets = 0
     recon_clean = True
     recon_by_date: list[dict] = []
+    parallel_lane_by_date: list[dict] = []
     paper_enabled = paper or bool(load_config().get("paper", {}).get("log_on_refresh", True))
     if paper_enabled and "value_flag" in scored.columns and "card_date" in scored.columns:
         from hibs_racing.institutional.paper_reconciliation import sync_paper_ledger_to_scored
@@ -334,14 +335,17 @@ def refresh_cards(
                     "clean": recon.is_clean,
                 }
             )
-            sync_lane_paper_ledger(
-                day_scored,
-                card_date=str(card_date),
-                lane="gate3",
-                flag_col="flag_gate3",
-                manifest_id=manifest_id,
-                odds_source=str(odds_meta.get("source")),
-                engine_profile=engine_profile,
+            parallel_lane_by_date.append(
+                {
+                    "card_date": str(card_date),
+                    "lanes": sync_parallel_lane_ledgers(
+                        day_scored,
+                        card_date=str(card_date),
+                        manifest_id=manifest_id,
+                        odds_source=str(odds_meta.get("source")),
+                        engine_profile=engine_profile,
+                    ),
+                }
             )
         if milestone in ("baseline", "pre_race_30m"):
             from hibs_racing.odds.exchange_quotes import sync_value_picks_from_scored
@@ -373,6 +377,7 @@ def refresh_cards(
         "paper_bets_logged": paper_bets,
         "paper_recon_clean": recon_clean,
         "paper_recon_by_date": recon_by_date,
+        "parallel_lane_by_date": parallel_lane_by_date,
         "manifest_id": manifest_id,
         "shadow_intents": shadow_count,
         "engine_profile": engine_profile,

@@ -24,6 +24,17 @@ from hibs_racing.config import db_path, load_config
 
 EXPERIMENTAL_LANES: tuple[str, ...] = ("gate3", "gate4", "gate5", "gate6", "gate7")
 BLEND_LANES: tuple[str, ...] = ("gate9", "gate10", "gate11")
+PARALLEL_FORWARD_LANES: tuple[str, ...] = (
+    "gate1",
+    "gate2",
+    "gate3",
+    "gate4",
+    "gate5",
+    "gate6",
+    "gate7",
+    "gate8",
+    *BLEND_LANES,
+)
 WALKFORWARD_FOCUS_LANES: tuple[str, ...] = (
     "gate2",
     "gate3",

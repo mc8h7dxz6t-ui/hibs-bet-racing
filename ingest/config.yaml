@@ -116,6 +116,20 @@ paper_lanes:
   recommended_paper_lane: gate3
   smart_picks_lane: gate3
   live_promotion: false
+  parallel_forward:
+    enabled: true
+    lanes:
+    - gate1
+    - gate2
+    - gate3
+    - gate4
+    - gate5
+    - gate6
+    - gate7
+    - gate8
+    - gate9
+    - gate10
+    - gate11
   gate3_anchor:
     enabled: true
     lane: gate3
