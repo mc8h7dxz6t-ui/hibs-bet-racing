@@ -25,6 +25,7 @@ Environment=HIBS_RACING_GUNICORN_UMASK=0o007
 Environment=HIBS_RACING_FORCE_DISK=1
 Environment=HIBS_RACING_DB_PATH=/opt/hibs-racing/data/feature_store.sqlite
 Environment=HIBS_RACING_DATA_DIR=/opt/hibs-racing/data
+EnvironmentFile=-/etc/hibs-bet/secrets/racing_api.env
 EnvironmentFile=-/opt/hibs-racing/.env
 
 RuntimeDirectory=hibs
