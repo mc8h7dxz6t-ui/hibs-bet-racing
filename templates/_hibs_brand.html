@@ -1,5 +1,5 @@
 {# HIBS — Football · Racing · Trading #}
-{% macro harvested_logo_link(home_url='/', height=56, file=hibs_harvested_logo|default('hibs_harvested_logo.png'), css_class='') %}
+{% macro harvested_logo_link(home_url='/', height=72, file=hibs_harvested_logo|default('hibs_harvested_logo.png'), css_class='') %}
 <a href="{{ home_url }}" class="hibs-harvested-logo-link {{ css_class }}" title="{{ hibs_tagline|default('HIBS — Football · Racing · Trading') }}">
     <img src="{{ static_v(file) }}" alt="{{ hibs_tagline_short|default('HIBS') }} — {{ hibs_tagline|default('Football · Racing · Trading') }}" class="hibs-harvested-logo" height="{{ height }}" decoding="async">
 </a>
