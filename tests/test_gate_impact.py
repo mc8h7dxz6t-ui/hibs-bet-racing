@@ -270,3 +270,43 @@ def test_regime_blend_defaults_inherit_gate8():
     spec = _regime_blend_defaults(full, "gate9_production_regime")
     assert spec["trigger_confidence"] == 0.75
     assert spec["default_max_value_per_race"] == 3
+
+
+def test_experimental_lanes_ignore_empty_exchange_raw(monkeypatch):
+    """SP snapshot replay must not zero gate3-11 when flag_exchange_raw column is all zeros."""
+    monkeypatch.setenv("HIBS_EXCHANGE_EV_SHADOW", "1")
+    paper = {
+        "value_gates_enabled": True,
+        "exempt_unrated_races": True,
+        "require_official_rating_for_value": True,
+        "min_official_rating": 45,
+        "gate2": {"enabled": True, "max_value_per_race": 3, "max_value_per_meeting": 6},
+    }
+    frame = pd.DataFrame(
+        [
+            {
+                "runner_id": "x",
+                "race_id": "r1",
+                "card_date": "2026-01-01",
+                "course": "Ascot",
+                "race_name": "Class 4 Handicap",
+                "official_rating": 60,
+                "field_size": 10,
+                "finish_pos": 2,
+                "win_decimal": 6.0,
+                "place_fraction": 0.25,
+                "places": 3,
+                "place_ev": 0.08,
+                "combo_bayes_place": 0.30,
+                "model_place_prob": 0.35,
+                "ew_combined_ev": 0.10,
+                "trainer_rtf": 12.0,
+                "flag_raw": 1,
+                "flag_none": 1,
+                "flag_exchange_raw": 0,
+            }
+        ]
+    )
+    out = apply_experimental_lanes(frame, paper)
+    assert int(out["flag_gate3"].sum()) >= 1
+    assert int(out["flag_gate8"].sum()) >= 0
