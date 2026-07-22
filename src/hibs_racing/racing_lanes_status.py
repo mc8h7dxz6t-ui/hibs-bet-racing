@@ -97,15 +97,19 @@ def _win_engine_lane_status() -> dict[str, Any]:
         from hibs_racing.config import db_path, load_config
         from hibs_racing.features.store import connect
         from hibs_racing.models.win_engine_config import (
+            min_win_calibration_n,
             win_engine_active,
             win_engine_env_requested,
             win_engine_public_release_allowed,
+            win_engine_staging_configured,
         )
         from hibs_racing.models.win_engine_store import ensure_win_engine_schema, load_calibration_state
 
         env_on = win_engine_env_requested()
+        configured = win_engine_staging_configured()
         active = win_engine_active()
         public = win_engine_public_release_allowed()
+        min_n = min_win_calibration_n()
         db = db_path(load_config())
         ensure_win_engine_schema(db)
         with connect(db) as conn:
@@ -116,11 +120,14 @@ def _win_engine_lane_status() -> dict[str, Any]:
     except Exception:
         return {
             "env_requested": False,
+            "staging_configured": False,
             "active": False,
             "public_release": False,
             "calibration_state": "UNKNOWN",
             "sample_n": 0,
-            "status_note": "Win engine staging — set HIBS_WIN_ENGINE_ACTIVE after calibration (see WIN_ENGINE_DEPLOYMENT.md).",
+            "races_in_window": 0,
+            "min_calibration_n": 100,
+            "status_note": "Win engine staging — run apply-win-engine-env.sh on VPS, then calibrate before go-live.",
         }
 
     if public:
@@ -128,16 +135,27 @@ def _win_engine_lane_status() -> dict[str, Any]:
     elif active:
         note = "Win engine active internally; public release pending calibration checks."
     elif env_on:
-        note = f"Win engine env on but not calibrated ({state}, n={sample_n}, races={races})."
+        note = (
+            f"Win engine armed but not calibrated ({state}, n={sample_n}/{min_n}, "
+            f"races={races}). Run refresh-cards until CALIBRATED."
+        )
+    elif configured:
+        note = (
+            f"Win engine staging — background scoring on card refresh ({state}, "
+            f"n={sample_n}/{min_n}, races={races}). Go-live: "
+            f"apply-win-engine-env.sh --active after CALIBRATED."
+        )
     else:
         note = "Win engine off — run apply-win-engine-env.sh then calibrate before go-live."
 
     return {
         "env_requested": env_on,
+        "staging_configured": configured,
         "active": active,
         "public_release": public,
         "calibration_state": state,
         "sample_n": sample_n,
         "races_in_window": races,
+        "min_calibration_n": min_n,
         "status_note": note,
     }
