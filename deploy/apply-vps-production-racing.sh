@@ -33,7 +33,9 @@ skip && /^$/ { skip=0; next }
   if [[ -f "${bet}/scripts/lib_racing_api_env.sh" ]]; then
     # shellcheck source=/dev/null
     source "${bet}/scripts/lib_racing_api_env.sh"
-    awk_prog="$(racing_api_env_strip_protected_awk)"
+    if declare -F racing_api_env_strip_protected_awk >/dev/null 2>&1; then
+      awk_prog="$(racing_api_env_strip_protected_awk)"
+    fi
   fi
   awk -v m="${m}" "${awk_prog}" "${ENV_FILE}" >"${ENV_FILE}.tmp" && mv "${ENV_FILE}.tmp" "${ENV_FILE}"
 }
