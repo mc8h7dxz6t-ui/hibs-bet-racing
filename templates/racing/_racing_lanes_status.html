@@ -29,10 +29,10 @@
         </div>
         <div class="lanes-status-item" role="listitem">
             <span class="lanes-status-label">Win engine</span>
-            <span class="pill {% if racing_lanes_status.win_engine.public_release %}ok{% elif racing_lanes_status.win_engine.env_requested %}warn{% else %}err{% endif %}">
-                {% if racing_lanes_status.win_engine.public_release %}LIVE{% elif racing_lanes_status.win_engine.env_requested %}{{ racing_lanes_status.win_engine.calibration_state }}{% else %}OFF{% endif %}
+            <span class="pill {% if racing_lanes_status.win_engine.public_release %}ok{% elif racing_lanes_status.win_engine.active %}ok{% elif racing_lanes_status.win_engine.env_requested %}warn{% elif racing_lanes_status.win_engine.staging_configured %}warn{% else %}err{% endif %}">
+                {% if racing_lanes_status.win_engine.public_release %}LIVE{% elif racing_lanes_status.win_engine.active %}ACTIVE{% elif racing_lanes_status.win_engine.env_requested %}{{ racing_lanes_status.win_engine.calibration_state }}{% elif racing_lanes_status.win_engine.staging_configured %}STAGING{% else %}OFF{% endif %}
             </span>
-            <span class="lanes-status-meta">n={{ racing_lanes_status.win_engine.sample_n }}</span>
+            <span class="lanes-status-meta">n={{ racing_lanes_status.win_engine.sample_n }}/{{ racing_lanes_status.win_engine.min_calibration_n|default(100) }}</span>
         </div>
         <div class="lanes-status-item" role="listitem">
             <span class="lanes-status-label">Matchbook</span>

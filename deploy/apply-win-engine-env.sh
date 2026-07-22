@@ -96,11 +96,12 @@ ${MARKER} (Leave as false initially)
 EOF
 fi
 
+upsert "HIBS_WIN_ENGINE_CONFIGURED" "1"
 upsert "HIBS_WIN_ENGINE_ACTIVE" "${ACTIVE}"
 upsert "HIBS_RACING_WIN_BRIER_PASS_MAX" "0.185"
 upsert "HIBS_RACING_MIN_WIN_CALIBRATION_N" "100"
 
 echo "Updated ${ENV_FILE}:"
-grep -E '^HIBS_WIN_ENGINE_ACTIVE=|^HIBS_RACING_WIN_BRIER_PASS_MAX=|^HIBS_RACING_MIN_WIN_CALIBRATION_N=' "${ENV_FILE}" || true
+grep -E '^HIBS_WIN_ENGINE_CONFIGURED=|^HIBS_WIN_ENGINE_ACTIVE=|^HIBS_RACING_WIN_BRIER_PASS_MAX=|^HIBS_RACING_MIN_WIN_CALIBRATION_N=' "${ENV_FILE}" || true
 echo
 echo "Restart racing to apply: sudo systemctl restart hibs-racing"

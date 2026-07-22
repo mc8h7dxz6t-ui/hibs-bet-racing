@@ -38,6 +38,13 @@ def win_engine_env_requested() -> bool:
     return _env_flag("HIBS_WIN_ENGINE_ACTIVE", default=False)
 
 
+def win_engine_staging_configured() -> bool:
+    """Staging keys present from apply-win-engine-env.sh (active may still be false)."""
+    if _env_flag("HIBS_WIN_ENGINE_CONFIGURED", default=False):
+        return True
+    return bool((os.environ.get("HIBS_RACING_MIN_WIN_CALIBRATION_N") or "").strip())
+
+
 def max_absolute_brier_small_field() -> float:
     return _env_float("HIBS_RACING_MAX_ABSOLUTE_BRIER_SMALL_FIELD", 0.280)
 
