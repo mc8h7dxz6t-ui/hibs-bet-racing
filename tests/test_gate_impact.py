@@ -145,6 +145,9 @@ def test_promotion_evaluation_volume_floor():
             "gate6": {"picks": 200, "roi_pct": 8.0},
             "gate7": {"picks": 10, "roi_pct": 12.0},
             "gate8": {"picks": 200, "roi_pct": 8.0},
+            "gate9": {"picks": 180, "roi_pct": 9.0},
+            "gate10": {"picks": 150, "roi_pct": 11.0},
+            "gate11": {"picks": 120, "roi_pct": 10.0},
         },
         period_rows=[{"gate2": {"picks": 100, "roi_pct": 5.0}, "gate5": {"picks": 5, "roi_pct": 12.0}, "gate3": {"picks": 80, "roi_pct": 8.0}}] * 8,
         months_with_data=8,
@@ -198,3 +201,72 @@ def test_apply_experimental_lanes_includes_gate5_gate6():
     out = apply_experimental_lanes(frame, paper)
     assert "flag_gate7" in out.columns
     assert "flag_gate8" in out.columns
+    assert "flag_gate9" in out.columns
+    assert "flag_gate10" in out.columns
+    assert "flag_gate11" in out.columns
+
+
+def test_gate11_is_intersection_of_gate3_and_gate6():
+    paper = {
+        "value_gates_enabled": True,
+        "exempt_unrated_races": True,
+        "require_official_rating_for_value": True,
+        "min_official_rating": 45,
+        "gate2": {"enabled": True, "max_value_per_race": 3, "max_value_per_meeting": 6},
+    }
+    frame = pd.DataFrame(
+        [
+            {
+                "runner_id": "a",
+                "race_id": "r1",
+                "card_date": "2026-01-01",
+                "course": "Ascot",
+                "flag_gate3": 1,
+                "flag_gate6": 1,
+                "gate3_reason": None,
+                "gate6_reason": None,
+            },
+            {
+                "runner_id": "b",
+                "race_id": "r1",
+                "card_date": "2026-01-01",
+                "course": "Ascot",
+                "flag_gate3": 1,
+                "flag_gate6": 0,
+                "gate3_reason": None,
+                "gate6_reason": "gate2_price_band",
+            },
+            {
+                "runner_id": "c",
+                "race_id": "r2",
+                "card_date": "2026-01-01",
+                "course": "Ayr",
+                "flag_gate3": 0,
+                "flag_gate6": 1,
+                "gate3_reason": "gate2_race_cap",
+                "gate6_reason": None,
+            },
+        ]
+    )
+    from hibs_racing.backtest.gate_impact import _apply_gate11_intersection
+
+    out = _apply_gate11_intersection(frame)
+    assert int(out.loc[out["runner_id"] == "a", "flag_gate11"].iloc[0]) == 1
+    assert int(out.loc[out["runner_id"] == "b", "flag_gate11"].iloc[0]) == 0
+    assert out.loc[out["runner_id"] == "b", "gate11_reason"].iloc[0] == "gate2_price_band"
+    assert int(out.loc[out["runner_id"] == "c", "flag_gate11"].iloc[0]) == 0
+    assert out.loc[out["runner_id"] == "c", "gate11_reason"].iloc[0] == "gate2_race_cap"
+
+
+def test_regime_blend_defaults_inherit_gate8():
+    from hibs_racing.backtest.gate_impact import _regime_blend_defaults
+
+    full = {
+        "experimental_replay_lanes": {
+            "gate8_regime_blend": {"trigger_confidence": 0.75, "default_max_value_per_race": 3},
+            "gate9_production_regime": {},
+        }
+    }
+    spec = _regime_blend_defaults(full, "gate9_production_regime")
+    assert spec["trigger_confidence"] == 0.75
+    assert spec["default_max_value_per_race"] == 3

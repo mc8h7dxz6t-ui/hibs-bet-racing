@@ -23,7 +23,29 @@ from hibs_racing.cards.actionability import _gate2_confidence, apply_value_gates
 from hibs_racing.config import db_path, load_config
 
 EXPERIMENTAL_LANES: tuple[str, ...] = ("gate3", "gate4", "gate5", "gate6", "gate7")
-WALKFORWARD_FOCUS_LANES: tuple[str, ...] = ("gate2", "gate3", "gate5", "gate6", "gate7", "gate8")
+BLEND_LANES: tuple[str, ...] = ("gate9", "gate10", "gate11")
+PARALLEL_FORWARD_LANES: tuple[str, ...] = (
+    "gate1",
+    "gate2",
+    "gate3",
+    "gate4",
+    "gate5",
+    "gate6",
+    "gate7",
+    "gate8",
+    *BLEND_LANES,
+)
+WALKFORWARD_FOCUS_LANES: tuple[str, ...] = (
+    "gate2",
+    "gate3",
+    "gate5",
+    "gate6",
+    "gate7",
+    "gate8",
+    "gate9",
+    "gate10",
+    "gate11",
+)
 
 _G2_FLAT_KEYS: frozenset[str] = frozenset(
     {
@@ -190,32 +212,56 @@ def _rank_col(frame: pd.DataFrame) -> str:
     return "combo_bayes_place"
 
 
-def _apply_gate8_regime_blend(frame: pd.DataFrame, paper_cfg: dict, full_cfg: dict) -> pd.DataFrame:
-    """Gate8: Gate3 baseline with tiered caps — tighter when confidence exceeds trigger."""
-    spec = _lane_spec(full_cfg, "gate8_regime_blend") or {}
-    trigger = float(spec.get("trigger_confidence", 0.70))
-    default_race = int(spec.get("default_max_value_per_race", 2))
-    default_meeting = int(spec.get("default_max_value_per_meeting", 4))
-    escalated_race = int(spec.get("escalated_max_value_per_race", 1))
-    escalated_meeting = int(spec.get("escalated_max_value_per_meeting", 2))
+def _regime_blend_defaults(full_cfg: dict, yaml_key: str) -> dict:
+    """Merge blend spec with gate8 defaults for shared cap parameters."""
+    spec = dict(_lane_spec(full_cfg, yaml_key) or {})
+    g8 = _lane_spec(full_cfg, "gate8_regime_blend") or {}
+    for key in (
+        "trigger_confidence",
+        "default_max_value_per_race",
+        "default_max_value_per_meeting",
+        "escalated_max_value_per_race",
+        "escalated_max_value_per_meeting",
+    ):
+        if key not in spec and key in g8:
+            spec[key] = g8[key]
+    return spec
 
-    g3 = gate3_config(paper_cfg, full_cfg)
-    g2 = g3.setdefault("gate2", {})
+
+def _apply_regime_blend_lane(
+    frame: pd.DataFrame,
+    base_paper_cfg: dict,
+    blend_spec: dict,
+    *,
+    flag_col: str,
+    reason_col: str,
+    cap_reason: str = "blend_tier_cap",
+) -> pd.DataFrame:
+    """Tiered race/meeting caps on an arbitrary base paper config."""
+    trigger = float(blend_spec.get("trigger_confidence", 0.70))
+    default_race = int(blend_spec.get("default_max_value_per_race", 2))
+    default_meeting = int(blend_spec.get("default_max_value_per_meeting", 4))
+    escalated_race = int(blend_spec.get("escalated_max_value_per_race", 1))
+    escalated_meeting = int(blend_spec.get("escalated_max_value_per_meeting", 2))
+
+    cfg = deepcopy(base_paper_cfg)
+    g2 = cfg.setdefault("gate2", {})
     if isinstance(g2, dict):
         g2["max_value_per_race"] = None
         g2["max_value_per_meeting"] = None
 
-    out = _apply_lane_from_none(frame, g3, "_gate8_precap", "gate8_reason")
+    precap_col = f"_{flag_col}_precap"
+    out = _apply_lane_from_none(frame, cfg, precap_col, reason_col)
     rank = _rank_col(out)
     flags = pd.Series(0, index=out.index, dtype=int)
     race_counts: dict[str, int] = {}
     meeting_counts: dict[tuple[str, str], int] = {}
 
-    candidates = out[out["_gate8_precap"].eq(1)].copy()
+    candidates = out[out[precap_col].eq(1)].copy()
     if not candidates.empty:
         candidates = candidates.sort_values([rank], ascending=False, na_position="last")
         for idx, row in candidates.iterrows():
-            conf = _gate2_confidence(row, g3)
+            conf = _gate2_confidence(row, cfg)
             max_r = escalated_race if conf >= trigger else default_race
             max_m = escalated_meeting if conf >= trigger else default_meeting
             race_id = str(row.get("race_id", ""))
@@ -228,10 +274,67 @@ def _apply_gate8_regime_blend(frame: pd.DataFrame, paper_cfg: dict, full_cfg: di
             race_counts[race_id] = race_counts.get(race_id, 0) + 1
             meeting_counts[meeting_key] = meeting_counts.get(meeting_key, 0) + 1
 
-    out["flag_gate8"] = flags.astype(int)
-    out.loc[out["flag_gate8"].eq(0) & out["_gate8_precap"].eq(1), "gate8_reason"] = "gate8_tier_cap"
-    out.loc[out["flag_gate8"].eq(1), "gate8_reason"] = None
-    return out.drop(columns=["_gate8_precap"], errors="ignore")
+    out[flag_col] = flags.astype(int)
+    out.loc[out[flag_col].eq(0) & out[precap_col].eq(1), reason_col] = cap_reason
+    out.loc[out[flag_col].eq(1), reason_col] = None
+    return out.drop(columns=[precap_col], errors="ignore")
+
+
+def _apply_gate8_regime_blend(frame: pd.DataFrame, paper_cfg: dict, full_cfg: dict) -> pd.DataFrame:
+    """Gate8: Gate3 baseline with tiered caps — tighter when confidence exceeds trigger."""
+    spec = _regime_blend_defaults(full_cfg, "gate8_regime_blend")
+    base = gate3_config(paper_cfg, full_cfg)
+    return _apply_regime_blend_lane(
+        frame,
+        base,
+        spec,
+        flag_col="flag_gate8",
+        reason_col="gate8_reason",
+        cap_reason="gate8_tier_cap",
+    )
+
+
+def _apply_gate9_production_regime(frame: pd.DataFrame, paper_cfg: dict, full_cfg: dict) -> pd.DataFrame:
+    """Gate9: live production stack + Gate8-style regime caps (forward blend)."""
+    spec = _regime_blend_defaults(full_cfg, "gate9_production_regime")
+    return _apply_regime_blend_lane(
+        frame,
+        deepcopy(paper_cfg),
+        spec,
+        flag_col="flag_gate9",
+        reason_col="gate9_reason",
+        cap_reason="gate9_tier_cap",
+    )
+
+
+def _apply_gate10_market_regime(frame: pd.DataFrame, paper_cfg: dict, full_cfg: dict) -> pd.DataFrame:
+    """Gate10: Gate6 market band (2–10) + regime caps (forward blend)."""
+    spec = _regime_blend_defaults(full_cfg, "gate10_market_regime")
+    base = gate6_config(paper_cfg, full_cfg)
+    return _apply_regime_blend_lane(
+        frame,
+        base,
+        spec,
+        flag_col="flag_gate10",
+        reason_col="gate10_reason",
+        cap_reason="gate10_tier_cap",
+    )
+
+
+def _apply_gate11_intersection(frame: pd.DataFrame) -> pd.DataFrame:
+    """Gate11: Gate3 ∩ Gate6 — institutional core plus SP band filter."""
+    out = frame.copy()
+    g3 = pd.to_numeric(out["flag_gate3"], errors="coerce").fillna(0).astype(int)
+    g6 = pd.to_numeric(out["flag_gate6"], errors="coerce").fillna(0).astype(int)
+    out["flag_gate11"] = (g3 & g6).astype(int)
+    g3_reason = out.get("gate3_reason")
+    g6_reason = out.get("gate6_reason")
+    if g3_reason is not None and g6_reason is not None:
+        out["gate11_reason"] = None
+        blocked = out["flag_gate11"].eq(0)
+        out.loc[blocked & g3.eq(0), "gate11_reason"] = g3_reason[blocked & g3.eq(0)]
+        out.loc[blocked & g3.eq(1) & g6.eq(0), "gate11_reason"] = g6_reason[blocked & g3.eq(1) & g6.eq(0)]
+    return out
 
 
 def _lane_config_builders(full_cfg: dict) -> dict[str, Any]:
@@ -282,6 +385,9 @@ def apply_experimental_lanes(frame: pd.DataFrame, paper_cfg: dict, full_cfg: dic
             continue
         out = _apply_lane_from_none(out, builders[lane](), f"flag_{lane}", f"{lane}_reason")
     out = _apply_gate8_regime_blend(out, paper_cfg, merged_cfg)
+    out = _apply_gate9_production_regime(out, paper_cfg, merged_cfg)
+    out = _apply_gate10_market_regime(out, paper_cfg, merged_cfg)
+    out = _apply_gate11_intersection(out)
     return out
 
 
@@ -290,7 +396,7 @@ def _experimental_lane_stats(frame: pd.DataFrame) -> dict[str, dict]:
         "gate2": _settle(frame, "flag_gate2"),
         "production": _settle(frame, "flag_production"),
     }
-    for lane in (*EXPERIMENTAL_LANES, "gate8"):
+    for lane in (*EXPERIMENTAL_LANES, *BLEND_LANES):
         stats[lane] = _settle(frame, f"flag_{lane}")
     return stats
 
@@ -385,6 +491,9 @@ def evaluate_lane_promotion(
         ("gate6", False, True),
         ("gate7", True, True),
         ("gate8", False, True),
+        ("gate9", False, True),
+        ("gate10", False, True),
+        ("gate11", False, True),
     ):
         out[lane] = _lane_eval(lane, volume_floor=vol, vs_gate3_required=vs3)
 
@@ -568,6 +677,11 @@ def run_gate_impact(
         "gate6_vs_gate3": _delta(lanes["gate6"], lanes["gate3"]),
         "gate7_vs_gate3": _delta(lanes["gate7"], lanes["gate3"]),
         "gate8_vs_gate3": _delta(lanes["gate8"], lanes["gate3"]),
+        "gate9_vs_gate3": _delta(lanes["gate9"], lanes["gate3"]),
+        "gate10_vs_gate3": _delta(lanes["gate10"], lanes["gate3"]),
+        "gate11_vs_gate3": _delta(lanes["gate11"], lanes["gate3"]),
+        "gate9_vs_production": _delta(lanes["gate9"], lanes["production"]),
+        "gate10_vs_gate6": _delta(lanes["gate10"], lanes["gate6"]),
         "gate2_vs_none": _delta(lanes["gate2"], lanes["none"]),
     }
 
@@ -587,11 +701,15 @@ def run_gate_impact(
             "gate5": gate5_config(paper_cfg, cfg).get("gate2"),
             "gate7": gate7_config(paper_cfg, cfg).get("gate2"),
             "gate8": _lane_spec(cfg, "gate8_regime_blend"),
+            "gate9": _regime_blend_defaults(cfg, "gate9_production_regime"),
+            "gate10": _regime_blend_defaults(cfg, "gate10_market_regime"),
+            "gate11": _lane_spec(cfg, "gate11_gate3_gate6_intersect"),
         },
         "message": (
             f"Gate impact {start_s} → {end_s}: gate2={lanes['gate2'].get('roi_pct')}, "
-            f"gate3={lanes['gate3'].get('roi_pct')}, gate7={lanes['gate7'].get('roi_pct')}, "
-            f"gate8={lanes['gate8'].get('roi_pct')}."
+            f"gate3={lanes['gate3'].get('roi_pct')}, gate8={lanes['gate8'].get('roi_pct')}, "
+            f"gate9={lanes['gate9'].get('roi_pct')}, gate10={lanes['gate10'].get('roi_pct')}, "
+            f"gate11={lanes['gate11'].get('roi_pct')}."
         ),
     }
 
@@ -692,6 +810,9 @@ def run_gate_lane_walkforward(
             row["delta_gate3_vs_gate2"] = _delta(lanes["gate3"], lanes["gate2"])
             row["delta_gate7_vs_gate3"] = _delta(lanes["gate7"], lanes["gate3"])
             row["delta_gate8_vs_gate3"] = _delta(lanes["gate8"], lanes["gate3"])
+            row["delta_gate9_vs_gate3"] = _delta(lanes["gate9"], lanes["gate3"])
+            row["delta_gate10_vs_gate3"] = _delta(lanes["gate10"], lanes["gate3"])
+            row["delta_gate11_vs_gate3"] = _delta(lanes["gate11"], lanes["gate3"])
         period_rows.append(row)
         if progress_path is not None:
             progress_path.parent.mkdir(parents=True, exist_ok=True)
@@ -718,6 +839,9 @@ def run_gate_lane_walkforward(
     aggregate["delta_gate3_vs_gate2"] = _delta(aggregate["gate3"], aggregate["gate2"])
     aggregate["delta_gate7_vs_gate3"] = _delta(aggregate["gate7"], aggregate["gate3"])
     aggregate["delta_gate8_vs_gate3"] = _delta(aggregate["gate8"], aggregate["gate3"])
+    aggregate["delta_gate9_vs_gate3"] = _delta(aggregate["gate9"], aggregate["gate3"])
+    aggregate["delta_gate10_vs_gate3"] = _delta(aggregate["gate10"], aggregate["gate3"])
+    aggregate["delta_gate11_vs_gate3"] = _delta(aggregate["gate11"], aggregate["gate3"])
 
     promotion = evaluate_lane_promotion(
         aggregate=aggregate,
@@ -735,6 +859,9 @@ def run_gate_lane_walkforward(
         "gate3_roi_wins_vs_gate2": _count_roi_wins(period_rows, "gate3", "gate2"),
         "gate7_roi_wins_vs_gate3": _count_roi_wins(period_rows, "gate7", "gate3"),
         "gate8_roi_wins_vs_gate3": _count_roi_wins(period_rows, "gate8", "gate3"),
+        "gate9_roi_wins_vs_gate3": _count_roi_wins(period_rows, "gate9", "gate3"),
+        "gate10_roi_wins_vs_gate3": _count_roi_wins(period_rows, "gate10", "gate3"),
+        "gate11_roi_wins_vs_gate3": _count_roi_wins(period_rows, "gate11", "gate3"),
         "aggregate": aggregate,
         "periods": period_rows,
         "promotion_evaluation": promotion,
@@ -743,11 +870,15 @@ def run_gate_lane_walkforward(
             "gate3": gate3_config(paper_cfg, cfg).get("gate2"),
             "gate7": gate7_config(paper_cfg, cfg).get("gate2"),
             "gate8": _lane_spec(cfg, "gate8_regime_blend"),
+            "gate9": _regime_blend_defaults(cfg, "gate9_production_regime"),
+            "gate10": _regime_blend_defaults(cfg, "gate10_market_regime"),
+            "gate11": _lane_spec(cfg, "gate11_gate3_gate6_intersect"),
         },
         "message": (
             f"Gate closure walk-forward {start_s} → {end_s}: "
             f"gate2={aggregate['gate2'].get('roi_pct')}, gate3={aggregate['gate3'].get('roi_pct')}, "
-            f"gate7={aggregate['gate7'].get('roi_pct')}, gate8={aggregate['gate8'].get('roi_pct')}. "
+            f"gate8={aggregate['gate8'].get('roi_pct')}, gate9={aggregate['gate9'].get('roi_pct')}, "
+            f"gate10={aggregate['gate10'].get('roi_pct')}, gate11={aggregate['gate11'].get('roi_pct')}. "
             f"Paper anchor: gate3."
         ),
     }

@@ -874,6 +874,11 @@ def record_paper_bet(
     database: Path | None = None,
     audit_extra: dict | None = None,
     paper_lane: str = "production",
+    card_date: str | None = None,
+    course: str | None = None,
+    off_time: str | None = None,
+    horse_name: str | None = None,
+    race_natural_key: str | None = None,
 ) -> str:
     import uuid
 
@@ -923,7 +928,16 @@ def record_paper_bet(
     vhash = bet_verification_hash(bet_id, now, runner_id, offered_win, stake_units)
     ctx: dict[str, str | None] = {}
     with connect(db) as conn:
-        ctx = _resolve_bet_context(conn, race_id=race_id, runner_id=runner_id)
+        ctx = _resolve_bet_context(
+            conn,
+            race_id=race_id,
+            runner_id=runner_id,
+            card_date=card_date,
+            horse_name=horse_name,
+            course=course,
+            off_time=off_time,
+            race_natural_key=race_natural_key,
+        )
     with connect(db) as conn:
         conn.execute(
             """
