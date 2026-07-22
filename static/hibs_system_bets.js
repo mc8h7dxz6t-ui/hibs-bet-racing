@@ -93,9 +93,15 @@
 
   function renderLegCard(leg, insights) {
     var insight = insightForLeg(leg, insights);
+    var dayTag = leg.day_label || leg.card_date || "";
+    var meta = leg.event || "—";
+    if (!leg.event && (leg.course || leg.off_time)) {
+      meta = [dayTag, [leg.course, leg.off_time].filter(Boolean).join(" ")].filter(Boolean).join(" · ") || "—";
+    }
     return (
       '<div class="value-strip-card sys-bets-leg-card">' +
-      '<div class="vsc-meta">' + esc(leg.event || "—") + "</div>" +
+      (dayTag ? '<div class="sys-bets-leg-day">' + esc(dayTag) + "</div>" : "") +
+      '<div class="vsc-meta">' + esc(meta) + "</div>" +
       '<div class="vsc-pick">' + esc(leg.selection || "—") + "</div>" +
       '<div class="vsc-odds sys-bets-market">' +
       esc((leg.market || "win").replace(/_/g, " ")) +
@@ -164,7 +170,7 @@
     );
   }
 
-  function updateIntro(source) {
+  function updateIntro(source, pickSource) {
     var intro = document.getElementById("system-bets-intro");
     if (!intro) return;
     if (source === "tipster") {
@@ -172,30 +178,60 @@
         'Parsed from today&apos;s tipster email. Paste or refresh on <a href="' +
         esc(intro.querySelector("a") ? intro.querySelector("a").getAttribute("href") || "/tips" : "/tips") +
         '">Tips</a> (include lines like <code>0.25pt Win Trixie</code>).';
-    } else if (source === "engine" || data.pick_source === "value_lane") {
+    } else if (source === "engine" || pickSource === "value_lane") {
       intro.textContent =
-        "Value-lane system bets — doubles, Trixies and Lucky 15 built from ROI-ranked EV picks (value_flag, one per race). Where paper success signal is strongest.";
+        "Value-lane system bets — doubles, Trixies and Lucky 15 per racing day (today vs tomorrow). Each leg shows the day, course and off time.";
     }
+  }
+
+  function renderDaySection(day, insights, mount, comboOffset) {
+    var html = "";
+    var combos = day.combinations || [];
+    var singles = day.singles || [];
+    var title = day.day_label || day.card_date || "Racing day";
+    var dateBits = [title];
+    if (day.card_date && day.card_date !== title) dateBits.push(day.card_date);
+    if (day.pick_count != null) dateBits.push(day.pick_count + " value pick" + (day.pick_count === 1 ? "" : "s"));
+    html +=
+      '<section class="sys-bets-day-section" data-card-date="' + esc(day.card_date || "") + '">' +
+      '<h3 class="sys-bets-day-title">' + esc(dateBits.join(" · ")) + "</h3>";
+    if (!combos.length && !singles.length) {
+      html +=
+        '<p class="sys-bets-empty">Need at least two value-lane runners on ' +
+        esc(title) +
+        " for doubles / Trixies.</p></section>";
+      return { html: html, nextOffset: comboOffset };
+    }
+    combos.forEach(function (group, i) {
+      html += renderCombination(group, comboOffset + i, insights);
+    });
+    html += renderSingles(singles, insights);
+    html += "</section>";
+    return { html: html, nextOffset: comboOffset + combos.length };
   }
 
   function renderPayload(data, mount) {
     var combos = data.combinations || [];
     var singles = data.singles || [];
+    var days = data.days || [];
     var insights = data.win_engine && data.win_engine.insights ? data.win_engine.insights : null;
     var tipsUrl = (mount && mount.getAttribute("data-tips-url")) || "/tips";
     var source = data.source || (data.tip_count > 0 ? "tipster" : "engine");
+    var pickSource = data.pick_source;
 
-    updateIntro(source);
+    updateIntro(source, pickSource);
 
-    if (!combos.length && !singles.length) {
+    var hasDayContent = days.some(function (day) {
+      return (day.combinations && day.combinations.length) || (day.singles && day.singles.length);
+    });
+
+    if (!combos.length && !singles.length && !hasDayContent) {
       if (data.message) {
         return '<p class="sys-bets-empty">' + esc(data.message) + "</p>";
       }
-      if (source === "engine" || data.pick_source === "value_lane") {
+      if (source === "engine" || pickSource === "value_lane") {
         return (
-          '<p class="sys-bets-empty">No value-lane system-bet legs yet for ' +
-          esc(data.card_date || "today") +
-          " \u2014 need at least two <strong>value_flag</strong> runners with positive EV. Check the Value lane panel above and run <strong>Refresh 24h</strong>.</p>"
+          '<p class="sys-bets-empty">No value-lane system-bet legs yet — need at least two <strong>value_flag</strong> runners with positive EV per day. Check the Value lane panel above and run <strong>Refresh 24h</strong>.</p>'
         );
       }
       return (
@@ -206,12 +242,18 @@
     }
 
     var html = renderCalibrationBanner(calibrationFromPayload(data));
-    if (data.card_date) {
+    if (days.length > 1) {
+      html += '<p class="sys-bets-date">Combinations are split by racing day — legs never mix today with tomorrow.</p>';
+    } else if (data.card_date) {
+      var dayLine = data.day_label || data.card_date;
+      if (data.day_label && data.card_date && data.day_label !== data.card_date) {
+        dayLine = data.day_label + " · " + data.card_date;
+      }
       html +=
         '<p class="sys-bets-date">' +
-        esc(data.card_date) +
+        esc(dayLine) +
         (source === "tipster" && data.tip_count != null ? " · " + data.tip_count + " tips ingested" : "") +
-        (data.pick_source === "value_lane" || source === "engine" ? " · value-lane EV ranked" : "") +
+        (pickSource === "value_lane" || source === "engine" ? " · value-lane EV ranked" : "") +
         (insights ? " · win engine overlay" : "") +
         "</p>";
     }
@@ -219,11 +261,24 @@
       html += '<p class="sys-bets-dual-hint">Win % = model chance to win · Place % = chance of a place (usually top 3). VALUE = price looks better than our model.</p>';
     }
 
-    mount._sysBetGroups = combos;
-    combos.forEach(function (group, i) {
-      html += renderCombination(group, i, insights);
-    });
-    html += renderSingles(singles, insights);
+    mount._sysBetGroups = [];
+    var comboOffset = 0;
+    if (days.length) {
+      days.forEach(function (day) {
+        var rendered = renderDaySection(day, insights, mount, comboOffset);
+        html += rendered.html;
+        (day.combinations || []).forEach(function (group) {
+          mount._sysBetGroups.push(group);
+        });
+        comboOffset = rendered.nextOffset;
+      });
+    } else {
+      mount._sysBetGroups = combos.slice();
+      combos.forEach(function (group, i) {
+        html += renderCombination(group, i, insights);
+      });
+      html += renderSingles(singles, insights);
+    }
     return html;
   }
 

@@ -64,10 +64,12 @@ def combinations_for_date(db: Path, card_date: str | None = None) -> dict[str, A
         singles = _tips_as_singles(rows)
 
     engine_payload: dict[str, Any] = {}
+    engine_days: list[dict[str, Any]] = []
     if not combinations:
-        from hibs_racing.tips.suggested_combinations import build_engine_combinations
+        from hibs_racing.tips.suggested_combinations import build_engine_combinations_by_day
 
-        engine_payload = build_engine_combinations()
+        engine_payload = build_engine_combinations_by_day(prefer_card_date=target_date)
+        engine_days = list(engine_payload.get("days") or [])
         engine_combos = engine_payload.get("combinations") or []
         if engine_combos:
             combinations = engine_combos
@@ -76,6 +78,15 @@ def combinations_for_date(db: Path, card_date: str | None = None) -> dict[str, A
                 singles = engine_payload.get("singles") or []
             elif not singles:
                 singles = engine_payload.get("singles") or []
+        elif engine_days and not bodies and not rows:
+            for day in engine_days:
+                day_combos = day.get("combinations") or []
+                if day_combos:
+                    combinations = day_combos
+                    singles = day.get("singles") or []
+                    source = "engine"
+                    target_date = str(day.get("card_date") or target_date)
+                    break
 
     payload: dict[str, Any] = {
         "ok": True,
@@ -85,6 +96,9 @@ def combinations_for_date(db: Path, card_date: str | None = None) -> dict[str, A
         "tip_count": len(rows),
         "source": source,
     }
+    if engine_days:
+        payload["days"] = engine_days
+        payload["day_label"] = engine_payload.get("day_label")
     if engine_payload.get("pick_source"):
         payload["pick_source"] = engine_payload["pick_source"]
     if engine_payload.get("message") and not combinations:
