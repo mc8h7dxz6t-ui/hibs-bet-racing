@@ -41,6 +41,15 @@ def db_path(cfg: dict | None = None) -> Path:
     return data_dir() / "feature_store.sqlite"
 
 
+def parquet_dir(cfg: dict | None = None) -> Path:
+    """Resolved parquet output dir (cwd-independent; honours HIBS_RACING_DATA_DIR)."""
+    cfg = cfg or load_config()
+    raw = cfg.get("paths", {}).get("parquet_dir", "data/parquet")
+    path = _resolve_data_relative(raw)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def model_dir(cfg: dict | None = None) -> Path:
     cfg = cfg or load_config()
     raw = cfg.get("paths", {}).get("model_dir", "data/models")

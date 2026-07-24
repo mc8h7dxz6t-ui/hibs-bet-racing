@@ -21,7 +21,7 @@ from hibs_racing.entity.timezone import LONDON
 from hibs_racing.backtest.place_signal import run_place_backtest
 from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.cards.store import load_upcoming_runners
-from hibs_racing.config import db_path, load_config
+from hibs_racing.config import db_path, load_config, parquet_dir
 from hibs_racing.entity.natural_key import generate_natural_key
 from hibs_racing.features.store import connect, init_db
 from hibs_racing.pick_explain import attach_pick_explanations, explain_pick
@@ -1080,6 +1080,6 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24, h
         "gate_summary": gate_summary,
         "gate_filter_modes": gate_filter_modes(),
         "market_gauges": latest_gauges(limit=100),
-        "parquet_path": str(Path(load_config()["paths"]["parquet_dir"]) / "card_scores.parquet"),
+        "parquet_path": str(parquet_dir() / "card_scores.parquet"),
         "ui_data_status": _ui_data_status(frame),
     }
