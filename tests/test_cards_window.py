@@ -1,6 +1,12 @@
 import pandas as pd
 
-from hibs_racing.cards.window import filter_next_hours, off_minutes, primary_card_date, runner_off_dt
+from hibs_racing.cards.window import (
+    filter_next_hours,
+    latest_iso_card_date,
+    off_minutes,
+    primary_card_date,
+    runner_off_dt,
+)
 
 
 def test_off_minutes():
@@ -75,3 +81,15 @@ def test_primary_card_date_keeps_today_while_races_remain():
         ]
     )
     assert primary_card_date(frame, now=now) == today
+
+
+def test_primary_card_date_ignores_blank_and_nan_values():
+    frame = pd.DataFrame(
+        [
+            {"card_date": None, "off_time": "14:00", "runner_id": "bad"},
+            {"card_date": "nan", "off_time": "14:00", "runner_id": "nan"},
+            {"card_date": "2026-07-26", "off_time": "14:30", "runner_id": "ok"},
+        ]
+    )
+    assert latest_iso_card_date(frame) == "2026-07-26"
+    assert primary_card_date(frame) == "2026-07-26"

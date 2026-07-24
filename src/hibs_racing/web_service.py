@@ -404,18 +404,16 @@ def health_status() -> HealthStatus:
     card_fresh = None
     if runners is not None and len(runners) > 0 and "card_date" in runners.columns:
         try:
-            from hibs_racing.cards.window import primary_card_date
+            from hibs_racing.cards.window import latest_iso_card_date, primary_card_date
 
-            latest_card_date = primary_card_date(runners)
-            if not latest_card_date:
-                valid = runners["card_date"].astype(str).str.strip()
-                valid = valid[valid.str.match(r"^\d{4}-\d{2}-\d{2}", na=False)]
-                if len(valid) > 0:
-                    latest_card_date = str(valid.max())
+            latest_card_date = primary_card_date(runners) or latest_iso_card_date(runners)
             if latest_card_date:
                 card_fresh = str(latest_card_date)[:10] >= today
+            else:
+                card_fresh = False
         except Exception:
             latest_card_date = None
+            card_fresh = False
     elif manifest is not None:
         latest_card_date = manifest.card_date
         card_fresh = str(latest_card_date) >= today if latest_card_date else False
