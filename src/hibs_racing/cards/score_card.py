@@ -22,6 +22,7 @@ from hibs_racing.place.hpl_combinatorial import (
     hpl_place_probabilities,
     resolve_place_positions,
     resolve_race_win_probabilities,
+    safe_field_size,
 )
 from hibs_racing.place.paper_ledger import record_paper_bet
 from hibs_racing.racing_engine.score_card import apply_scoring
@@ -87,7 +88,11 @@ def score_upcoming_cards(
     place_positions: list[int] = []
     for _, group in frame.groupby("race_id", sort=False):
         wp = resolve_race_win_probabilities(group, database=db)
-        fs = int(group["field_size"].iloc[0]) if "field_size" in group.columns else len(group)
+        fs = (
+            safe_field_size(group["field_size"].iloc[0], fallback=len(group))
+            if "field_size" in group.columns
+            else len(group)
+        )
         configured = None
         if "places" in group.columns and group["places"].notna().any():
             try:

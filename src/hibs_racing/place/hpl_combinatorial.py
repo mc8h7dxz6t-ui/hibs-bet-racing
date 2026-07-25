@@ -19,6 +19,22 @@ from hibs_racing.place.place_picker_config import (
 )
 
 
+def safe_field_size(field_size: object | None, *, fallback: int) -> int:
+    """Coerce field_size for HPL — NaN/null must not crash int() during score/refresh."""
+    fb = max(1, int(fallback))
+    if field_size is None:
+        return fb
+    try:
+        if pd.isna(field_size):
+            return fb
+    except (TypeError, ValueError):
+        pass
+    try:
+        return max(1, int(float(field_size)))
+    except (TypeError, ValueError):
+        return fb
+
+
 def _normalize_probabilities(probs: np.ndarray) -> np.ndarray:
     arr = np.asarray(probs, dtype=np.float64)
     arr = np.clip(arr, 1e-12, None)
@@ -118,9 +134,16 @@ def _place_prob_fourth_vectorized(probs: np.ndarray, gamma: float) -> np.ndarray
 
 
 def resolve_place_positions(field_size: int, configured_places: int | None = None) -> int:
-    fs = max(1, int(field_size))
-    if configured_places is not None and int(configured_places) > 0:
-        return min(int(configured_places), fs)
+    fs = safe_field_size(field_size, fallback=12)
+    places = None
+    if configured_places is not None:
+        try:
+            if not pd.isna(configured_places):
+                places = int(float(configured_places))
+        except (TypeError, ValueError):
+            places = None
+    if places is not None and places > 0:
+        return min(places, fs)
     if fs >= 16:
         return min(4, fs)
     return min(3, fs)
@@ -138,7 +161,7 @@ def hpl_place_probabilities(
     """
     probs = _normalize_probabilities(np.asarray(win_probs, dtype=np.float64))
     n = len(probs)
-    fs = int(field_size) if field_size is not None else n
+    fs = safe_field_size(field_size, fallback=n)
     k = resolve_place_positions(fs, configured_places=places)
     k = min(k, n)
     if k <= 0:

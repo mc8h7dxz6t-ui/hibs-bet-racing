@@ -35,6 +35,22 @@ def test_henery_reduces_longshot_place_vs_harville(monkeypatch):
     assert henery[1] < plain[1]
 
 
+from hibs_racing.place.hpl_combinatorial import hpl_place_probabilities, resolve_place_positions, safe_field_size
+
+
+def test_safe_field_size_handles_nan():
+    assert safe_field_size(float("nan"), fallback=7) == 7
+    assert safe_field_size(None, fallback=5) == 5
+    assert safe_field_size(9, fallback=5) == 9
+    assert resolve_place_positions(float("nan")) == 3
+
+
+def test_hpl_place_probabilities_nan_field_size():
+    wp = [0.4, 0.3, 0.2, 0.1]
+    pp = hpl_place_probabilities(wp, places=3, field_size=float("nan"))
+    assert len(pp) == 4
+
+
 def test_score_card_smoke(monkeypatch, tmp_path):
     from hibs_racing.config import load_config
     from hibs_racing.features.store import connect, init_db
