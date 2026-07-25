@@ -21,7 +21,7 @@ from hibs_racing.entity.timezone import LONDON
 from hibs_racing.backtest.place_signal import run_place_backtest
 from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.cards.store import load_upcoming_runners
-from hibs_racing.config import db_path, load_config
+from hibs_racing.config import db_path, load_config, parquet_dir
 from hibs_racing.entity.natural_key import generate_natural_key
 from hibs_racing.features.store import connect, init_db
 from hibs_racing.pick_explain import attach_pick_explanations, explain_pick
@@ -404,10 +404,16 @@ def health_status() -> HealthStatus:
     card_fresh = None
     if runners is not None and len(runners) > 0 and "card_date" in runners.columns:
         try:
-            latest_card_date = str(runners["card_date"].astype(str).max())
-            card_fresh = latest_card_date >= today
+            from hibs_racing.cards.window import latest_iso_card_date, primary_card_date
+
+            latest_card_date = primary_card_date(runners) or latest_iso_card_date(runners)
+            if latest_card_date:
+                card_fresh = str(latest_card_date)[:10] >= today
+            else:
+                card_fresh = False
         except Exception:
             latest_card_date = None
+            card_fresh = False
     elif manifest is not None:
         latest_card_date = manifest.card_date
         card_fresh = str(latest_card_date) >= today if latest_card_date else False
@@ -1080,6 +1086,6 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24, h
         "gate_summary": gate_summary,
         "gate_filter_modes": gate_filter_modes(),
         "market_gauges": latest_gauges(limit=100),
-        "parquet_path": str(Path(load_config()["paths"]["parquet_dir"]) / "card_scores.parquet"),
+        "parquet_path": str(parquet_dir() / "card_scores.parquet"),
         "ui_data_status": _ui_data_status(frame),
     }

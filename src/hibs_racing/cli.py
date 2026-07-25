@@ -570,6 +570,7 @@ def cmd_ingest_raceform(args: argparse.Namespace) -> int:
 
 
 def cmd_build_matrix(_: argparse.Namespace) -> int:
+    from hibs_racing.config import parquet_dir
     from hibs_racing.features.ranker_matrix import build_ranker_matrix
 
     frame = build_ranker_matrix()
@@ -578,7 +579,7 @@ def cmd_build_matrix(_: argparse.Namespace) -> int:
             {
                 "rows": len(frame),
                 "races": int(frame["race_id"].nunique()) if not frame.empty else 0,
-                "parquet": str(Path(load_config()["paths"]["parquet_dir"]) / "ranker_matrix.parquet"),
+                "parquet": str(parquet_dir() / "ranker_matrix.parquet"),
             },
             indent=2,
         )
@@ -953,6 +954,7 @@ def cmd_score_card(args: argparse.Namespace) -> int:
 
     from hibs_racing.cards.score_card import paper_log_value_picks, score_upcoming_cards, top_place_picks
     from hibs_racing.cards.store import load_upcoming_runners
+    from hibs_racing.config import parquet_dir
     from hibs_racing.odds.loader import resolve_scoring_odds
 
     cards = load_upcoming_runners()
@@ -1015,8 +1017,7 @@ def cmd_score_card(args: argparse.Namespace) -> int:
             ids = paper_log_value_picks(value, stake=float(load_config().get("paper", {}).get("default_stake", 1.0)))
         print(f"\nPaper bets logged: {len(ids)}")
 
-    out = Path(load_config()["paths"]["parquet_dir"]) / "card_scores.parquet"
-    out.parent.mkdir(parents=True, exist_ok=True)
+    out = parquet_dir() / "card_scores.parquet"
     scored.to_parquet(out, index=False)
     print(f"\nFull scores: {out}")
     return 0
@@ -1024,6 +1025,7 @@ def cmd_score_card(args: argparse.Namespace) -> int:
 
 def cmd_fetch_odds(args: argparse.Namespace) -> int:
     from hibs_racing.cards.store import load_upcoming_runners
+    from hibs_racing.config import parquet_dir
     from hibs_racing.odds.matchbook import fetch_matchbook_odds
     from hibs_racing.odds.oddschecker import fetch_oddschecker_odds, load_race_urls_file
 
@@ -1042,8 +1044,9 @@ def cmd_fetch_odds(args: argparse.Namespace) -> int:
         odds, report = fetch_oddschecker_odds(cards, race_urls=race_urls)
         default_name = "retail_odds.parquet"
 
-    out = Path(args.out) if args.out else Path(load_config()["paths"]["parquet_dir"]) / default_name
-    out.parent.mkdir(parents=True, exist_ok=True)
+    out = Path(args.out) if args.out else parquet_dir() / default_name
+    if args.out:
+        out.parent.mkdir(parents=True, exist_ok=True)
     odds.to_parquet(out, index=False)
     print(json.dumps({"output": str(out), "source": source, **report.to_dict()}, indent=2))
     return 0 if report.runners_priced > 0 else 1

@@ -36,4 +36,20 @@ def test_parse_racing_api_free_payload():
     frame = parse_racing_api_payload(payload, region="gb")
     assert len(frame) == 2
     assert frame.iloc[0]["course"] == "Ascot"
+    assert frame.iloc[0]["card_date"] == "2026-05-30"
     assert "runner_id" in frame.columns
+
+
+def test_parse_racing_api_payload_uses_fallback_card_date():
+    payload = {
+        "racecards": [
+            {
+                "course": "Ascot",
+                "off_time": "14:30",
+                "runners": [{"horse": "Demo Runner (GB)", "jockey": "H Doyle", "trainer": "T Smith"}],
+            }
+        ]
+    }
+    frame = parse_racing_api_payload(payload, region="gb", card_date="2026-07-24")
+    assert len(frame) == 1
+    assert frame.iloc[0]["card_date"] == "2026-07-24"

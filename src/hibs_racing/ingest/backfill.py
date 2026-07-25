@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from hibs_racing.config import db_path, load_config
+from hibs_racing.config import parquet_dir as resolve_parquet_dir
 from hibs_racing.entity.natural_key import generate_natural_key, normalize_off_time
 from hibs_racing.features.store import connect, init_db
 from hibs_racing.ingest.csv_loader import file_hash, normalize_csv_frame, utc_now
@@ -137,7 +138,7 @@ def export_parquet_year(
 ) -> Path:
     """Normalize CSV → year partition Parquet (cold archive layer)."""
     cfg = load_config(config_path)
-    out_dir = parquet_dir or Path(cfg["paths"]["parquet_dir"])
+    out_dir = parquet_dir or resolve_parquet_dir(cfg)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     frame = normalize_csv_frame(pd.read_csv(csv_path))

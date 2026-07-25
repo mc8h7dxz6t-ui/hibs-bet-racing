@@ -25,6 +25,16 @@ def _api_day(day: int | None) -> str:
     raise ValueError("Racing API free/basic plans only support day 1 (today) or 2 (tomorrow)")
 
 
+def _api_day_to_iso(api_day: str) -> str:
+    """Resolve Racing API day label to YYYY-MM-DD (UTC calendar)."""
+    from datetime import datetime, timedelta, timezone
+
+    base = datetime.now(timezone.utc).date()
+    if api_day == "tomorrow":
+        base += timedelta(days=1)
+    return base.isoformat()
+
+
 def _race_id(race: dict, *, fallback_date: str) -> str:
     rid = race.get("race_id") or race.get("id")
     if rid:
@@ -208,7 +218,13 @@ def fetch_racing_api_racecards(
             base=base,
         )
         try:
-            frames.append(parse_racing_api_payload(payload, region=region))
+            frames.append(
+                parse_racing_api_payload(
+                    payload,
+                    region=region,
+                    card_date=_api_day_to_iso(api_day),
+                )
+            )
         except ValueError as exc:
             # Tomorrow often has no IRE card; skip empty day when fetching today+tomorrow.
             if str(exc) != "Racing API returned no runners for this query." or len(api_days) == 1:

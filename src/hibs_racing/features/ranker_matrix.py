@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from hibs_racing.cards.enrich import ENRICH_RANKER_FEATURES, compute_enrich_ranker_fields
-from hibs_racing.config import db_path, load_config
+from hibs_racing.config import db_path, load_config, parquet_dir
 from hibs_racing.features.cd_stats import add_all_cd_stats
 from hibs_racing.features.combo_stats import add_point_in_time_combo_stats
 from hibs_racing.features.discrepancy import add_discrepancy_features
@@ -291,7 +291,7 @@ def build_ranker_matrix(
     _persist_ranker_features(db, frame, built_at)
 
     if export_parquet:
-        out_path = Path(cfg["paths"]["parquet_dir"]) / (
+        out_path = parquet_dir(cfg) / (
             "ranker_matrix_enrich.parquet" if with_enrich else "ranker_matrix.parquet"
         )
         out_path.parent.mkdir(parents=True, exist_ok=True)

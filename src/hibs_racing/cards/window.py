@@ -9,6 +9,15 @@ from hibs_racing.entity.natural_key import normalize_off_time
 from hibs_racing.entity.timezone import LONDON
 
 _TIME_RE = re.compile(r"(\d{1,2}):(\d{2})")
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def valid_card_date_strings(frame: pd.DataFrame) -> list[str]:
+    """ISO YYYY-MM-DD values from card_date, skipping blank/nan/invalid."""
+    if frame.empty or "card_date" not in frame.columns:
+        return []
+    raw = frame["card_date"].astype(str).str.strip().str[:10]
+    return sorted({d for d in raw.tolist() if isinstance(d, str) and _ISO_DATE_RE.match(d)})
 
 
 def off_minutes(off_time: object) -> int:
@@ -38,10 +47,10 @@ def runner_off_dt(card_date: object, off_time: object) -> datetime | None:
 
 def primary_card_date(frame: pd.DataFrame, *, now: datetime | None = None) -> str | None:
     """Earliest card_date with a runner still upcoming; else the latest date in frame."""
-    if frame.empty or "card_date" not in frame.columns:
+    dates = valid_card_date_strings(frame)
+    if not dates:
         return None
     now = now or datetime.now(LONDON)
-    dates = sorted(frame["card_date"].astype(str).str[:10].unique())
     for day in dates:
         day_rows = frame[frame["card_date"].astype(str).str[:10] == day]
         for _, row in day_rows.iterrows():
@@ -51,6 +60,11 @@ def primary_card_date(frame: pd.DataFrame, *, now: datetime | None = None) -> st
             if off >= now - timedelta(minutes=30):
                 return day
     return dates[-1]
+
+
+def latest_iso_card_date(frame: pd.DataFrame) -> str | None:
+    dates = valid_card_date_strings(frame)
+    return dates[-1] if dates else None
 
 
 def filter_next_hours(frame: pd.DataFrame, *, hours: int = 24) -> pd.DataFrame:
