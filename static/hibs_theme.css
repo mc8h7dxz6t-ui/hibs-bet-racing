@@ -183,7 +183,6 @@ html.hibs-product-navigating .ref-page {
     opacity: 0.55;
     transform: scale(0.992);
     transition: opacity 0.28s ease, transform 0.28s ease;
-    pointer-events: none;
     filter: blur(1px);
 }
 
