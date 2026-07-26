@@ -89,10 +89,8 @@
 </section>
 
 {% include 'racing/_racing_lanes_status.html' %}
-{% include 'racing/_value_lane_panel.html' %}
+<p class="insights-value-link">Best bets (value lane producer): <a href="{{ url_for('value_picks_page') }}">Value picks page →</a> · Multiples: <a href="{{ url_for('combinations_page') }}">Combinations</a></p>
 {% include 'racing/_sniper_lane_panel.html' %}
-
-{% include '_system_bets_panel.html' %}
 
 {% if not top_picks and not picks_by_day %}
 <div class="banner error">No qualifying picks in the next {{ window_hours or 24 }}h window. Run <strong>Refresh 24h</strong> once cards and scores are loaded.</div>

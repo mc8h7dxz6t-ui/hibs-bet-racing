@@ -44,7 +44,28 @@ def test_insights_page_loads():
     resp = client.get("/insights")
     assert resp.status_code == 200
     assert b"Best 10 picks" in resp.data
-    assert b"value-lane-hero" in resp.data or b"value-lane-blocked" in resp.data
+    assert b"value-picks" in resp.data or b"Value picks" in resp.data
+
+
+def test_value_picks_page_loads():
+    from hibs_racing.web import create_app
+
+    app = create_app()
+    client = app.test_client()
+    resp = client.get("/value-picks")
+    assert resp.status_code == 200
+    assert b"Best bets" in resp.data
+    assert b"value-lane-hero" in resp.data or b"value-lane-empty" in resp.data or b"value-lane-blocked" in resp.data
+
+
+def test_combinations_page_loads():
+    from hibs_racing.web import create_app
+
+    app = create_app()
+    client = app.test_client()
+    resp = client.get("/combinations")
+    assert resp.status_code == 200
+    assert b"system-bets-mount" in resp.data
 
 
 def test_tracker_page_public():

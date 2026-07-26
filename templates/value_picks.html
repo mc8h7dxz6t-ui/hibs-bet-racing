@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Best bets — {{ product_name }}{% endblock %}
+
+{% block content %}
+<section class="value-picks-page-hero card" aria-label="Value picks home">
+    <h1>Best bets</h1>
+    <p class="section-hint">Horses where our each-way price looks <strong>better than the book</strong> after safety checks. Not a guarantee — paper stakes only. Full history on <a href="{{ url_for('tracker_page') }}">Track Record</a>.</p>
+    {% if value_lane_producer is defined %}
+    <dl class="value-producer-meta">
+        <div><dt>Last card</dt><dd>{{ value_lane_producer.latest_card_date or '—' }}{% if value_lane_producer.card_fresh %} <span class="pill ok">fresh</span>{% endif %}</dd></div>
+        <div><dt>Runners scanned</dt><dd>{{ value_lane_producer.runners_scanned }}</dd></div>
+        <div><dt>Looked promising</dt><dd>{{ value_lane_producer.raw_value_count }}</dd></div>
+        <div><dt>Picks today</dt><dd><strong>{{ value_lane_producer.picks_emitted }}</strong></dd></div>
+        {% if value_lane_producer.odds_coverage_pct is not none %}
+        <div><dt>Odds loaded</dt><dd>{{ value_lane_producer.odds_coverage_pct }}%</dd></div>
+        {% endif %}
+    </dl>
+    {% endif %}
+</section>
+
+{% include 'racing/_picks_glossary.html' %}
+{% set value_lane_page = true %}
+{% include 'racing/_value_lane_panel.html' %}
+
+<p class="value-picks-footer-hint">Multiples built from these picks (doubles, Trixies, Lucky 15) live on <a href="{{ url_for('combinations_page') }}">Combinations</a> — separate from this producer list.</p>
+{% endblock %}

@@ -849,3 +849,41 @@ html[data-hibs-ui="away"] {
     --accent: #94a3b8;
     --border: rgba(148, 163, 184, 0.22);
 }
+
+/* Value picks home + traffic shed */
+.hibs-traffic-shed-banner {
+    margin: 0 0 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    background: rgba(251, 191, 36, 0.12);
+    color: #78350f;
+    font-size: 0.82em;
+    font-weight: 600;
+    line-height: 1.4;
+}
+html.hibs-traffic-shed .value-lane-hero,
+html.hibs-traffic-shed .smart-picks-hero {
+    transition: none;
+}
+.value-producer-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    margin: 12px 0 0;
+    padding: 0;
+    font-size: 0.78em;
+}
+.value-producer-meta > div { display: flex; gap: 6px; align-items: baseline; }
+.value-producer-meta dt { color: var(--muted); font-weight: 600; margin: 0; }
+.value-producer-meta dd { margin: 0; color: var(--text); font-weight: 700; }
+.value-producer-meta--compact { margin-top: 10px; }
+.value-picks-teaser { margin-bottom: 16px; padding: 14px 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.value-picks-page-hero,
+.combinations-page-hero { margin-bottom: 16px; padding: 16px 18px; }
+.value-picks-page-hero h1,
+.combinations-page-hero h1 { font-family: 'Orbitron', monospace; font-size: 1.1em; color: var(--hibs-neon); margin: 0 0 8px; }
+.value-picks-footer-hint,
+.dash-combos-hint,
+.insights-value-link { font-size: 0.8em; color: var(--muted); margin: 12px 0 16px; line-height: 1.45; }
+.value-lane-quiet-meta { font-size: 0.8em; color: var(--muted); margin-top: 10px; }

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Combinations — {{ product_name }}{% endblock %}
+
+{% block content %}
+<section class="combinations-page-hero card" aria-label="Tip combinations">
+    <h1>Combinations</h1>
+    <p class="section-hint">Multiples and accas — from pasted tipster emails or from <a href="{{ url_for('value_picks_page') }}">best bets</a> when enough legs qualify. Split by racing day with course and off time on each leg.</p>
+</section>
+
+{% include '_system_bets_panel.html' %}
+{% endblock %}

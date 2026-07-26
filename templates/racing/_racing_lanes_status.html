@@ -3,16 +3,16 @@
     <div class="value-lane-hd">
         <div>
             <h2>Racing lanes</h2>
-            <p class="section-hint">Value, sniper, place, and win engines — counts and blockers for today’s card.</p>
+            <p class="section-hint">How many horses made each list today — and what might be blocking picks.</p>
         </div>
     </div>
     <div class="lanes-status-grid" role="list">
         <div class="lanes-status-item" role="listitem">
-            <span class="lanes-status-label">Value lane</span>
+            <span class="lanes-status-label">Best bets</span>
             <span class="pill {% if racing_lanes_status.value_lane_count %}ok{% elif racing_lanes_status.value_lane_ready %}warn{% else %}err{% endif %}">
                 {{ racing_lanes_status.value_lane_count }} pick{% if racing_lanes_status.value_lane_count != 1 %}s{% endif %}
             </span>
-            {% if racing_lanes_status.raw_value_count %}<span class="lanes-status-meta">{{ racing_lanes_status.raw_value_count }} value flags</span>{% endif %}
+            {% if racing_lanes_status.raw_value_count %}<span class="lanes-status-meta">{{ racing_lanes_status.raw_value_count }} looked promising</span>{% endif %}
         </div>
         <div class="lanes-status-item" role="listitem">
             <span class="lanes-status-label">Sniper lane</span>
@@ -48,7 +48,7 @@
         </div>
     </div>
     {% if racing_lanes_status.value_lane_blockers %}
-    <p class="lanes-status-blockers"><strong>Blockers:</strong> {{ racing_lanes_status.value_lane_blockers|join(', ') }}</p>
+    <p class="lanes-status-blockers"><strong>Waiting on:</strong> {{ racing_lanes_status.value_lane_blockers|join(', ') }}</p>
     {% endif %}
     {% if racing_lanes_status.hints %}
     <ul class="lanes-status-hints">
@@ -59,7 +59,7 @@
     {% endif %}
 </section>
 <style>
-.racing-lanes-status{margin-bottom:16px;padding:14px 16px;border-radius:14px;border:1px solid rgba(94,234,212,0.22);background:rgba(6,14,24,0.6);}
+.racing-lanes-status{margin-bottom:16px;padding:14px 16px;border-radius:14px;border:1px solid var(--border);background:var(--hibs-surface-card);}
 .racing-lanes-status h2{font-family:'Orbitron',monospace;color:var(--hibs-neon);font-size:0.95em;margin:0;}
 .lanes-status-grid{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;}
 .lanes-status-item{display:flex;flex-direction:column;gap:4px;min-width:120px;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.2);}

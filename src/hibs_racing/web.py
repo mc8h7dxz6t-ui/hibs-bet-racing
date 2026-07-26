@@ -31,6 +31,7 @@ from hibs_racing.web_service import (
     health_status,
     insights_context,
     shell_health_status,
+    value_picks_context,
 )
 from hibs_racing.middleware.auth import require_api_key, validate_auth_config
 from hibs_racing.utils.ui_settings import (
@@ -225,6 +226,14 @@ def create_app() -> Flask:
     @app.route("/insights")
     def insights_page():
         return render_template("insights.html", **insights_context(top_n=10))
+
+    @app.route("/value-picks")
+    def value_picks_page():
+        return render_template("value_picks.html", **value_picks_context())
+
+    @app.route("/combinations")
+    def combinations_page():
+        return render_template("combinations.html", **value_picks_context())
 
     @app.route("/api/picks")
     def api_picks():

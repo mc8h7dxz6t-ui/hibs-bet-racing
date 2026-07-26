@@ -107,7 +107,7 @@ def explain_pick(row: dict | pd.Series, *, race_peers: pd.DataFrame | None = Non
         reasons.append(f"Place chance about {fmt_prob_phrase(place_p)} in a {fs} race.")
 
     if value_flag == 1:
-        reasons.append("Passes value gates at logged each-way odds.")
+        reasons.append("Each-way price looks better than our place model at these odds.")
     elif ew_ev is not None and not (isinstance(ew_ev, float) and math.isnan(ew_ev)) and _f(ew_ev) > 0.05:
         reasons.append(f"Each-way EV +{_f(ew_ev):.2f} units at offered price.")
 
