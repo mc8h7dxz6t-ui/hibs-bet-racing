@@ -7,13 +7,35 @@
 set -euo pipefail
 
 RACING="${HIBS_RACING_DEPLOY_PATH:-/opt/hibs-racing}"
+BET="${HIBS_BET_DEPLOY_PATH:-/opt/hibs-bet}"
 ENABLE=0
 [[ "${1:-}" == "--enable" ]] && ENABLE=1
 
 [[ "$(id -u)" -ne 0 ]] && { echo "run as root" >&2; exit 1; }
 
-install -m 0644 "${RACING}/deploy/hibs-trading-daemon.service" /etc/systemd/system/hibs-trading-daemon.service
+log() { echo "[trading-daemon] $*"; }
+
+UNIT_SRC=""
+for candidate in \
+  "${BET}/deploy/systemd/hibs-trading-daemon.service" \
+  "${BET}/deploy/hibs-trading-daemon.service" \
+  "${RACING}/deploy/hibs-trading-daemon.service"; do
+  if [[ -f "${candidate}" ]]; then
+    UNIT_SRC="${candidate}"
+    break
+  fi
+done
+[[ -n "${UNIT_SRC}" ]] || { echo "missing hibs-trading-daemon.service unit file" >&2; exit 1; }
+
+if [[ -f "${BET}/deploy/fix-hibs-runtime-dirs.sh" ]]; then
+  bash "${BET}/deploy/fix-hibs-runtime-dirs.sh"
+elif [[ -f "${BET}/deploy/fix-football-data-permissions.sh" ]]; then
+  APP_ROOT="${BET}" HIBS_RACING_DEPLOY_PATH="${RACING}" bash "${BET}/deploy/fix-football-data-permissions.sh"
+fi
+
+install -m 0644 "${UNIT_SRC}" /etc/systemd/system/hibs-trading-daemon.service
 systemctl daemon-reload
+log "installed unit from ${UNIT_SRC}"
 
 ENV_FILE="${RACING}/.env"
 touch "${ENV_FILE}"
@@ -27,10 +49,18 @@ upsert "HIBS_EXECUTION_LATENCY_MAX_MS" "250"
 upsert "HIBS_SLIPPAGE_MAX_TICKS" "2"
 upsert "HIBS_FLIGHT_LATENCY_MAX_MS" "450"
 upsert "HIBS_ADVERSE_SELECTION_VOLUME_DROP_PCT" "0.40"
+upsert "HIBS_TRADING_STATUS_FILE" "/var/run/hibs/trading_daemon.json"
 
 if [[ "${ENABLE}" -eq 1 ]]; then
-  systemctl enable --now hibs-trading-daemon
+  systemctl enable hibs-trading-daemon
+  systemctl restart hibs-trading-daemon
+  sleep 2
   systemctl status hibs-trading-daemon --no-pager || true
+  if journalctl -u hibs-trading-daemon -n 5 --no-pager 2>/dev/null | grep -q "Permission denied: '/var/run/hibs'"; then
+    log "WARN: still seeing /var/run/hibs permission errors — run: sudo bash ${BET}/deploy/fix-hibs-runtime-dirs.sh"
+  else
+    log "OK: trading daemon restarted (simulation sandbox)"
+  fi
 else
   echo "Installed unit. Start with: sudo systemctl enable --now hibs-trading-daemon"
 fi

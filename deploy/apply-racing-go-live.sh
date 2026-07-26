@@ -44,6 +44,9 @@ else
 fi
 
 log "3/7 trading daemon + flight-latency guard configs (simulation only)"
+if [[ -f "${BET}/deploy/fix-hibs-runtime-dirs.sh" ]]; then
+  bash "${BET}/deploy/fix-hibs-runtime-dirs.sh"
+fi
 if [[ -f "${RACING}/deploy/apply-trading-daemon.sh" ]]; then
   bash "${RACING}/deploy/apply-trading-daemon.sh" --enable
 fi
