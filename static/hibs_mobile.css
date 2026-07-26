@@ -280,6 +280,30 @@
         max-width: 100%;
     }
 
+    /* Product nav must stay tappable even if transition state sticks (mobile Safari bfcache) */
+    html.hibs-product-navigating .ref-page,
+    html.hibs-product-navigating .hibs-workspace-shell,
+    html.hibs-product-navigating .hibs-app-shell {
+        pointer-events: auto !important;
+    }
+
+    .hibs-product-bar {
+        position: relative;
+        z-index: 140;
+    }
+
+    .hibs-product-pill,
+    .hibs-workspace-shell .line-tab[data-product-nav] {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+        min-height: 36px;
+    }
+
+    .hibs-product-transition:not(.is-visible) {
+        pointer-events: none !important;
+        visibility: hidden !important;
+    }
+
     input,
     select,
     textarea,

@@ -9,6 +9,8 @@
     var NAV_DELAY_MS = 80;
     var FAILSAFE_MS = 3500;
 
+    document.documentElement.classList.remove('hibs-product-navigating');
+
     function ready(fn) {
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', fn);
@@ -104,13 +106,16 @@
         );
     }
 
-    function navDelayMs() {
+    function useNativeMobileNav() {
         try {
-            if (global.matchMedia && global.matchMedia('(max-width: 767px)').matches) {
-                return 0;
-            }
-        } catch (e) { /* noop */ }
-        return NAV_DELAY_MS;
+            return global.matchMedia && global.matchMedia('(max-width: 767px)').matches;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function navDelayMs() {
+        return useNativeMobileNav() ? 0 : NAV_DELAY_MS;
     }
 
     function bindOverlayDismiss() {
@@ -154,6 +159,9 @@
                 }
                 var href = pill.getAttribute('href');
                 if (!href) return;
+                if (useNativeMobileNav()) {
+                    return;
+                }
                 evt.preventDefault();
                 var label = navLabel(pill);
                 try {
