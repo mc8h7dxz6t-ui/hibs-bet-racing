@@ -1,11 +1,13 @@
 /**
  * Product switcher — sliding indicator, prefetch, logo transition overlay.
+ * Keep in sync with hibs-bet/static/hibs_product_switch.js
  */
 (function (global) {
     'use strict';
 
     var NAV_KEY = 'hibs-product-nav';
-    var NAV_DELAY_MS = 120;
+    var NAV_DELAY_MS = 80;
+    var FAILSAFE_MS = 3500;
 
     function ready(fn) {
         if (document.readyState === 'loading') {
@@ -32,15 +34,28 @@
 
     function hideTransition() {
         var overlay = overlayEl();
+        document.documentElement.classList.remove('hibs-product-navigating');
         if (!overlay) return;
         overlay.classList.remove('is-visible');
-        document.documentElement.classList.remove('hibs-product-navigating');
         window.setTimeout(function () {
             if (!overlay.classList.contains('is-visible')) {
                 overlay.hidden = true;
                 overlay.setAttribute('aria-hidden', 'true');
             }
         }, 280);
+    }
+
+    function forceResetNavigationState() {
+        document.documentElement.classList.remove('hibs-product-navigating');
+        var overlay = overlayEl();
+        if (overlay) {
+            overlay.classList.remove('is-visible');
+            overlay.hidden = true;
+            overlay.setAttribute('aria-hidden', 'true');
+        }
+        try {
+            sessionStorage.removeItem(NAV_KEY);
+        } catch (e) { /* noop */ }
     }
 
     function positionIndicator(switchEl, indicator, pill) {
@@ -89,6 +104,26 @@
         );
     }
 
+    function navDelayMs() {
+        try {
+            if (global.matchMedia && global.matchMedia('(max-width: 767px)').matches) {
+                return 0;
+            }
+        } catch (e) { /* noop */ }
+        return NAV_DELAY_MS;
+    }
+
+    function bindOverlayDismiss() {
+        var overlay = overlayEl();
+        if (!overlay || overlay.getAttribute('data-hibs-overlay-bound') === '1') return;
+        overlay.setAttribute('data-hibs-overlay-bound', '1');
+        overlay.addEventListener('click', function () {
+            if (overlay.classList.contains('is-visible')) {
+                forceResetNavigationState();
+            }
+        });
+    }
+
     function bindSwitch(switchEl) {
         if (!switchEl || switchEl.getAttribute('data-hibs-switch-bound') === '1') return;
         switchEl.setAttribute('data-hibs-switch-bound', '1');
@@ -109,7 +144,7 @@
                 if (indicator) positionIndicator(switchEl, indicator, pill);
             });
 
-            pill.addEventListener('click', function (evt) {
+            function goNav(evt) {
                 if (evt.defaultPrevented || evt.metaKey || evt.ctrlKey || evt.shiftKey || evt.altKey) {
                     return;
                 }
@@ -125,10 +160,17 @@
                     sessionStorage.setItem(NAV_KEY, label);
                 } catch (e) { /* noop */ }
                 showTransition(label);
-                window.setTimeout(function () {
-                    global.location.href = href;
-                }, NAV_DELAY_MS);
-            });
+                var delay = navDelayMs();
+                if (delay <= 0) {
+                    global.location.assign(href);
+                } else {
+                    window.setTimeout(function () {
+                        global.location.assign(href);
+                    }, delay);
+                }
+            }
+
+            pill.addEventListener('click', goNav);
         });
 
         if (typeof global.ResizeObserver === 'function') {
@@ -142,6 +184,9 @@
     }
 
     ready(function () {
+        forceResetNavigationState();
+        bindOverlayDismiss();
+
         document.querySelectorAll('[data-hibs-product-switch]').forEach(bindSwitch);
 
         var pending;
@@ -158,10 +203,11 @@
             window.setTimeout(hideTransition, 420);
         }
 
-        window.addEventListener('pageshow', function (evt) {
-            if (evt.persisted) {
-                hideTransition();
-            }
+        window.setTimeout(forceResetNavigationState, FAILSAFE_MS);
+
+        window.addEventListener('pageshow', function () {
+            hideTransition();
+            forceResetNavigationState();
         });
 
         var resizeTimer;
@@ -172,4 +218,6 @@
             }, 80);
         }, { passive: true });
     });
+
+    global.hibsForceResetProductNav = forceResetNavigationState;
 })(window);
