@@ -59,7 +59,7 @@ def append_execution_intent(
     with _LOCK:
         prev = _prev_hash(path)
         chain_hash = hashlib.sha256(f"{prev}|{payload}".encode()).hexdigest()
-        row = {**body, "prev_hash": prev, "chain_hash": chain_hash}
+        row = {**body, "prev_hash": prev, "chain_hash": chain_hash, "audit_digest": chain_hash, "ledger_sha256": chain_hash}
         with open(path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(row, default=str) + "\n")
             if os.getenv("HIBS_EXEC_INTENT_FSYNC", "1").strip().lower() in ("1", "true", "yes"):

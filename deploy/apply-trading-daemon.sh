@@ -49,7 +49,13 @@ upsert "HIBS_EXECUTION_LATENCY_MAX_MS" "250"
 upsert "HIBS_SLIPPAGE_MAX_TICKS" "2"
 upsert "HIBS_FLIGHT_LATENCY_MAX_MS" "450"
 upsert "HIBS_ADVERSE_SELECTION_VOLUME_DROP_PCT" "0.40"
-upsert "HIBS_TRADING_STATUS_FILE" "/var/run/hibs/trading_daemon.json"
+upsert "HIBS_TRADING_STATUS_FILE" "${RACING}/run/trading_daemon.json"
+upsert "HIBS_RUNNER_DISARM_FILE" "${RACING}/run/drift_disarmed_runners.json"
+upsert "HIBS_RACING_RUNTIME_DIR" "${RACING}/run"
+
+mkdir -p "${RACING}/run"
+chown hibs_executor:hibs-shared "${RACING}/run" 2>/dev/null || chown www-data:www-data "${RACING}/run" 2>/dev/null || true
+chmod 2770 "${RACING}/run" 2>/dev/null || true
 
 if [[ "${ENABLE}" -eq 1 ]]; then
   systemctl enable hibs-trading-daemon

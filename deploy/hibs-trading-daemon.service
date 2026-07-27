@@ -19,7 +19,9 @@ RuntimeDirectoryMode=2770
 UMask=0007
 Environment=HOME=/opt/hibs-racing
 Environment=PYTHONPATH=/opt/hibs-racing/src
-Environment=HIBS_TRADING_STATUS_FILE=/var/run/hibs/trading_daemon.json
+Environment=HIBS_TRADING_STATUS_FILE=/opt/hibs-racing/run/trading_daemon.json
+Environment=HIBS_RUNNER_DISARM_FILE=/opt/hibs-racing/run/drift_disarmed_runners.json
+Environment=HIBS_RACING_RUNTIME_DIR=/opt/hibs-racing/run
 Environment=HIBS_RACING_FORCE_DISK=1
 Environment=HIBS_RACING_DB_PATH=/opt/hibs-racing/data/feature_store.sqlite
 Environment=HIBS_RACING_DATA_DIR=/opt/hibs-racing/data
