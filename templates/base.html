@@ -384,11 +384,13 @@
         <div class="site-top-left">
             <nav class="site-links" aria-label="Racing">
                 <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Cards</a>
+                <a href="{{ url_for('value_picks_page') }}" class="nav-primary-only {% if request.endpoint == 'value_picks_page' %}active{% endif %}">Best bets</a>
                 <a href="{{ url_for('insights_page') }}" class="nav-primary-only {% if request.endpoint == 'insights_page' %}active{% endif %}">Insights</a>
                 <a href="{{ url_for('tracker_page') }}" class="nav-primary-only {% if request.endpoint == 'tracker_page' %}active{% endif %}">Track Record</a>
                 <details class="nav-more">
                     <summary>More ▾</summary>
                     <div class="nav-more-menu">
+                        <a href="{{ url_for('combinations_page') }}">Combinations</a>
                         <a href="{{ url_for('portfolio_page') }}">Ledger</a>
                         <a href="{{ url_for('backtest_page') }}">Backtest</a>
                         <a href="{{ url_for('status_page') }}">Status</a>
@@ -419,6 +421,7 @@
         <span class="pill">Scoring: <strong>{{ scoring_method }}</strong></span>
         {% endif %}
     </div>
+    <div id="hibs-traffic-shed-banner" class="hibs-traffic-shed-banner" role="status" aria-live="polite" hidden></div>
     <div class="bankroll-bar" id="bankroll-bar">
         <label for="bankroll-input">My betting bankroll</label>
         <span>£</span>
@@ -460,6 +463,8 @@
     setInterval(tick, 120000);
 })();
 </script>
+<script id="hibs-stack-evidence-config" type="application/json">{"evidenceUrl": {{ (hibs_football_home_url|default('/') ~ 'api/stack/evidence')|tojson }}, "pollMs": 90000}</script>
+<script src="{{ static_v('hibs_ops_banner.js') }}" defer></script>
 <script>
 document.getElementById('btn-refresh')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-refresh');

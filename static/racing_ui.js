@@ -940,19 +940,46 @@
   const label = document.getElementById('racing-inst-card');
   if (!chip || !label || typeof EventSource === 'undefined') return;
 
+  const shedActive = () => document.documentElement.classList.contains('hibs-traffic-shed');
+  const reconnectMs = () => (shedActive() ? 30000 : 5000);
+  const minFlushMs = 16;
+
   let source = null;
+  let pending = null;
+  let flushTimer = null;
+
+  function applyStatus(msg) {
+    if (!msg || msg.type !== 'trading_status' || !msg.status) return;
+    const active = msg.status.active === true;
+    const comp = (msg.status.payload || {}).component || 'daemon';
+    label.textContent = active ? `${comp} live` : 'daemon idle';
+    chip.classList.toggle('ok', active);
+    chip.classList.toggle('warn', !active);
+  }
+
+  function scheduleFlush() {
+    if (flushTimer) return;
+    flushTimer = setTimeout(() => {
+      flushTimer = null;
+      if (pending) {
+        applyStatus(pending);
+        pending = null;
+      }
+    }, minFlushMs);
+  }
+
   function connect() {
     if (source) return;
     source = new EventSource('/api/stream/deltas');
     source.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data || '{}');
-        if (msg.type !== 'trading_status' || !msg.status) return;
-        const active = msg.status.active === true;
-        const comp = (msg.status.payload || {}).component || 'daemon';
-        label.textContent = active ? `${comp} live` : 'daemon idle';
-        chip.classList.toggle('ok', active);
-        chip.classList.toggle('warn', !active);
+        if (shedActive()) {
+          pending = msg;
+          scheduleFlush();
+        } else {
+          applyStatus(msg);
+        }
       } catch (_) {}
     };
     source.onerror = () => {
@@ -960,8 +987,16 @@
         source.close();
         source = null;
       }
-      setTimeout(connect, 5000);
+      setTimeout(connect, reconnectMs());
     };
   }
   connect();
+
+  document.addEventListener('hibs-traffic-shed-change', () => {
+    if (source) {
+      source.close();
+      source = null;
+    }
+    setTimeout(connect, 500);
+  });
 })(window);

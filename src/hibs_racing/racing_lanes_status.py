@@ -38,15 +38,15 @@ def build_racing_lanes_status(
 
     hints: list[str] = []
     if not racing_api:
-        hints.append("Set RACING_API_* in /opt/hibs-racing/.env for cards.")
+        hints.append("Racing API not configured — we need credentials to load racecards.")
     if not matchbook:
-        hints.append("Set MATCHBOOK_USER + MATCHBOOK_PASSWORD for exchange odds and value EV.")
+        hints.append("Matchbook not connected — add login details for live odds and edge checks.")
     elif lane_ready and not vl and value_count == 0:
-        hints.append("Cards scored but no value_flag runners — run Refresh 24h after Matchbook poll.")
+        hints.append("Cards are scored but nothing looked like value yet — try Refresh 24h after odds load.")
     elif lane_ready and not vl and value_count > 0:
-        hints.append(f"{value_count} raw value flags gated — see Card stats for block rate.")
+        hints.append(f"{value_count} horses looked interesting but didn't pass every safety check.")
     if lane_ready and not sl and vl:
-        hints.append("Value picks exist but none pass Gate7 (OR≥65, RTF≥20) for sniper lane.")
+        hints.append("Best bets exist but none qualify for the tighter sniper lane today.")
     if runner_count > 0 and not ep:
         hints.append("Place engine: score cards to populate model_place_prob.")
     if not win["public_release"]:

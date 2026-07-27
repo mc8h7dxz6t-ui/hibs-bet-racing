@@ -1,11 +1,12 @@
+{% set _page = value_lane_page|default(false) %}
 {% if value_lane_picks is defined and value_lane_picks %}
-<section class="value-lane-hero card" id="value-lane-hero" aria-label="Value lane picks">
+<section class="value-lane-hero card" id="value-lane-hero" aria-label="Best bets">
     <div class="value-lane-hd">
         <div>
-            <h2>Value lane</h2>
-            <p class="section-hint">ROI-ranked each-way angles — <strong>value_flag</strong> runners with positive <strong>EV</strong>. Grouped by racing day so you can match picks to today&apos;s or tomorrow&apos;s card.</p>
+            <h2>{% if _page %}Today&apos;s best bets{% else %}Best bets{% endif %}</h2>
+            <p class="section-hint">Each-way angles where our model sees <strong>positive edge</strong> vs the book — grouped by racing day. Tap a card for the racecard.</p>
         </div>
-        <span class="pill warn">{{ value_lane_picks|length }} ROI pick{% if value_lane_picks|length != 1 %}s{% endif %}</span>
+        <span class="pill warn">{{ value_lane_picks|length }} pick{% if value_lane_picks|length != 1 %}s{% endif %}</span>
     </div>
     {% for day, day_picks in value_lane_picks|groupby('card_date') %}
     <div class="value-lane-day" data-card-date="{{ day }}">
@@ -34,13 +35,13 @@
                         · {{ p.off_time or '—' }} · {{ p.course or '' }}
                     </div>
                     {% if p.ew_combined_ev is not none %}
-                    <div class="vlc-roi" title="Each-way expected value — positive means model edge vs price">
-                        EV <strong>{{ p.ew_combined_ev|fmt_num }}</strong>
-                        <span class="vlc-roi-hint">ROI signal</span>
+                    <div class="vlc-roi" title="If our model is right, this each-way bet looks favourable — not a promise of profit">
+                        Edge <strong>{{ p.ew_combined_ev|fmt_num }}</strong>
+                        <span class="vlc-roi-hint">model vs book</span>
                     </div>
                     {% endif %}
                     <div class="vlc-stats">
-                        <span>Place {{ (p.model_place_prob or 0)|fmt_pct }}</span>
+                        <span>Place chance {{ (p.model_place_prob or 0)|fmt_pct }}</span>
                         {% if p.win_decimal %}<span>Win {{ p.win_decimal|fmt_num(1) }}</span>{% endif %}
                         {% if p.data_quality_pct %}<span>Data {{ p.data_quality_pct }}%</span>{% endif %}
                     </div>
@@ -57,13 +58,26 @@
     {% endfor %}
 </section>
 {% elif health is defined and health.value_lane_ready is defined and not health.value_lane_ready %}
-<section class="value-lane-hero card value-lane-blocked" id="value-lane-hero" aria-label="Value lane status">
-    <h2>Value lane</h2>
-    <p class="section-hint">No ROI picks right now{% if health.value_lane_blockers %} — blockers: {{ health.value_lane_blockers|join(', ') }}{% endif %}. Run <strong>Refresh 24h</strong> once cards and Matchbook odds are loaded.</p>
+<section class="value-lane-hero card value-lane-blocked" id="value-lane-hero" aria-label="Best bets status">
+    <h2>Best bets</h2>
+    <p class="section-hint">We can&apos;t publish picks yet{% if health.value_lane_blockers %} — waiting on: {{ health.value_lane_blockers|join(', ') }}{% endif %}. Try <strong>Refresh 24h</strong> after cards and Matchbook odds are loaded.</p>
+    {% if value_lane_producer is defined %}
+    <p class="value-lane-quiet-meta">Scanned {{ value_lane_producer.runners_scanned }} runners · card {{ value_lane_producer.latest_card_date or '—' }}</p>
+    {% endif %}
 </section>
 {% elif health is defined and health.value_lane_ready %}
-<section class="value-lane-empty card value-lane-empty-ready" id="value-lane-hero" aria-label="Value lane status">
-    <h2>Value lane</h2>
-    <p class="section-hint">Card healthy but no qualifying ROI picks{% if racing_lanes_status is defined and racing_lanes_status.raw_value_count %} ({{ racing_lanes_status.raw_value_count }} raw value flags gated){% endif %}. Check Matchbook coverage and gate block rate in Card stats.</p>
+<section class="value-lane-empty card value-lane-empty-ready" id="value-lane-hero" aria-label="Best bets status">
+    <h2>Best bets</h2>
+    <p class="section-hint">No horses met our bar today{% if racing_lanes_status is defined and racing_lanes_status.raw_value_count %} — we flagged {{ racing_lanes_status.raw_value_count }} as interesting but they didn&apos;t pass every safety check{% endif %}.</p>
+    {% if value_lane_producer is defined %}
+    <dl class="value-producer-meta value-producer-meta--compact">
+        <div><dt>Runners scanned</dt><dd>{{ value_lane_producer.runners_scanned }}</dd></div>
+        <div><dt>Card date</dt><dd>{{ value_lane_producer.latest_card_date or '—' }}</dd></div>
+        {% if value_lane_producer.odds_coverage_pct is not none %}
+        <div><dt>Odds coverage</dt><dd>{{ value_lane_producer.odds_coverage_pct }}%</dd></div>
+        {% endif %}
+    </dl>
+    {% endif %}
+    <p class="value-lane-quiet-meta">Recent settled picks: <a href="{{ url_for('tracker_page') }}">Track Record</a> · Multiples: <a href="{{ url_for('combinations_page') }}">Combinations</a></p>
 </section>
 {% endif %}

@@ -180,7 +180,7 @@
         '">Tips</a> (include lines like <code>0.25pt Win Trixie</code>).';
     } else if (source === "engine" || pickSource === "value_lane") {
       intro.textContent =
-        "Value-lane system bets — doubles, Trixies and Lucky 15 per racing day (today vs tomorrow). Each leg shows the day, course and off time.";
+        "Built from best bets — doubles, Trixies and Lucky 15 per racing day. Each leg shows day, course and off time.";
     }
   }
 
@@ -197,7 +197,7 @@
       '<h3 class="sys-bets-day-title">' + esc(dateBits.join(" · ")) + "</h3>";
     if (!combos.length && !singles.length) {
       html +=
-        '<p class="sys-bets-empty">Need at least two value-lane runners on ' +
+        '<p class="sys-bets-empty">Need at least two best bets on ' +
         esc(title) +
         " for doubles / Trixies.</p></section>";
       return { html: html, nextOffset: comboOffset };
@@ -216,6 +216,7 @@
     var days = data.days || [];
     var insights = data.win_engine && data.win_engine.insights ? data.win_engine.insights : null;
     var tipsUrl = (mount && mount.getAttribute("data-tips-url")) || "/tips";
+    var valuePicksUrl = (mount && mount.getAttribute("data-value-picks-url")) || "/value-picks";
     var source = data.source || (data.tip_count > 0 ? "tipster" : "engine");
     var pickSource = data.pick_source;
 
@@ -231,7 +232,9 @@
       }
       if (source === "engine" || pickSource === "value_lane") {
         return (
-          '<p class="sys-bets-empty">No value-lane system-bet legs yet — need at least two <strong>value_flag</strong> runners with positive EV per day. Check the Value lane panel above and run <strong>Refresh 24h</strong>.</p>'
+          '<p class="sys-bets-empty">No combination legs yet — need at least two <strong>best bets</strong> with positive edge per day. See <a href="' +
+          esc(valuePicksUrl) +
+          '">Best bets</a> and run <strong>Refresh 24h</strong>.</p>'
         );
       }
       return (
@@ -253,7 +256,7 @@
         '<p class="sys-bets-date">' +
         esc(dayLine) +
         (source === "tipster" && data.tip_count != null ? " · " + data.tip_count + " tips ingested" : "") +
-        (pickSource === "value_lane" || source === "engine" ? " · value-lane EV ranked" : "") +
+        (pickSource === "value_lane" || source === "engine" ? " · from best bets" : "") +
         (insights ? " · win engine overlay" : "") +
         "</p>";
     }

@@ -268,7 +268,15 @@ tr.gate-filter-hidden,.runner-mobile-card.gate-filter-hidden{display:none!import
 {% endif %}
 
 {% include 'racing/_racing_lanes_status.html' %}
-{% include 'racing/_value_lane_panel.html' %}
+<section class="value-picks-teaser card" id="value-picks-teaser" aria-label="Best bets teaser">
+    <div class="value-lane-hd">
+        <div>
+            <h2>Best bets</h2>
+            <p class="section-hint">Each-way picks where our price beats the book — on their own page, with a clear message when nothing qualifies.</p>
+        </div>
+        <a class="btn vlc-link" href="{{ url_for('value_picks_page') }}">Open best bets →</a>
+    </div>
+</section>
 {% include 'racing/_sniper_lane_panel.html' %}
 
 {% if pick_candidates is defined and runner_count > 0 %}
@@ -285,7 +293,7 @@ tr.gate-filter-hidden,.runner-mobile-card.gate-filter-hidden{display:none!import
 </section>
 {% endif %}
 
-{% include '_system_bets_panel.html' %}
+<p class="dash-combos-hint">Doubles, Trixies and Lucky 15: <a href="{{ url_for('combinations_page') }}">Combinations</a> (built from best bets or pasted tips).</p>
 
 <details class="dash-fold">
     <summary>Racecards · next {{ window_hours or 24 }}h{% if card_dates %} · {{ card_dates|join(' · ') }}{% endif %}</summary>

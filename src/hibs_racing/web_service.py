@@ -944,6 +944,53 @@ def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
     }
 
 
+def value_picks_context(*, window_hours: int = 24) -> dict:
+    """Dedicated value-lane producer page — picks, quiet state, last-scan metadata."""
+    from hibs_racing.daily.pick_display import build_value_lane_display_picks
+    from hibs_racing.data_producer_slo import build_data_producer_snapshot
+    from hibs_racing.racing_lanes_status import build_racing_lanes_status
+
+    frame = _base_frame(window_hours=window_hours)
+    link_index = race_deep_link_index(frame) if not frame.empty else []
+    health = shell_health_status()
+    value_lane_picks = build_value_lane_display_picks(None, frame, top_n=12, deep_links=link_index)
+    value_n = int(safe_value_mask(frame).sum()) if not frame.empty else 0
+    ui_status = _ui_data_status(frame)
+    racing_lanes_status = build_racing_lanes_status(
+        health=health,
+        value_lane_picks=value_lane_picks,
+        sniper_lane_picks=[],
+        value_count=value_n,
+        runner_count=len(frame),
+        ui_data_status=ui_status,
+    )
+    producer_snap = build_data_producer_snapshot()
+    cards_prod = (producer_snap.get("producers") or {}).get("racing_cards") or {}
+    scrape_prod = (producer_snap.get("producers") or {}).get("robust_scrape") or {}
+    value_lane_producer = {
+        "runners_scanned": int(racing_lanes_status.get("runner_count") or 0),
+        "raw_value_count": int(racing_lanes_status.get("raw_value_count") or 0),
+        "picks_emitted": len(value_lane_picks),
+        "latest_card_date": cards_prod.get("latest_card_date"),
+        "card_fresh": cards_prod.get("card_fresh"),
+        "odds_coverage_pct": cards_prod.get("odds_coverage_pct"),
+        "last_scrape_ok": scrape_prod.get("ok"),
+        "last_scrape_message": scrape_prod.get("message") or scrape_prod.get("last_message"),
+        "producer_ok": bool(producer_snap.get("ok")),
+    }
+    card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else []
+    return {
+        "value_lane_picks": value_lane_picks,
+        "racing_lanes_status": racing_lanes_status,
+        "value_lane_producer": value_lane_producer,
+        "health": health,
+        "runner_count": len(frame),
+        "card_dates": card_dates,
+        "window_hours": window_hours,
+        "ui_data_status": ui_status,
+    }
+
+
 def _ui_data_completeness(row: dict) -> int:
     """UI completeness — same logic as Gate1 min_data_quality_pct."""
     from hibs_racing.cards.data_quality import runner_data_quality_pct
