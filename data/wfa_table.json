@@ -1,0 +1,22 @@
+{
+  "description": "BHA Weight-for-Age allowances (simplified flat). Values in lbs to add to carried weight for time normalization.",
+  "bands": [
+    {"min_f": 5.0, "max_f": 6.5, "month": 1, "age": 3, "allowance_lbs": 12},
+    {"min_f": 5.0, "max_f": 6.5, "month": 1, "age": 4, "allowance_lbs": 5},
+    {"min_f": 5.0, "max_f": 6.5, "month": 7, "age": 3, "allowance_lbs": 15},
+    {"min_f": 5.0, "max_f": 6.5, "month": 7, "age": 4, "allowance_lbs": 7},
+    {"min_f": 6.5, "max_f": 10.0, "month": 1, "age": 3, "allowance_lbs": 14},
+    {"min_f": 6.5, "max_f": 10.0, "month": 1, "age": 4, "allowance_lbs": 6},
+    {"min_f": 6.5, "max_f": 10.0, "month": 7, "age": 3, "allowance_lbs": 17},
+    {"min_f": 6.5, "max_f": 10.0, "month": 7, "age": 4, "allowance_lbs": 9},
+    {"min_f": 10.0, "max_f": 14.0, "month": 1, "age": 3, "allowance_lbs": 16},
+    {"min_f": 10.0, "max_f": 14.0, "month": 1, "age": 4, "allowance_lbs": 8},
+    {"min_f": 10.0, "max_f": 14.0, "month": 7, "age": 3, "allowance_lbs": 19},
+    {"min_f": 10.0, "max_f": 14.0, "month": 7, "age": 4, "allowance_lbs": 11},
+    {"min_f": 14.0, "max_f": 99.0, "month": 1, "age": 3, "allowance_lbs": 18},
+    {"min_f": 14.0, "max_f": 99.0, "month": 1, "age": 4, "allowance_lbs": 10},
+    {"min_f": 14.0, "max_f": 99.0, "month": 7, "age": 3, "allowance_lbs": 21},
+    {"min_f": 14.0, "max_f": 99.0, "month": 7, "age": 4, "allowance_lbs": 13}
+  ],
+  "default_allowance_lbs": 0
+}
