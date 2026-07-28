@@ -49,7 +49,7 @@ def _holdout_top1_hit_rate(test: pd.DataFrame, features: list[str], *, ranker) -
     from hibs_racing.racing_engine.score_card import _build_feature_matrix
 
     usable = [c for c in features if c in test.columns]
-    if not usable:
+    if not usable or len(usable) != len(features):
         return None
     scored = test.copy()
     scored["pred_score"] = ranker.predict(_build_feature_matrix(scored, usable))

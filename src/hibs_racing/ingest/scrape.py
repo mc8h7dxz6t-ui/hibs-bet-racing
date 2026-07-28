@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import time
@@ -40,10 +41,33 @@ def ensure_rpscrape() -> Path:
     return RPSCRAPE_SCRIPTS
 
 
+_RPSCRAPE_IMPORTS: dict[str, str] = {
+    "curl_cffi": "curl_cffi",
+    "jarowinkler": "jarowinkler",
+    "lxml": "lxml",
+    "orjson": "orjson",
+    "python-dotenv": "dotenv",
+    "tomli": "tomli",
+    "tqdm": "tqdm",
+}
+
+
 def ensure_rpscrape_deps() -> None:
+    import importlib.util
+
+    missing = [
+        pkg
+        for pkg in RPSCRAPE_DEPS
+        if importlib.util.find_spec(_RPSCRAPE_IMPORTS.get(pkg, pkg.replace("-", "_"))) is None
+    ]
+    if not missing:
+        return
+    env = os.environ.copy()
+    env.setdefault("PIP_CACHE_DIR", str(ROOT / ".cache" / "pip"))
     subprocess.run(
-        [sys.executable, "-m", "pip", "install", *RPSCRAPE_DEPS, "-q"],
+        [sys.executable, "-m", "pip", "install", *missing, "-q"],
         check=True,
+        env=env,
     )
 
 
@@ -155,14 +179,24 @@ def _invoke_rpscrape(
     ]
     if clean:
         cmd.append("--clean")
-    return subprocess.run(
-        cmd,
-        cwd=scripts,
-        capture_output=True,
-        text=True,
-        env=_load_env(),
-        timeout=DAY_JOB_TIMEOUT_SEC,
-    )
+    from hibs_racing.ingest.rp_traffic_guard import acquire_rp_live_slot, record_rate_limit
+
+    try:
+        with acquire_rp_live_slot(label="rpscrape_results"):
+            return subprocess.run(
+                cmd,
+                cwd=scripts,
+                capture_output=True,
+                text=True,
+                env=_load_env(),
+                timeout=DAY_JOB_TIMEOUT_SEC,
+            )
+    except RuntimeError as exc:
+        record_rate_limit(reason=str(exc)[:80])
+        raise
+    except subprocess.TimeoutExpired as exc:
+        record_rate_limit(reason="rpscrape_timeout")
+        raise
 
 
 def run_rpscrape(

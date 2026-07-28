@@ -122,26 +122,25 @@ def _sql_val(val: Any) -> Any | None:
     return val
 
 
-def _apply_enrich_updates(db, frame, *args, **kwargs):
-    # Institutional++ Ingestion Data Loss Protection Guard
-    # Intercepts sparse data frames and enforces mathematical par fallbacks
-    if "trainer_14d_strike" in frame.columns:
-        if "trainer_rp_14d_win_rate" in frame.columns:
-            frame["trainer_14d_strike"] = frame["trainer_14d_strike"].fillna(frame["trainer_rp_14d_win_rate"])
-        frame["trainer_14d_strike"] = frame["trainer_14d_strike"].fillna(0.11)
-        
-    for col in ["trainer_14d_wins", "trainer_14d_runs"]:
-        if col in frame.columns:
-            frame[col] = frame[col].fillna(0.0)
-            
-    for col in ["form_cd_flag", "form_bf_flag", "form_poor_runs_3", "form_trip_change_f"]:
-        if col in frame.columns:
-            frame[col] = frame[col].fillna(0.0)
-            
-    if "form_lto_position" in frame.columns:
-        frame["form_lto_position"] = frame["form_lto_position"].fillna(5.0)
+def _apply_enrich_fallbacks(frame: pd.DataFrame) -> pd.DataFrame:
+    """Sparse ingest guard — par fills before DB merge."""
+    out = frame.copy()
+    if "trainer_14d_strike" in out.columns:
+        strike = pd.to_numeric(out["trainer_14d_strike"], errors="coerce")
+        if "trainer_rp_14d_win_rate" in out.columns:
+            strike = strike.fillna(pd.to_numeric(out["trainer_rp_14d_win_rate"], errors="coerce"))
+        out["trainer_14d_strike"] = strike.fillna(0.11)
+    for col in ("trainer_14d_wins", "trainer_14d_runs"):
+        if col in out.columns:
+            out[col] = pd.to_numeric(out[col], errors="coerce").fillna(0.0)
+    for col in ("form_cd_flag", "form_bf_flag", "form_poor_runs_3", "form_trip_change_f"):
+        if col in out.columns:
+            out[col] = pd.to_numeric(out[col], errors="coerce").fillna(0.0)
+    if "form_lto_position" in out.columns:
+        out["form_lto_position"] = pd.to_numeric(out["form_lto_position"], errors="coerce").fillna(5.0)
+    return out
 
-    # Revert control flow cleanly to the underlying system compiler
+
 def _apply_enrich_updates(
     db: Path,
     enrich: pd.DataFrame,
@@ -153,6 +152,7 @@ def _apply_enrich_updates(
         return 0
     init_db(db)
     enrich = compute_enrich_ranker_fields(enrich)
+    enrich = _apply_enrich_fallbacks(enrich)
     enrich["_ej"] = _historical_join_key(enrich)
     enrich["_ej_loose"] = _historical_join_key_loose(enrich)
     enrich = enrich.drop_duplicates(subset=["_ej_loose"], keep="last")

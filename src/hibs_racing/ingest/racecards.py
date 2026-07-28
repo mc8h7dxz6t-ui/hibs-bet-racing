@@ -18,6 +18,38 @@ RPSCRAPE_RACECARDS = ROOT / "vendor" / "rpscrape" / "racecards"
 RPSCRAPE_ROOT = ROOT / "vendor" / "rpscrape"
 
 
+def rp_auth_configured(env: dict[str, str] | None = None) -> bool:
+    """True when Racing Post scrape credentials are present in env."""
+    env = env if env is not None else (_load_env() or os.environ.copy())
+    return bool(str(env.get("EMAIL", "")).strip() and str(env.get("ACCESS_TOKEN", "")).strip())
+
+
+def _live_rp_fetch_enabled(env: dict[str, str] | None = None) -> bool:
+    env = env if env is not None else (_load_env() or os.environ.copy())
+    raw = str(env.get("HIBS_RACING_RP_LIVE_FETCH", "auto")).strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return False
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    return rp_auth_configured(env)
+
+
+def _target_dates(*, day: int | None, days: int | None) -> list[str]:
+    if days is not None:
+        return [(date.today() + timedelta(days=i)).isoformat() for i in range(days)]
+    d = day if day is not None else 1
+    return [(date.today() + timedelta(days=d - 1)).isoformat()]
+
+
+def _cached_racecard_paths(target_dates: list[str]) -> list[Path]:
+    paths: list[Path] = []
+    for target_date in target_dates:
+        out = RPSCRAPE_RACECARDS / f"{target_date}.json"
+        if out.is_file() and out.stat().st_size > 100:
+            paths.append(out)
+    return paths
+
+
 def _sync_rpscrape_dotenv() -> dict[str, str]:
     """Load hibs-racing .env and pass EMAIL/ACCESS_TOKEN into the rpscrape subprocess."""
     env = _load_env() or os.environ.copy()
@@ -36,6 +68,7 @@ def fetch_racecards(
     days: int | None = None,
     region: str = "gb",
     timeout_sec: int = 120,
+    allow_live: bool | None = None,
 ) -> list[Path]:
     """
     Fetch racecards via vendor rpscrape racecards.py.
@@ -45,46 +78,72 @@ def fetch_racecards(
     """
     if day is not None and days is not None:
         raise ValueError("Use either day= or days=, not both")
+
+    target_dates = _target_dates(day=day, days=days)
+    RPSCRAPE_RACECARDS.mkdir(parents=True, exist_ok=True)
+    cached = _cached_racecard_paths(target_dates)
+    if cached:
+        return cached
+
+    env = _sync_rpscrape_dotenv()
+    live_ok = _live_rp_fetch_enabled(env) if allow_live is None else bool(allow_live)
+    if not live_ok:
+        raise RuntimeError(
+            "No cached RP racecards and live fetch disabled. "
+            "Add EMAIL + ACCESS_TOKEN to .env, warm cards first, or set HIBS_RACING_RP_LIVE_FETCH=1."
+        )
+
+    from hibs_racing.ingest.rp_traffic_guard import acquire_rp_live_slot, record_rate_limit, rp_live_traffic_allowed
+
+    if not rp_live_traffic_allowed():
+        raise RuntimeError(
+            "Racing Post live fetch blocked (rate-limit trip or missing credentials). "
+            "Use cached racecards or wait for trip TTL."
+        )
+
     scripts = ensure_rpscrape()
     ensure_rpscrape_deps()
-    RPSCRAPE_RACECARDS.mkdir(parents=True, exist_ok=True)
 
     if days is not None:
         cmd = [sys.executable, "racecards.py", "--days", str(days), "--region", region]
-        target_dates = [(date.today() + timedelta(days=i)).isoformat() for i in range(days)]
     else:
         d = day if day is not None else 1
         cmd = [sys.executable, "racecards.py", "--day", str(d), "--region", region]
-        target_dates = [(date.today() + timedelta(days=d - 1)).isoformat()]
 
-    env = _sync_rpscrape_dotenv()
-    if not env.get("EMAIL") or not env.get("ACCESS_TOKEN"):
+    if not rp_auth_configured(env):
         print(
             "Note: no EMAIL/ACCESS_TOKEN in .env — RP may rate-limit. "
             "See README → rpscrape auth.",
             file=sys.stderr,
         )
+        timeout_sec = min(timeout_sec, 25)
 
-    result = subprocess.run(
-        cmd,
-        cwd=scripts,
-        capture_output=True,
-        text=True,
-        env=env,
-        timeout=timeout_sec,
-    )
+    try:
+        with acquire_rp_live_slot(label="racecards"):
+            result = subprocess.run(
+                cmd,
+                cwd=scripts,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=timeout_sec,
+            )
+    except RuntimeError as exc:
+        record_rate_limit(reason=str(exc)[:80])
+        raise
+    except subprocess.TimeoutExpired as exc:
+        record_rate_limit(reason="racecards_timeout")
+        raise RuntimeError(f"racecards fetch timed out after {timeout_sec}s") from exc
     if result.returncode != 0:
+        if "429" in (result.stderr or "") or "rate" in (result.stderr or "").lower():
+            record_rate_limit(reason="racecards_subprocess_429")
         raise RuntimeError(
             f"racecards fetch failed:\n{result.stdout}\n{result.stderr}\n"
             "Add Racing Post credentials to .env (EMAIL + ACCESS_TOKEN), "
             "or import a CSV: hibs-racing ingest-cards data/samples/cards_template.csv"
         )
 
-    paths: list[Path] = []
-    for target_date in target_dates:
-        out = RPSCRAPE_RACECARDS / f"{target_date}.json"
-        if out.exists():
-            paths.append(out)
+    paths = _cached_racecard_paths(target_dates)
     if not paths:
         candidates = sorted(RPSCRAPE_RACECARDS.glob("*.json"), key=lambda p: p.stat().st_mtime)
         if not candidates:
@@ -113,9 +172,15 @@ def fetch_racecards_on_date(
     )
 
 
-def load_racecard_frames(*, day: int | None = None, days: int | None = None, region: str = "gb") -> pd.DataFrame:
+def load_racecard_frames(
+    *,
+    day: int | None = None,
+    days: int | None = None,
+    region: str = "gb",
+    allow_live: bool | None = None,
+) -> pd.DataFrame:
     """Fetch + parse racecard JSON into a single runner-level frame."""
-    json_paths = fetch_racecards(day=day, days=days, region=region)
+    json_paths = fetch_racecards(day=day, days=days, region=region, allow_live=allow_live)
     frames = [parse_racecard_json(path) for path in json_paths]
     if len(frames) == 1:
         return frames[0]

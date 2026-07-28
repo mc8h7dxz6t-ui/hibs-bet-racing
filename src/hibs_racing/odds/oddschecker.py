@@ -210,9 +210,11 @@ def fetch_oddschecker_odds(
     if not cfg.get("enabled", True):
         return pd.DataFrame(), OddscheckerFetchReport(0, 0, 0, ["oddschecker disabled in config"])
 
+    from hibs_racing.ingest.rate_limit import pause_sec
+
     session = _get_session()
     base_url = cfg.get("base_url", "https://www.oddschecker.com")
-    pause = float(cfg.get("request_pause_sec", 1.5))
+    pause = float(cfg.get("request_pause_sec") or pause_sec("oddschecker_pause_sec") or 1.5)
     place_fraction = float(cfg.get("default_place_fraction", 0.25))
     places = int(cfg.get("default_places", 3))
     retail_only = bool(cfg.get("retail_only", True))

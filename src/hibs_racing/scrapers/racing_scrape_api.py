@@ -41,6 +41,7 @@ def scrape_status_payload() -> Dict[str, Any]:
         "targeted_overflow": cat.get("targeted_overflow") or [],
         "cards_source": resolve_cards_source(),
         "racing_api_guard": guard_status(),
+        "api_pools": __import__("hibs_racing.api_pools", fromlist=["all_pool_status"]).all_pool_status(),
         "resilience": scrape_resilience_status(),
     }
 
@@ -115,12 +116,11 @@ def odds_coverage_summary(frame: Optional[pd.DataFrame] = None) -> Dict[str, Any
 
 
 def run_thin_rescue_pass(*, max_per_cycle: Optional[int] = None) -> Dict[str, Any]:
+    from hibs_racing.data_quality_targets import racing_rescue_max_per_cycle
+
     cap = max_per_cycle
     if cap is None:
-        try:
-            cap = max(1, int(os.getenv("HIBS_RACING_RESCUE_MAX", "30")))
-        except ValueError:
-            cap = 30
+        cap = racing_rescue_max_per_cycle()
     frame = load_scored_cards()
     if frame.empty:
         return {"rescued": 0, "attempted": 0, "coverage": odds_coverage_summary(frame)}
@@ -133,6 +133,9 @@ def run_thin_rescue_pass(*, max_per_cycle: Optional[int] = None) -> Dict[str, An
     thin_floor = racing_thin_rescue_dq_pct()
     target = racing_data_quality_target_pct()
     updates: List[Dict[str, Any]] = []
+    from hibs_racing.scrapers.field_resolver import clear_race_enrich_cache
+
+    clear_race_enrich_cache()
     for _, row in frame.iterrows():
         if cap <= 0:
             break
@@ -174,3 +177,75 @@ def run_thin_rescue_pass(*, max_per_cycle: Optional[int] = None) -> Dict[str, An
         "persisted": persisted,
         "coverage": odds_coverage_summary(),
     }
+
+
+def run_data_quality_reboost(
+    *,
+    target_pct: Optional[float] = None,
+    max_rescue_passes: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Multi-stage DQ lift: enrich recovery → scrape thin rescue (repeat) toward 95%+.
+
+    Uses scrape APIs (``resolve_runner_fields``) and offline enrich backfill.
+    """
+    from hibs_racing.cards.dq_persist import mean_runner_dq
+    from hibs_racing.data_quality_targets import (
+        racing_data_quality_target_pct,
+        racing_enrich_recovery_min_pct,
+    )
+
+    target = target_pct if target_pct is not None else racing_data_quality_target_pct()
+    passes = max_rescue_passes
+    if passes is None:
+        try:
+            passes = max(1, int(os.getenv("HIBS_RACING_DQ_REBOOST_PASSES", "2")))
+        except ValueError:
+            passes = 2
+
+    frame = load_scored_cards()
+    mean_before = mean_runner_dq(frame)
+    report: Dict[str, Any] = {
+        "target_pct": target,
+        "mean_dq_before": mean_before,
+        "runner_count": len(frame),
+        "ok": mean_before >= target,
+    }
+
+    if mean_before >= target:
+        report["mean_dq_after"] = mean_before
+        report["skipped"] = True
+        return report
+
+    if os.getenv("HIBS_RACING_ENRICH_RECOVERY", "1").strip().lower() in ("1", "true", "yes", "on"):
+        try:
+            from hibs_racing.ingest.enrich_backup import run_targeted_enrich_recovery
+
+            min_cov = racing_enrich_recovery_min_pct()
+            max_days = int(os.getenv("HIBS_RACING_ENRICH_RECOVERY_DAYS", "120"))
+            report["enrich_recovery"] = run_targeted_enrich_recovery(
+                min_mean_coverage_pct=min_cov,
+                max_days=max_days,
+            )
+        except Exception as exc:
+            report["enrich_recovery_error"] = str(exc)[:120]
+
+    current = mean_before
+    for idx in range(passes):
+        if current >= target:
+            break
+        try:
+            rescue = run_thin_rescue_pass()
+            report[f"thin_rescue_pass_{idx + 1}"] = rescue
+            after = mean_runner_dq(load_scored_cards())
+            if after <= current and int(rescue.get("rescued") or 0) == 0:
+                break
+            current = after
+        except Exception as exc:
+            report[f"thin_rescue_error_{idx + 1}"] = str(exc)[:120]
+            break
+
+    mean_after = mean_runner_dq(load_scored_cards())
+    report["mean_dq_after"] = mean_after
+    report["ok"] = mean_after >= target
+    return report

@@ -22,7 +22,7 @@ def test_load_racecard_frames_days_only_passes_kwargs(monkeypatch) -> None:
     monkeypatch.setattr("hibs_racing.ingest.racecards.fetch_racecards", fake_fetch)
     with pytest.raises(Exception):
         load_racecard_frames(days=2, region="ire")
-    assert captured == {"day": None, "days": 2, "region": "ire"}
+    assert captured == {"day": None, "days": 2, "region": "ire", "allow_live": None}
 
 
 def test_load_racecard_frames_default_day(monkeypatch) -> None:
@@ -35,4 +35,4 @@ def test_load_racecard_frames_default_day(monkeypatch) -> None:
     monkeypatch.setattr("hibs_racing.ingest.racecards.fetch_racecards", fake_fetch)
     with pytest.raises(Exception):
         load_racecard_frames(region="gb")
-    assert captured == {"day": None, "days": None, "region": "gb"}
+    assert captured == {"day": None, "days": None, "region": "gb", "allow_live": None}

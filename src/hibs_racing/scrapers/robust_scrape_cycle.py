@@ -113,6 +113,21 @@ def run_robust_scrape_cycle(
         except Exception as exc:
             report["thin_rescue_error"] = str(exc)[:120]
 
+    if os.getenv("HIBS_RACING_ENRICH_RECOVERY", "1").strip().lower() in ("1", "true", "yes", "on"):
+        try:
+            from hibs_racing.data_quality_targets import racing_enrich_recovery_min_pct
+            from hibs_racing.ingest.enrich_backup import run_targeted_enrich_recovery
+
+            min_cov = racing_enrich_recovery_min_pct()
+            max_days = int(os.getenv("HIBS_RACING_ENRICH_RECOVERY_DAYS", "120"))
+            enrich_hit = run_targeted_enrich_recovery(
+                min_mean_coverage_pct=min_cov,
+                max_days=max_days,
+            )
+            report["enrich_recovery"] = enrich_hit
+        except Exception as exc:
+            report["enrich_recovery_error"] = str(exc)[:200]
+
     report["resilience"] = scrape_resilience_status()
     elapsed = (datetime.now(timezone.utc) - t0).total_seconds()
     report["elapsed_sec"] = round(elapsed, 2)

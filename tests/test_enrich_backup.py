@@ -1,7 +1,11 @@
 from hibs_racing.features.store import connect, init_db
 from hibs_racing.ingest import historical_racecards
 from hibs_racing.ingest.dense_field_repair import repair_dense_fields_for_date
-from hibs_racing.ingest.enrich_backup import derive_enrich_for_date, fetch_racecards_with_fallback
+from hibs_racing.ingest.enrich_backup import (
+    derive_enrich_for_date,
+    fetch_racecards_with_fallback,
+    run_targeted_enrich_recovery,
+)
 
 
 def _seed_runners(db):
@@ -150,3 +154,13 @@ def test_fetch_cascade_repairs_dense_fields_from_cached_json(tmp_path, monkeypat
         row = conn.execute("SELECT official_rating, trainer_rtf FROM runners WHERE runner_id = 'r4'").fetchone()
     assert row[0] == 77
     assert row[1] == 23.0
+
+
+def test_targeted_enrich_recovery_derives_from_history(tmp_path):
+    db = tmp_path / "t.sqlite"
+    _seed_runners(db)
+    out = run_targeted_enrich_recovery(database=db, min_mean_coverage_pct=99.0, max_days=30)
+    assert out.get("skipped") is False
+    assert int(out.get("derived_rows") or 0) >= 1
+    after = out.get("after") or {}
+    assert float(after.get("mean_enrich_coverage_pct") or 0) > 0

@@ -197,7 +197,7 @@ def sync_horse_form_state_from_runners(
         params.append(int(limit))
         rows = conn.execute(q, params).fetchall()
         if not rows:
-            return {"ok": True, "updated": 0, "reason": "no_rows"}
+            return {"ok": True, "updated": 0, "horses": 0, "reason": "no_rows"}
 
         frame = pd.DataFrame([dict(r) for r in rows])
         frame = compute_speed_deltas(frame)
@@ -205,12 +205,16 @@ def sync_horse_form_state_from_runners(
         ewma: Dict[str, float] = {}
         runs: Dict[str, int] = {}
         updated = 0
+        skipped_no_horse = 0
+        skipped_no_delta = 0
         for _, row in frame.iterrows():
             hid = str(row.get("horse_id") or "").strip()
             if not hid:
+                skipped_no_horse += 1
                 continue
             delta = row.get("speed_figure_delta")
             if delta is None or (isinstance(delta, float) and pd.isna(delta)):
+                skipped_no_delta += 1
                 continue
             try:
                 d = float(delta)
@@ -235,4 +239,11 @@ def sync_horse_form_state_from_runners(
             )
             updated += 1
         conn.commit()
-    return {"ok": True, "updated": updated, "horses": len(ewma)}
+    return {
+        "ok": True,
+        "updated": updated,
+        "horses": len(ewma),
+        "rows_scanned": len(rows),
+        "skipped_no_horse_id": skipped_no_horse,
+        "skipped_no_speed_delta": skipped_no_delta,
+    }
