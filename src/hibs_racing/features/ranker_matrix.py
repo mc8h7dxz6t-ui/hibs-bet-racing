@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 EXPECTED_BASE_FEATURE_COUNT = 36
 EXPECTED_ENRICH_FEATURE_COUNT = 48
+EXPECTED_TRACKER_FEATURE_COUNT = 51
 
 RUNNER_ENRICH_QUERY_COLUMNS: tuple[str, ...] = (
     "form_string",
@@ -138,6 +139,7 @@ def validate_ranker_matrix(
     frame: pd.DataFrame,
     *,
     with_enrich: bool,
+    with_tracker: bool = False,
     feature_cols: list[str],
     min_enrich_coverage_pct: float = 0.0,
 ) -> dict[str, float]:
@@ -146,7 +148,12 @@ def validate_ranker_matrix(
         raise RankerMatrixValidationError("Ranker matrix is empty — ingest + tag first.")
 
     present = [c for c in feature_cols if c in frame.columns]
-    expected = EXPECTED_ENRICH_FEATURE_COUNT if with_enrich else EXPECTED_BASE_FEATURE_COUNT
+    if with_tracker:
+        expected = EXPECTED_TRACKER_FEATURE_COUNT
+    elif with_enrich:
+        expected = EXPECTED_ENRICH_FEATURE_COUNT
+    else:
+        expected = EXPECTED_BASE_FEATURE_COUNT
     if len(present) != expected:
         missing = [c for c in feature_cols if c not in frame.columns]
         raise RankerMatrixValidationError(
@@ -216,20 +223,22 @@ def build_ranker_matrix(
     config_path: Path | None = None,
     export_parquet: bool = True,
     with_enrich: bool = False,
+    with_tracker: bool = False,
 ) -> pd.DataFrame:
     """
     Unified LTR feature matrix: one row per runner, grouped by race_id.
     Combo stats are point-in-time; NLP and OR features are race-relative.
     """
+    if with_tracker and not with_enrich:
+        raise RankerMatrixValidationError("with_tracker requires with_enrich=True (tracker_51 = enrich_48 + 3)")
+
     cfg = load_config(config_path)
     db = database or db_path(cfg)
     alpha = cfg.get("ranker", {}).get("combo_alpha", 8.0)
     place_cutoff = cfg["backtest"].get("place_cutoff_default", 3)
 
-    logger.info(
-        "Compiling ranker matrix mode=%s",
-        "enrich_48" if with_enrich else "base_36",
-    )
+    mode = "tracker_51" if with_tracker else ("enrich_48" if with_enrich else "base_36")
+    logger.info("Compiling ranker matrix mode=%s", mode)
 
     frame = load_runner_frame(db, with_enrich=with_enrich)
     if frame.empty:
@@ -275,10 +284,20 @@ def build_ranker_matrix(
         frame = frame[base_cols + manifest_48]
         frame.attrs["enrich_coverage_raw_pct"] = raw_coverage
 
-    feature_cols = ranker_enrich_feature_columns() if with_enrich else ranker_feature_columns()
+    if with_tracker:
+        from hibs_racing.features.horse_form_state import attach_horse_tracker_features
+
+        with connect(db) as conn:
+            frame = attach_horse_tracker_features(frame, conn)
+
+    if with_tracker:
+        feature_cols = ranker_tracker_feature_columns()
+    else:
+        feature_cols = ranker_enrich_feature_columns() if with_enrich else ranker_feature_columns()
     validate_ranker_matrix(
         frame,
         with_enrich=with_enrich,
+        with_tracker=with_tracker,
         feature_cols=feature_cols,
         min_enrich_coverage_pct=0.0,
     )
@@ -292,7 +311,9 @@ def build_ranker_matrix(
 
     if export_parquet:
         out_path = parquet_dir(cfg) / (
-            "ranker_matrix_enrich.parquet" if with_enrich else "ranker_matrix.parquet"
+            "ranker_matrix_tracker.parquet"
+            if with_tracker
+            else ("ranker_matrix_enrich.parquet" if with_enrich else "ranker_matrix.parquet")
         )
         out_path.parent.mkdir(parents=True, exist_ok=True)
         frame.to_parquet(out_path, index=False)
@@ -399,6 +420,13 @@ def ranker_enrich_feature_columns() -> list[str]:
         "form_lto_position", "form_trip_change_f", "form_cd_flag", "form_bf_flag", "form_poor_runs_3"
     ]
 
+
+def ranker_tracker_feature_columns() -> list[str]:
+    """Wave 2: enrich_48 + horse tracker speed/σ features."""
+    from hibs_racing.features.horse_form_state import HORSE_TRACKER_RANKER_FEATURES
+
+    return ranker_enrich_feature_columns() + list(HORSE_TRACKER_RANKER_FEATURES)
+
 def _nlp_history_index(hist: pd.DataFrame) -> pd.DataFrame:
     """Point-in-time NLP keyed by normalized horse name (bridges API horse_id vs name history)."""
     if hist.empty:
@@ -497,6 +525,14 @@ def build_card_feature_frame(
     combined = add_within_race_features(combined)
     combined = compute_enrich_ranker_fields(combined)
     combined["hidden_potential"] = combined["hidden_potential"].fillna(0.0)
+
+    try:
+        from hibs_racing.features.horse_form_state import attach_horse_tracker_features
+
+        with connect(db) as conn:
+            combined = attach_horse_tracker_features(combined, conn)
+    except Exception:
+        pass
 
     card_ids = set(upcoming["runner_id"])
     out = combined[combined["runner_id"].isin(card_ids)].copy()

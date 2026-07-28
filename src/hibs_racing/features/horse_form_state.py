@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterator, List, Optional
 
+import numpy as np
 import pandas as pd
 
 from hibs_racing.config import db_path as racing_db_path
@@ -17,6 +18,12 @@ SIGMA_MIN = 0.05
 SIGMA_MAX = 1.0
 DEFAULT_SIGMA = 0.45
 EWMA_ALPHA = 0.25
+
+HORSE_TRACKER_RANKER_FEATURES: tuple[str, ...] = (
+    "speed_delta_lto",
+    "ewma_speed_delta",
+    "sample_uncertainty_sigma",
+)
 
 
 def _ensure_horse_form_table(conn: sqlite3.Connection) -> None:
@@ -110,6 +117,67 @@ def sigma_from_runs(n_runs: int) -> float:
     if n_runs >= 12:
         return SIGMA_MIN + 0.05
     return max(SIGMA_MIN, DEFAULT_SIGMA * (1.0 - n_runs / 16.0))
+
+
+def impute_horse_tracker_features(frame: pd.DataFrame) -> pd.DataFrame:
+    """Fill tracker ranker columns (neutral defaults when missing)."""
+    out = frame.copy()
+    defaults = {
+        "speed_delta_lto": 0.0,
+        "ewma_speed_delta": 0.0,
+        "sample_uncertainty_sigma": DEFAULT_SIGMA,
+    }
+    for col, default in defaults.items():
+        if col not in out.columns:
+            out[col] = default
+        else:
+            out[col] = pd.to_numeric(out[col], errors="coerce").fillna(default)
+    return out
+
+
+def attach_horse_tracker_features(frame: pd.DataFrame, conn: sqlite3.Connection) -> pd.DataFrame:
+    """Point-in-time join horse_form_state onto runner rows (leakage-safe)."""
+    out = frame.copy()
+    if out.empty or "horse_id" not in out.columns:
+        return impute_horse_tracker_features(out)
+
+    try:
+        states = pd.read_sql_query(
+            """
+            SELECT horse_id, as_of_date, ewma_speed_delta, speed_delta_lto, sample_uncertainty
+            FROM horse_form_state
+            """,
+            conn,
+        )
+    except Exception:
+        return impute_horse_tracker_features(out)
+
+    if states.empty:
+        return impute_horse_tracker_features(out)
+
+    states = states.copy()
+    states["horse_id"] = states["horse_id"].astype(str)
+    states["as_of_date"] = states["as_of_date"].astype(str).str[:10]
+    states = states.sort_values(["horse_id", "as_of_date"])
+    states = states.rename(columns={"sample_uncertainty": "sample_uncertainty_sigma"})
+
+    work = out.copy()
+    work["horse_id"] = work["horse_id"].astype(str)
+    work["_race_dt"] = pd.to_datetime(work.get("race_date", work.get("card_date")).astype(str).str[:10], errors="coerce")
+    states["as_of_dt"] = pd.to_datetime(states["as_of_date"].astype(str).str[:10], errors="coerce")
+    work = work.sort_values(["horse_id", "_race_dt"])
+    states = states.sort_values(["horse_id", "as_of_dt"])
+
+    merged = pd.merge_asof(
+        work,
+        states,
+        left_on="_race_dt",
+        right_on="as_of_dt",
+        by="horse_id",
+        direction="backward",
+    )
+    merged = merged.drop(columns=["_race_dt", "as_of_dt", "as_of_date"], errors="ignore")
+    return impute_horse_tracker_features(merged)
 
 
 def sync_horse_form_state_from_runners(

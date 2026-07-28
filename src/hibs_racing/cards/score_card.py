@@ -80,6 +80,13 @@ def score_upcoming_cards(
 
     frame = apply_scoring(frame)
 
+    try:
+        from hibs_racing.engine_adapter_promotion import maybe_log_ranker_v2_shadow
+
+        maybe_log_ranker_v2_shadow(frame)
+    except Exception:
+        pass
+
     from hibs_racing.models.win_prob_calibration import apply_win_prob_calibration
 
     frame = apply_win_prob_calibration(frame)

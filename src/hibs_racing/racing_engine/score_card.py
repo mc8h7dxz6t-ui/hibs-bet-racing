@@ -50,6 +50,13 @@ def _build_feature_matrix(race_df: pd.DataFrame, feature_cols: list[str]) -> pd.
             work = impute_enrich_features(work.copy(), log_warnings=False)
     except Exception:
         work = race_df
+    try:
+        from hibs_racing.features.horse_form_state import HORSE_TRACKER_RANKER_FEATURES, impute_horse_tracker_features
+
+        if any(col in feature_cols for col in HORSE_TRACKER_RANKER_FEATURES):
+            work = impute_horse_tracker_features(work)
+    except Exception:
+        pass
 
     x = pd.DataFrame(index=work.index)
     for col in feature_cols:
