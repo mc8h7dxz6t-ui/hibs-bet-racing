@@ -1,54 +1,83 @@
 /* HIBS — unified lite shell (football + racing + trading)
-   Pastel teal on slate — high contrast readable text */
+   Light grey canvas + teal accents — readable text, visible logo watermark */
 :root {
     --hibs-green: #0d9488;
-    --hibs-green-dark: #1e293b;
-    --hibs-green-mid: #134e4a;
-    --hibs-green-soft: rgba(167, 243, 208, 0.16);
-    --hibs-green-glow: rgba(94, 234, 212, 0.08);
-    --hibs-green-highlight: rgba(167, 243, 208, 0.08);
-    --hibs-navy: #1e293b;
-    --hibs-navy-deep: #0f172a;
-    --hibs-neon: #e2e8f0;
-    --neon-value: #5eead4;
-    --green: #a7f3d0;
-    --green-dim: #94a3b8;
-    --border: rgba(167, 243, 208, 0.14);
-    --glow: rgba(94, 234, 212, 0.08);
-    --gold: #fde68a;
-    --gold-dim: rgba(253, 230, 138, 0.12);
-    --accent: #cbd5e1;
-    --blue: #a5f3fc;
-    --card: rgba(30, 41, 59, 0.72);
-    --text: #f8fafc;
-    --muted: #cbd5e1;
+    --hibs-green-dark: #134e4a;
+    --hibs-green-mid: #0f766e;
+    --hibs-green-soft: rgba(13, 148, 136, 0.12);
+    --hibs-green-glow: rgba(13, 148, 136, 0.08);
+    --hibs-green-highlight: rgba(13, 148, 136, 0.1);
+    --hibs-navy: #f1f3f5;
+    --hibs-navy-deep: #e4e7eb;
+    --hibs-neon: #0f766e;
+    --neon-value: #0d9488;
+    --green: #047857;
+    --green-dim: #64748b;
+    --border: rgba(100, 116, 139, 0.28);
+    --glow: rgba(13, 148, 136, 0.12);
+    --gold: #b45309;
+    --gold-dim: rgba(180, 83, 9, 0.12);
+    --accent: #475569;
+    --blue: #0369a1;
+    --card: rgba(255, 255, 255, 0.94);
+    --text: #1e293b;
+    --muted: #475569;
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
-    --shadow-md: 0 10px 32px rgba(0, 0, 0, 0.32);
+    --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.1);
     --primary-brand-color: var(--hibs-green);
     --wordmark-font: 'Inter', sans-serif;
-    --hibs-accent-bg: rgba(13, 148, 136, 0.1);
-    --hibs-accent-bg-strong: rgba(13, 148, 136, 0.16);
-    --hibs-accent-border: rgba(94, 234, 212, 0.28);
-    --hibs-accent-border-strong: rgba(94, 234, 212, 0.35);
-    --hibs-mint: #a7f3d0;
-    --hibs-mint-soft: rgba(167, 243, 208, 0.14);
-    --hibs-success-text: #86efac;
-    --hibs-slate-card: rgba(15, 23, 42, 0.96);
+    --hibs-accent-bg: rgba(13, 148, 136, 0.08);
+    --hibs-accent-bg-strong: rgba(13, 148, 136, 0.14);
+    --hibs-accent-border: rgba(13, 148, 136, 0.28);
+    --hibs-accent-border-strong: rgba(13, 148, 136, 0.38);
+    --hibs-mint: #0d9488;
+    --hibs-mint-soft: rgba(13, 148, 136, 0.1);
+    --hibs-success-text: #047857;
+    --hibs-slate-card: rgba(255, 255, 255, 0.96);
+    --hibs-watermark-opacity: 0.07;
+    --hibs-watermark-size: min(480px, 58vw);
+    /* Dashboard / drawer surfaces (pastel default — light grey canvas) */
+    --hibs-surface-card: rgba(255, 255, 255, 0.94);
+    --hibs-surface-raised: rgba(255, 255, 255, 0.96);
+    --hibs-surface-overlay: rgba(255, 255, 255, 0.98);
+    --hibs-surface-inset: rgba(241, 245, 249, 0.9);
+    --hibs-surface-muted: rgba(226, 232, 240, 0.78);
+    --hibs-surface-input: rgba(255, 255, 255, 0.92);
+    --hibs-surface-stripe: rgba(248, 250, 252, 0.88);
 }
 
 body {
     background-color: var(--hibs-navy-deep);
     color: var(--text);
     background-image:
-        radial-gradient(ellipse at 10% 20%, rgba(167, 243, 208, 0.07) 0%, transparent 42%),
-        radial-gradient(ellipse at 90% 8%, rgba(125, 211, 252, 0.06) 0%, transparent 38%),
-        linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+        radial-gradient(ellipse at 12% 18%, rgba(13, 148, 136, 0.08) 0%, transparent 44%),
+        radial-gradient(ellipse at 88% 6%, rgba(14, 116, 144, 0.06) 0%, transparent 40%),
+        linear-gradient(180deg, #e8eaed 0%, #f3f4f6 100%);
 }
 
 body::before {
-    opacity: 0.018;
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: var(--hibs-watermark-url);
+    background-repeat: repeat;
+    background-size: var(--hibs-watermark-size) auto;
+    opacity: var(--hibs-watermark-opacity);
+}
+
+.brand-logo-watermark {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: min(72vw, 720px) auto;
+    opacity: 0.09;
 }
 
 .brand-logo,
@@ -79,7 +108,7 @@ body::before {
     background: var(--hibs-slate-card);
     border: 1px solid var(--border);
     border-radius: 12px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
 }
 
 .hibs-product-switch {
@@ -88,9 +117,9 @@ body::before {
     align-items: stretch;
     gap: 0;
     padding: 4px;
-    border: 1px solid rgba(148, 163, 184, 0.28);
+    border: 1px solid rgba(100, 116, 139, 0.28);
     border-radius: 999px;
-    background: rgba(2, 6, 23, 0.55);
+    background: rgba(255, 255, 255, 0.72);
     flex-wrap: nowrap;
     isolation: isolate;
 }
@@ -126,15 +155,20 @@ body::before {
     font-weight: 700;
     letter-spacing: 0.01em;
     text-decoration: none;
-    color: #cbd5e1;
+    color: #475569;
     background: transparent;
     border-radius: 999px;
-    transition: color 0.22s ease;
+    transition: color 0.22s ease, transform 0.18s ease;
     white-space: nowrap;
 }
 
 .hibs-product-pill:hover {
-    color: #f1f5f9;
+    color: #0f172a;
+}
+
+.hibs-product-pill:focus-visible {
+    outline: 2px solid var(--neon-value);
+    outline-offset: 2px;
 }
 
 .hibs-product-pill.active {
@@ -166,104 +200,22 @@ body::before {
 
 .hibs-harvested-logo,
 .hibs-header-logo {
-    height: 56px;
+    height: 72px;
     width: auto;
-    max-width: min(420px, 58vw);
+    max-width: min(520px, 64vw);
     object-fit: contain;
-    filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.35));
+    filter:
+        drop-shadow(0 1px 0 rgba(255, 255, 255, 0.65))
+        drop-shadow(0 6px 20px rgba(15, 23, 42, 0.14));
+}
+
+.hibs-product-bar .hibs-harvested-logo-link {
+    margin-right: 2px;
 }
 
 .hibs-product-bar .hibs-harvested-logo {
-    height: 76px;
-    max-width: min(520px, 64vw);
-}
-
-html.hibs-product-navigating .hibs-app-shell,
-html.hibs-product-navigating .ref-page {
-    opacity: 0.55;
-    transform: scale(0.992);
-    transition: opacity 0.28s ease, transform 0.28s ease;
-    filter: blur(1px);
-}
-
-.hibs-product-transition {
-    position: fixed;
-    inset: 0;
-    z-index: 100008;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.26s ease, visibility 0.26s ease;
-}
-
-.hibs-product-transition.is-visible {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-}
-
-.hibs-product-transition-backdrop {
-    position: absolute;
-    inset: 0;
-    background:
-        radial-gradient(ellipse at 50% 42%, rgba(13, 148, 136, 0.14) 0%, transparent 58%),
-        rgba(6, 14, 24, 0.78);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-}
-
-.hibs-product-transition-panel {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    padding: 28px 36px;
-    border-radius: 20px;
-    border: 1px solid rgba(94, 234, 212, 0.22);
-    background: rgba(15, 23, 42, 0.55);
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
-    text-align: center;
-    animation: hibs-product-transition-in 0.32s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.hibs-product-transition-panel .hibs-launch-crest {
-    width: auto;
-    height: 128px;
-    filter: drop-shadow(0 0 28px rgba(13, 148, 136, 0.35));
-    animation: hibs-product-logo-pulse 1.2s ease-in-out infinite;
-}
-
-.hibs-product-transition-label {
-    margin: 4px 0 0;
-    font-family: 'Orbitron', monospace;
-    font-size: 0.82em;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: var(--neon-value);
-    text-transform: uppercase;
-}
-
-.hibs-product-transition-tagline {
-    margin: 0;
-    font-size: 0.72em;
-    color: var(--muted);
-    max-width: 280px;
-    line-height: 1.45;
-}
-
-@keyframes hibs-product-transition-in {
-    from { opacity: 0; transform: translateY(12px) scale(0.96); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes hibs-product-logo-pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.03); }
+    height: 96px;
+    max-width: min(620px, 72vw);
 }
 
 .hibs-portfolio-bar {
@@ -308,8 +260,8 @@ html.hibs-product-navigating .ref-page {
 .hibs-portfolio-pill {
     padding: 3px 10px;
     border-radius: 999px;
-    border: 1px solid rgba(148, 163, 184, 0.2);
-    color: #cbd5e1;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    color: var(--text-secondary, #475569);
     font-size: 0.88em;
 }
 
@@ -343,8 +295,9 @@ html.hibs-product-navigating .ref-page {
 
 header,
 .site-top {
-    background: linear-gradient(135deg, rgba(13, 148, 136, 0.18), rgba(11, 18, 32, 0.92));
+    background: linear-gradient(135deg, rgba(13, 148, 136, 0.12), rgba(255, 255, 255, 0.96));
     border-color: var(--border);
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
 }
 
 .tab-bar {
@@ -364,18 +317,172 @@ header,
     color: var(--neon-value);
 }
 
+html.hibs-product-navigating .hibs-app-shell,
+html.hibs-product-navigating .hibs-workspace-shell {
+    opacity: 0.55;
+    transform: scale(0.992);
+    transition: opacity 0.28s ease, transform 0.28s ease;
+    filter: blur(1px);
+}
+
+.hibs-product-transition {
+    position: fixed;
+    inset: 0;
+    z-index: 100008;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.26s ease, visibility 0.26s ease;
+}
+
+.hibs-product-transition.is-visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.hibs-product-transition-backdrop {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse at 50% 42%, rgba(13, 148, 136, 0.12) 0%, transparent 58%),
+        rgba(228, 231, 235, 0.88);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.hibs-product-transition-panel {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 28px 36px;
+    border-radius: 20px;
+    border: 1px solid rgba(13, 148, 136, 0.22);
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow:
+        0 24px 48px rgba(15, 23, 42, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    text-align: center;
+    animation: hibs-product-transition-in 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hibs-product-transition-panel .hibs-launch-crest {
+    width: auto;
+    height: 160px;
+    filter:
+        drop-shadow(0 0 28px rgba(13, 148, 136, 0.35))
+        drop-shadow(0 8px 24px rgba(0, 0, 0, 0.45));
+    animation: hibs-product-logo-pulse 1.2s ease-in-out infinite;
+}
+
+.hibs-product-transition-label {
+    margin: 4px 0 0;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.82em;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--neon-value, #5eead4);
+    text-transform: uppercase;
+}
+
+.hibs-product-transition-tagline {
+    margin: 0;
+    font-size: 0.72em;
+    color: var(--muted, #94a3b8);
+    max-width: 280px;
+    line-height: 1.45;
+}
+
+@keyframes hibs-product-transition-in {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes hibs-product-logo-pulse {
+    0%, 100% {
+        transform: scale(1);
+        filter:
+            drop-shadow(0 0 28px rgba(13, 148, 136, 0.35))
+            drop-shadow(0 8px 24px rgba(0, 0, 0, 0.45));
+    }
+    50% {
+        transform: scale(1.03);
+        filter:
+            drop-shadow(0 0 36px rgba(13, 148, 136, 0.5))
+            drop-shadow(0 10px 28px rgba(0, 0, 0, 0.5));
+    }
+}
+
+#hibs-launch-overlay,
+.hibs-launch-overlay {
+    background: linear-gradient(165deg, #e8eaed 0%, #f3f4f6 55%, #e8eaed 100%);
+}
+
+.hibs-launch-backdrop {
+    background:
+        radial-gradient(ellipse at 50% 42%, rgba(13, 148, 136, 0.12) 0%, transparent 58%),
+        rgba(228, 231, 235, 0.88);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.hibs-launch-panel {
+    border: 1px solid rgba(13, 148, 136, 0.22);
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow:
+        0 24px 48px rgba(15, 23, 42, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.hibs-launch-crest {
+    height: 160px;
+    width: auto;
+}
+
 @media (max-width: 640px) {
     .hibs-harvested-logo,
     .hibs-header-logo {
-        height: 44px;
+        height: 56px;
+    }
+
+    .hibs-product-bar {
+        gap: 10px 12px;
+        padding: 8px 12px;
     }
 
     .hibs-product-bar .hibs-harvested-logo {
-        height: 48px;
+        height: 68px;
+    }
+
+    .hibs-launch-crest {
+        height: 120px;
+    }
+
+    .hibs-product-switch {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .hibs-product-switch::-webkit-scrollbar {
+        display: none;
     }
 
     .hibs-product-pill {
-        padding: 6px 10px;
+        padding: 7px 12px;
         font-size: 0.78em;
     }
 
@@ -387,18 +494,59 @@ header,
     }
 }
 
+.picks-glossary {
+    margin: 0 0 12px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 10px;
+    background: rgba(2, 6, 23, 0.35);
+}
+
+.picks-glossary-sum {
+    cursor: pointer;
+    font-size: 0.78em;
+    font-weight: 700;
+    color: var(--hibs-neon);
+    padding: 8px 12px;
+    list-style: none;
+}
+
+.picks-glossary-sum::-webkit-details-marker {
+    display: none;
+}
+
+.picks-glossary-body {
+    padding: 0 12px 10px;
+    font-size: 0.76em;
+    line-height: 1.5;
+    color: var(--muted);
+}
+
+.picks-glossary-body p {
+    margin: 0 0 8px;
+}
+
+.picks-glossary-body strong {
+    color: var(--text);
+}
+
+.picks-glossary-note {
+    margin-top: 6px;
+    font-size: 0.95em;
+}
+
 /* -------------------------------------------------------------------------
-   Institutional workstation shell — high-density fixed-sidebar layout
+   Workstation shell — high-density fixed-sidebar layout
    ------------------------------------------------------------------------- */
 :root {
-    --canvas-bg: #090d16;
-    --surface-base: #111827;
-    --surface-elevated: #1f293d;
-    --border-subtle: #1e293b;
-    --border-muted: #334155;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #475569;
+    /* Workstation shell defaults — overridden to light grey under pastel/default theme */
+    --canvas-bg: #e4e7eb;
+    --surface-base: rgba(255, 255, 255, 0.96);
+    --surface-elevated: rgba(248, 250, 252, 0.98);
+    --border-subtle: rgba(100, 116, 139, 0.22);
+    --border-muted: rgba(100, 116, 139, 0.32);
+    --text-primary: #1e293b;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
     --state-pass: #10b981;
     --state-gate: #f59e0b;
     --state-fail: #ef4444;
@@ -446,7 +594,7 @@ body.hibs-workspace-active::before {
 
 .hibs-workspace-shell.app-container {
     display: grid;
-    grid-template-rows: 48px minmax(0, 1fr);
+    grid-template-rows: 72px minmax(0, 1fr);
     height: 100vh;
     max-width: none;
     margin: 0;
@@ -461,8 +609,81 @@ body.hibs-workspace-active::before {
     justify-content: space-between;
     align-items: center;
     padding: 0 16px;
-    gap: 12px;
-    min-height: 48px;
+    gap: 14px;
+    min-height: 72px;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65), 0 4px 18px rgba(15, 23, 42, 0.06);
+}
+
+.hibs-workspace-shell .control-bar-brand {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    min-width: 0;
+}
+
+.hibs-workspace-shell .control-bar-logo-link {
+    line-height: 0;
+}
+
+.hibs-workspace-shell .control-bar-brand .hibs-harvested-logo {
+    height: 64px;
+    max-width: min(300px, 38vw);
+}
+
+.hibs-workspace-shell .line-tabs.hibs-product-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+    gap: 0;
+    padding: 4px;
+    border: 1px solid rgba(100, 116, 139, 0.28);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        0 2px 12px rgba(15, 23, 42, 0.07);
+    isolation: isolate;
+}
+
+.hibs-workspace-shell .line-tabs .hibs-product-switch-indicator {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    height: calc(100% - 8px);
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--line-accent, var(--hibs-green, #0d9488)), #0f766e);
+    box-shadow:
+        0 2px 12px rgba(15, 23, 42, 0.14),
+        inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    transition:
+        transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+        width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.2s ease,
+        background 0.24s ease;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0;
+}
+
+[data-active-line="football"] .hibs-workspace-shell .line-tabs .hibs-product-switch-indicator {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+[data-active-line="racing"] .hibs-workspace-shell .line-tabs .hibs-product-switch-indicator {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+}
+
+[data-active-line="trading"] .hibs-workspace-shell .line-tabs .hibs-product-switch-indicator {
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+}
+
+[data-active-line="lines"] .hibs-workspace-shell .line-tabs .hibs-product-switch-indicator {
+    background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+}
+
+.hibs-workspace-shell .line-tabs.is-ready .hibs-product-switch-indicator,
+.hibs-workspace-shell .hibs-product-switch.is-ready .hibs-product-switch-indicator {
+    opacity: 1;
 }
 
 .hibs-workspace-shell .brand-zone {
@@ -485,30 +706,61 @@ body.hibs-workspace-active::before {
 }
 
 .hibs-workspace-shell .line-tab {
+    position: relative;
+    z-index: 1;
     background: transparent;
     border: none;
     color: var(--text-secondary);
-    padding: 6px 12px;
+    padding: 8px 14px;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 700;
     cursor: pointer;
-    border-radius: 4px;
-    transition: all 0.12s ease;
+    border-radius: 999px;
+    transition: color 0.22s ease, transform 0.18s ease;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
+    gap: 5px;
     font-family: inherit;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+}
+
+.hibs-workspace-shell .line-tab-icon {
+    font-size: 1.05em;
+    line-height: 1;
+    filter: saturate(1.1);
+}
+
+.hibs-workspace-shell .line-tab-label {
+    line-height: 1.1;
 }
 
 .hibs-workspace-shell .line-tab:hover {
     color: var(--text-primary);
-    background: var(--border-subtle);
+}
+
+.hibs-workspace-shell .line-tab[data-product-nav="football"]:not(.active):hover {
+    color: #2563eb;
+}
+
+.hibs-workspace-shell .line-tab[data-product-nav="racing"]:not(.active):hover {
+    color: #7c3aed;
+}
+
+.hibs-workspace-shell .line-tab[data-product-nav="trading"]:not(.active):hover {
+    color: #0d9488;
+}
+
+.hibs-workspace-shell .line-tab[data-product-nav="lines"]:not(.active):hover {
+    color: #0284c7;
 }
 
 .hibs-workspace-shell .line-tab.active {
-    color: var(--text-primary);
-    background: var(--surface-elevated);
-    box-shadow: inset 0 -2px 0 var(--line-accent);
+    color: #fff;
+    background: transparent;
+    box-shadow: none;
+    text-shadow: 0 1px 0 rgba(15, 23, 42, 0.12);
 }
 
 .hibs-workspace-shell .telemetry-tray {
@@ -552,9 +804,10 @@ body.hibs-workspace-active::before {
 
 .hibs-workspace-shell .workspace {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) var(--workspace-sidebar-w);
+    grid-template-columns: minmax(0, 1fr);
     height: 100%;
     overflow: hidden;
+    position: relative;
 }
 
 .hibs-workspace-shell .matrix-pane {
@@ -570,7 +823,7 @@ body.hibs-workspace-active::before {
     padding-top: 12px;
     border-top: 1px solid var(--border-subtle);
     font-size: 0.72em;
-    color: var(--text-muted);
+    color: var(--text-secondary);
 }
 
 .hibs-workspace-shell .filter-strip {
@@ -646,32 +899,98 @@ body.hibs-workspace-active::before {
 }
 
 .hibs-workspace-shell .execution-drawer {
+    position: fixed;
+    top: 64px;
+    right: 12px;
+    z-index: 120;
+    width: min(360px, calc(100vw - 24px));
+    max-height: min(72vh, 520px);
     background: var(--surface-base);
-    border-left: 1px solid var(--border-subtle);
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.hibs-workspace-shell .execution-drawer.is-collapsed {
+    max-height: none;
+    height: auto;
+}
+
+.hibs-workspace-shell .execution-drawer.is-collapsed .drawer-body {
+    display: none;
+}
+
+.hibs-workspace-shell .drawer-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow: hidden;
 }
 
 .hibs-workspace-shell .drawer-header {
-    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
     border-bottom: 1px solid var(--border-subtle);
     font-size: 12px;
     font-weight: 600;
     color: var(--text-secondary);
     letter-spacing: 0.02em;
+    cursor: pointer;
+    user-select: none;
+}
+
+.hibs-workspace-shell .drawer-title {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.hibs-workspace-shell .drawer-header-pl {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.hibs-workspace-shell .drawer-header-pl.positive {
+    color: var(--state-pass);
+}
+
+.hibs-workspace-shell .drawer-header-pl.negative {
+    color: var(--state-fail);
+}
+
+.hibs-workspace-shell .drawer-toggle {
+    flex: 0 0 auto;
+    border: 1px solid var(--border-subtle);
+    background: var(--canvas-bg);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
 }
 
 .hibs-workspace-shell .drawer-content {
     padding: 12px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 .hibs-workspace-shell .drawer-footer {
     padding: 12px;
     border-top: 1px solid var(--border-subtle);
     background: var(--canvas-bg);
+    flex: 0 0 auto;
 }
 
 .hibs-workspace-shell .odds-button {
@@ -793,17 +1112,36 @@ body.hibs-workspace-active .betslip-backdrop {
 /* Theme variants — set data-hibs-theme on <html> (settings + lite shell default pastel) */
 html[data-hibs-theme="default"],
 html[data-hibs-theme="pastel"] {
-    --hibs-neon: #e2e8f0;
-    --green: #a7f3d0;
-    --neon-value: #5eead4;
-    --gold: #fde68a;
-    --accent: #cbd5e1;
-    --blue: #a5f3fc;
-    --card: rgba(30, 41, 59, 0.72);
-    --border: rgba(167, 243, 208, 0.14);
-    --glow: rgba(94, 234, 212, 0.08);
-    --text: #f8fafc;
-    --muted: #cbd5e1;
+    --hibs-navy-deep: #e4e7eb;
+    --hibs-navy: #f1f3f5;
+    --hibs-neon: #0f766e;
+    --green: #047857;
+    --neon-value: #0d9488;
+    --gold: #b45309;
+    --accent: #475569;
+    --blue: #0369a1;
+    --card: rgba(255, 255, 255, 0.94);
+    --border: rgba(100, 116, 139, 0.28);
+    --glow: rgba(13, 148, 136, 0.12);
+    --text: #1e293b;
+    --muted: #475569;
+    --hibs-slate-card: rgba(255, 255, 255, 0.96);
+    --hibs-watermark-opacity: 0.07;
+    --hibs-surface-card: rgba(255, 255, 255, 0.94);
+    --hibs-surface-raised: rgba(255, 255, 255, 0.96);
+    --hibs-surface-overlay: rgba(255, 255, 255, 0.98);
+    --hibs-surface-inset: rgba(241, 245, 249, 0.9);
+    --hibs-surface-muted: rgba(226, 232, 240, 0.78);
+    --hibs-surface-input: rgba(255, 255, 255, 0.92);
+    --hibs-surface-stripe: rgba(248, 250, 252, 0.88);
+    --canvas-bg: #e4e7eb;
+    --surface-base: rgba(255, 255, 255, 0.96);
+    --surface-elevated: rgba(248, 250, 252, 0.98);
+    --border-subtle: rgba(100, 116, 139, 0.22);
+    --border-muted: rgba(100, 116, 139, 0.32);
+    --text-primary: #1e293b;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
 }
 
 html[data-hibs-theme="bright-pitch"] {
@@ -819,6 +1157,21 @@ html[data-hibs-theme="bright-pitch"] {
     --card: rgba(15, 23, 42, 0.92);
     --border: rgba(148, 163, 184, 0.22);
     --glow: rgba(20, 184, 166, 0.14);
+    --hibs-surface-card: rgba(15, 23, 42, 0.92);
+    --hibs-surface-raised: rgba(15, 23, 42, 0.96);
+    --hibs-surface-overlay: rgba(15, 23, 42, 0.98);
+    --hibs-surface-inset: rgba(2, 6, 23, 0.55);
+    --hibs-surface-muted: rgba(15, 23, 42, 0.45);
+    --hibs-surface-input: rgba(2, 6, 23, 0.68);
+    --hibs-surface-stripe: rgba(15, 23, 42, 0.35);
+    --canvas-bg: #090d16;
+    --surface-base: #111827;
+    --surface-elevated: #1f293d;
+    --border-subtle: #1e293b;
+    --border-muted: #334155;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #475569;
 }
 
 html[data-hibs-theme="deep-forest"] {
@@ -833,6 +1186,21 @@ html[data-hibs-theme="deep-forest"] {
     --card: rgba(15, 23, 42, 0.94);
     --border: rgba(148, 163, 184, 0.14);
     --glow: rgba(13, 148, 136, 0.1);
+    --hibs-surface-card: rgba(15, 23, 42, 0.92);
+    --hibs-surface-raised: rgba(15, 23, 42, 0.96);
+    --hibs-surface-overlay: rgba(15, 23, 42, 0.98);
+    --hibs-surface-inset: rgba(2, 6, 23, 0.55);
+    --hibs-surface-muted: rgba(15, 23, 42, 0.45);
+    --hibs-surface-input: rgba(2, 6, 23, 0.68);
+    --hibs-surface-stripe: rgba(15, 23, 42, 0.35);
+    --canvas-bg: #090d16;
+    --surface-base: #111827;
+    --surface-elevated: #1f293d;
+    --border-subtle: #1e293b;
+    --border-muted: #334155;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #475569;
 }
 
 html[data-hibs-theme="low-glow"] {
@@ -849,41 +1217,3 @@ html[data-hibs-ui="away"] {
     --accent: #94a3b8;
     --border: rgba(148, 163, 184, 0.22);
 }
-
-/* Value picks home + traffic shed */
-.hibs-traffic-shed-banner {
-    margin: 0 0 10px;
-    padding: 10px 14px;
-    border-radius: 10px;
-    border: 1px solid rgba(251, 191, 36, 0.45);
-    background: rgba(251, 191, 36, 0.12);
-    color: #78350f;
-    font-size: 0.82em;
-    font-weight: 600;
-    line-height: 1.4;
-}
-html.hibs-traffic-shed .value-lane-hero,
-html.hibs-traffic-shed .smart-picks-hero {
-    transition: none;
-}
-.value-producer-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px 20px;
-    margin: 12px 0 0;
-    padding: 0;
-    font-size: 0.78em;
-}
-.value-producer-meta > div { display: flex; gap: 6px; align-items: baseline; }
-.value-producer-meta dt { color: var(--muted); font-weight: 600; margin: 0; }
-.value-producer-meta dd { margin: 0; color: var(--text); font-weight: 700; }
-.value-producer-meta--compact { margin-top: 10px; }
-.value-picks-teaser { margin-bottom: 16px; padding: 14px 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
-.value-picks-page-hero,
-.combinations-page-hero { margin-bottom: 16px; padding: 16px 18px; }
-.value-picks-page-hero h1,
-.combinations-page-hero h1 { font-family: 'Orbitron', monospace; font-size: 1.1em; color: var(--hibs-neon); margin: 0 0 8px; }
-.value-picks-footer-hint,
-.dash-combos-hint,
-.insights-value-link { font-size: 0.8em; color: var(--muted); margin: 12px 0 16px; line-height: 1.45; }
-.value-lane-quiet-meta { font-size: 0.8em; color: var(--muted); margin-top: 10px; }
