@@ -29,7 +29,7 @@ DQ_BLOCKS: Dict[str, Dict[str, Any]] = {
     },
     "enrich": {
         "weight": 25,
-        "fields": ("form_string", "horse_course_win_rate"),
+        "fields": ("form_string", "trainer_rtf", "horse_course_win_rate"),
         "requires_enrich_source": True,
     },
 }

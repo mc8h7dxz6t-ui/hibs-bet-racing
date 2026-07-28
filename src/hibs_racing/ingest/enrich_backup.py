@@ -242,7 +242,7 @@ def fetch_racecards_with_fallback(
 def run_targeted_enrich_recovery(
     *,
     database=None,
-    min_mean_coverage_pct: float = 75.0,
+    min_mean_coverage_pct: float = 95.0,
     max_days: int = 120,
 ) -> dict[str, Any]:
     """

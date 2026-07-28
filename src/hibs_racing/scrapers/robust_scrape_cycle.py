@@ -115,9 +115,10 @@ def run_robust_scrape_cycle(
 
     if os.getenv("HIBS_RACING_ENRICH_RECOVERY", "1").strip().lower() in ("1", "true", "yes", "on"):
         try:
+            from hibs_racing.data_quality_targets import racing_enrich_recovery_min_pct
             from hibs_racing.ingest.enrich_backup import run_targeted_enrich_recovery
 
-            min_cov = float(os.getenv("HIBS_RACING_ENRICH_RECOVERY_MIN_PCT", "75"))
+            min_cov = racing_enrich_recovery_min_pct()
             max_days = int(os.getenv("HIBS_RACING_ENRICH_RECOVERY_DAYS", "120"))
             enrich_hit = run_targeted_enrich_recovery(
                 min_mean_coverage_pct=min_cov,
