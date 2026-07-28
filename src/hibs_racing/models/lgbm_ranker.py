@@ -139,6 +139,7 @@ def train_lgbm_ranker(
     min_races: int | None = None,
     save: bool = True,
     with_enrich: bool = False,
+    with_tracker: bool = False,
     save_stable_hash: bool = False,
 ) -> RankerTrainReport:
     """
@@ -160,22 +161,35 @@ def train_lgbm_ranker(
         build_ranker_matrix,
         ranker_enrich_feature_columns,
         ranker_feature_columns,
+        ranker_tracker_feature_columns,
         validate_ranker_matrix,
     )
 
+    if with_tracker and not with_enrich:
+        with_enrich = True
+
     if frame is None:
-        frame = build_ranker_matrix(export_parquet=False, config_path=config_path, with_enrich=with_enrich)
+        frame = build_ranker_matrix(
+            export_parquet=False,
+            config_path=config_path,
+            with_enrich=with_enrich,
+            with_tracker=with_tracker,
+        )
 
     raw_enrich_coverage = frame.attrs.get("enrich_coverage_raw_pct") if with_enrich else None
 
     if frame.empty:
         return RankerTrainReport(0, 0, None, None, None, None, None, "No rows — ingest + tag first.")
 
-    feature_cols = ranker_enrich_feature_columns() if with_enrich else ranker_feature_columns()
+    if with_tracker:
+        feature_cols = ranker_tracker_feature_columns()
+    else:
+        feature_cols = ranker_enrich_feature_columns() if with_enrich else ranker_feature_columns()
     try:
         enrich_coverage = validate_ranker_matrix(
             frame,
             with_enrich=with_enrich,
+            with_tracker=with_tracker,
             feature_cols=feature_cols,
             min_enrich_coverage_pct=0.0,
         )
@@ -272,16 +286,21 @@ def train_lgbm_ranker(
             None,
             f"Holdout top-1 {top1_hit:.1%} below enrich safety bar {min_holdout:.1%} — model not saved.",
             enrich_coverage_pct=enrich_coverage or None,
-            ranker_tier="enrich_48" if with_enrich else "base_36",
+            ranker_tier="tracker_51" if with_tracker else ("enrich_48" if with_enrich else "base_36"),
         )
 
     model_path_str: str | None = None
     stable_hash: str | None = None
     manifest_path: str | None = None
-    ranker_tier = "enrich_48" if with_enrich else "base_36"
+    ranker_tier = "tracker_51" if with_tracker else ("enrich_48" if with_enrich else "base_36")
     if save:
         final = _fit(df)
-        fp = ranker_enrich_feature_path(cfg) if with_enrich else ranker_feature_path(cfg)
+        if with_tracker:
+            from hibs_racing.ranker_features import ranker_tracker_feature_path
+
+            fp = ranker_tracker_feature_path(cfg)
+        else:
+            fp = ranker_enrich_feature_path(cfg) if with_enrich else ranker_feature_path(cfg)
         mp, _ = save_ranker_artifacts(
             final,
             features,

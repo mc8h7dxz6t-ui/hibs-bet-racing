@@ -626,6 +626,7 @@ def cmd_train_ranker(args: argparse.Namespace) -> int:
     try:
         report = train_lgbm_ranker(
             with_enrich=bool(getattr(args, "with_enrich", False)),
+            with_tracker=bool(getattr(args, "with_tracker", False)),
             save_stable_hash=bool(getattr(args, "save_stable_hash", False)),
         )
     except ImportError as exc:
@@ -1565,6 +1566,11 @@ def main(argv: list[str] | None = None) -> int:
         "--with-enrich",
         action="store_true",
         help="Train with RP enrich features (48 cols); saves lgbm_ranker_features_enrich.json",
+    )
+    p_ranker.add_argument(
+        "--with-tracker",
+        action="store_true",
+        help="Train with horse tracker features (51 cols = enrich + speed delta); shared place+win spine",
     )
     p_ranker.add_argument(
         "--save-stable-hash",
