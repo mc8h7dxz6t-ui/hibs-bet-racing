@@ -9,6 +9,7 @@ description = "Offline racing NLP + place/EW research engine (separate from hibs
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
 dependencies = [
+    "numpy>=1.26",
     "pyyaml>=6.0",
     "pandas>=2.0",
     "pyarrow>=14.0",

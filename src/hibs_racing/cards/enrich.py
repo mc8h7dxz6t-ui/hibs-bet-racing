@@ -149,6 +149,10 @@ def compute_enrich_ranker_fields(frame: pd.DataFrame) -> pd.DataFrame:
         w = pd.to_numeric(out["trainer_14d_wins"], errors="coerce")
         r = pd.to_numeric(out["trainer_14d_runs"], errors="coerce")
         out["trainer_14d_strike"] = (w / r).where(r > 0)
+    if "trainer_14d_strike" in out.columns and "trainer_rp_14d_win_rate" in out.columns:
+        strike = pd.to_numeric(out["trainer_14d_strike"], errors="coerce")
+        rp = pd.to_numeric(out["trainer_rp_14d_win_rate"], errors="coerce")
+        out["trainer_14d_strike"] = strike.fillna(rp)
     if "trainer_rtf" in out.columns:
         out["trainer_rtf"] = pd.to_numeric(out["trainer_rtf"], errors="coerce")
     for col in ENRICH_RANKER_FEATURES:

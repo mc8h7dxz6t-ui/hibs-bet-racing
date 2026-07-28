@@ -20,7 +20,18 @@ from hibs_racing.features.ranker_matrix import (
 )
 
 
-def test_tracker_feature_manifest_count():
+def test_impute_enrich_fills_trainer_strike_from_rp_rate():
+    from hibs_racing.features.ranker_matrix import impute_enrich_features
+
+    frame = pd.DataFrame(
+        {
+            "form_string": [""],
+            "trainer_rp_14d_win_rate": [0.22],
+            "trainer_14d_strike": [None],
+        }
+    )
+    out = impute_enrich_features(frame, log_warnings=False)
+    assert float(out["trainer_14d_strike"].iloc[0]) == 0.22
     cols = ranker_tracker_feature_columns()
     assert len(cols) == EXPECTED_TRACKER_FEATURE_COUNT
     for feat in HORSE_TRACKER_RANKER_FEATURES:

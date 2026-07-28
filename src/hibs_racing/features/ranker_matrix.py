@@ -132,6 +132,11 @@ def impute_enrich_features(frame: pd.DataFrame, *, log_warnings: bool = True) ->
         else:
             median = float(series.median()) if series.notna().any() else 0.0
             out[col] = series.fillna(median)
+    if "trainer_14d_strike" in out.columns:
+        strike = pd.to_numeric(out["trainer_14d_strike"], errors="coerce")
+        if "trainer_rp_14d_win_rate" in out.columns:
+            strike = strike.fillna(pd.to_numeric(out["trainer_rp_14d_win_rate"], errors="coerce"))
+        out["trainer_14d_strike"] = strike.fillna(0.11)
     return out
 
 

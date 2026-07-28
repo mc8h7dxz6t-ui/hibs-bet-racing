@@ -237,3 +237,68 @@ def fetch_racecards_with_fallback(
         }
     )
     return result
+
+
+def run_targeted_enrich_recovery(
+    *,
+    database=None,
+    min_mean_coverage_pct: float = 75.0,
+    max_days: int = 120,
+) -> dict[str, Any]:
+    """
+    Raceform-derived enrich + cached RP racecard backfill when coverage is thin.
+    No external API — safe for VPS scrape-first profile.
+    """
+    from hibs_racing.features.runner_enrich_backfill import backfill_runner_enrich
+
+    db = database or db_path(load_config())
+    before = coverage_report(db)
+    mean_before = float(before.get("mean_enrich_coverage_pct") or 0.0)
+    if mean_before >= min_mean_coverage_pct:
+        return {
+            "ok": True,
+            "skipped": True,
+            "before": before,
+            "after": before,
+            "message": f"Enrich coverage {mean_before:.1f}% >= {min_mean_coverage_pct:.1f}% — skip recovery.",
+        }
+
+    init_db(db)
+    derived_rows = 0
+    dates: list[str] = []
+    with connect(db) as conn:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT race_date
+            FROM runners
+            WHERE finish_pos IS NOT NULL
+            ORDER BY race_date DESC
+            LIMIT ?
+            """,
+            (int(max_days),),
+        ).fetchall()
+        dates = [str(r[0])[:10] for r in rows if r and r[0]]
+
+    for card_date in dates:
+        try:
+            hit = derive_enrich_for_date(card_date, database=db, only_missing=True)
+            derived_rows += int(hit.get("rows_updated") or 0)
+        except Exception:
+            continue
+
+    backfill = backfill_runner_enrich(database=db, include_upcoming=False)
+    after = coverage_report(db)
+    mean_after = float(after.get("mean_enrich_coverage_pct") or 0.0)
+    return {
+        "ok": mean_after >= min_mean_coverage_pct or mean_after > mean_before,
+        "skipped": False,
+        "before": before,
+        "after": after,
+        "derived_rows": derived_rows,
+        "backfill": backfill,
+        "dates_scanned": len(dates),
+        "message": (
+            f"Targeted enrich recovery: {mean_before:.1f}% → {mean_after:.1f}% "
+            f"({derived_rows} derived rows, {int(backfill.get('rows_updated') or 0)} backfill rows)."
+        ),
+    }
