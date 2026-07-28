@@ -132,6 +132,9 @@ def run_thin_rescue_pass(*, max_per_cycle: Optional[int] = None) -> Dict[str, An
     thin_floor = racing_thin_rescue_dq_pct()
     target = racing_data_quality_target_pct()
     updates: List[Dict[str, Any]] = []
+    from hibs_racing.scrapers.field_resolver import clear_race_enrich_cache
+
+    clear_race_enrich_cache()
     for _, row in frame.iterrows():
         if cap <= 0:
             break

@@ -2,11 +2,29 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
 from hibs_racing.scrapers.multi_scraper_api import FIELD_LADDERS
+
+_RACE_ENRICH_CACHE: Dict[str, pd.DataFrame] = {}
+
+
+def clear_race_enrich_cache() -> None:
+    _RACE_ENRICH_CACHE.clear()
+
+
+def _allow_live_rp_enrich() -> bool:
+    raw = str(os.getenv("HIBS_RACING_THIN_RESCUE_RP_LIVE", "auto")).strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return False
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    from hibs_racing.ingest.racecards import rp_auth_configured
+
+    return rp_auth_configured()
 
 
 def _is_missing(val: Any) -> bool:
@@ -55,10 +73,20 @@ def _resolve_enrich_form(race_slice: pd.DataFrame, row: Dict[str, Any]) -> Tuple
     need = any(_is_missing(row.get(k)) for k in ("form_string", "card_comment", "official_rating"))
     if not need or race_slice.empty:
         return updates, steps
-    from hibs_racing.cards.enrich import dual_source_enrich
+    race_id = str(row.get("race_id") or "")
+    if race_id and race_id in _RACE_ENRICH_CACHE:
+        enriched = _RACE_ENRICH_CACHE[race_id]
+        steps.append("race_enrich_cache")
+    else:
+        from hibs_racing.cards.enrich import dual_source_enrich
 
-    enriched, meta = dual_source_enrich(race_slice.copy())
-    steps.append(str(meta.get("source") or "dual_source_enrich"))
+        enriched, meta = dual_source_enrich(
+            race_slice.copy(),
+            allow_live=_allow_live_rp_enrich(),
+        )
+        steps.append(str(meta.get("source") or meta.get("error") or "dual_source_enrich"))
+        if race_id:
+            _RACE_ENRICH_CACHE[race_id] = enriched
     horse = str(row.get("horse_name") or "").strip()
     if not horse or "horse_name" not in enriched.columns:
         return updates, steps

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import time
@@ -40,10 +41,33 @@ def ensure_rpscrape() -> Path:
     return RPSCRAPE_SCRIPTS
 
 
+_RPSCRAPE_IMPORTS: dict[str, str] = {
+    "curl_cffi": "curl_cffi",
+    "jarowinkler": "jarowinkler",
+    "lxml": "lxml",
+    "orjson": "orjson",
+    "python-dotenv": "dotenv",
+    "tomli": "tomli",
+    "tqdm": "tqdm",
+}
+
+
 def ensure_rpscrape_deps() -> None:
+    import importlib.util
+
+    missing = [
+        pkg
+        for pkg in RPSCRAPE_DEPS
+        if importlib.util.find_spec(_RPSCRAPE_IMPORTS.get(pkg, pkg.replace("-", "_"))) is None
+    ]
+    if not missing:
+        return
+    env = os.environ.copy()
+    env.setdefault("PIP_CACHE_DIR", str(ROOT / ".cache" / "pip"))
     subprocess.run(
-        [sys.executable, "-m", "pip", "install", *RPSCRAPE_DEPS, "-q"],
+        [sys.executable, "-m", "pip", "install", *missing, "-q"],
         check=True,
+        env=env,
     )
 
 

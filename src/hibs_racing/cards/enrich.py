@@ -218,6 +218,7 @@ def fetch_rp_enrich_frame(
     *,
     day: int = 1,
     regions: tuple[str, ...] = ("gb", "ire"),
+    allow_live: bool | None = None,
 ) -> pd.DataFrame:
     """Fetch rpscrape racecards with stats for dual-source enrich (best-effort)."""
     cfg = load_config().get("cards", {})
@@ -226,14 +227,17 @@ def fetch_rp_enrich_frame(
     if cfg.get("enrich_fetch_stats", True):
         ensure_rp_stats_settings(fetch_stats=True)
 
-    from hibs_racing.ingest.racecards import load_racecard_frames
+    from hibs_racing.ingest.racecards import load_racecard_frames, rp_auth_configured
+
+    if allow_live is None:
+        allow_live = rp_auth_configured()
 
     frames: list[pd.DataFrame] = []
     for i, region in enumerate(regions):
         if i > 0:
             polite_sleep("rp_racecard_region_pause_sec")
         try:
-            frames.append(load_racecard_frames(day=day, region=region))
+            frames.append(load_racecard_frames(day=day, region=region, allow_live=allow_live))
         except Exception:
             if region == regions[0]:
                 raise
@@ -247,6 +251,7 @@ def dual_source_enrich(
     *,
     regions: tuple[str, ...] = ("gb", "ire"),
     day: int = 1,
+    allow_live: bool | None = None,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """
     Racing API spine + RP enrich merge. Failures return spine unchanged (no regression).
@@ -260,7 +265,7 @@ def dual_source_enrich(
         return apply_form_enrich(spine), meta
 
     try:
-        enrich = fetch_rp_enrich_frame(day=day, regions=regions)
+        enrich = fetch_rp_enrich_frame(day=day, regions=regions, allow_live=allow_live)
     except Exception as exc:
         meta["error"] = str(exc)[:200]
         return apply_form_enrich(spine), meta
