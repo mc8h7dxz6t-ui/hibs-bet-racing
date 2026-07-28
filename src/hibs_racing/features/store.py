@@ -27,6 +27,14 @@ RUNNER_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("rpr", "INTEGER"),
     ("race_class", "TEXT"),
     ("days_since_last_run", "INTEGER"),
+    ("beaten_lengths", "REAL"),
+    ("margin_to_next", "REAL"),
+    ("topspeed", "INTEGER"),
+    ("race_time_secs", "REAL"),
+    ("weight_lbs", "REAL"),
+    ("age", "INTEGER"),
+    ("surface", "TEXT"),
+    ("speed_figure_delta", "REAL"),
 )
 
 UPCOMING_MIGRATIONS: tuple[tuple[str, str], ...] = (

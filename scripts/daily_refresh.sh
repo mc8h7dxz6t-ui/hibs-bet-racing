@@ -36,6 +36,11 @@ echo "hibs-racing daily refresh — results since ${START_DATE}"
 run_logged "daily-ingest-sync" \
   hibs-racing ingest-raceform "${RFDB}" --since "${START_DATE}" --sync
 
+if [[ -f "${SCRIPT_DIR}/sync_horse_form_state.py" ]]; then
+  run_tier2_logged "horse-form-state-sync" \
+    python3 "${SCRIPT_DIR}/sync_horse_form_state.py" --since "${START_DATE}" || true
+fi
+
 # Recover missing OR / enrich fields on upcoming + cached RP racecards.
 run_tier2_logged "daily-or-enrich-backfill" \
   hibs-racing backfill-runner-enrich

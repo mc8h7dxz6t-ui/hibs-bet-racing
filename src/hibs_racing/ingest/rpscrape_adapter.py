@@ -108,6 +108,26 @@ def normalize_rpscrape_csv(
         out["race_class"] = frame["class"].fillna("").astype(str).str.strip()
     if "off" in frame.columns:
         out["off_time"] = frame["off"].astype(str).str.strip()
+    if "ovr_btn" in frame.columns:
+        out["beaten_lengths"] = pd.to_numeric(frame["ovr_btn"], errors="coerce")
+    elif "btn" in frame.columns:
+        out["beaten_lengths"] = pd.to_numeric(frame["btn"], errors="coerce")
+    if "btn" in frame.columns:
+        out["margin_to_next"] = pd.to_numeric(frame["btn"], errors="coerce")
+    if "ts" in frame.columns:
+        out["topspeed"] = pd.to_numeric(frame["ts"], errors="coerce").astype("Int64")
+    if "secs" in frame.columns:
+        out["race_time_secs"] = pd.to_numeric(frame["secs"], errors="coerce")
+    elif "time" in frame.columns:
+        out["race_time_secs"] = pd.to_numeric(frame["time"], errors="coerce")
+    if "lbs" in frame.columns:
+        out["weight_lbs"] = pd.to_numeric(frame["lbs"], errors="coerce")
+    if "age" in frame.columns:
+        out["age"] = pd.to_numeric(frame["age"], errors="coerce").astype("Int64")
+    if "surface" in frame.columns:
+        out["surface"] = frame["surface"].fillna("").astype(str).str.strip()
+    elif "type" in frame.columns:
+        out["surface"] = frame["type"].map(_race_type)
 
     cfg = load_config()
     need_comment = (
