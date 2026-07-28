@@ -179,14 +179,24 @@ def _invoke_rpscrape(
     ]
     if clean:
         cmd.append("--clean")
-    return subprocess.run(
-        cmd,
-        cwd=scripts,
-        capture_output=True,
-        text=True,
-        env=_load_env(),
-        timeout=DAY_JOB_TIMEOUT_SEC,
-    )
+    from hibs_racing.ingest.rp_traffic_guard import acquire_rp_live_slot, record_rate_limit
+
+    try:
+        with acquire_rp_live_slot(label="rpscrape_results"):
+            return subprocess.run(
+                cmd,
+                cwd=scripts,
+                capture_output=True,
+                text=True,
+                env=_load_env(),
+                timeout=DAY_JOB_TIMEOUT_SEC,
+            )
+    except RuntimeError as exc:
+        record_rate_limit(reason=str(exc)[:80])
+        raise
+    except subprocess.TimeoutExpired as exc:
+        record_rate_limit(reason="rpscrape_timeout")
+        raise
 
 
 def run_rpscrape(

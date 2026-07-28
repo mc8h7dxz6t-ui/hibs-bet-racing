@@ -86,11 +86,25 @@ def global_trip_active() -> bool:
     data = _load_state()
     trip = data.get("global_trip")
     if not isinstance(trip, dict) or not trip.get("at"):
+        forbidden = data.get("forbidden")
+        if isinstance(forbidden, dict) and forbidden.get("at"):
+            try:
+                at = datetime.fromisoformat(str(forbidden["at"]).replace("Z", "+00:00"))
+                if at.tzinfo is None:
+                    at = at.replace(tzinfo=timezone.utc)
+                age_h = (datetime.now(timezone.utc) - at).total_seconds() / 3600.0
+                return age_h < _block_ttl_hours()
+            except (TypeError, ValueError):
+                return False
         return False
-    forbidden = data.get("forbidden")
-    if isinstance(forbidden, dict) and forbidden.get("at"):
-        return True
-    return bool(trip.get("at"))
+    try:
+        at = datetime.fromisoformat(str(trip["at"]).replace("Z", "+00:00"))
+        if at.tzinfo is None:
+            at = at.replace(tzinfo=timezone.utc)
+        age_h = (datetime.now(timezone.utc) - at).total_seconds() / 3600.0
+        return age_h < _block_ttl_hours()
+    except (TypeError, ValueError):
+        return False
 
 
 def racing_api_traffic_allowed() -> bool:

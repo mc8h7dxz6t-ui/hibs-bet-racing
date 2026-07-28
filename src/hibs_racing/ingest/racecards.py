@@ -93,6 +93,14 @@ def fetch_racecards(
             "Add EMAIL + ACCESS_TOKEN to .env, warm cards first, or set HIBS_RACING_RP_LIVE_FETCH=1."
         )
 
+    from hibs_racing.ingest.rp_traffic_guard import acquire_rp_live_slot, record_rate_limit, rp_live_traffic_allowed
+
+    if not rp_live_traffic_allowed():
+        raise RuntimeError(
+            "Racing Post live fetch blocked (rate-limit trip or missing credentials). "
+            "Use cached racecards or wait for trip TTL."
+        )
+
     scripts = ensure_rpscrape()
     ensure_rpscrape_deps()
 
@@ -110,15 +118,25 @@ def fetch_racecards(
         )
         timeout_sec = min(timeout_sec, 25)
 
-    result = subprocess.run(
-        cmd,
-        cwd=scripts,
-        capture_output=True,
-        text=True,
-        env=env,
-        timeout=timeout_sec,
-    )
+    try:
+        with acquire_rp_live_slot(label="racecards"):
+            result = subprocess.run(
+                cmd,
+                cwd=scripts,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=timeout_sec,
+            )
+    except RuntimeError as exc:
+        record_rate_limit(reason=str(exc)[:80])
+        raise
+    except subprocess.TimeoutExpired as exc:
+        record_rate_limit(reason="racecards_timeout")
+        raise RuntimeError(f"racecards fetch timed out after {timeout_sec}s") from exc
     if result.returncode != 0:
+        if "429" in (result.stderr or "") or "rate" in (result.stderr or "").lower():
+            record_rate_limit(reason="racecards_subprocess_429")
         raise RuntimeError(
             f"racecards fetch failed:\n{result.stdout}\n{result.stderr}\n"
             "Add Racing Post credentials to .env (EMAIL + ACCESS_TOKEN), "

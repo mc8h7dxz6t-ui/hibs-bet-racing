@@ -16,6 +16,7 @@ _ENV_MAP = {
     "rp_verdict_race_pause_sec": "RP_VERDICT_RACE_PAUSE_SEC",
     "rp_verdict_workers": "RP_VERDICT_WORKERS",
     "rp_verdict_max_races": "RP_VERDICT_MAX_RACES",
+    "oddschecker_pause_sec": "HIBS_ODDSCHECKER_PAUSE_SEC",
 }
 
 

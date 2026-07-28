@@ -230,7 +230,10 @@ def fetch_rp_enrich_frame(
     from hibs_racing.ingest.racecards import load_racecard_frames, rp_auth_configured
 
     if allow_live is None:
-        allow_live = rp_auth_configured()
+        from hibs_racing.ingest.racecards import rp_auth_configured
+        from hibs_racing.ingest.rp_traffic_guard import rp_live_traffic_allowed
+
+        allow_live = rp_auth_configured() and rp_live_traffic_allowed()
 
     frames: list[pd.DataFrame] = []
     for i, region in enumerate(regions):

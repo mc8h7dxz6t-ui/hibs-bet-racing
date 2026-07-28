@@ -41,6 +41,7 @@ def scrape_status_payload() -> Dict[str, Any]:
         "targeted_overflow": cat.get("targeted_overflow") or [],
         "cards_source": resolve_cards_source(),
         "racing_api_guard": guard_status(),
+        "api_pools": __import__("hibs_racing.api_pools", fromlist=["all_pool_status"]).all_pool_status(),
         "resilience": scrape_resilience_status(),
     }
 
