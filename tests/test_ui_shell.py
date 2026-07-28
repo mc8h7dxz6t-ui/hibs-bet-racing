@@ -39,6 +39,16 @@ def test_base_template_uses_theme_css_not_legacy_inline_tokens():
     assert 'data-hibs-theme="pastel"' in text
 
 
+def test_theme_css_uses_light_grey_canvas_not_dark_slate():
+    from pathlib import Path
+
+    css = Path("static/hibs_theme.css").read_text(encoding="utf-8")
+    assert "Light grey canvas" in css or "#e8eaed" in css
+    assert "--hibs-navy-deep: #e4e7eb" in css
+    assert "linear-gradient(180deg, #e8eaed 0%, #f3f4f6 100%)" in css
+    assert "#0f172a 0%, #1e293b 100%" not in css
+
+
 def test_product_switcher_urls_local(monkeypatch):
     from hibs_racing.web import create_app
 
