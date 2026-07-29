@@ -80,12 +80,20 @@ def run_robust_scrape_cycle(
         report["odds_source"] = stats.get("odds_source")
         report["odds_runners"] = stats.get("odds_runners", 0)
         report["ok"] = int(stats.get("runners") or 0) > 0
+        if report.get("ok") and str(report.get("cards_source") or source) != "racing_api":
+            try:
+                from hibs_racing.racing_api_guard import clear_guard_state
+
+                clear_guard_state()
+            except Exception:
+                pass
     except Exception as exc:
         report["error"] = str(exc)[:200]
         if source == "racing_api":
-            from hibs_racing.racing_api_guard import record_forbidden
+            from hibs_racing.racing_api_guard import record_forbidden, should_record_api_forbidden
 
-            record_forbidden(http_status=403, reason=str(exc)[:80])
+            if should_record_api_forbidden(exc):
+                record_forbidden(http_status=403, reason=str(exc)[:80])
             fallback = resolve_cards_source("rpscrape")
             if fallback != source:
                 try:

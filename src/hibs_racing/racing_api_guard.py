@@ -49,6 +49,49 @@ def _block_ttl_hours() -> float:
         return 6.0
 
 
+def should_record_api_forbidden(exc: BaseException) -> bool:
+    """Only trip the Racing API guard on real HTTP/auth blocks — not parse or RP errors."""
+    msg = str(exc).lower()
+    non_api_markers = (
+        "nan",
+        "no cached rp",
+        "racing post",
+        "rpscrape",
+        "no racecards",
+        "no runners",
+        "field_size",
+    )
+    if any(m in msg for m in non_api_markers):
+        return False
+    api_markers = (
+        "403",
+        "401",
+        "429",
+        "unauthorized",
+        "forbidden",
+        "rate limit",
+        "traffic blocked",
+        "plan_",
+    )
+    return any(m in msg for m in api_markers)
+
+
+def clear_guard_state() -> None:
+    """Reset guard after a successful scrape-first refresh (rpscrape / score-card path)."""
+    from pathlib import Path
+
+    path = Path(_state_path())
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+    with _log_once_lock:
+        _logged_once.discard("forbidden:403")
+        _logged_once.discard("forbidden:401")
+        _logged_once.discard("forbidden:429")
+        _logged_once.discard("global_trip")
+
+
 def record_forbidden(*, http_status: int = 403, reason: str = "") -> None:
     data = _load_state()
     data["forbidden"] = {

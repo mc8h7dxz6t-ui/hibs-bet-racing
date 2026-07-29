@@ -31,6 +31,16 @@ export HIBS_RACING_SCRAPE_FORCE="${HIBS_RACING_SCRAPE_FORCE:-${HIBS_ALWAYS_SCRAP
 export PIP_CACHE_DIR="${PIP_CACHE_DIR:-${APP}/.cache/pip}"
 mkdir -p "${PIP_CACHE_DIR}" "${HIBS_RACING_CACHE_DIR}"
 
+# Honour scrape-first flags from .env (root shell exports are ignored by sudo -u www-data).
+if [[ -f "${APP}/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${APP}/.env"
+  set +a
+fi
+export HIBS_RACING_SCRAPE_FIRST="${HIBS_RACING_SCRAPE_FIRST:-0}"
+export HIBS_RACING_SCRAPE_SOURCE="${HIBS_RACING_SCRAPE_SOURCE:-auto}"
+
 PY="${APP}/.venv/bin/python3"
 SCRAPE_PY="${APP}/scripts/warm_racing_scrape.py"
 
@@ -42,6 +52,8 @@ if [[ "$(id -u)" -eq 0 ]] && id www-data &>/dev/null; then
     PIP_CACHE_DIR="${PIP_CACHE_DIR}" \
     HIBS_ALWAYS_SCRAPE="${HIBS_ALWAYS_SCRAPE}" \
     HIBS_RACING_SCRAPE_FORCE="${HIBS_RACING_SCRAPE_FORCE}" \
+    HIBS_RACING_SCRAPE_FIRST="${HIBS_RACING_SCRAPE_FIRST}" \
+    HIBS_RACING_SCRAPE_SOURCE="${HIBS_RACING_SCRAPE_SOURCE}" \
     "${PY}" "${SCRAPE_PY}"
 else
   "${PY}" "${SCRAPE_PY}"

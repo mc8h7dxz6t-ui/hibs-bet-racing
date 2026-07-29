@@ -124,9 +124,10 @@ def fetch_cards_window(
     except Exception as exc:
         if fetch_source != "racing_api":
             raise
-        from hibs_racing.racing_api_guard import record_forbidden
+        from hibs_racing.racing_api_guard import record_forbidden, should_record_api_forbidden
 
-        record_forbidden(http_status=403, reason=str(exc)[:80])
+        if should_record_api_forbidden(exc):
+            record_forbidden(http_status=403, reason=str(exc)[:80])
         raw = _fetch_cards_window_inner(
             source="rpscrape",
             regions=regions,
@@ -395,4 +396,11 @@ def refresh_cards(
         observation_lane=observation_lane,
     )
     result["telemetry_balance"] = telemetry.to_dict()
+    if src != "racing_api" and len(cards) > 0:
+        try:
+            from hibs_racing.racing_api_guard import clear_guard_state
+
+            clear_guard_state()
+        except Exception:
+            pass
     return result
