@@ -76,6 +76,8 @@ def test_product_switcher_urls_public(monkeypatch):
 
     monkeypatch.setenv("HIBS_RACING_PUBLIC_URL", "https://hibs-bet.co.uk/racing")
     monkeypatch.setenv("HIBS_FOOTBALL_HOME_URL", "https://hibs-bet.co.uk/")
+    monkeypatch.setenv("HIBS_TRADING_STATUS_URL", "https://hibs-bet.co.uk/harvested-execution")
+    monkeypatch.setenv("HIBS_LINE_TRADER_URL", "https://hibs-bet.co.uk/line-trader")
     app = create_app()
     client = app.test_client()
     resp = client.get("/cards")
@@ -83,6 +85,8 @@ def test_product_switcher_urls_public(monkeypatch):
     html = resp.data.decode("utf-8", errors="replace")
     assert 'href="https://hibs-bet.co.uk/racing/cards"' in html
     assert 'href="https://hibs-bet.co.uk/"' in html
+    assert 'href="https://hibs-bet.co.uk/harvested-execution"' in html
+    assert 'href="https://hibs-bet.co.uk/line-trader"' in html
 
 
 def test_subpath_rewrites_internal_nav(monkeypatch):

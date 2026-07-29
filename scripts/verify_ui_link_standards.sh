@@ -13,7 +13,8 @@ if [[ -x "${ROOT}/.venv/bin/python" ]]; then
 fi
 
 TPL="${ROOT}/templates/_product_switcher.html"
-for marker in 'aria-selected=' 'data-product=' 'rel="noopener"' 'data-hibs-product-switch'; do
+for marker in 'aria-selected=' 'data-product=' 'rel="noopener"' 'data-hibs-product-switch' \
+  'hibs_trading_status_url' 'hibs_line_trader_url' 'hibs_racing_cards_url'; do
   if ! grep -qF "${marker}" "${TPL}"; then
     echo "FAIL: ${TPL} missing ${marker}" >&2
     exit 1
@@ -28,8 +29,8 @@ if [[ ! -f "${JS}" ]]; then
 fi
 echo "product switch JS present: ok"
 
-echo "==> pytest product_links"
+echo "==> pytest product_links + ui_shell nav"
 "${PY}" -m pip install -q -e ".[dev,web]" 2>/dev/null || "${PY}" -m pip install -q pytest 2>/dev/null || true
-"${PY}" -m pytest tests/test_product_links.py tests/test_url_prefix.py -q --tb=short
+"${PY}" -m pytest tests/test_product_links.py tests/test_url_prefix.py tests/test_ui_shell.py -q --tb=short
 
 echo "==> racing UI link standards: GREEN"
