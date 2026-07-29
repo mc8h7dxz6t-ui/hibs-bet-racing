@@ -69,7 +69,7 @@ def parse_racing_api_payload(payload: dict, *, region: str, card_date: str | Non
                     "race_class": str(race.get("race_class") or race.get("class") or ""),
                     "going": race.get("going"),
                     "distance_f": _float_or_none(race.get("distance_f") or race.get("dist_f")),
-                    "field_size": int(race.get("field_size") or len(runners) or 0),
+                    "field_size": _int_or_none(race.get("field_size")) or len(runners) or 0,
                     "horse_id": str(runner.get("horse_id") or horse),
                     "horse_name": horse,
                     "draw": _int_or_none(runner.get("draw")),
