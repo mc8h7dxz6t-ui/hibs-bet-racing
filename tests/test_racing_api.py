@@ -40,6 +40,29 @@ def test_parse_racing_api_free_payload():
     assert "runner_id" in frame.columns
 
 
+def test_parse_racing_api_payload_nan_field_size_uses_runner_count():
+    import math
+
+    payload = {
+        "racecards": [
+            {
+                "course": "Ascot",
+                "date": "2026-07-29",
+                "off_time": "14:30",
+                "field_size": math.nan,
+                "runners": [
+                    {"horse": "A"},
+                    {"horse": "B"},
+                    {"horse": "C"},
+                ],
+            }
+        ]
+    }
+    frame = parse_racing_api_payload(payload, region="gb")
+    assert len(frame) == 3
+    assert int(frame.iloc[0]["field_size"]) == 3
+
+
 def test_parse_racing_api_payload_uses_fallback_card_date():
     payload = {
         "racecards": [
