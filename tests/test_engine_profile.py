@@ -34,10 +34,12 @@ def test_runner_data_quality_pandas_na_enrich_field():
             "card_comment": "held up",
             "enrich_source": "rp",
             "form_string": pd.NA,
+            "trainer_rtf": 18,
             "horse_course_win_rate": 0.2,
         }
     )
-    assert pct == 100
+    # NA form_string must not count as present; trainer_rtf + course rate = 2/3 enrich block.
+    assert pct == 92
 
 
 def test_value_gate_below_data_quality():

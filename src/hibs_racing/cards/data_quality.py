@@ -44,8 +44,13 @@ def is_exempt_unrated_race(row: pd.Series | dict) -> bool:
 
 
 def _present(val: object) -> bool:
-    if val is None or (isinstance(val, float) and pd.isna(val)):
+    if val is None:
         return False
+    try:
+        if pd.isna(val):
+            return False
+    except (TypeError, ValueError):
+        pass
     return bool(str(val).strip())
 
 

@@ -47,4 +47,7 @@ RACING_TESTS=(
 echo "==> pytest (release-critical suite, ${#RACING_TESTS[@]} modules)"
 "${PY}" -m pytest "${RACING_TESTS[@]}" -q --tb=short
 
+echo "==> UI link standards"
+bash "${ROOT}/scripts/verify_ui_link_standards.sh"
+
 echo "==> racing release gate GREEN"
