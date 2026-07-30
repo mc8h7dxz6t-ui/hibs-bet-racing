@@ -217,6 +217,19 @@ def run_data_quality_reboost(
         report["skipped"] = True
         return report
 
+    try:
+        from hibs_racing.cards.upcoming_dq_recovery import run_upcoming_dq_recovery
+
+        report["upcoming_recovery"] = run_upcoming_dq_recovery(target_pct=target)
+        mean_before = mean_runner_dq(load_scored_cards())
+        report["mean_dq_before"] = mean_before
+        if mean_before >= target:
+            report["mean_dq_after"] = mean_before
+            report["ok"] = True
+            return report
+    except Exception as exc:
+        report["upcoming_recovery_error"] = str(exc)[:120]
+
     if os.getenv("HIBS_RACING_ENRICH_RECOVERY", "1").strip().lower() in ("1", "true", "yes", "on"):
         try:
             from hibs_racing.ingest.enrich_backup import run_targeted_enrich_recovery

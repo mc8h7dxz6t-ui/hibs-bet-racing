@@ -8,14 +8,17 @@ import pandas as pd
 def test_racing_dq_target_defaults_95(monkeypatch):
     monkeypatch.delenv("HIBS_RACING_TARGET_DQ_PCT", raising=False)
     monkeypatch.delenv("HIBS_RACING_ENRICH_RECOVERY_MIN_PCT", raising=False)
+    monkeypatch.delenv("HIBS_ENGINE_OUTPUT_MIN_DQ_PCT", raising=False)
     from hibs_racing.data_quality_targets import (
         racing_data_quality_target_pct,
+        racing_engine_output_min_dq_pct,
         racing_enrich_recovery_min_pct,
         racing_rescue_max_per_cycle,
     )
 
     assert racing_data_quality_target_pct() == 95.0
     assert racing_enrich_recovery_min_pct() == 95.0
+    assert racing_engine_output_min_dq_pct() == 90.0
     assert racing_rescue_max_per_cycle() == 64
 
 
