@@ -32,3 +32,8 @@ def racing_rescue_max_per_cycle() -> int:
 
 def racing_enrich_recovery_min_pct() -> float:
     return max(0.0, min(100.0, _env_float("HIBS_RACING_ENRICH_RECOVERY_MIN_PCT", 95.0)))
+
+
+def racing_engine_output_min_dq_pct() -> float:
+    """Minimum runner DQ for engine picks / value gates (default 90%)."""
+    return max(0.0, min(100.0, _env_float("HIBS_ENGINE_OUTPUT_MIN_DQ_PCT", 90.0)))
