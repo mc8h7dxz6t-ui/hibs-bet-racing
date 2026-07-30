@@ -832,9 +832,10 @@ def create_app() -> Flask:
         except Exception as exc:
             err = exc
             if source == "racing_api":
-                from hibs_racing.racing_api_guard import record_forbidden
+                from hibs_racing.racing_api_guard import record_forbidden, should_record_api_forbidden
 
-                record_forbidden(http_status=403, reason=str(exc)[:80])
+                if should_record_api_forbidden(exc):
+                    record_forbidden(http_status=403, reason=str(exc)[:80])
                 fallback = resolve_cards_source("rpscrape")
                 if fallback != source:
                     try:
