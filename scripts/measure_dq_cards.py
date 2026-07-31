@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 
 def main() -> int:
-    from hibs_racing.cards.data_quality import runner_data_quality_pct, runner_quality_blocks
+    from hibs_racing.cards.data_quality import runner_data_quality_pct, runner_quality_blocks, _safe_int
     from hibs_racing.cards.dq_persist import mean_runner_dq
     from hibs_racing.cards.query import load_scored_cards
     from hibs_racing.data_quality_targets import racing_data_quality_target_pct
@@ -37,7 +37,7 @@ def main() -> int:
             for block_id, block in runner_quality_blocks(d).items():
                 if block.get("skipped"):
                     continue
-                if int(block.get("pct") or 0) < 100:
+                if _safe_int(block.get("pct")) < 100:
                     for miss in block.get("missing") or []:
                         block_gaps[f"{block_id}:{miss}"] += 1
 
