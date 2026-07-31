@@ -118,6 +118,7 @@ paper_lanes:
   live_promotion: false
   parallel_forward:
     enabled: true
+    min_mean_dq_pct: 95.0
     lanes:
     - gate1
     - gate2

@@ -33,10 +33,13 @@ closure = cfg.get("gate_closure") or {}
 print(f"  recommended_paper_lane: {lanes.get('recommended_paper_lane', 'gate3')}")
 print(f"  live_promotion:         {lanes.get('live_promotion', False)}")
 print(f"  parallel_forward:       {(lanes.get('parallel_forward') or {}).get('enabled', False)}")
+min_dq = (lanes.get('parallel_forward') or {}).get('min_mean_dq_pct', 95.0)
+print(f"  parallel_min_mean_dq:   {min_dq}%")
 print(f"  gate_closure note:      {closure.get('note', '(none)')}")
 print()
 print("  UI shows only: Place engine | Value lane | Sniper (Gate7) | Win engine (when calibrated)")
 print("  Gate3–Gate11 log to paper_bets in parallel — replay/promotion trial, not live panels.")
+print("  Parallel logging skips when card mean DQ < parallel_min_mean_dq (see refresh-cards lanes meta).")
 PY
 
 echo ""
