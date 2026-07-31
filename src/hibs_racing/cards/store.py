@@ -59,6 +59,9 @@ def store_upcoming_runners(frame: pd.DataFrame, *, source: str, database: Path |
     if preserve_best_dq_enabled():
         existing = load_upcoming_runners(database=db)
         if not existing.empty:
+            incoming_dates = set(frame["card_date"].astype(str).str[:10].unique())
+            # Drop off-window dates so refresh does not re-accumulate stale runners.
+            existing = existing[existing["card_date"].astype(str).str[:10].isin(incoming_dates)]
             frame = merge_runners_preserve_best(existing, frame)
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     count = 0

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 import pandas as pd
@@ -214,6 +214,21 @@ def merge_null_only(spine: pd.DataFrame, enrich: pd.DataFrame) -> pd.DataFrame:
     return apply_form_enrich(left)
 
 
+def _day_offsets_for_card_dates(card_dates: list[str]) -> list[int]:
+    """Map card_date strings to rpscrape --day offsets (1=today)."""
+    today = date.today()
+    offsets: list[int] = []
+    for raw in card_dates:
+        try:
+            card_day = date.fromisoformat(str(raw)[:10])
+        except ValueError:
+            continue
+        offset = (card_day - today).days + 1
+        if offset >= 1:
+            offsets.append(offset)
+    return sorted(set(offsets)) or [1]
+
+
 def fetch_rp_enrich_frame(
     *,
     day: int = 1,
@@ -268,7 +283,14 @@ def dual_source_enrich(
         return apply_form_enrich(spine), meta
 
     try:
-        enrich = fetch_rp_enrich_frame(day=day, regions=regions, allow_live=allow_live)
+        card_dates = sorted(spine["card_date"].astype(str).str[:10].unique().tolist())
+        day_offsets = _day_offsets_for_card_dates(card_dates) if card_dates else [day]
+        enrich_frames: list[pd.DataFrame] = []
+        for day_offset in day_offsets:
+            part = fetch_rp_enrich_frame(day=day_offset, regions=regions, allow_live=allow_live)
+            if not part.empty:
+                enrich_frames.append(part)
+        enrich = pd.concat(enrich_frames, ignore_index=True) if enrich_frames else pd.DataFrame()
     except Exception as exc:
         meta["error"] = str(exc)[:200]
         return apply_form_enrich(spine), meta

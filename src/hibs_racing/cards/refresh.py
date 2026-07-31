@@ -189,6 +189,15 @@ def refresh_cards(
             regions=regions or ("gb", "ire"),
             day=day if window_hours is None else 1,
         )
+        from hibs_racing.cards.upcoming_dq_recovery import (
+            derive_raceform_enrich_for_upcoming,
+            repair_upcoming_dense_fields,
+        )
+
+        cards, dense_meta = repair_upcoming_dense_fields(cards)
+        cards, derived_meta = derive_raceform_enrich_for_upcoming(cards)
+        enrich_meta["dense_repair"] = dense_meta
+        enrich_meta["raceform_derived"] = derived_meta
 
     rp_workers = rp_verdict_workers()
     verdict_pause = rp_verdict_race_pause()
