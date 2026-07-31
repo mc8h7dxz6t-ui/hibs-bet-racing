@@ -3,29 +3,58 @@
     <div class="value-lane-hd">
         <div>
             <h2>Racing lanes</h2>
-            <p class="section-hint">How many horses made each list today — and what might be blocking picks.</p>
+            <p class="section-hint">Gate tier counts match VPS <code>audit_gate_hit_rates.sh</code> — display lists may show fewer (top-N cap).</p>
         </div>
+        <span class="pill {% if racing_lanes_status.runner_count %}ok{% else %}err{% endif %}">{{ racing_lanes_status.runner_count }} runners</span>
     </div>
     <div class="lanes-status-grid" role="list">
         <div class="lanes-status-item" role="listitem">
-            <span class="lanes-status-label">Best bets</span>
-            <span class="pill {% if racing_lanes_status.value_lane_count %}ok{% elif racing_lanes_status.value_lane_ready %}warn{% else %}err{% endif %}">
-                {{ racing_lanes_status.value_lane_count }} pick{% if racing_lanes_status.value_lane_count != 1 %}s{% endif %}
+            <span class="lanes-status-label">Watchlist+</span>
+            <span class="pill {% if racing_lanes_status.watchlist_count %}ok{% else %}warn{% endif %}">
+                {{ racing_lanes_status.watchlist_count }}
             </span>
-            {% if racing_lanes_status.raw_value_count %}<span class="lanes-status-meta">{{ racing_lanes_status.raw_value_count }} looked promising</span>{% endif %}
+            <span class="lanes-status-meta">engine watchlist</span>
         </div>
         <div class="lanes-status-item" role="listitem">
-            <span class="lanes-status-label">Sniper lane</span>
-            <span class="pill {% if racing_lanes_status.sniper_lane_count %}ok{% else %}warn{% endif %}">
-                {{ racing_lanes_status.sniper_lane_count }} sniper{% if racing_lanes_status.sniper_lane_count != 1 %}s{% endif %}
+            <span class="lanes-status-label">Value (gated)</span>
+            <span class="pill {% if racing_lanes_status.gated_value_count %}ok{% else %}warn{% endif %}">
+                {{ racing_lanes_status.gated_value_count }}
             </span>
-            <span class="lanes-status-meta">Gate7 overlay</span>
+            {% if racing_lanes_status.raw_value_count %}<span class="lanes-status-meta">{{ racing_lanes_status.raw_value_count }} flagged</span>{% endif %}
+        </div>
+        <div class="lanes-status-item" role="listitem">
+            <span class="lanes-status-label">Value lane</span>
+            <span class="pill {% if racing_lanes_status.value_lane_count %}ok{% elif racing_lanes_status.value_lane_ready %}warn{% else %}err{% endif %}">
+                {{ racing_lanes_status.value_lane_count }}
+            </span>
+            {% if racing_lanes_status.value_lane_display_count is defined and racing_lanes_status.value_lane_display_count != racing_lanes_status.value_lane_count %}
+            <span class="lanes-status-meta">{{ racing_lanes_status.value_lane_display_count }} shown</span>
+            {% endif %}
+        </div>
+        <div class="lanes-status-item" role="listitem">
+            <span class="lanes-status-label">Paper-ready</span>
+            <span class="pill {% if racing_lanes_status.paper_ready_count %}ok{% else %}warn{% endif %}">
+                {{ racing_lanes_status.paper_ready_count }}
+            </span>
+            <span class="lanes-status-meta">betting tier</span>
+        </div>
+        <div class="lanes-status-item" role="listitem">
+            <span class="lanes-status-label">Sniper (Gate7)</span>
+            <span class="pill {% if racing_lanes_status.sniper_lane_count %}ok{% else %}warn{% endif %}">
+                {{ racing_lanes_status.sniper_lane_count }}
+            </span>
+            {% if racing_lanes_status.sniper_lane_display_count is defined and racing_lanes_status.sniper_lane_display_count != racing_lanes_status.sniper_lane_count %}
+            <span class="lanes-status-meta">{{ racing_lanes_status.sniper_lane_display_count }} shown</span>
+            {% endif %}
         </div>
         <div class="lanes-status-item" role="listitem">
             <span class="lanes-status-label">Place engine</span>
             <span class="pill {% if racing_lanes_status.place_engine_count %}ok{% else %}warn{% endif %}">
-                {{ racing_lanes_status.place_engine_count }} top place{% if racing_lanes_status.place_engine_count != 1 %}s{% endif %}
+                {{ racing_lanes_status.place_engine_count }}
             </span>
+            {% if racing_lanes_status.place_engine_display_count is defined and racing_lanes_status.place_engine_display_count != racing_lanes_status.place_engine_count %}
+            <span class="lanes-status-meta">{{ racing_lanes_status.place_engine_display_count }} shown</span>
+            {% endif %}
         </div>
         <div class="lanes-status-item" role="listitem">
             <span class="lanes-status-label">Win engine</span>
@@ -47,6 +76,16 @@
             </span>
         </div>
     </div>
+    {% if racing_lanes_status.gate_blocks %}
+    <div class="lanes-status-blocks">
+        <strong>Top gate blocks:</strong>
+        <ul>
+            {% for block in racing_lanes_status.gate_blocks %}
+            <li>{{ block.reason }} ({{ block.count }})</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
     {% if racing_lanes_status.value_lane_blockers %}
     <p class="lanes-status-blockers"><strong>Waiting on:</strong> {{ racing_lanes_status.value_lane_blockers|join(', ') }}</p>
     {% endif %}
@@ -61,10 +100,13 @@
 <style>
 .racing-lanes-status{margin-bottom:16px;padding:14px 16px;border-radius:14px;border:1px solid var(--border);background:var(--hibs-surface-card);}
 .racing-lanes-status h2{font-family:'Orbitron',monospace;color:var(--hibs-neon);font-size:0.95em;margin:0;}
+.racing-lanes-status .value-lane-hd{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:8px;}
 .lanes-status-grid{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;}
 .lanes-status-item{display:flex;flex-direction:column;gap:4px;min-width:120px;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.2);}
 .lanes-status-label{font-size:0.72em;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);}
 .lanes-status-meta{font-size:0.72em;color:var(--muted);}
+.lanes-status-blocks{margin-top:10px;font-size:0.8em;color:var(--muted);}
+.lanes-status-blocks ul{margin:4px 0 0;padding-left:1.2em;line-height:1.5;}
 .lanes-status-blockers{font-size:0.82em;color:#fca5a5;margin:10px 0 0;}
 .lanes-status-hints{margin:8px 0 0;padding-left:1.2em;font-size:0.8em;color:var(--muted);line-height:1.5;}
 .sniper-lane-empty,.value-lane-empty{margin-bottom:16px;padding:14px 16px;border-radius:14px;border:1px dashed rgba(148,163,184,0.35);}

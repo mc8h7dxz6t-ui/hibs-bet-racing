@@ -63,7 +63,8 @@ else:
     for _, row in sub.iterrows():
         r = row.to_dict()
         q = classify_runner_pick_quality(runner_to_pick_context(r))
-        tiers[q.get("tier", "none")] = tiers.get(q.get("tier", "none"), 0) + 1
+        tier = q.get("pick_gate_tier") or "none"
+        tiers[tier] = tiers.get(tier, 0) + 1
         reason = str(r.get("value_gate_reason") or "").strip()
         if reason and reason.lower() not in ("none", "nan"):
             blocked[reason] = blocked.get(reason, 0) + 1

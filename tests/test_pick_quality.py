@@ -7,6 +7,7 @@ from hibs_racing.pick_quality import (
     classify_runner_pick_quality,
     normalize_gate_filter_mode,
     runner_passes_gate_filter,
+    summarize_gate_tiers_from_frame,
 )
 
 
@@ -85,3 +86,19 @@ def test_attach_pick_quality_flags_meetings():
     b = meetings[0]["races"][0]["runners"][1]
     assert a["pick_gate_sniper"] is True
     assert b["pick_gate_value"] is False
+
+
+def test_summarize_gate_tiers_from_frame():
+    import pandas as pd
+
+    frame = pd.DataFrame(
+        [
+            _runner(runner_id="A"),
+            _runner(runner_id="B", value_flag=0, value_gate_reason="thin_odds"),
+            _runner(runner_id="C", official_rating=55),
+        ]
+    )
+    tiers = summarize_gate_tiers_from_frame(frame)
+    assert tiers["sniper"] == 1
+    assert tiers["none"] >= 1
+    assert sum(tiers.values()) == 3
