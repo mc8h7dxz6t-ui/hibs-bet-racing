@@ -109,6 +109,7 @@ def _try_oddschecker(
     race_urls_file: str | Path | None,
     meta: dict,
     prior_source: str,
+    exchange_only: bool | None = None,
 ) -> tuple[pd.DataFrame | None, dict]:
     if not _oddschecker_enabled(load_config(config_path)):
         return None, meta
@@ -117,15 +118,19 @@ def _try_oddschecker(
         meta["oddschecker_attempt"] = {"errors": ["oddschecker circuit open (blocked)"]}
         return None, meta
     race_urls = load_race_urls_file(Path(race_urls_file)) if race_urls_file else {}
-    odds, report = fetch_oddschecker_odds(cards, config_path=config_path, race_urls=race_urls)
+    odds, report = fetch_oddschecker_odds(
+        cards, config_path=config_path, race_urls=race_urls, exchange_only=exchange_only
+    )
+    source = "oddschecker_exchange" if exchange_only else "oddschecker"
     if odds is not None and not odds.empty:
         meta = dict(meta)
-        meta["source"] = "oddschecker"
+        meta["source"] = source
         meta["report"] = report.to_dict()
         meta["fallback_from"] = prior_source
         return odds, meta
     meta = dict(meta)
-    meta["oddschecker_attempt"] = report.to_dict() if hasattr(report, "to_dict") else {}
+    key = "oddschecker_exchange_attempt" if exchange_only else "oddschecker_attempt"
+    meta[key] = report.to_dict() if hasattr(report, "to_dict") else {}
     return None, meta
 
 
@@ -162,7 +167,7 @@ def _auto_cascade(
     meta: dict,
     force_live_odds: bool = False,
 ) -> tuple[pd.DataFrame | None, dict]:
-    """embedded → matchbook → oddschecker → exchange cache; merge partial layers."""
+    """embedded → matchbook → oddschecker exchange → oddschecker retail → exchange cache."""
     cfg = load_config(config_path)
     mb_cfg = cfg.get("matchbook", {})
     card_n = max(len(cards), 1)
@@ -187,6 +192,23 @@ def _auto_cascade(
         except Exception as exc:
             meta = dict(meta)
             meta["matchbook_attempt"] = {"error": str(exc)[:120]}
+
+    cov = _odds_coverage(merged, card_runners=card_n)
+    oc_cfg = cfg.get("oddschecker", {})
+    exchange_scrape = oc_cfg.get("exchange_scrape_after_matchbook", True)
+    if exchange_scrape is not False and cov < min_cov:
+        oc_odds, meta = _try_oddschecker(
+            cards,
+            config_path=config_path,
+            race_urls_file=race_urls_file,
+            meta=meta,
+            prior_source="auto",
+            exchange_only=True,
+        )
+        if oc_odds is not None:
+            parts.append(oc_odds)
+            sources.append("oddschecker_exchange")
+            merged = _merge_odds_frames(*parts)
 
     cov = _odds_coverage(merged, card_runners=card_n)
     if cov < min_cov:
@@ -232,7 +254,7 @@ def resolve_scoring_odds(
     """
     Resolve odds for score-card: csv | matchbook | oddschecker | embedded card prices.
 
-    Cascade (auto / matchbook modes): embedded → matchbook → oddschecker scrape → exchange cache → none.
+    Cascade (auto): embedded → matchbook → oddschecker exchange → oddschecker retail → exchange cache → none.
     Returns (odds_df_or_none, meta_dict).
     """
     cfg = load_config(config_path)

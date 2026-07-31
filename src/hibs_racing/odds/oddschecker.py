@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
+from typing import Literal
 from urllib.parse import quote_plus
 
 import pandas as pd
@@ -13,6 +15,8 @@ import pandas as pd
 from hibs_racing.config import load_config
 from hibs_racing.odds.fractions import fraction_to_decimal
 from hibs_racing.odds.matching import horse_names_match, normalize_horse_name
+
+BookMode = Literal["retail", "exchange", "all"]
 
 DEFAULT_HEADERS = {
     "User-Agent": (
@@ -29,6 +33,15 @@ EXCHANGE_BOOKS = {
     "matchbook",
     "smarkets",
 }
+
+# When multiple exchange columns have prices, prefer sharper / primary venues first.
+EXCHANGE_COLUMN_PREFERENCE: tuple[str, ...] = (
+    "betfair exchange",
+    "betfair",
+    "matchbook",
+    "smarkets",
+    "betdaq",
+)
 
 
 @dataclass
@@ -80,21 +93,53 @@ def _parse_html_table(html: str) -> pd.DataFrame | None:
     return df
 
 
-def _book_columns(df: pd.DataFrame, *, retail_only: bool = True) -> list[str]:
+def _is_exchange_column(key: str) -> bool:
+    text = str(key).strip().lower()
+    return text in EXCHANGE_BOOKS or "exchange" in text or text.endswith(" exchange")
+
+
+def resolve_book_mode(cfg: dict | None = None) -> BookMode:
+    """retail (default) | exchange (Betfair/Matchbook cols only) | all books."""
+    if os.getenv("HIBS_ODDSCHECKER_EXCHANGE_ONLY", "").strip().lower() in ("1", "true", "yes", "on"):
+        return "exchange"
+    oc = cfg or {}
+    if oc.get("exchange_only"):
+        return "exchange"
+    if oc.get("retail_only") is False and not oc.get("exchange_only"):
+        return "all"
+    return "retail"
+
+
+def _book_columns(df: pd.DataFrame, *, book_mode: BookMode = "retail") -> list[str]:
     cols: list[str] = []
     for col in df.columns:
         key = str(col).strip().lower()
         if key in {"winner", "selection", "name", "horse", "unnamed: 0"}:
             continue
-        if retail_only and key in EXCHANGE_BOOKS:
+        is_exchange = _is_exchange_column(key)
+        if book_mode == "retail" and is_exchange:
             continue
-        if "exchange" in key or key.endswith(" exchange"):
+        if book_mode == "exchange" and not is_exchange:
             continue
         cols.append(col)
+    if book_mode == "exchange":
+        pref = {name: i for i, name in enumerate(EXCHANGE_COLUMN_PREFERENCE)}
+        cols.sort(key=lambda c: pref.get(str(c).strip().lower(), 99))
     return cols
 
 
-def _row_best_price(row: pd.Series, book_cols: list[str]) -> tuple[float | None, str | None]:
+def _row_best_price(
+    row: pd.Series,
+    book_cols: list[str],
+    *,
+    book_mode: BookMode = "retail",
+) -> tuple[float | None, str | None]:
+    if book_mode == "exchange":
+        for col in book_cols:
+            price = fraction_to_decimal(row.get(col))
+            if price is not None and price > 1.0:
+                return price, col
+        return None, None
     best: float | None = None
     best_book: str | None = None
     for col in book_cols:
@@ -140,8 +185,10 @@ def fetch_race_odds_page(
     *,
     session=None,
     retail_only: bool = True,
+    book_mode: BookMode | None = None,
 ) -> pd.DataFrame:
     """Parse an Oddschecker race winner market into horse × bookmaker prices."""
+    mode = book_mode or ("retail" if retail_only else "all")
     session = session or _get_session()
 
     def _fetch_html():
@@ -170,21 +217,22 @@ def fetch_race_odds_page(
     if name_col is None:
         name_col = table.columns[0]
 
-    books = _book_columns(table, retail_only=retail_only)
+    books = _book_columns(table, book_mode=mode)
+    odds_source = "oddschecker_exchange" if mode == "exchange" else "oddschecker"
     rows: list[dict] = []
     for _, row in table.iterrows():
         horse = str(row.get(name_col) or "").strip()
-        if not horse or horse.lower() in {"nr", "non runner"}:
+        if not horse or horse.lower() in {"nr", "non runner", "non-runner", "wd", "withdrawn"}:
             continue
-        best, book = _row_best_price(row, books)
-        if best is None:
+        best, book = _row_best_price(row, books, book_mode=mode)
+        if best is None or best <= 1.0:
             continue
         rows.append(
             {
                 "horse_name": horse,
                 "win_decimal": best,
                 "best_book": book,
-                "odds_source": "oddschecker",
+                "odds_source": odds_source,
                 "odds_url": url,
             }
         )
@@ -201,10 +249,13 @@ def fetch_oddschecker_odds(
     *,
     config_path: Path | None = None,
     race_urls: dict[str, str] | None = None,
+    exchange_only: bool | None = None,
 ) -> tuple[pd.DataFrame, OddscheckerFetchReport]:
     """
-    Scrape retail bookmaker win prices from Oddschecker for card races.
-    Returns odds frame (horse_name, win_decimal, best_book, …) aligned for score-card merge.
+    Scrape win prices from Oddschecker for card races.
+
+    ``exchange_only=True`` reads Betfair/Matchbook/Smarkets exchange columns only
+    (no Betfair API account required).
     """
     cfg = load_config(config_path).get("oddschecker", {})
     if not cfg.get("enabled", True):
@@ -217,7 +268,13 @@ def fetch_oddschecker_odds(
     pause = float(cfg.get("request_pause_sec") or pause_sec("oddschecker_pause_sec") or 1.5)
     place_fraction = float(cfg.get("default_place_fraction", 0.25))
     places = int(cfg.get("default_places", 3))
-    retail_only = bool(cfg.get("retail_only", True))
+    if exchange_only is True:
+        book_mode: BookMode = "exchange"
+    elif exchange_only is False:
+        book_mode = "retail" if bool(cfg.get("retail_only", True)) else "all"
+    else:
+        book_mode = resolve_book_mode(cfg)
+    odds_source = "oddschecker_exchange" if book_mode == "exchange" else "oddschecker"
     race_urls = race_urls or {}
 
     errors: list[str] = []
@@ -242,7 +299,7 @@ def fetch_oddschecker_odds(
             continue
 
         try:
-            oc = fetch_race_odds_page(url, session=session, retail_only=retail_only)
+            oc = fetch_race_odds_page(url, session=session, book_mode=book_mode)
             matched += 1
         except Exception as exc:
             errors.append(f"{race_id}: scrape failed — {exc}")
@@ -267,7 +324,7 @@ def fetch_oddschecker_odds(
                     "best_book": hit.get("best_book"),
                     "place_fraction": place_fraction,
                     "places": places,
-                    "odds_source": "oddschecker",
+                    "odds_source": odds_source,
                     "odds_url": url,
                 }
             )

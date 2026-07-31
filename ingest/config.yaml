@@ -258,6 +258,9 @@ oddschecker:
   auto_scrape: false
   backup_on_exchange_fail: true
   retail_only: true
+  # Scrape Betfair/Matchbook exchange columns (no Betfair API account). Runs after Matchbook in auto mode.
+  exchange_only: false
+  exchange_scrape_after_matchbook: true
   default_place_fraction: 0.25
   default_places: 3
   request_pause_sec: 1.5
