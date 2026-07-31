@@ -14,12 +14,15 @@ def build_racing_lanes_status(
     value_count: int = 0,
     runner_count: int = 0,
     ui_data_status: dict | None = None,
+    gate_tier_counts: dict[str, int] | None = None,
+    gate_blocks: list[tuple[str, int]] | None = None,
 ) -> dict[str, Any]:
-    """Summary for dashboard/insights — always surface lane state (even when pick lists empty)."""
+    """Summary for dashboard/insights — tier counts match VPS audit_gate_hit_rates.sh."""
     vl = list(value_lane_picks or [])
     sl = list(sniper_lane_picks or [])
     ep = list(engine_top_picks or [])
     ui = ui_data_status or {}
+    tiers = dict(gate_tier_counts or {})
 
     blockers: list[str] = []
     if health is not None:
@@ -36,26 +39,50 @@ def build_racing_lanes_status(
 
     win = _win_engine_lane_status()
 
+    # Tier counts (full card scan) — what VPS audit reports.
+    watchlist_n = int(tiers.get("watchlist") or 0)
+    gated_value_n = int(tiers.get("value") or 0)
+    value_lane_tier_n = int(tiers.get("value_lane") or 0)
+    paper_ready_n = int(tiers.get("paper_ready") or 0)
+    sniper_tier_n = int(tiers.get("sniper") or 0)
+    none_n = int(tiers.get("none") or 0)
+
     hints: list[str] = []
+    if runner_count <= 0:
+        hints.append("No horses loaded for this window — click Refresh 24h in the header.")
     if not racing_api:
         hints.append("Racing API not configured — we need credentials to load racecards.")
     if not matchbook:
         hints.append("Matchbook not connected — add login details for live odds and edge checks.")
-    elif lane_ready and not vl and value_count == 0:
+    elif lane_ready and value_lane_tier_n == 0 and value_count == 0:
         hints.append("Cards are scored but nothing looked like value yet — try Refresh 24h after odds load.")
-    elif lane_ready and not vl and value_count > 0:
+    elif lane_ready and value_lane_tier_n == 0 and value_count > 0:
         hints.append(f"{value_count} horses looked interesting but didn't pass every safety check.")
-    if lane_ready and not sl and vl:
-        hints.append("Best bets exist but none qualify for the tighter sniper lane today.")
-    if runner_count > 0 and not ep:
+    elif lane_ready and sniper_tier_n == 0 and value_lane_tier_n > 0:
+        hints.append(
+            f"{value_lane_tier_n} value-lane horse(s) on card — none passed the tighter sniper overlay today."
+        )
+    if runner_count > 0 and not ep and watchlist_n == 0 and paper_ready_n == 0:
         hints.append("Place engine: score cards to populate model_place_prob.")
     if not win["public_release"]:
         hints.append(win["status_note"])
 
     return {
-        "value_lane_count": len(vl),
-        "sniper_lane_count": len(sl),
-        "place_engine_count": len(ep),
+        # Display panel sizes (top-N lists shown in UI sections).
+        "value_lane_display_count": len(vl),
+        "sniper_lane_display_count": len(sl),
+        "place_engine_display_count": len(ep),
+        # Tier counts — parity with scripts/audit_gate_hit_rates.sh.
+        "gate_tier_counts": tiers,
+        "watchlist_count": watchlist_n,
+        "gated_value_count": gated_value_n,
+        "value_lane_count": value_lane_tier_n,
+        "paper_ready_count": paper_ready_n,
+        "sniper_lane_count": sniper_tier_n,
+        "ungated_count": none_n,
+        "gate_blocks": [{"reason": r, "count": n} for r, n in (gate_blocks or [])],
+        "place_engine_count": watchlist_n + paper_ready_n,
+        "place_engine_display_count": len(ep),
         "raw_value_count": int(value_count),
         "runner_count": int(runner_count),
         "value_lane_ready": lane_ready,

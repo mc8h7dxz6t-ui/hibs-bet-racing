@@ -895,27 +895,37 @@ def _ui_data_status(frame: pd.DataFrame) -> dict:
 
 
 def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
-    from hibs_racing.daily.pick_display import build_sniper_lane_display_picks, build_value_lane_display_picks
+    from hibs_racing.daily.pick_display import (
+        build_engine_display_picks,
+        build_sniper_lane_display_picks,
+        build_value_lane_display_picks,
+    )
     from hibs_racing.models.feature_impact import load_feature_impact_report
     from hibs_racing.monitor import top_places_of_day
+    from hibs_racing.pick_quality import summarize_gate_blocks_from_frame, summarize_gate_tiers_from_frame
+    from hibs_racing.racing_lanes_status import build_racing_lanes_status
 
     frame = _base_frame(window_hours=window_hours)
     link_index = race_deep_link_index(frame) if not frame.empty else []
     health = shell_health_status()
     picks = attach_deep_links_to_picks(top_places_of_day(frame, top_n=top_n), link_index)
     picks_by_day = top_picks_by_day(frame, link_index, top_n=top_n)
+    engine_top_picks = build_engine_display_picks(None, frame, top_n=6, deep_links=link_index)
     value_lane_picks = build_value_lane_display_picks(None, frame, top_n=8, deep_links=link_index)
     sniper_lane_picks = build_sniper_lane_display_picks(None, frame, top_n=6, deep_links=link_index)
-    from hibs_racing.racing_lanes_status import build_racing_lanes_status
-
+    gate_tiers = summarize_gate_tiers_from_frame(frame)
+    gate_blocks = summarize_gate_blocks_from_frame(frame)
     value_n = int(safe_value_mask(frame).sum()) if not frame.empty else 0
     racing_lanes_status = build_racing_lanes_status(
         health=health,
         value_lane_picks=value_lane_picks,
         sniper_lane_picks=sniper_lane_picks,
+        engine_top_picks=engine_top_picks,
         value_count=value_n,
         runner_count=len(frame),
         ui_data_status=_ui_data_status(frame),
+        gate_tier_counts=gate_tiers,
+        gate_blocks=gate_blocks,
     )
     card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else []
     pick_dates = sorted(picks_by_day.keys())
@@ -948,6 +958,7 @@ def value_picks_context(*, window_hours: int = 24) -> dict:
     """Dedicated value-lane producer page — picks, quiet state, last-scan metadata."""
     from hibs_racing.daily.pick_display import build_value_lane_display_picks
     from hibs_racing.data_producer_slo import build_data_producer_snapshot
+    from hibs_racing.pick_quality import summarize_gate_blocks_from_frame, summarize_gate_tiers_from_frame
     from hibs_racing.racing_lanes_status import build_racing_lanes_status
 
     frame = _base_frame(window_hours=window_hours)
@@ -956,6 +967,8 @@ def value_picks_context(*, window_hours: int = 24) -> dict:
     value_lane_picks = build_value_lane_display_picks(None, frame, top_n=12, deep_links=link_index)
     value_n = int(safe_value_mask(frame).sum()) if not frame.empty else 0
     ui_status = _ui_data_status(frame)
+    gate_tiers = summarize_gate_tiers_from_frame(frame)
+    gate_blocks = summarize_gate_blocks_from_frame(frame)
     racing_lanes_status = build_racing_lanes_status(
         health=health,
         value_lane_picks=value_lane_picks,
@@ -963,6 +976,8 @@ def value_picks_context(*, window_hours: int = 24) -> dict:
         value_count=value_n,
         runner_count=len(frame),
         ui_data_status=ui_status,
+        gate_tier_counts=gate_tiers,
+        gate_blocks=gate_blocks,
     )
     producer_snap = build_data_producer_snapshot()
     cards_prod = (producer_snap.get("producers") or {}).get("racing_cards") or {}
@@ -1085,12 +1100,18 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24, h
     pick_candidates = novice_pick_candidates(meetings)
     picks_by_day = top_picks_by_day(frame, meetings, top_n=6)
     from hibs_racing.daily.pick_display import build_engine_display_picks, build_sniper_lane_display_picks, build_value_lane_display_picks
+    from hibs_racing.pick_quality import (
+        gate_filter_modes,
+        summarize_gate_blocks_from_frame,
+        summarize_gate_tiers_from_frame,
+    )
+    from hibs_racing.racing_lanes_status import build_racing_lanes_status
 
     engine_top_picks = build_engine_display_picks(meetings, frame, top_n=6)
     value_lane_picks = build_value_lane_display_picks(meetings, frame, top_n=8)
     sniper_lane_picks = build_sniper_lane_display_picks(meetings, frame, top_n=6)
-    from hibs_racing.racing_lanes_status import build_racing_lanes_status
-
+    gate_tiers = summarize_gate_tiers_from_frame(frame)
+    gate_blocks = summarize_gate_blocks_from_frame(frame)
     racing_lanes_status = build_racing_lanes_status(
         health=health,
         value_lane_picks=value_lane_picks,
@@ -1099,6 +1120,8 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24, h
         value_count=len(value),
         runner_count=len(frame),
         ui_data_status=_ui_data_status(frame),
+        gate_tier_counts=gate_tiers,
+        gate_blocks=gate_blocks,
     )
     if heavy:
         from hibs_racing.backtest.gate_compare import compare_value_gates
@@ -1107,7 +1130,6 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24, h
             gate_summary = compare_value_gates(days=14).to_dict()
         except Exception:
             gate_summary = None
-    from hibs_racing.pick_quality import gate_filter_modes
 
     return {
         "health": health,

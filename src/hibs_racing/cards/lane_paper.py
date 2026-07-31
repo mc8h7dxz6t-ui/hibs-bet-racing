@@ -8,6 +8,7 @@ import pandas as pd
 
 from hibs_racing.backtest.gate_benchmark import _apply_gate_flags
 from hibs_racing.backtest.gate_impact import PARALLEL_FORWARD_LANES, apply_experimental_lanes, gate3_config
+from hibs_racing.cards.data_quality import frame_mean_data_quality_pct
 from hibs_racing.config import db_path, load_config
 from hibs_racing.entity.natural_key import generate_natural_key
 from hibs_racing.features.store import connect, init_db
@@ -51,6 +52,47 @@ def _parallel_forward_enabled(cfg: dict) -> bool:
         return bool(pf.get("enabled"))
     anchor = lanes_cfg.get("gate3_anchor") or {}
     return bool(anchor.get("enabled", False))
+
+
+def parallel_forward_min_mean_dq_pct(cfg: dict | None = None) -> float:
+    """Minimum card mean DQ before gate1–gate11 forward logging (0 = disabled)."""
+    import os
+
+    from hibs_racing.data_quality_targets import racing_data_quality_target_pct
+
+    env_raw = (os.getenv("HIBS_PARALLEL_FORWARD_MIN_DQ_PCT") or "").strip()
+    if env_raw:
+        try:
+            return max(0.0, min(100.0, float(env_raw)))
+        except ValueError:
+            pass
+    full = cfg if cfg is not None else load_config()
+    pf = (full.get("paper_lanes") or {}).get("parallel_forward") or {}
+    raw = pf.get("min_mean_dq_pct")
+    if raw is None:
+        return racing_data_quality_target_pct()
+    try:
+        return max(0.0, min(100.0, float(raw)))
+    except (TypeError, ValueError):
+        return racing_data_quality_target_pct()
+
+
+def parallel_forward_dq_ready(scored: pd.DataFrame, *, cfg: dict | None = None) -> dict:
+    """Whether parallel lane logging is allowed for this card slice."""
+    full = cfg if cfg is not None else load_config()
+    if not _parallel_forward_enabled(full):
+        return {"ready": False, "skipped": "disabled", "mean_dq_pct": 0.0, "min_mean_dq_pct": 0.0}
+    min_pct = parallel_forward_min_mean_dq_pct(full)
+    mean_dq = frame_mean_data_quality_pct(scored)
+    if min_pct <= 0:
+        return {"ready": True, "mean_dq_pct": mean_dq, "min_mean_dq_pct": min_pct}
+    ready = mean_dq >= min_pct
+    return {
+        "ready": ready,
+        "skipped": None if ready else "below_min_mean_dq",
+        "mean_dq_pct": mean_dq,
+        "min_mean_dq_pct": min_pct,
+    }
 
 
 def resolve_parallel_lane_specs(cfg: dict | None = None) -> list[tuple[str, str]]:
@@ -199,6 +241,19 @@ def sync_parallel_lane_ledgers(
     specs = resolve_parallel_lane_specs(cfg)
     if not specs:
         return []
+    dq_gate = parallel_forward_dq_ready(scored, cfg=cfg)
+    if not dq_gate.get("ready"):
+        return [
+            {
+                "lane": lane,
+                "flag_col": flag_col,
+                "logged": 0,
+                "skipped": dq_gate.get("skipped") or "not_ready",
+                "mean_dq_pct": dq_gate.get("mean_dq_pct"),
+                "min_mean_dq_pct": dq_gate.get("min_mean_dq_pct"),
+            }
+            for lane, flag_col in specs
+        ]
     results: list[dict] = []
     for lane, flag_col in specs:
         results.append(

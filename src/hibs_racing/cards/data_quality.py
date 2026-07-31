@@ -139,3 +139,27 @@ def _legacy_runner_data_quality_pct(row: pd.Series | dict) -> int:
             continue
         ok += 1
     return int(round(100 * ok / max(len(checks), 1)))
+
+
+def frame_mean_data_quality_pct(frame: pd.DataFrame) -> float:
+    """Mean runner DQ for a scored card slice (same logic as measure_dq_cards.py)."""
+    if frame is None or frame.empty:
+        return 0.0
+    scores: list[int] = []
+    if "data_quality_pct" in frame.columns:
+        for val in frame["data_quality_pct"]:
+            try:
+                pct = int(float(val))
+            except (TypeError, ValueError):
+                continue
+            if pct > 0:
+                scores.append(pct)
+    if not scores:
+        for rec in frame.to_dict(orient="records"):
+            pct = runner_data_quality_pct(rec)
+            if pct > 0:
+                scores.append(pct)
+    if not scores:
+        return 0.0
+    return round(sum(scores) / len(scores), 1)
+

@@ -133,5 +133,30 @@ def attach_pick_quality_flags(meetings: list[dict]) -> None:
                 runner.update(classify_runner_pick_quality(runner))
 
 
+def summarize_gate_tiers_from_frame(frame) -> dict[str, int]:
+    """Count runners per pick-quality tier — same logic as audit_gate_hit_rates.sh."""
+    tiers: dict[str, int] = {m["id"]: 0 for m in GATE_FILTER_MODES if m["id"] != "all"}
+    tiers["none"] = 0
+    if frame is None or getattr(frame, "empty", True):
+        return tiers
+    for rec in frame.to_dict(orient="records"):
+        tier = classify_runner_pick_quality(rec).get("pick_gate_tier") or "none"
+        tiers[tier] = tiers.get(tier, 0) + 1
+    return tiers
+
+
+def summarize_gate_blocks_from_frame(frame, *, limit: int = 8) -> list[tuple[str, int]]:
+    """Top value_gate_reason blocks on the card (operator parity with VPS audit)."""
+    if frame is None or getattr(frame, "empty", True):
+        return []
+    blocked: dict[str, int] = {}
+    for rec in frame.to_dict(orient="records"):
+        reason = str(rec.get("value_gate_reason") or "").strip()
+        if not reason or reason.lower() in ("none", "nan"):
+            continue
+        blocked[reason] = blocked.get(reason, 0) + 1
+    return sorted(blocked.items(), key=lambda x: -x[1])[:limit]
+
+
 def gate_filter_modes() -> list[dict[str, str]]:
     return [dict(m) for m in GATE_FILTER_MODES]

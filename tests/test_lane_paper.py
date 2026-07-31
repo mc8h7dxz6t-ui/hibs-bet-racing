@@ -3,6 +3,7 @@ import pandas as pd
 from hibs_racing.backtest.gate_impact import PARALLEL_FORWARD_LANES
 from hibs_racing.cards.lane_paper import (
     attach_lane_flags,
+    parallel_forward_dq_ready,
     resolve_parallel_lane_specs,
     sync_parallel_lane_ledgers,
 )
@@ -73,6 +74,7 @@ def test_sync_parallel_lane_ledgers_logs_per_lane(tmp_path):
                 "flag_gate3": 1,
                 "flag_gate7": 1,
                 "flag_gate11": 0,
+                "data_quality_pct": 96,
                 "ew_combined_ev": 0.1,
                 "win_decimal": 5.0,
                 "place_fraction": 0.25,
@@ -88,6 +90,7 @@ def test_sync_parallel_lane_ledgers_logs_per_lane(tmp_path):
                 "flag_gate3": 0,
                 "flag_gate7": 1,
                 "flag_gate11": 0,
+                "data_quality_pct": 96,
                 "ew_combined_ev": 0.12,
                 "win_decimal": 4.5,
                 "place_fraction": 0.25,
@@ -99,6 +102,7 @@ def test_sync_parallel_lane_ledgers_logs_per_lane(tmp_path):
         "paper_lanes": {
             "parallel_forward": {
                 "enabled": True,
+                "min_mean_dq_pct": 95.0,
                 "lanes": ["gate3", "gate7"],
             }
         },
@@ -161,3 +165,51 @@ def test_record_paper_bet_persists_context(tmp_path):
             "SELECT card_date, course, off_time, horse_name, race_natural_key FROM paper_bets"
         ).fetchone()
     assert tuple(row) == ("2026-07-22", "Ascot", "14:30", "Context Horse", "2026-07-22|ascot|14:30")
+
+
+def test_parallel_forward_skips_when_mean_dq_below_floor(tmp_path):
+    db = tmp_path / "dq.db"
+    init_db(db)
+    scored = pd.DataFrame(
+        [
+            {
+                "race_id": "r1",
+                "runner_id": "runner-a",
+                "card_date": "2026-07-22",
+                "course": "Ascot",
+                "off_time": "14:30",
+                "horse_name": "Alpha",
+                "flag_gate3": 1,
+                "data_quality_pct": 70,
+                "ew_combined_ev": 0.1,
+                "win_decimal": 5.0,
+                "place_fraction": 0.25,
+                "places": 3,
+            },
+        ]
+    )
+    cfg = {
+        "paper_lanes": {
+            "parallel_forward": {
+                "enabled": True,
+                "min_mean_dq_pct": 95.0,
+                "lanes": ["gate3"],
+            }
+        },
+        "paper": {"default_stake": 1.0},
+        "paths": {"db_path": str(db)},
+    }
+    from unittest.mock import patch
+
+    gate = parallel_forward_dq_ready(scored, cfg=cfg)
+    assert gate["ready"] is False
+    assert gate["skipped"] == "below_min_mean_dq"
+    assert gate["mean_dq_pct"] == 70.0
+
+    with patch("hibs_racing.cards.lane_paper.load_config", return_value=cfg), patch(
+        "hibs_racing.cards.lane_paper.db_path", return_value=db
+    ):
+        results = sync_parallel_lane_ledgers(scored, card_date="2026-07-22", database=db)
+    assert results[0]["logged"] == 0
+    assert results[0]["skipped"] == "below_min_mean_dq"
+
