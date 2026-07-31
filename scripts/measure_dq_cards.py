@@ -44,9 +44,11 @@ def main() -> int:
     g90 = sum(1 for d in dqs if d >= 90)
     g95 = sum(1 for d in dqs if d >= 95)
     mean = mean_runner_dq(frame)
+    card_dates = sorted(frame["card_date"].astype(str).str[:10].unique().tolist()) if "card_date" in frame.columns else []
     report = {
         "ok": mean >= target,
         "target_pct": target,
+        "card_dates": card_dates,
         "runner_count": len(dqs),
         "mean_dq_pct": mean,
         "dq_gte_90": g90,
