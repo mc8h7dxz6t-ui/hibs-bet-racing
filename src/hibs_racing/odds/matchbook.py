@@ -17,50 +17,11 @@ import pandas as pd
 from hibs_racing.config import load_config
 from hibs_racing.entity.natural_key import courses_match, generate_natural_key, normalize_course, normalize_off_time
 from hibs_racing.entity.timezone import LONDON, matchbook_event_local_date, normalize_matchbook_time_to_london
+from hibs_racing.odds.course_aliases import COURSE_ALIASES, resolve_course_aliases, venue_matches
 from hibs_racing.odds.exchange_quotes import exchange_spread_bps
 from hibs_racing.odds.matching import horse_names_match
 
 logger = logging.getLogger(__name__)
-
-# Canonical slug → substrings to match in Matchbook event name / venue tags.
-COURSE_ALIASES: dict[str, list[str]] = {
-    "newton_abbot": ["newton abbot", "newton-abbot"],
-    "stratford": ["stratford-on-avon", "stratford on avon", "stratford"],
-    "fontwell": ["fontwell park", "fontwell"],
-    "leopardstown": ["leopardstown (ire)", "leopardstown"],
-    "newcastle": ["newcastle (aw)", "newcastle aw", "newcastle"],
-    "kempton": ["kempton park", "kempton (aw)", "kempton"],
-    "lingfield": ["lingfield park", "lingfield (aw)", "lingfield"],
-    "wolverhampton": ["wolverhampton (aw)", "wolverhampton"],
-    "southwell": ["southwell (aw)", "southwell"],
-    "chelmsford": ["chelmsford city", "chelmsford (aw)", "chelmsford"],
-    "brighton": ["brighton", "brighton & hove", "brighton and hove"],
-    "great_yarmouth": ["great yarmouth", "yarmouth"],
-    "hamilton": ["hamilton park", "hamilton"],
-    "ayr": ["ayr", "ayr (scot)"],
-    "perth": ["perth", "perth (scot)"],
-    "downpatrick": ["downpatrick", "downpatrick (ni)"],
-    "down_royal": ["down royal", "down royal (ni)"],
-    "curragh": ["curragh", "curragh (ire)"],
-    "galway": ["galway", "galway (ire)"],
-    "punchestown": ["punchestown", "punchestown (ire)"],
-    "naas": ["naas", "naas (ire)"],
-    "tipperary": ["tipperary", "tipperary (ire)"],
-    "wexford": ["wexford", "wexford (ire)"],
-    "killarney": ["killarney", "killarney (ire)"],
-    "roscommon": ["roscommon", "roscommon (ire)"],
-    "sligo": ["sligo", "sligo (ire)"],
-    "listowel": ["listowel", "listowel (ire)"],
-    "bath": ["bath"],
-    "salisbury": ["salisbury"],
-    "goodwood": ["goodwood"],
-    "york": ["york"],
-    "doncaster": ["doncaster"],
-    "ascot": ["ascot", "royal ascot"],
-    "epsom": ["epsom", "epsom downs"],
-    "sandown": ["sandown", "sandown park"],
-    "kempton_park": ["kempton park", "kempton"],
-}
 
 _COURSE_SLUG_RE = re.compile(r"[^a-z0-9]+")
 
@@ -303,25 +264,6 @@ def _course_slug(course: str | None) -> str:
     return normalize_course(course) or _COURSE_SLUG_RE.sub("_", str(course).lower().strip()).strip("_")
 
 
-def _course_alias_tokens(course: str | None) -> list[str]:
-    if not course:
-        return []
-    slug = _course_slug(course)
-    tokens = list(COURSE_ALIASES.get(slug, []))
-    base = str(course).lower().split("(")[0].strip()
-    tokens.extend([base, slug.replace("_", " ")])
-    tokens.append(slug)
-    # de-dupe preserving order
-    seen: set[str] = set()
-    out: list[str] = []
-    for t in tokens:
-        t = t.strip().lower()
-        if t and t not in seen:
-            seen.add(t)
-            out.append(t)
-    return out
-
-
 def _exchange_course_strings(event: dict) -> list[str]:
     strings: list[str] = []
     for raw in (_event_course_hint(event), str(event.get("name") or "")):
@@ -332,16 +274,7 @@ def _exchange_course_strings(event: dict) -> list[str]:
 
 
 def _venue_matches(card_course: str | None, event: dict) -> bool:
-    if not card_course:
-        return True
-    aliases = _course_alias_tokens(card_course)
-    for exch in _exchange_course_strings(event):
-        if courses_match(card_course, exch):
-            return True
-        for alias in aliases:
-            if alias in exch or exch in alias:
-                return True
-    return False
+    return venue_matches(card_course, _exchange_course_strings(event))
 
 
 def _card_off_datetime(card_date: str | None, off_time: str | None) -> datetime | None:
@@ -648,6 +581,7 @@ def fetch_matchbook_odds(
     if client is None and not matchbook_traffic_allowed(force=force):
         return pd.DataFrame(), MatchbookFetchReport(errors=["matchbook poll gated (rate/owner/trip)"])
     cfg = load_config(config_path)
+    resolve_course_aliases(cfg)
     mb_cfg = cfg.get("matchbook", {})
     if not mb_cfg.get("enabled", True):
         return pd.DataFrame(), MatchbookFetchReport(errors=["matchbook disabled in config"])

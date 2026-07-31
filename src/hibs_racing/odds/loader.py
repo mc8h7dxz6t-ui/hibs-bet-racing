@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 
 from hibs_racing.config import load_config
+from hibs_racing.odds.betfair import betfair_odds_configured, fetch_betfair_odds
 from hibs_racing.odds.matchbook import fetch_matchbook_odds
 from hibs_racing.odds.oddschecker import fetch_oddschecker_odds, load_race_urls_file
 
@@ -129,6 +130,30 @@ def _try_oddschecker(
     return None, meta
 
 
+def _try_betfair(
+    cards: pd.DataFrame,
+    *,
+    config_path: Path | None,
+    meta: dict,
+) -> tuple[pd.DataFrame | None, dict]:
+    if not betfair_odds_configured():
+        meta = dict(meta)
+        meta["betfair_attempt"] = {"errors": ["betfair not configured"]}
+        return None, meta
+    try:
+        odds, report = fetch_betfair_odds(cards, config_path=config_path)
+    except Exception as exc:
+        meta = dict(meta)
+        meta["betfair_attempt"] = {"error": str(exc)[:120]}
+        return None, meta
+    meta = dict(meta)
+    meta["source"] = "betfair"
+    meta["report"] = report.to_dict()
+    meta["runners_priced"] = report.runners_priced
+    meta["runners_skipped_no_odds"] = report.runners_skipped_no_odds
+    return (odds if odds is not None and not odds.empty else None), meta
+
+
 def _try_matchbook(
     cards: pd.DataFrame,
     *,
@@ -189,6 +214,19 @@ def _auto_cascade(
             meta["matchbook_attempt"] = {"error": str(exc)[:120]}
 
     cov = _odds_coverage(merged, card_runners=card_n)
+    bf_cfg = cfg.get("betfair", {})
+    if cov < min_cov and bf_cfg.get("enabled", True) and bf_cfg.get("auto_fetch", True) and betfair_odds_configured():
+        try:
+            bf_odds, meta = _try_betfair(cards, config_path=config_path, meta=meta)
+            if bf_odds is not None:
+                parts.append(bf_odds)
+                sources.append("betfair")
+                merged = _merge_odds_frames(*parts)
+        except Exception as exc:
+            meta = dict(meta)
+            meta["betfair_attempt"] = {"error": str(exc)[:120]}
+
+    cov = _odds_coverage(merged, card_runners=card_n)
     if cov < min_cov:
         oc_odds, meta = _try_oddschecker(
             cards, config_path=config_path, race_urls_file=race_urls_file, meta=meta, prior_source="auto"
@@ -232,7 +270,7 @@ def resolve_scoring_odds(
     """
     Resolve odds for score-card: csv | matchbook | oddschecker | embedded card prices.
 
-    Cascade (auto / matchbook modes): embedded → matchbook → oddschecker scrape → exchange cache → none.
+    Cascade (auto): embedded → matchbook → betfair → oddschecker → exchange cache → none.
     Returns (odds_df_or_none, meta_dict).
     """
     cfg = load_config(config_path)
@@ -270,6 +308,9 @@ def resolve_scoring_odds(
         odds, meta = _try_matchbook(cards, config_path=config_path, meta=meta, force=force)
         if odds is not None:
             return odds, meta
+        odds, meta = _try_betfair(cards, config_path=config_path, meta=meta)
+        if odds is not None:
+            return odds, meta
         odds, meta = _try_oddschecker(
             cards, config_path=config_path, race_urls_file=race_urls_file, meta=meta, prior_source="matchbook"
         )
@@ -280,6 +321,28 @@ def resolve_scoring_odds(
             meta["fallback_from"] = "matchbook"
             return embedded, meta
         cached, meta = _try_cached_exchange(cards, meta=meta, prior_source="matchbook")
+        if cached is not None:
+            return cached, meta
+        meta["source"] = "none"
+        return None, meta
+
+    if source in ("betfair", "bf"):
+        odds, meta = _try_betfair(cards, config_path=config_path, meta=meta)
+        if odds is not None:
+            return odds, meta
+        odds, meta = _try_matchbook(cards, config_path=config_path, meta=meta, force=force)
+        if odds is not None:
+            return odds, meta
+        odds, meta = _try_oddschecker(
+            cards, config_path=config_path, race_urls_file=race_urls_file, meta=meta, prior_source="betfair"
+        )
+        if odds is not None:
+            return odds, meta
+        if embedded is not None:
+            meta["source"] = "card_embedded"
+            meta["fallback_from"] = "betfair"
+            return embedded, meta
+        cached, meta = _try_cached_exchange(cards, meta=meta, prior_source="betfair")
         if cached is not None:
             return cached, meta
         meta["source"] = "none"

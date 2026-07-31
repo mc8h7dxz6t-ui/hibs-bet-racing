@@ -99,7 +99,7 @@ def _resolve_matchbook_back_odds(row: pd.Series) -> float | None:
         val = float(row["matchbook_back_odds"])
         return val if val > 1.0 else None
     book = str(row.get("best_book") or row.get("odds_source") or "").strip().lower()
-    if book in ("matchbook", "mb", "exchange") and pd.notna(row.get("win_decimal")):
+    if book in ("matchbook", "mb", "exchange", "betfair", "bf") and pd.notna(row.get("win_decimal")):
         val = float(row["win_decimal"])
         return val if val > 1.0 else None
     if pd.notna(row.get("live_odds_decimal")):

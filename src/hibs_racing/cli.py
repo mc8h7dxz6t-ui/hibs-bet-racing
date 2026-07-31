@@ -1027,6 +1027,7 @@ def cmd_score_card(args: argparse.Namespace) -> int:
 def cmd_fetch_odds(args: argparse.Namespace) -> int:
     from hibs_racing.cards.store import load_upcoming_runners
     from hibs_racing.config import parquet_dir
+    from hibs_racing.odds.betfair import fetch_betfair_odds
     from hibs_racing.odds.matchbook import fetch_matchbook_odds
     from hibs_racing.odds.oddschecker import fetch_oddschecker_odds, load_race_urls_file
 
@@ -1041,6 +1042,9 @@ def cmd_fetch_odds(args: argparse.Namespace) -> int:
     if source in ("matchbook", "mb", "exchange"):
         odds, report = fetch_matchbook_odds(cards)
         default_name = "matchbook_odds.parquet"
+    elif source in ("betfair", "bf"):
+        odds, report = fetch_betfair_odds(cards)
+        default_name = "betfair_odds.parquet"
     else:
         odds, report = fetch_oddschecker_odds(cards, race_urls=race_urls)
         default_name = "retail_odds.parquet"
@@ -1698,7 +1702,7 @@ def main(argv: list[str] | None = None) -> int:
     p_fc.add_argument("--odds", help="Optional odds CSV for EW value")
     p_fc.add_argument(
         "--odds-source",
-        choices=["auto", "matchbook", "oddschecker", "csv", "none"],
+        choices=["auto", "matchbook", "betfair", "oddschecker", "csv", "none"],
         help="Odds source when --score (default: auto)",
     )
     p_fc.add_argument("--race-urls", help="JSON map race_id→Oddschecker URL (bypass search)")
@@ -1718,7 +1722,7 @@ def main(argv: list[str] | None = None) -> int:
     p_refresh.add_argument("--regions", default="gb,ire", help="Comma-separated regions for window mode")
     p_refresh.add_argument(
         "--odds-source",
-        choices=["auto", "matchbook", "oddschecker", "csv", "none"],
+        choices=["auto", "matchbook", "betfair", "oddschecker", "csv", "none"],
         default="auto",
     )
     p_refresh.add_argument("--paper", action="store_true", help="Log paper EW bets for value flags")
@@ -1776,7 +1780,7 @@ def main(argv: list[str] | None = None) -> int:
     p_sc.add_argument("--odds", help="CSV: horse_name or runner_id, win_decimal, place_fraction, places")
     p_sc.add_argument(
         "--odds-source",
-        choices=["auto", "matchbook", "oddschecker", "csv", "none"],
+        choices=["auto", "matchbook", "betfair", "oddschecker", "csv", "none"],
         help="auto=API prices→Matchbook→none; matchbook=exchange back prices",
     )
     p_sc.add_argument("--race-urls", help="JSON map race_id→Oddschecker URL")
@@ -1784,10 +1788,10 @@ def main(argv: list[str] | None = None) -> int:
     p_sc.add_argument("--top", type=int, default=2, help="Top N place picks per race to print")
     p_sc.set_defaults(func=cmd_score_card)
 
-    p_odds = sub.add_parser("fetch-odds", help="Fetch win prices (Matchbook or Oddschecker)")
+    p_odds = sub.add_parser("fetch-odds", help="Fetch win prices (Matchbook, Betfair, or Oddschecker)")
     p_odds.add_argument(
         "--source",
-        choices=["matchbook", "oddschecker"],
+        choices=["matchbook", "betfair", "oddschecker"],
         default="oddschecker",
         help="Price source (default oddschecker retail)",
     )
