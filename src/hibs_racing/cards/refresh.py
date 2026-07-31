@@ -191,13 +191,16 @@ def refresh_cards(
         )
         from hibs_racing.cards.upcoming_dq_recovery import (
             derive_raceform_enrich_for_upcoming,
+            impute_enrich_course_stats_for_debuts,
             repair_upcoming_dense_fields,
         )
 
-        cards, dense_meta = repair_upcoming_dense_fields(cards)
         cards, derived_meta = derive_raceform_enrich_for_upcoming(cards)
-        enrich_meta["dense_repair"] = dense_meta
+        cards, impute_meta = impute_enrich_course_stats_for_debuts(cards)
+        cards, dense_meta = repair_upcoming_dense_fields(cards)
         enrich_meta["raceform_derived"] = derived_meta
+        enrich_meta["course_stats_impute"] = impute_meta
+        enrich_meta["dense_repair"] = dense_meta
 
     rp_workers = rp_verdict_workers()
     verdict_pause = rp_verdict_race_pause()
@@ -210,6 +213,11 @@ def refresh_cards(
             skip_existing=True,
         )
     )
+    if source == "racing_api":
+        from hibs_racing.cards.upcoming_dq_recovery import fill_card_comment_fallbacks
+
+        cards, comment_meta = fill_card_comment_fallbacks(cards)
+        enrich_meta["card_comment_fallback"] = comment_meta
 
     _, timings["store_ms"] = timed_ms(lambda: store_upcoming_runners(cards, source=src))
 
