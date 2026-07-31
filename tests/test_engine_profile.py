@@ -42,6 +42,38 @@ def test_runner_data_quality_pandas_na_enrich_field():
     assert pct == 92
 
 
+def test_runner_data_quality_nan_block_pct_does_not_crash():
+  import math
+
+  blocks = {
+      "pricing": {"pct": float("nan"), "weight": 35, "skipped": False},
+      "connections": {"pct": 100, "weight": 20, "skipped": False},
+      "handicap": {"pct": 100, "weight": 20, "skipped": False, "reason": "unrated_race"},
+      "enrich": {"pct": 100, "weight": 25, "skipped": True},
+  }
+  row = {
+      "race_name": "Class 4 Handicap",
+      "official_rating": 70,
+      "win_decimal": 5.0,
+      "model_win_prob": 0.1,
+      "model_place_prob": 0.3,
+      "jockey": "A",
+      "trainer": "B",
+      "card_comment": "held up",
+  }
+  from hibs_racing.cards.data_quality import runner_data_quality_pct, runner_quality_blocks
+
+  # Normal path still returns int.
+  assert isinstance(runner_data_quality_pct(row), int)
+  # Direct NaN pct in a block must not raise when scoring.
+  active = [b for b in blocks.values() if not b.get("skipped")]
+  from hibs_racing.cards.data_quality import _safe_int
+
+  score = sum(_safe_int(b.get("pct")) * _safe_int(b.get("weight")) for b in active)
+  assert score >= 0
+  assert not math.isnan(score)
+
+
 def test_value_gate_below_data_quality():
     reason = value_gate_reason(
         {

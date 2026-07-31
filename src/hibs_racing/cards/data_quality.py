@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any, Dict
 
@@ -33,6 +34,19 @@ DQ_BLOCKS: Dict[str, Dict[str, Any]] = {
         "requires_enrich_source": True,
     },
 }
+
+
+def _safe_int(val: object, default: int = 0) -> int:
+    try:
+        if val is None:
+            return default
+        if isinstance(val, float) and math.isnan(val):
+            return default
+        if pd.isna(val):
+            return default
+        return int(val)
+    except (TypeError, ValueError):
+        return default
 
 
 def is_exempt_unrated_race(row: pd.Series | dict) -> bool:
@@ -82,7 +96,7 @@ def runner_quality_blocks(row: pd.Series | dict) -> Dict[str, Dict[str, Any]]:
             "pct": pct,
             "present": present,
             "missing": [f for f in fields if f not in present],
-            "weight": int(spec.get("weight") or 0),
+            "weight": _safe_int(spec.get("weight")),
         }
     return blocks
 
@@ -98,9 +112,9 @@ def runner_data_quality_pct(row: pd.Series | dict) -> int:
     active = [b for b in blocks.values() if not b.get("skipped")]
     if not active:
         return _legacy_runner_data_quality_pct(row)
-    total_w = sum(int(b.get("weight") or 0) for b in active) or 100
-    score = sum(int(b.get("pct") or 0) * int(b.get("weight") or 0) for b in active)
-    return int(round(score / total_w))
+    total_w = sum(_safe_int(b.get("weight")) for b in active) or 100
+    score = sum(_safe_int(b.get("pct")) * _safe_int(b.get("weight")) for b in active)
+    return _safe_int(round(score / total_w))
 
 
 def _legacy_runner_data_quality_pct(row: pd.Series | dict) -> int:
