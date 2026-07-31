@@ -7,7 +7,7 @@ from typing import Any
 
 import pandas as pd
 
-from hibs_racing.cards.data_quality import runner_data_quality_pct
+from hibs_racing.cards.data_quality import is_exempt_unrated_race, runner_data_quality_pct
 from hibs_racing.cards.dq_persist import mean_runner_dq
 from hibs_racing.cards.enrich import dual_source_enrich, enrich_join_key
 from hibs_racing.cards.store import load_upcoming_runners, store_upcoming_runners
@@ -146,6 +146,12 @@ def derive_raceform_enrich_for_upcoming(frame: pd.DataFrame) -> tuple[pd.DataFra
                 out.at[idx, "horse_course_runs"] = runs
                 out.at[idx, "horse_course_wins"] = int(course_prior["won"].sum())
                 changed = True
+            elif not prior.empty:
+                # Debut at course — explicit zero counts for enrich DQ (horse has form elsewhere).
+                out.at[idx, "horse_course_win_rate"] = 0.0
+                out.at[idx, "horse_course_runs"] = 0
+                out.at[idx, "horse_course_wins"] = 0
+                changed = True
         if not _present(out.at[idx, "form_lto_position"] if "form_lto_position" in out.columns else None):
             lto = prior["finish_pos"].iloc[-1]
             if _present(lto):
@@ -154,6 +160,52 @@ def derive_raceform_enrich_for_upcoming(frame: pd.DataFrame) -> tuple[pd.DataFra
         if changed and not _present(out.at[idx, "enrich_source"] if "enrich_source" in out.columns else None):
             out.at[idx, "enrich_source"] = "raceform_derived"
             out.at[idx, "enriched_at"] = now
+            updated += 1
+    return out, {"rows": len(frame), "updated": updated}
+
+
+def impute_enrich_course_stats_for_debuts(frame: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """RP-enriched runners without raceform course stats get explicit zero course form."""
+    if frame.empty:
+        return frame, {"rows": 0, "updated": 0}
+    out = frame.copy()
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    updated = 0
+    for idx, row in out.iterrows():
+        if not _present(row.get("enrich_source") if isinstance(row, dict) else out.at[idx, "enrich_source"]):
+            continue
+        if _present(out.at[idx, "horse_course_win_rate"] if "horse_course_win_rate" in out.columns else None):
+            continue
+        out.at[idx, "horse_course_win_rate"] = 0.0
+        out.at[idx, "horse_course_runs"] = 0
+        out.at[idx, "horse_course_wins"] = 0
+        if not _present(out.at[idx, "enrich_source"] if "enrich_source" in out.columns else None):
+            out.at[idx, "enrich_source"] = "raceform_derived"
+            out.at[idx, "enriched_at"] = now
+        updated += 1
+    return out, {"rows": len(frame), "updated": updated}
+
+
+def fill_card_comment_fallbacks(frame: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Use rp_verdict or form_string when card_comment still empty after RP JSON repair."""
+    if frame.empty:
+        return frame, {"rows": 0, "updated": 0}
+    out = frame.copy()
+    updated = 0
+    for idx, row in out.iterrows():
+        if is_exempt_unrated_race(row):
+            continue
+        if _present(out.at[idx, "card_comment"] if "card_comment" in out.columns else None):
+            continue
+        verdict = out.at[idx, "rp_verdict"] if "rp_verdict" in out.columns else row.get("rp_verdict")
+        if _present(verdict):
+            text = str(verdict).strip()
+            out.at[idx, "card_comment"] = text[:200]
+            updated += 1
+            continue
+        form = out.at[idx, "form_string"] if "form_string" in out.columns else row.get("form_string")
+        if _present(form):
+            out.at[idx, "card_comment"] = f"Form {str(form).strip()[:40]}"
             updated += 1
     return out, {"rows": len(frame), "updated": updated}
 
@@ -180,19 +232,25 @@ def backfill_upcoming_enrich(frame: pd.DataFrame | None = None) -> dict[str, Any
     derived, derived_meta = derive_raceform_enrich_for_upcoming(enriched)
     report["raceform_derived"] = derived_meta
 
-    repaired, dense_meta = repair_upcoming_dense_fields(derived)
+    imputed, impute_meta = impute_enrich_course_stats_for_debuts(derived)
+    report["course_stats_impute"] = impute_meta
+
+    repaired, dense_meta = repair_upcoming_dense_fields(imputed)
     report["dense_repair"] = dense_meta
 
-    mean_after = mean_runner_dq(repaired)
+    commented, comment_meta = fill_card_comment_fallbacks(repaired)
+    report["card_comment_fallback"] = comment_meta
+
+    mean_after = mean_runner_dq(commented)
     enrich_after = (
-        int(repaired["enrich_source"].notna().sum()) if "enrich_source" in repaired.columns else 0
+        int(commented["enrich_source"].notna().sum()) if "enrich_source" in commented.columns else 0
     )
     report["mean_dq_after"] = mean_after
     report["enrich_source_after"] = enrich_after
     report["persisted"] = 0
 
     if mean_after > mean_before or enrich_after > report["enrich_source_before"]:
-        report["persisted"] = store_upcoming_runners(repaired, source="dq_recovery")
+        report["persisted"] = store_upcoming_runners(commented, source="dq_recovery")
 
     report["ok"] = mean_after >= mean_before
     return report

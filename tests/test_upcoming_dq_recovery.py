@@ -128,3 +128,48 @@ def test_runner_dq_reaches_90_with_enrich_and_handicap():
         }
     )
     assert pct >= 90
+
+
+def test_impute_enrich_course_stats_for_debuts():
+    from hibs_racing.cards.data_quality import runner_data_quality_pct
+    from hibs_racing.cards.upcoming_dq_recovery import impute_enrich_course_stats_for_debuts
+
+    frame = pd.DataFrame(
+        [
+            {
+                "runner_id": "u1",
+                "race_name": "Handicap",
+                "enrich_source": "rpscrape",
+                "form_string": "112",
+                "trainer_rtf": 20,
+                "win_decimal": 5.0,
+                "model_win_prob": 0.1,
+                "model_place_prob": 0.3,
+                "jockey": "A",
+                "trainer": "B",
+                "official_rating": 80,
+                "card_comment": "ok",
+            }
+        ]
+    )
+    out, meta = impute_enrich_course_stats_for_debuts(frame)
+    assert meta["updated"] == 1
+    assert float(out.iloc[0]["horse_course_win_rate"]) == 0.0
+    assert runner_data_quality_pct(out.iloc[0].to_dict()) >= 95
+
+
+def test_fill_card_comment_from_rp_verdict():
+    from hibs_racing.cards.upcoming_dq_recovery import fill_card_comment_fallbacks
+
+    frame = pd.DataFrame(
+        [
+            {
+                "runner_id": "u1",
+                "race_name": "Class 4 Handicap",
+                "rp_verdict": "Should go close on this ground.",
+            }
+        ]
+    )
+    out, meta = fill_card_comment_fallbacks(frame)
+    assert meta["updated"] == 1
+    assert "close" in str(out.iloc[0]["card_comment"])
