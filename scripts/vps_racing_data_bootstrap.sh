@@ -38,10 +38,19 @@ if [[ -f "${RFDB}" ]]; then
   _run_as_www "${CLI}" ingest-raceform "${RFDB}" --since "$(date -u -d "-${LOOKBACK} days" +%F)" --sync || \
     log "WARN: ingest-raceform partial"
 fi
-_run_as_www "${CLI}" scrape --days "${LOOKBACK}" --region gb --ingest --from-cache || \
-  log "WARN: scrape --from-cache empty — trying live scrape (needs EMAIL/ACCESS_TOKEN)"
-_run_as_www "${CLI}" scrape --days "${LOOKBACK}" --region gb --ingest || \
-  log "WARN: live scrape failed — add Racing Post creds to ${APP}/.env"
+if [[ "${HIBS_MAX_DATA:-0}" == "1" ]]; then
+  log "HIBS_MAX_DATA=1 — multi-region live results scrape"
+  for spec in "gb flat" "gb jump" "ire flat"; do
+    set -- ${spec}
+    _run_as_www "${CLI}" scrape --days "${LOOKBACK}" --region "$1" --type "$2" --ingest \
+      || log "WARN: scrape $1 $2 partial"
+  done
+else
+  _run_as_www "${CLI}" scrape --days "${LOOKBACK}" --region gb --ingest --from-cache || \
+    log "WARN: scrape --from-cache empty — trying live scrape (needs EMAIL/ACCESS_TOKEN)"
+  _run_as_www "${CLI}" scrape --days "${LOOKBACK}" --region gb --ingest || \
+    log "WARN: live scrape failed — add Racing Post creds to ${APP}/.env"
+fi
 
 log "3/5 horse_form_state sync (since=${SINCE})"
 _run_as_www "${PY}" "${APP}/scripts/sync_horse_form_state.py" --since "${SINCE}"
