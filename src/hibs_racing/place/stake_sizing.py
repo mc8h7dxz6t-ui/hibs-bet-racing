@@ -23,19 +23,24 @@ def resolve_stake_units(
     bankroll_units: float | None = None,
     default_stake: float | None = None,
     kelly_multiplier: float = 1.0,
+    bet_type: str | None = None,
     cfg: dict | None = None,
 ) -> float:
     """
-    Stake from kelly_place_pct × bankroll × steam multiplier, else flat default.
+    Stake from kelly_ew_pct (each_way) or kelly_place_pct × bankroll × steam multiplier.
 
-    Industry standard: fractional Kelly already in kelly_place_pct; steam scales after base.
+    Industry standard: fractional Kelly already in pct columns; steam scales after base.
     """
     conf = cfg or load_config()
     paper = conf.get("paper") or {}
     br = bankroll_units if bankroll_units is not None else paper_bankroll_units(conf)
     fallback = default_stake if default_stake is not None else float(paper.get("default_stake", 1.0))
 
-    kelly_pct = row.get("kelly_place_pct")
+    leg = (bet_type or row.get("bet_type") or "each_way").lower()
+    kelly_col = "kelly_ew_pct" if leg == "each_way" else "kelly_place_pct"
+    kelly_pct = row.get(kelly_col)
+    if leg == "each_way" and (kelly_pct is None or (isinstance(kelly_pct, float) and pd.isna(kelly_pct))):
+        kelly_pct = row.get("kelly_place_pct")
     base = fallback
     if kelly_pct is not None and not (isinstance(kelly_pct, float) and pd.isna(kelly_pct)):
         try:

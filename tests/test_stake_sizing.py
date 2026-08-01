@@ -12,6 +12,11 @@ def test_resolve_stake_from_kelly_pct():
     assert resolve_stake_units(row, bankroll_units=100.0, default_stake=1.0) == 2.5
 
 
+def test_resolve_stake_each_way_uses_ew_kelly():
+    row = {"kelly_ew_pct": 2.0, "kelly_place_pct": 1.0}
+    assert resolve_stake_units(row, bankroll_units=100.0, bet_type="each_way") == 2.0
+
+
 def test_resolve_stake_fallback_without_kelly():
     row = {"kelly_place_pct": None}
     assert resolve_stake_units(row, default_stake=1.0) == 1.0
