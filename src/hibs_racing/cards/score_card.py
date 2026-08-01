@@ -370,6 +370,8 @@ def paper_log_value_picks(
     engine_profile: dict | None = None,
 ) -> list[str]:
     """Record paper EW bets for rows that passed value + DQ + steam gates."""
+    from hibs_racing.place.stake_sizing import resolve_stake_units
+
     bet_ids: list[str] = []
     from hibs_racing.cards.ui_frame import safe_value_mask
 
@@ -383,11 +385,12 @@ def paper_log_value_picks(
             from hibs_racing.entity.natural_key import generate_natural_key
 
             race_natural_key = generate_natural_key(str(cd), str(course), str(off_time))
+        row_stake = resolve_stake_units(rec, default_stake=stake)
         bet_id = record_paper_bet(
             rec["race_id"],
             rec["runner_id"],
             "each_way",
-            stake,
+            row_stake,
             model_ev=rec.get("ew_combined_ev"),
             offered_win=rec.get("win_decimal"),
             place_terms=f"1/{int((rec.get('place_fraction') or 0.25)*4)} top {int(rec.get('places') or 3)}",

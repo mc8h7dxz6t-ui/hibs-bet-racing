@@ -751,12 +751,36 @@ def cmd_win_prob_calibration_fit(args: argparse.Namespace) -> int:
 
 
 def cmd_route_execution(args: argparse.Namespace) -> int:
-    from hibs_racing.live.execution_config import EXECUTION_DISABLED_MSG
-    from hibs_racing.live.execution_router import route_execution_batch
+    from datetime import datetime, timezone
 
-    report = route_execution_batch([], log_results=False)
-    print(json.dumps({**report, "cli_note": EXECUTION_DISABLED_MSG}, indent=2))
-    return 0 if report.get("status") == "disabled" else 1
+    import pandas as pd
+
+    from hibs_racing.config import db_path, load_config
+    from hibs_racing.features.store import connect, init_db
+    from hibs_racing.live.execution_config import EXECUTION_DISABLED_MSG
+    from hibs_racing.live.execution_router import build_execution_intents, route_execution_batch
+    from hibs_racing.odds.market_steam import evaluate_market_gauges
+
+    cfg = load_config()
+    db = db_path(cfg)
+    init_db(db)
+    card_date = getattr(args, "card_date", None) or datetime.now(timezone.utc).date().isoformat()
+    with connect(db) as conn:
+        scored = pd.read_sql_query(
+            """
+            SELECT u.*, c.value_flag, c.kelly_place_pct, c.ew_combined_ev
+            FROM upcoming_runners u
+            INNER JOIN card_scores c ON c.runner_id = u.runner_id
+            WHERE u.card_date = ?
+            """,
+            conn,
+            params=(card_date,),
+        )
+    gauges = evaluate_market_gauges()
+    intents = build_execution_intents(scored, gauges=gauges) if not scored.empty else []
+    report = route_execution_batch(intents, log_results=bool(getattr(args, "log", False)))
+    print(json.dumps({**report, "intents": len(intents), "cli_note": EXECUTION_DISABLED_MSG}, indent=2))
+    return 0 if report.get("status") == "disabled" or report.get("ok", True) else 1
 
 
 def cmd_trading_daemon(args: argparse.Namespace) -> int:

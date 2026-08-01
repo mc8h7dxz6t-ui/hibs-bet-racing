@@ -50,6 +50,10 @@ if ! run_logged "daily-scrape-results" \
   hibs-racing scrape --days "${LOOKBACK_DAYS}" --region gb --ingest --from-cache; then
   echo "WARN: [TIER-2] daily-scrape-results failed — continuing" >&2
 fi
+if ! run_tier2_logged "daily-scrape-ire-results" \
+  hibs-racing scrape --days "${LOOKBACK_DAYS}" --region ire --ingest --from-cache; then
+  echo "WARN: [TIER-2] daily-scrape-ire-results failed — continuing" >&2
+fi
 # Prefer --from-cache on daily cron; live scrape uses rp_scrape_day_pause_sec pacing in config.
 
 export HIBS_POLL_MILESTONE=baseline
