@@ -11,6 +11,7 @@ from pathlib import Path
 from hibs_racing.config import db_path, load_config
 from hibs_racing.entity.natural_key import courses_match, generate_natural_key
 from hibs_racing.features.store import connect, init_db
+from hibs_racing.odds.matching import horse_names_match
 
 _PLACE_TERMS_RE = re.compile(r"top\s*(\d+)", re.I)
 _FRACTION_RE = re.compile(r"1/(\d+)")
@@ -99,16 +100,30 @@ def _each_way_pnl(
     return -stake, "lost"
 
 
-def _horse_slug(name: str) -> str:
-    return name.lower().strip().replace(" ", "_")
-
-
-def _normalize_horse(name: str) -> str:
-    return re.sub(r"\s+", " ", name.lower().strip())
-
-
 def _runner_slug_from_id(runner_id: str) -> str:
     return runner_id.split(":", 1)[-1] if ":" in runner_id else runner_id
+
+
+def _runner_name_from_id(runner_id: str) -> str:
+    return _runner_slug_from_id(runner_id).replace("_", " ")
+
+
+def _horses_match(
+    horse_id: object,
+    *,
+    runner_id: str,
+    horse_name: str | None,
+) -> bool:
+    if not horse_id:
+        return False
+    horse_text = str(horse_id)
+    hints: list[str] = []
+    if horse_name:
+        hints.append(horse_name)
+    rid_hint = _runner_name_from_id(runner_id)
+    if rid_hint:
+        hints.append(rid_hint)
+    return any(horse_names_match(horse_text, hint) for hint in hints)
 
 
 def _iso_date_prefix(value: str | None) -> str | None:
@@ -120,18 +135,6 @@ def _iso_date_prefix(value: str | None) -> str | None:
     return None
 
 
-def _horse_matches_runner(
-    horse_id: object,
-    *,
-    slug: str,
-    target_name: str,
-) -> bool:
-    if not horse_id:
-        return False
-    text = str(horse_id)
-    return _horse_slug(text) == slug or (bool(target_name) and _normalize_horse(text) == target_name)
-
-
 def _guess_card_date_from_results(
     conn,
     *,
@@ -140,8 +143,6 @@ def _guess_card_date_from_results(
     hint_date: str | None = None,
 ) -> str | None:
     """Recover race day from ingested results when paper_bets context was wiped."""
-    slug = _runner_slug_from_id(runner_id)
-    target_name = _normalize_horse(horse_name) if horse_name else ""
     if hint_date:
         rows = conn.execute(
             """
@@ -150,35 +151,18 @@ def _guess_card_date_from_results(
             """,
             (hint_date,),
         ).fetchall()
-        if any(_horse_matches_runner(horse, slug=slug, target_name=target_name) for (horse,) in rows):
+        if any(_horses_match(horse, runner_id=runner_id, horse_name=horse_name) for (horse,) in rows):
             return hint_date
-    row = conn.execute(
+    rows = conn.execute(
         """
-        SELECT race_date FROM runners
-        WHERE finish_pos IS NOT NULL
-          AND race_date <= date('now')
-          AND lower(replace(horse_id, ' ', '_')) = ?
+        SELECT race_date, horse_id FROM runners
+        WHERE finish_pos IS NOT NULL AND race_date <= date('now')
         ORDER BY race_date DESC
-        LIMIT 1
         """,
-        (slug.lower(),),
-    ).fetchone()
-    if row:
-        return str(row[0])
-    if target_name:
-        row = conn.execute(
-            """
-            SELECT race_date FROM runners
-            WHERE finish_pos IS NOT NULL
-              AND race_date <= date('now')
-              AND lower(trim(horse_id)) = ?
-            ORDER BY race_date DESC
-            LIMIT 1
-            """,
-            (target_name,),
-        ).fetchone()
-        if row:
-            return str(row[0])
+    ).fetchall()
+    for race_date, horse in rows:
+        if _horses_match(horse, runner_id=runner_id, horse_name=horse_name):
+            return str(race_date)
     return None
 
 
@@ -198,7 +182,6 @@ def _upcoming_context(conn, runner_id: str) -> dict[str, str | None]:
 
 def _runners_context(conn, race_id: str, runner_id: str) -> dict[str, str | None]:
     """Fallback when upcoming_runners row was replaced — use ingested results spine."""
-    slug = _runner_slug_from_id(runner_id)
     race_row = conn.execute(
         """
         SELECT race_date, course, off_time, race_natural_key
@@ -211,7 +194,7 @@ def _runners_context(conn, race_id: str, runner_id: str) -> dict[str, str | None
         "SELECT horse_id FROM runners WHERE race_id = ? AND finish_pos IS NOT NULL",
         (race_id,),
     ).fetchall():
-        if horse_id and _horse_slug(str(horse_id)) == slug:
+        if _horses_match(horse_id, runner_id=runner_id, horse_name=None):
             horse_name = str(horse_id)
             break
     if not horse_name:
@@ -219,7 +202,7 @@ def _runners_context(conn, race_id: str, runner_id: str) -> dict[str, str | None
             "SELECT horse_id FROM runners WHERE race_id = ?",
             (race_id,),
         ).fetchall():
-            if horse_id and _horse_slug(str(horse_id)) == slug:
+            if _horses_match(horse_id, runner_id=runner_id, horse_name=None):
                 horse_name = str(horse_id)
                 break
     if not race_row and not horse_name:
@@ -357,17 +340,10 @@ def _find_finish_pos(
     off_time: str | None = None,
     race_natural_key: str | None = None,
 ) -> int | None:
-    slug = runner_id.split(":", 1)[-1] if ":" in runner_id else _horse_slug(horse_name or "")
-    target_name = _normalize_horse(horse_name) if horse_name else ""
-
     def _match_horse(rows: list[tuple]) -> int | None:
         for pos, horse in rows:
-            if horse and _horse_slug(str(horse)) == slug:
+            if _horses_match(horse, runner_id=runner_id, horse_name=horse_name):
                 return int(pos)
-        if target_name:
-            for pos, horse in rows:
-                if horse and _normalize_horse(str(horse)) == target_name:
-                    return int(pos)
         return None
 
     # 1) Natural key — prefer canonical key (fixes stale ISO off_time keys on paper_bets)
@@ -423,10 +399,7 @@ def _find_finish_pos(
         for pos, horse, rcourse in conn.execute(sql, params).fetchall():
             if course and not courses_match(course, rcourse):
                 continue
-            if horse and (
-                _horse_slug(str(horse)) == slug
-                or (target_name and _normalize_horse(str(horse)) == target_name)
-            ):
+            if _horses_match(horse, runner_id=runner_id, horse_name=horse_name):
                 return int(pos)
 
     # 5) Horse + date only when course/time keys diverge across sources
@@ -440,11 +413,7 @@ def _find_finish_pos(
     matched = [
         int(pos)
         for pos, horse in rows
-        if horse
-        and (
-            _horse_slug(str(horse)) == slug
-            or (target_name and _normalize_horse(str(horse)) == target_name)
-        )
+        if _horses_match(horse, runner_id=runner_id, horse_name=horse_name)
     ]
     if len(matched) == 1:
         return matched[0]
@@ -475,15 +444,12 @@ def _closing_sp_for_runner(
     race_natural_key: str | None = None,
 ) -> float | None:
     """Best-effort SP decimal from ingested results for CLV audit."""
-    slug = runner_id.split(":", 1)[-1] if ":" in runner_id else _horse_slug(horse_name or "")
-    target_name = _normalize_horse(horse_name) if horse_name else ""
-    natural_key = race_natural_key or generate_natural_key(card_date, course, off_time)
 
     def _sp_from_rows(rows: list[tuple]) -> float | None:
         for pos, horse, sp in rows:
             if int(pos) != finish_pos:
                 continue
-            if horse and (_horse_slug(str(horse)) == slug or (target_name and _normalize_horse(str(horse)) == target_name)):
+            if _horses_match(horse, runner_id=runner_id, horse_name=horse_name):
                 try:
                     val = float(sp)
                     return val if val > 1.0 else None
@@ -491,7 +457,7 @@ def _closing_sp_for_runner(
                     return None
         return None
 
-    if natural_key:
+    for natural_key in _natural_key_candidates(card_date, course, off_time, race_natural_key):
         rows = conn.execute(
             """
             SELECT finish_pos, horse_id, sp_decimal FROM runners
