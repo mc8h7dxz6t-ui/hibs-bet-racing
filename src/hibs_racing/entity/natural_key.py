@@ -15,10 +15,13 @@ def normalize_course(course: str | None) -> str:
 
 
 def normalize_off_time(off_time: str | None) -> str:
-    """14:30:00 / 2:30pm → 14:30 (24h HH:MM)."""
+    """14:30:00 / 2:30pm / ISO datetimes → 14:30 (24h HH:MM)."""
     if not off_time:
         return "00:00"
     text = str(off_time).strip().lower()
+    if "t" in text:
+        # Avoid matching HH:MM inside YYYY-MM-DD (e.g. 2026-07-25T14:30:00).
+        text = re.split(r"[z+]", text.split("t", 1)[1], maxsplit=1)[0]
     m = _TIME_RE.search(text)
     if not m:
         return "00:00"

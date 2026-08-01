@@ -332,6 +332,20 @@ def _backfill_open_paper_context(conn) -> int:
     return updated
 
 
+def _natural_key_candidates(
+    card_date: str,
+    course: str | None,
+    off_time: str | None,
+    race_natural_key: str | None,
+) -> list[str]:
+    canonical = generate_natural_key(card_date, course, off_time)
+    keys: list[str] = []
+    for candidate in (canonical, race_natural_key):
+        if candidate and candidate not in keys:
+            keys.append(candidate)
+    return keys
+
+
 def _find_finish_pos(
     conn,
     *,
@@ -346,8 +360,6 @@ def _find_finish_pos(
     slug = runner_id.split(":", 1)[-1] if ":" in runner_id else _horse_slug(horse_name or "")
     target_name = _normalize_horse(horse_name) if horse_name else ""
 
-    natural_key = race_natural_key or generate_natural_key(card_date, course, off_time)
-
     def _match_horse(rows: list[tuple]) -> int | None:
         for pos, horse in rows:
             if horse and _horse_slug(str(horse)) == slug:
@@ -358,8 +370,8 @@ def _find_finish_pos(
                     return int(pos)
         return None
 
-    # 1) Natural key — primary cross-source join
-    if natural_key:
+    # 1) Natural key — prefer canonical key (fixes stale ISO off_time keys on paper_bets)
+    for natural_key in _natural_key_candidates(card_date, course, off_time, race_natural_key):
         rows = conn.execute(
             """
             SELECT finish_pos, horse_id FROM runners
@@ -416,6 +428,26 @@ def _find_finish_pos(
                 or (target_name and _normalize_horse(str(horse)) == target_name)
             ):
                 return int(pos)
+
+    # 5) Horse + date only when course/time keys diverge across sources
+    rows = conn.execute(
+        """
+        SELECT finish_pos, horse_id FROM runners
+        WHERE race_date = ? AND finish_pos IS NOT NULL
+        """,
+        (card_date,),
+    ).fetchall()
+    matched = [
+        int(pos)
+        for pos, horse in rows
+        if horse
+        and (
+            _horse_slug(str(horse)) == slug
+            or (target_name and _normalize_horse(str(horse)) == target_name)
+        )
+    ]
+    if len(matched) == 1:
+        return matched[0]
     return None
 
 
@@ -502,6 +534,7 @@ def settle_paper_bets(database: Path | None = None) -> dict:
     settled = 0
     still_open = 0
     skip_reasons: dict[str, int] = {"no_card_date": 0, "no_finish_pos": 0}
+    unmatched_sample: list[dict] = []
     details: list[dict] = []
 
     init_db(db)
@@ -511,6 +544,7 @@ def settle_paper_bets(database: Path | None = None) -> dict:
             """
             SELECT pb.bet_id, pb.race_id, pb.runner_id, pb.bet_type, pb.stake_units,
                    pb.offered_win, pb.place_terms, pb.created_at,
+                   COALESCE(pb.paper_lane, 'production') AS paper_lane,
                    COALESCE(pb.card_date, u.card_date) AS card_date,
                    COALESCE(pb.horse_name, u.horse_name) AS horse_name,
                    COALESCE(pb.course, u.course) AS course,
@@ -531,6 +565,7 @@ def settle_paper_bets(database: Path | None = None) -> dict:
                 offered_win,
                 place_terms,
                 created_at,
+                paper_lane,
                 card_date,
                 horse_name,
                 course,
@@ -570,6 +605,19 @@ def settle_paper_bets(database: Path | None = None) -> dict:
             if finish_pos is None:
                 still_open += 1
                 skip_reasons["no_finish_pos"] += 1
+                if len(unmatched_sample) < 5:
+                    unmatched_sample.append(
+                        {
+                            "bet_id": bet_id,
+                            "card_date": card_date,
+                            "course": course,
+                            "off_time": off_time,
+                            "horse_name": horse_name,
+                            "runner_id": runner_id,
+                            "race_natural_key": race_natural_key,
+                            "paper_lane": paper_lane,
+                        }
+                    )
                 continue
             places, fraction = _parse_place_terms(place_terms, default_places=default_places, default_fraction=default_fraction)
             closing_sp = _closing_sp_for_runner(
@@ -638,6 +686,7 @@ def settle_paper_bets(database: Path | None = None) -> dict:
         "still_open": still_open,
         "skip_reasons": skip_reasons,
         "context_backfill": context_backfill,
+        "unmatched_sample": unmatched_sample,
         "details": details,
         "stats": stats,
     }
