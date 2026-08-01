@@ -413,6 +413,22 @@ def refresh_cards(
         observation_lane=observation_lane,
     )
     result["telemetry_balance"] = telemetry.to_dict()
+    try:
+        from hibs_racing.live.execution_router import build_execution_intents, route_execution_batch
+        from hibs_racing.odds.market_steam import evaluate_market_gauges
+
+        gauges = evaluate_market_gauges()
+        intents = build_execution_intents(scored, gauges=gauges) if not scored.empty else []
+        result["execution_intents"] = len(intents)
+        if intents:
+            exec_report = route_execution_batch(intents, log_results=False)
+            result["execution_routing"] = {
+                "ok": exec_report.get("ok"),
+                "status": exec_report.get("status"),
+                "routed": exec_report.get("routed", 0),
+            }
+    except Exception as exc:
+        result["execution_routing"] = {"ok": False, "error": str(exc)[:160]}
     if src != "racing_api" and len(cards) > 0:
         try:
             from hibs_racing.racing_api_guard import clear_guard_state

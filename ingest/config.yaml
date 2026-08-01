@@ -62,6 +62,7 @@ paper:
   exchange_ev_min_coverage_pct: 50
   exchange_ev_min_settled: 100
   default_stake: 1.0
+  bankroll_units: 100.0
   sync_ledger_on_score: true
   log_on_refresh: true
   min_data_quality_pct: 95

@@ -680,7 +680,8 @@ def build_execution_intents(
     if scored.empty:
         return []
     cfg = load_config()
-    stake = default_stake if default_stake is not None else float(cfg.get("paper", {}).get("default_stake", 1.0))
+    paper_cfg = cfg.get("paper") or {}
+    stake_fallback = default_stake if default_stake is not None else float(paper_cfg.get("default_stake", 1.0))
     gauge_by_runner = {g.runner_id: g for g in (gauges or evaluate_market_gauges())}
 
     intents: list[ExecutionIntent] = []
@@ -700,6 +701,15 @@ def build_execution_intents(
     for _, row in subset.iterrows():
         rid = str(row.get("runner_id") or "")
         gauge = gauge_by_runner.get(rid)
+        row_dict = row.to_dict()
+        from hibs_racing.place.stake_sizing import resolve_stake_units
+
+        stake = resolve_stake_units(
+            row_dict,
+            default_stake=stake_fallback,
+            kelly_multiplier=float(gauge.kelly_multiplier) if gauge else 1.0,
+            cfg=cfg,
+        )
         mb = mb_lookup.get(rid, {})
         intents.append(
             ExecutionIntent(

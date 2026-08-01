@@ -28,8 +28,11 @@ def log_shadow_intents(
     ts_ns = int(datetime.now(timezone.utc).timestamp() * 1_000_000_000)
     intents: list[BetIntent] = []
     picks = scored[scored.get("value_flag", 0) == 1] if not scored.empty else scored
+    from hibs_racing.place.stake_sizing import resolve_stake_units
+
     for rec in picks.to_dict(orient="records"):
         intent_id = stable_event_id("shadow", rec["runner_id"], str(ts_ns))
+        stake = resolve_stake_units(rec)
         intent = BetIntent(
             intent_msg_id=intent_id,
             strategy_id=strategy_id,
@@ -37,7 +40,7 @@ def log_shadow_intents(
             runner_id=str(rec["runner_id"]),
             race_id=str(rec["race_id"]),
             bet_type="each_way",
-            stake_units="1.0",
+            stake_units=str(stake),
             offered_win=str(rec.get("win_decimal") or ""),
             model_ev=str(rec.get("ew_combined_ev") or ""),
             timestamp_ns=ts_ns,
