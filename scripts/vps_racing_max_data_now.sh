@@ -67,10 +67,14 @@ if [[ -f "${APP}/scripts/sync_horse_form_state.py" ]]; then
 fi
 _run_as_www "${CLI}" backfill-runner-enrich || warn "enrich backfill partial"
 
-log "6/6 DQ probe"
+log "6/6 DQ probe + engine store"
 if [[ -f "${APP}/scripts/measure_dq_cards.py" ]]; then
   _run_as_www "${PY}" "${APP}/scripts/measure_dq_cards.py" | tee /var/log/hibs-racing/measure-dq-max-data.json \
     || warn "measure_dq_cards partial"
+fi
+if [[ -f "${APP}/scripts/sync_racing_engine_store.sh" ]]; then
+  bash "${APP}/scripts/sync_racing_engine_store.sh" >>/var/log/hibs-racing/racing-engine-store.log 2>&1 \
+    || warn "engine store sync partial"
 fi
 
 log "done — check:"
