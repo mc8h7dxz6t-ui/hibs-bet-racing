@@ -202,6 +202,12 @@ def score_upcoming_cards(
     if persist:
         _persist_scores(db, frame, scored_at)
         _persist_runner_odds(db, frame)
+        try:
+            from hibs_racing.features.engine_runner_store import materialize_engine_runner_features
+
+            materialize_engine_runner_features(frame, database=db)
+        except Exception:
+            pass
 
     do_sync = sync_paper_ledger
     if do_sync is None:
