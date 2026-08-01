@@ -132,6 +132,31 @@ def test_settle_recovers_from_iso_off_time_natural_key(tmp_path: Path) -> None:
     assert bad_nk != nk
 
 
+def test_settle_matches_rpscrape_country_suffix(tmp_path: Path) -> None:
+    db = tmp_path / "feature_store.sqlite"
+    init_db(db)
+    _seed_result(db, horse="Bold Move (GB)", finish_pos=3)
+
+    record_paper_bet(
+        "api-race-suffix",
+        "api-race-suffix:bold_move",
+        "each_way",
+        1.0,
+        offered_win=6.0,
+        is_value_pick=True,
+        backtest=False,
+        card_date="2026-07-25",
+        course="York",
+        off_time="15:30",
+        horse_name="Bold Move",
+        database=db,
+    )
+
+    out = settle_paper_bets(database=db)
+    assert out["settled"] == 1
+    assert out["details"][0]["finish_pos"] == 3
+
+
 def test_settle_open_bet_guesses_card_date_from_results(tmp_path: Path) -> None:
     db = tmp_path / "feature_store.sqlite"
     init_db(db)
