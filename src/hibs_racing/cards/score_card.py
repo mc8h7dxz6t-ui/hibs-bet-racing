@@ -16,7 +16,7 @@ from hibs_racing.place.exchange_config import (
     exchange_ev_production_enabled,
     exchange_runtime_config,
 )
-from hibs_racing.place.portfolio_kelly import apply_portfolio_place_kelly
+from hibs_racing.place.portfolio_kelly import apply_portfolio_ew_kelly, apply_portfolio_place_kelly
 from hibs_racing.place.hpl_combinatorial import (
     apply_place_alpha_and_liquidity,
     hpl_place_probabilities,
@@ -118,6 +118,7 @@ def score_upcoming_cards(
     frame["place_ev_exchange"] = np.nan
     frame["ew_combined_ev"] = np.nan
     frame["kelly_place_pct"] = np.nan
+    frame["kelly_ew_pct"] = np.nan
     frame["value_flag"] = 0
     frame["flag_exchange_raw"] = 0
 
@@ -160,6 +161,20 @@ def score_upcoming_cards(
             ev = each_way_ev(float(row["model_win_prob"]), float(row["model_place_prob"]), quote)
             frame.at[idx, "place_ev"] = ev.place_ev
             frame.at[idx, "ew_combined_ev"] = ev.combined_ev
+            if ev.combined_ev > 0:
+                from hibs_racing.place.ew_kelly import each_way_kelly_fraction
+
+                frame.at[idx, "kelly_ew_pct"] = round(
+                    each_way_kelly_fraction(
+                        float(row["model_win_prob"]),
+                        float(row["model_place_prob"]),
+                        quote,
+                        kelly_fraction=float(exchange_cfg["kelly_fraction"]),
+                        max_runner_risk_pct=float(exchange_cfg["max_runner_risk_pct"]),
+                    )
+                    * 100.0,
+                    3,
+                )
             ew_value = (
                 ev.place_ev >= min_place_ev
                 and float(row["combo_bayes_place"]) >= min_combo_place
@@ -175,6 +190,11 @@ def score_upcoming_cards(
         frame = apply_portfolio_place_kelly(
             frame,
             commission=commission,
+            kelly_fraction=float(exchange_cfg["kelly_fraction"]),
+            max_runner_risk_pct=float(exchange_cfg["max_runner_risk_pct"]),
+        )
+        frame = apply_portfolio_ew_kelly(
+            frame,
             kelly_fraction=float(exchange_cfg["kelly_fraction"]),
             max_runner_risk_pct=float(exchange_cfg["max_runner_risk_pct"]),
         )
