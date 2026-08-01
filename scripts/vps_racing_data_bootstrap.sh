@@ -40,7 +40,7 @@ if [[ -f "${RFDB}" ]]; then
 fi
 if [[ "${HIBS_MAX_DATA:-0}" == "1" ]]; then
   log "HIBS_MAX_DATA=1 — multi-region live results scrape"
-  for spec in "gb flat" "gb jump" "ire flat"; do
+  for spec in "gb flat" "gb jumps" "ire flat"; do
     set -- ${spec}
     _run_as_www "${CLI}" scrape --days "${LOOKBACK}" --region "$1" --type "$2" --ingest \
       || log "WARN: scrape $1 $2 partial"
