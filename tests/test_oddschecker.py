@@ -3,7 +3,13 @@ from pathlib import Path
 
 from hibs_racing.odds.fractions import fraction_to_decimal
 from hibs_racing.odds.matching import horse_names_match, normalize_horse_name
-from hibs_racing.odds.oddschecker import _parse_html_table, _row_best_price, fetch_race_odds_page
+from hibs_racing.odds.oddschecker import (
+    _book_columns,
+    _parse_html_table,
+    _row_best_price,
+    fetch_race_odds_page,
+    resolve_book_mode,
+)
 
 
 def test_fraction_to_decimal():
@@ -28,7 +34,7 @@ def test_parse_oddschecker_html():
     assert df is not None
     from hibs_racing.odds.oddschecker import _book_columns
 
-    books = _book_columns(df, retail_only=True)
+    books = _book_columns(df, book_mode="retail")
     best, book = _row_best_price(df.iloc[0], books)
     assert best == 9.0
     assert book == "william hill"
@@ -52,6 +58,56 @@ def test_fetch_race_odds_page_retail_only(monkeypatch):
     star = out[out["horse_name"].str.contains("Star", na=False)].iloc[0]
     assert star["win_decimal"] == 9.0
     assert star["best_book"] == "william hill"
+
+
+def test_fetch_race_odds_page_exchange_only(monkeypatch):
+    html = FIXTURE.read_text(encoding="utf-8")
+
+    class FakeResp:
+        text = html
+
+        def raise_for_status(self):
+            return None
+
+    class FakeSession:
+        def get(self, url, timeout=45):
+            return FakeResp()
+
+    out = fetch_race_odds_page("http://example.com/race", session=FakeSession(), book_mode="exchange")
+    assert len(out) == 2
+    star = out[out["horse_name"].str.contains("Star", na=False)].iloc[0]
+    assert star["win_decimal"] == 10.0
+    assert star["best_book"] == "betfair exchange"
+    assert star["odds_source"] == "oddschecker_exchange"
+
+
+def test_fetch_race_odds_page_skips_non_runners():
+    html = """
+    <html><body><table class="eventTable ">
+    <tr><th>Winner</th><th>betfair exchange</th></tr>
+    <tr><td>Non Runner</td><td>5/1</td></tr>
+    <tr><td>Active Horse</td><td>4/1</td></tr>
+    </table></body></html>
+    """
+
+    class FakeResp:
+        text = html
+
+        def raise_for_status(self):
+            return None
+
+    class FakeSession:
+        def get(self, url, timeout=45):
+            return FakeResp()
+
+    out = fetch_race_odds_page("http://example.com/race", session=FakeSession(), book_mode="exchange")
+    assert len(out) == 1
+    assert out.iloc[0]["horse_name"] == "Active Horse"
+
+
+def test_resolve_book_mode_env(monkeypatch):
+    monkeypatch.setenv("HIBS_ODDSCHECKER_EXCHANGE_ONLY", "1")
+    assert resolve_book_mode({}) == "exchange"
 
 
 def test_merge_odds_loader_auto_embedded():
