@@ -1,4 +1,3 @@
-from hibs_racing.ingest.csv_loader import file_hash, normalize_csv_frame, utc_now
-from hibs_racing.ingest.backfill import ingest_csv
+"""Layer 3 field ingest (racing)."""
 
-__all__ = ["file_hash", "normalize_csv_frame", "utc_now", "ingest_csv"]
+__all__ = ["capture_racing_field_snapshots", "merge_racing_fields"]
