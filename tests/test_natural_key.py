@@ -19,6 +19,8 @@ def test_normalize_off_time():
     assert normalize_off_time("14:30:00") == "14:30"
     assert normalize_off_time("6:15") == "18:15"
     assert normalize_off_time("2:30") == "14:30"
+    assert normalize_off_time("2026-07-25T14:30:00") == "14:30"
+    assert normalize_off_time("2026-07-25T14:30:00+00:00") == "14:30"
 
 
 def test_generate_natural_key():

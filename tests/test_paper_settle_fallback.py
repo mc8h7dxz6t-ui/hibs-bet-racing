@@ -75,6 +75,63 @@ def test_settle_open_bet_card_date_from_created_at(tmp_path: Path) -> None:
     assert out["details"][0]["finish_pos"] == 2
 
 
+def test_settle_recovers_from_iso_off_time_natural_key(tmp_path: Path) -> None:
+    from hibs_racing.entity.natural_key import generate_natural_key
+
+    db = tmp_path / "feature_store.sqlite"
+    init_db(db)
+    race_date = "2026-07-28"
+    course = "York"
+    off_time = "15:30"
+    horse = "Iso Hero"
+    nk = generate_natural_key(race_date, course, off_time)
+    bad_nk = "2026-07-28_york_19:25"  # stale key from pre-ISO off_time normalization
+
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            """
+            INSERT INTO runners (
+                runner_id, race_id, horse_id, race_date, course, off_time,
+                race_natural_key, finish_pos, comment_raw, comment_norm, ingested_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                f"rf:{horse.lower().replace(' ', '_')}",
+                "rf-race",
+                horse,
+                race_date,
+                course,
+                off_time,
+                nk,
+                1,
+                "ok",
+                "ok",
+                "2026-07-29T00:00:00+00:00",
+            ),
+        )
+        conn.commit()
+
+    record_paper_bet(
+        "api-race-iso",
+        "api-race-iso:iso_hero",
+        "each_way",
+        1.0,
+        offered_win=7.0,
+        is_value_pick=True,
+        backtest=False,
+        card_date=race_date,
+        course=course,
+        off_time="2026-07-28T15:30:00+00:00",
+        horse_name=horse,
+        race_natural_key=bad_nk,
+        database=db,
+    )
+
+    out = settle_paper_bets(database=db)
+    assert out["settled"] == 1
+    assert bad_nk != nk
+
+
 def test_settle_open_bet_guesses_card_date_from_results(tmp_path: Path) -> None:
     db = tmp_path / "feature_store.sqlite"
     init_db(db)
