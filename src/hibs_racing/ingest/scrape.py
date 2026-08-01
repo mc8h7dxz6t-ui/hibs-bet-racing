@@ -93,8 +93,18 @@ def _format_rp_range(start: date, end: date) -> str:
     return f"{_format_rp_date(start)}-{_format_rp_date(end)}"
 
 
+def normalize_rps_race_type(race_type: str) -> str:
+    """rpscrape CLI accepts flat|jumps only — shell/docs often say 'jump'."""
+    text = str(race_type or "flat").strip().lower()
+    if text in ("jump", "jumps", "nh", "hurdle", "chase"):
+        return "jumps"
+    if text in ("flat", "aw"):
+        return "flat"
+    return text
+
+
 def rpscrape_data_dir(region: str, race_type: str) -> Path:
-    return RPSCRAPE_DIR / "data" / "region" / region / race_type
+    return RPSCRAPE_DIR / "data" / "region" / region / normalize_rps_race_type(race_type)
 
 
 def day_csv_path(day: date, region: str, race_type: str) -> Path:
@@ -167,6 +177,7 @@ def _invoke_rpscrape(
 ) -> subprocess.CompletedProcess[str]:
     scripts = ensure_rpscrape()
     ensure_rpscrape_deps()
+    rp_type = normalize_rps_race_type(race_type)
     cmd = [
         sys.executable,
         "rpscrape.py",
@@ -175,7 +186,7 @@ def _invoke_rpscrape(
         "-r",
         region,
         "-t",
-        race_type,
+        rp_type,
     ]
     if clean:
         cmd.append("--clean")

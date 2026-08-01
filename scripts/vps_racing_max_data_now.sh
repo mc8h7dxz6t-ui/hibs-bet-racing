@@ -36,8 +36,8 @@ _run_as_www() {
     "$@"
 }
 
-log "1/6 live results scrape (gb flat+jump, ire flat) lookback=${LOOKBACK}d"
-for spec in "gb flat" "gb jump" "ire flat"; do
+log "1/6 live results scrape (gb flat+jumps, ire flat) lookback=${LOOKBACK}d"
+for spec in "gb flat" "gb jumps" "ire flat"; do
   set -- ${spec}
   region="$1"
   rtype="$2"
