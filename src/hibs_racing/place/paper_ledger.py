@@ -980,6 +980,37 @@ def export_master_ledger_csv(
     return buf.getvalue()
 
 
+def _find_semantic_duplicate_bet(
+    conn,
+    *,
+    card_date: str | None,
+    course: str | None,
+    horse_name: str | None,
+    runner_id: str,
+    paper_lane: str,
+    backtest: bool,
+) -> str | None:
+    """Dedupe when Racing API churns race_id/runner_id across refresh-cards cycles."""
+    if backtest or not card_date:
+        return None
+    rows = conn.execute(
+        """
+        SELECT bet_id, horse_name, runner_id, course FROM paper_bets
+        WHERE backtest = ? AND COALESCE(paper_lane, 'production') = ?
+          AND (card_date = ? OR created_at LIKE ?)
+        """,
+        (1 if backtest else 0, paper_lane, card_date, f"{card_date}%"),
+    ).fetchall()
+    for bet_id, hn, rid, rc in rows:
+        if course and rc and not courses_match(course, rc):
+            continue
+        if _horses_match(hn, runner_id=runner_id, horse_name=horse_name):
+            return str(bet_id)
+        if horse_name and rid and _horses_match(horse_name, runner_id=rid, horse_name=hn):
+            return str(bet_id)
+    return None
+
+
 def record_paper_bet(
     race_id: str,
     runner_id: str,
@@ -1007,6 +1038,23 @@ def record_paper_bet(
     lane = str(paper_lane or "production").strip() or "production"
     db = database or db_path(load_config())
     init_db(db)
+    ctx_preview: dict[str, str | None] = {}
+    with connect(db) as conn:
+        ctx_preview = _resolve_bet_context(
+            conn,
+            race_id=race_id,
+            runner_id=runner_id,
+            card_date=card_date,
+            horse_name=horse_name,
+            course=course,
+            off_time=off_time,
+            race_natural_key=race_natural_key,
+            created_at=created_at,
+        )
+    eff_card_date = card_date or ctx_preview.get("card_date")
+    eff_course = course or ctx_preview.get("course")
+    eff_horse = horse_name or ctx_preview.get("horse_name")
+
     with connect(db) as conn:
         existing = conn.execute(
             """
@@ -1017,6 +1065,21 @@ def record_paper_bet(
             """,
             (runner_id, race_id, 1 if backtest else 0, lane),
         ).fetchone()
+        if not existing:
+            semantic_id = _find_semantic_duplicate_bet(
+                conn,
+                card_date=eff_card_date,
+                course=eff_course,
+                horse_name=eff_horse,
+                runner_id=runner_id,
+                paper_lane=lane,
+                backtest=backtest,
+            )
+            if semantic_id:
+                existing = conn.execute(
+                    "SELECT bet_id, is_value_pick FROM paper_bets WHERE bet_id = ?",
+                    (semantic_id,),
+                ).fetchone()
         if existing:
             bet_id = str(existing[0])
             if is_value_pick and not int(existing[1] or 0):
