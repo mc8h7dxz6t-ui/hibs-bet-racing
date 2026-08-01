@@ -295,7 +295,7 @@ matchbook:
   drift_threshold_pct: 10.0
   steam_min_odds: 1.5
 betfair:
-  enabled: true
+  enabled: false
   auto_fetch: true
   date_slack_days: 1
   event_time_tolerance_sec: 120
