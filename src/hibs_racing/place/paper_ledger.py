@@ -111,6 +111,77 @@ def _runner_slug_from_id(runner_id: str) -> str:
     return runner_id.split(":", 1)[-1] if ":" in runner_id else runner_id
 
 
+def _iso_date_prefix(value: str | None) -> str | None:
+    if not value:
+        return None
+    text = str(value).strip()
+    if len(text) >= 10 and text[4] == "-" and text[7] == "-":
+        return text[:10]
+    return None
+
+
+def _horse_matches_runner(
+    horse_id: object,
+    *,
+    slug: str,
+    target_name: str,
+) -> bool:
+    if not horse_id:
+        return False
+    text = str(horse_id)
+    return _horse_slug(text) == slug or (bool(target_name) and _normalize_horse(text) == target_name)
+
+
+def _guess_card_date_from_results(
+    conn,
+    *,
+    runner_id: str,
+    horse_name: str | None,
+    hint_date: str | None = None,
+) -> str | None:
+    """Recover race day from ingested results when paper_bets context was wiped."""
+    slug = _runner_slug_from_id(runner_id)
+    target_name = _normalize_horse(horse_name) if horse_name else ""
+    if hint_date:
+        rows = conn.execute(
+            """
+            SELECT horse_id FROM runners
+            WHERE race_date = ? AND finish_pos IS NOT NULL
+            """,
+            (hint_date,),
+        ).fetchall()
+        if any(_horse_matches_runner(horse, slug=slug, target_name=target_name) for (horse,) in rows):
+            return hint_date
+    row = conn.execute(
+        """
+        SELECT race_date FROM runners
+        WHERE finish_pos IS NOT NULL
+          AND race_date <= date('now')
+          AND lower(replace(horse_id, ' ', '_')) = ?
+        ORDER BY race_date DESC
+        LIMIT 1
+        """,
+        (slug.lower(),),
+    ).fetchone()
+    if row:
+        return str(row[0])
+    if target_name:
+        row = conn.execute(
+            """
+            SELECT race_date FROM runners
+            WHERE finish_pos IS NOT NULL
+              AND race_date <= date('now')
+              AND lower(trim(horse_id)) = ?
+            ORDER BY race_date DESC
+            LIMIT 1
+            """,
+            (target_name,),
+        ).fetchone()
+        if row:
+            return str(row[0])
+    return None
+
+
 def _upcoming_context(conn, runner_id: str) -> dict[str, str | None]:
     row = conn.execute(
         """
@@ -182,6 +253,7 @@ def _resolve_bet_context(
     course: str | None = None,
     off_time: str | None = None,
     race_natural_key: str | None = None,
+    created_at: str | None = None,
 ) -> dict[str, str | None]:
     ctx = _merge_context(
         {
@@ -194,6 +266,20 @@ def _resolve_bet_context(
         _upcoming_context(conn, runner_id),
         _runners_context(conn, race_id, runner_id),
     )
+    if not ctx.get("horse_name") and ":" in runner_id:
+        slug = _runner_slug_from_id(runner_id)
+        if slug:
+            ctx["horse_name"] = slug.replace("_", " ").title()
+    hint_date = _iso_date_prefix(created_at)
+    if not ctx.get("card_date"):
+        ctx["card_date"] = _guess_card_date_from_results(
+            conn,
+            runner_id=runner_id,
+            horse_name=ctx.get("horse_name"),
+            hint_date=hint_date,
+        )
+    if not ctx.get("card_date"):
+        ctx["card_date"] = hint_date
     return ctx
 
 
@@ -201,14 +287,14 @@ def _backfill_open_paper_context(conn) -> int:
     """Persist race context on open forward bets so settlement survives card refresh."""
     rows = conn.execute(
         """
-        SELECT bet_id, race_id, runner_id, card_date, course, off_time, horse_name, race_natural_key
+        SELECT bet_id, race_id, runner_id, card_date, course, off_time, horse_name, race_natural_key, created_at
         FROM paper_bets
         WHERE status = 'open' AND backtest = 0
         """
     ).fetchall()
     updated = 0
-    for bet_id, race_id, runner_id, card_date, course, off_time, horse_name, race_natural_key in rows:
-        if card_date and horse_name:
+    for bet_id, race_id, runner_id, card_date, course, off_time, horse_name, race_natural_key, created_at in rows:
+        if card_date and horse_name and course and off_time and race_natural_key:
             continue
         ctx = _resolve_bet_context(
             conn,
@@ -219,6 +305,7 @@ def _backfill_open_paper_context(conn) -> int:
             course=course,
             off_time=off_time,
             race_natural_key=race_natural_key,
+            created_at=created_at,
         )
         if not ctx.get("card_date"):
             continue
@@ -414,15 +501,16 @@ def settle_paper_bets(database: Path | None = None) -> dict:
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     settled = 0
     still_open = 0
+    skip_reasons: dict[str, int] = {"no_card_date": 0, "no_finish_pos": 0}
     details: list[dict] = []
 
     init_db(db)
     with connect(db) as conn:
-        _backfill_open_paper_context(conn)
+        context_backfill = _backfill_open_paper_context(conn)
         bets = conn.execute(
             """
             SELECT pb.bet_id, pb.race_id, pb.runner_id, pb.bet_type, pb.stake_units,
-                   pb.offered_win, pb.place_terms,
+                   pb.offered_win, pb.place_terms, pb.created_at,
                    COALESCE(pb.card_date, u.card_date) AS card_date,
                    COALESCE(pb.horse_name, u.horse_name) AS horse_name,
                    COALESCE(pb.course, u.course) AS course,
@@ -434,7 +522,21 @@ def settle_paper_bets(database: Path | None = None) -> dict:
             """
         ).fetchall()
         for bet in bets:
-            bet_id, race_id, runner_id, bet_type, stake, offered_win, place_terms, card_date, horse_name, course, off_time, race_natural_key = bet
+            (
+                bet_id,
+                race_id,
+                runner_id,
+                bet_type,
+                stake,
+                offered_win,
+                place_terms,
+                created_at,
+                card_date,
+                horse_name,
+                course,
+                off_time,
+                race_natural_key,
+            ) = bet
             ctx = _resolve_bet_context(
                 conn,
                 race_id=race_id,
@@ -444,6 +546,7 @@ def settle_paper_bets(database: Path | None = None) -> dict:
                 course=course,
                 off_time=off_time,
                 race_natural_key=race_natural_key,
+                created_at=created_at,
             )
             card_date = ctx.get("card_date")
             horse_name = ctx.get("horse_name")
@@ -452,6 +555,7 @@ def settle_paper_bets(database: Path | None = None) -> dict:
             race_natural_key = ctx.get("race_natural_key")
             if not card_date:
                 still_open += 1
+                skip_reasons["no_card_date"] += 1
                 continue
             finish_pos = _find_finish_pos(
                 conn,
@@ -465,6 +569,7 @@ def settle_paper_bets(database: Path | None = None) -> dict:
             )
             if finish_pos is None:
                 still_open += 1
+                skip_reasons["no_finish_pos"] += 1
                 continue
             places, fraction = _parse_place_terms(place_terms, default_places=default_places, default_fraction=default_fraction)
             closing_sp = _closing_sp_for_runner(
@@ -531,6 +636,8 @@ def settle_paper_bets(database: Path | None = None) -> dict:
     return {
         "settled": settled,
         "still_open": still_open,
+        "skip_reasons": skip_reasons,
+        "context_backfill": context_backfill,
         "details": details,
         "stats": stats,
     }
