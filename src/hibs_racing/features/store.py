@@ -67,6 +67,7 @@ UPCOMING_MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("trainer_14d_strike", "REAL"),
     ("enrich_source", "TEXT"),
     ("enriched_at", "TEXT"),
+    ("runner_status", "TEXT NOT NULL DEFAULT 'active'"),
 )
 
 CARD_SCORES_MIGRATIONS: tuple[tuple[str, str], ...] = (

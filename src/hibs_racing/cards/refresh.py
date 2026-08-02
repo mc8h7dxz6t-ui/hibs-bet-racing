@@ -203,6 +203,20 @@ def refresh_cards(
 
     _, timings["store_ms"] = timed_ms(lambda: store_upcoming_runners(cards, source=src))
 
+    try:
+        from hibs_racing.quant.horse_tracker_sync import sync_card_horses_to_quant_plane
+
+        sync_meta, timings["quant_horse_sync_ms"] = timed_ms(
+            lambda: sync_card_horses_to_quant_plane(cards)
+        )
+        if sync_meta and not sync_meta.get("skipped"):
+            timings["quant_horse_sync"] = {
+                "horses": sync_meta.get("horses_upserted"),
+                "runs": sync_meta.get("tracker_runs_upserted"),
+            }
+    except Exception as exc:
+        timings["quant_horse_sync_error"] = str(exc)[:120]
+
     (odds, odds_meta), timings["odds_ms"] = timed_ms(
         lambda: resolve_scoring_odds(cards, odds_source=odds_source, force_live_odds=True)
     )
