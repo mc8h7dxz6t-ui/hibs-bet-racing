@@ -343,8 +343,14 @@ def _persist_ranker_features(db: Path, frame: pd.DataFrame, built_at: str) -> in
             try: conn.execute(f"ALTER TABLE ranker_features ADD COLUMN {col} REAL;")
             except Exception: pass
     count = 0
+    runner_ids = [str(r) for r in frame["runner_id"].tolist() if r]
     with connect(db) as conn:
-        conn.execute("DELETE FROM ranker_features")
+        if runner_ids:
+            placeholders = ",".join(["?"] * len(runner_ids))
+            conn.execute(
+                f"DELETE FROM ranker_features WHERE runner_id IN ({placeholders})",
+                runner_ids,
+            )
         placeholders = ", ".join(["?"] * (len(cols) + 1))
         columns_str = ", ".join(cols) + ", built_at"
         sql_query = f"INSERT INTO ranker_features ({columns_str}) VALUES ({placeholders})"

@@ -70,10 +70,7 @@ def merge_runners_preserve_best(existing: pd.DataFrame, incoming: pd.DataFrame) 
                     merged[key] = val
             out_rows.append(merged)
 
-    for rid, old in by_id.items():
-        if rid not in seen:
-            out_rows.append(old)
-
+    # Runners absent from incoming are withdrawn by store_upcoming_runners — do not re-append.
     return pd.DataFrame(out_rows)
 
 
