@@ -42,6 +42,8 @@ def test_settle_paper_from_results(tmp_path, monkeypatch):
     assert stats.value_pick_hits == 1
     assert stats.value_pick_strike == 1.0
     assert stats.total_pnl != 0
+    assert stats.value_pick_pnl == stats.total_pnl
+    assert stats.value_pick_open == 0
 
 
 def test_settle_paper_fallback_by_horse_date(tmp_path, monkeypatch):
