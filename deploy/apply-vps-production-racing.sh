@@ -91,5 +91,10 @@ echo "  curl -s http://127.0.0.1:5003/api/health | python3 -m json.tool | head -
 
 PY="${APP_ROOT}/.venv/bin/python3"
 [[ -x "${PY}" ]] || PY="python3"
-OBS="$("${PY}" -c "from hibs_racing.models.ranker_preflight import observation_lane_enabled; print(observation_lane_enabled())" 2>/dev/null || echo unknown)"
+OBS="$("${PY}" -c "
+from dotenv import load_dotenv
+load_dotenv('${ENV_FILE}')
+from hibs_racing.models.ranker_preflight import observation_lane_enabled
+print(observation_lane_enabled())
+" 2>/dev/null || echo unknown)"
 echo "observation_lane_enabled=${OBS}"
