@@ -120,12 +120,33 @@ def test_governor_cas_capital_reject(trading_db, monkeypatch):
     assert verdict.status == "CAPITAL_REJECT"
 
 
-def test_live_exchange_stubbed_even_when_flag_true(monkeypatch):
+def test_live_exchange_stubbed_without_execution_live(monkeypatch):
     monkeypatch.setenv("HIBS_LIVE_TRADING_ENABLED", "true")
+    monkeypatch.delenv("HIBS_EXECUTION_LIVE", raising=False)
     with pytest.raises(LiveExchangeWriteDisabled):
         dispatch_live_order(
             {"market_id": "1", "runner_id": "2", "odds": 3.0, "stake": 1.0},
         )
+
+
+def test_live_exchange_dispatches_when_operator_armed(monkeypatch):
+    monkeypatch.setenv("HIBS_LIVE_TRADING_ENABLED", "true")
+    monkeypatch.setenv("HIBS_EXECUTION_LIVE", "1")
+
+    class FakeClient:
+        def place_back_offer(self, **kwargs):
+            return {"offer-id": "99", **kwargs}
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "hibs_racing.odds.matchbook.MatchbookClient",
+        lambda *a, **k: FakeClient(),
+    )
+    out = dispatch_live_order({"market_id": "1", "runner_id": "2", "odds": 3.0, "stake": 1.0})
+    assert out["offer-id"] == "99"
+    assert out["stake"] == 1.0
 
 
 def test_payload_signature_stable():
