@@ -333,15 +333,22 @@ def create_app() -> Flask:
         payload = _safe_portfolio_payload(racing_limit=100)
         s = payload.get("summary") or {}
         racing_stats = payload.get("racing_stats") or {}
-        pnl = s.get("racing_pnl_units")
+        summary_block = payload.get("summary") or {}
+        pnl = summary_block.get("racing_pnl_units")
+        if pnl is None:
+            pnl = s.get("racing_pnl_units")
         summary = {
             "ok": payload.get("ok", True),
             "mode": "analytics",
             "updated_at": payload.get("updated_at"),
+            "pnl_plane": payload.get("pnl_plane", "forward_value_picks"),
             "combined_pnl_units": pnl,
             "racing_pnl_units": pnl,
-            "racing_settled": s.get("racing_settled"),
-            "racing_open": racing_stats.get("open_bets", 0),
+            "all_paper_pnl_units": summary_block.get("all_paper_pnl_units"),
+            "racing_settled": summary_block.get("racing_settled", s.get("racing_settled")),
+            "racing_open": summary_block.get("open_bets", racing_stats.get("value_pick_open", racing_stats.get("open_bets", 0))),
+            "value_pick_count": summary_block.get("value_pick_count", racing_stats.get("value_pick_count")),
+            "value_pick_open": summary_block.get("value_pick_open", racing_stats.get("value_pick_open")),
             "links": payload.get("links") or {},
         }
         if payload.get("error"):

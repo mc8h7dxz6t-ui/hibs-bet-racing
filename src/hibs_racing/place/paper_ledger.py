@@ -33,8 +33,16 @@ class LedgerStats:
     value_pick_settled: int
     value_pick_hits: int
     value_pick_strike: float | None
+    value_pick_pnl: float
+    value_pick_open: int
+    value_pick_staked: float
 
     def to_dict(self) -> dict:
+        value_roi = (
+            (self.value_pick_pnl / self.value_pick_staked * 100)
+            if self.value_pick_staked > 0
+            else None
+        )
         return {
             "open_bets": self.open_bets,
             "settled_bets": self.settled_bets,
@@ -52,6 +60,10 @@ class LedgerStats:
             "value_pick_hits": self.value_pick_hits,
             "value_pick_strike": round(self.value_pick_strike, 4) if self.value_pick_strike is not None else None,
             "value_pick_strike_pct": round(self.value_pick_strike * 100, 1) if self.value_pick_strike is not None else None,
+            "value_pick_pnl": round(self.value_pick_pnl, 2),
+            "value_pick_open": self.value_pick_open,
+            "value_pick_staked": round(self.value_pick_staked, 2),
+            "value_pick_roi_pct": round(value_roi, 2) if value_roi is not None else None,
         }
 
 
@@ -788,7 +800,10 @@ def ledger_stats(database: Path | None = None, *, days: int | None = None, backt
 
     open_bets = settled = place_hits = place_misses = win_hits = 0
     value_pick_count = value_pick_settled = value_pick_hits = value_pick_misses = 0
+    value_pick_open = 0
     total_staked = settled_staked = total_pnl = 0.0
+    value_pick_pnl = 0.0
+    value_pick_staked = 0.0
 
     for status, stake, pnl, is_value in rows:
         stake_f = float(stake or 0)
@@ -796,6 +811,8 @@ def ledger_stats(database: Path | None = None, *, days: int | None = None, backt
         is_val = int(is_value or 0) == 1
         if is_val:
             value_pick_count += 1
+            if status == "open":
+                value_pick_open += 1
 
         if status == "open":
             open_bets += 1
@@ -815,6 +832,8 @@ def ledger_stats(database: Path | None = None, *, days: int | None = None, backt
 
         if is_val:
             value_pick_settled += 1
+            value_pick_staked += stake_f
+            value_pick_pnl += float(pnl or 0)
             if placed:
                 value_pick_hits += 1
             elif status == "lost":
@@ -843,6 +862,9 @@ def ledger_stats(database: Path | None = None, *, days: int | None = None, backt
         value_pick_settled=value_pick_settled,
         value_pick_hits=value_pick_hits,
         value_pick_strike=value_strike,
+        value_pick_pnl=value_pick_pnl,
+        value_pick_open=value_pick_open,
+        value_pick_staked=value_pick_staked,
     )
 
 
