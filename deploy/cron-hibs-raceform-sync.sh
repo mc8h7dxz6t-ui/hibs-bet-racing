@@ -33,6 +33,13 @@ print(json.dumps({'sportinglife_probe': probe_availability()}))
 install_cron() {
   mkdir -p "${LOG_DIR}"
   chmod +x "${SCRIPT}" 2>/dev/null || true
+  if [[ "${HIBS_OPS_MASTER_INSTALL:-0}" != "1" && -f "${APP_ROOT}/scripts/vps_racing_ops_hardening_gate.sh" ]]; then
+    echo "Running racing ops hardening gate (100% required)..."
+    bash "${APP_ROOT}/scripts/vps_racing_ops_hardening_gate.sh" || {
+      echo "HARDENING BLOCKED — fix gate failures before --install" >&2
+      exit 1
+    }
+  fi
   local existing tmp
   existing="$(crontab -u www-data -l 2>/dev/null || true)"
   existing="$(printf '%s\n' "${existing}" | grep -vF "${MARKER}" | grep -vF 'sync_raceform_baseline' || true)"
