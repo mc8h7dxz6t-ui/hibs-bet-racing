@@ -65,6 +65,8 @@ def main() -> int:
     print(json.dumps(payload))
     if report.get("status") == "disabled":
         return 0
+    if report.get("errors", 0) > 0:
+        return 1
     return 0 if payload["ok"] else 1
 
 
