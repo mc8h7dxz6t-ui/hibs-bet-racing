@@ -439,6 +439,12 @@ def create_app() -> Flask:
 
         return jsonify(public_monetization_payload())
 
+    @app.route("/api/monetization/status")
+    def api_monetization_status():
+        from hibs_racing.monetization_status import build_monetization_status
+
+        return jsonify(build_monetization_status())
+
     @app.route("/status")
     def status_page():
         hs = health_status()
