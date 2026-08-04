@@ -9,13 +9,14 @@
     background:none;border:none;color:var(--hibs-neon);cursor:pointer;font-size:0.78em;
     font-weight:600;padding:4px 8px;border-radius:6px;
 }
-.hero-toggle:hover{background:rgba(0,122,51,0.15);}
+.hero-toggle:hover{background:rgba(13,148,136,0.15);}
 .meetings-shell{border-radius:14px;overflow:hidden;}
 .meetings-toolbar{
     position:sticky;top:8px;z-index:20;
     display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;
-    padding:14px 16px;background:linear-gradient(180deg,rgba(10,28,20,0.98),rgba(10,28,20,0.92));
+    padding:14px 16px;background:linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,253,245,0.94));
     border-bottom:1px solid var(--border);backdrop-filter:blur(8px);
+    box-shadow:0 8px 18px rgba(15,23,42,0.06);
 }
 .meetings-toolbar h2{
     flex:1 1 100%;font-family:'Orbitron',monospace;font-size:0.95em;color:var(--hibs-neon);
@@ -25,66 +26,113 @@
 .ctrl-group label{font-size:0.68em;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;font-weight:700;}
 .ctrl-select{
     appearance:none;-webkit-appearance:none;
-    background:rgba(0,0,0,0.45) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2394a3b8' d='M1 1l5 5 5-5'/%3E%3C/svg%3E") no-repeat right 12px center;
-    color:var(--text);border:1px solid rgba(183,247,200,0.2);border-radius:10px;
+    background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23334155' d='M1 1l5 5 5-5'/%3E%3C/svg%3E") no-repeat right 12px center;
+    color:#0f172a;border:1px solid rgba(100,116,139,0.32);border-radius:10px;
     padding:10px 36px 10px 12px;font-size:0.9em;font-weight:600;cursor:pointer;width:100%;
 }
-.ctrl-select:hover,.ctrl-select:focus{border-color:rgba(183,247,200,0.45);outline:none;}
+.ctrl-select:hover,.ctrl-select:focus{border-color:rgba(13,148,136,0.55);outline:none;}
 .toolbar-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-left:auto;}
 .meeting-panel{display:none;animation:fadeIn .25s ease;}
 .meeting-panel.is-active{display:block;}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 .meeting-header{
     padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;
-    background:rgba(0,122,51,0.08);border-bottom:1px solid var(--border);
+    background:rgba(13,148,136,0.08);border-bottom:1px solid var(--border);
 }
 .meeting-header .meeting-course{font-size:1.05em;}
 .race-nav-strip{
     display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);
-    background:rgba(0,0,0,0.15);
+    background:rgba(248,250,252,0.96);
 }
 .race-tab{
-    background:rgba(255,255,255,0.04);border:1px solid var(--border);color:var(--text);
+    background:rgba(255,255,255,0.86);border:1px solid var(--border);color:var(--text);
     border-radius:999px;padding:6px 12px;font-size:0.78em;font-weight:600;cursor:pointer;
     font-family:'Orbitron',monospace;transition:background .15s,border-color .15s;
 }
-.race-tab:hover{background:rgba(0,122,51,0.15);}
-.race-tab.is-active{background:rgba(0,122,51,0.28);border-color:rgba(183,247,200,0.35);color:var(--hibs-neon);}
+.race-tab:hover{background:rgba(13,148,136,0.15);}
+.race-tab.is-active{background:rgba(13,148,136,0.28);border-color:rgba(94,234,212,0.35);color:var(--hibs-neon);}
+.race-tab.has-gate-pick{border-color:rgba(94,234,212,0.55);}
 .race-tab.has-value{border-color:rgba(246,216,137,0.45);}
+tr.gate-filter-hidden,.runner-mobile-card.gate-filter-hidden{display:none!important;}
+.race-drawer.gate-filter-empty .race-body{position:relative;}
+.race-drawer.gate-filter-empty .race-table-wrap::before{
+    content:'No runners pass this pick-quality filter — try All runners or a looser gate.';
+    display:block;padding:10px 12px;margin-bottom:8px;border-radius:8px;
+    font-size:0.78em;color:var(--muted);border:1px dashed rgba(148,163,184,0.35);
+}
 .meeting-drawer > summary::after,.race-drawer > summary::after{
     content:'';width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);
     transform:rotate(45deg);margin-left:auto;transition:transform .2s;flex-shrink:0;
 }
 .meeting-drawer[open] > summary::after,.race-drawer[open] > summary::after{transform:rotate(-135deg);margin-top:4px;}
 .race-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+/* Compact runner rows — ~50% vertical footprint; horse / jockey / trainer unchanged */
+.race-table-wrap table{font-size:0.72em;}
+.race-table-wrap th{padding:4px 6px;font-size:0.62em;line-height:1.2;white-space:nowrap;}
+.race-table-wrap td{padding:4px 6px;line-height:1.25;vertical-align:top;}
+.race-table-wrap .horse-cell{max-width:11em;line-height:1.2;}
+.race-table-wrap .runner-jockey,
+.race-table-wrap .runner-trainer{max-width:8.5em;font-size:0.95em;line-height:1.2;word-break:break-word;}
+.race-table-wrap .enrich-panel{font-size:0.72em;min-width:96px;max-width:128px;padding:4px 6px;}
+.race-table-wrap .enrich-row{margin-bottom:2px;}
+.race-table-wrap .enrich-row-label{font-size:0.68em;}
+.race-table-wrap .rp-comment{font-size:0.72em;max-width:200px;line-height:1.3;}
+.race-table-wrap .engine-opinion{font-size:0.72em;max-width:220px;line-height:1.3;}
+.race-table-wrap .place-telemetry-strip{font-size:0.65em;gap:3px 6px;margin-top:2px;}
+.race-table-wrap .place-value-chip{padding:1px 5px;font-size:0.9em;}
+.race-table-wrap .gate-reason,.race-table-wrap .steam-badge{font-size:0.58em;}
 @media(max-width:720px){
     .meetings-toolbar{position:relative;top:0;}
     .toolbar-actions{width:100%;margin-left:0;}
 }
 .runner-highlight td{background:rgba(246,216,137,0.18)!important;box-shadow:inset 0 0 0 1px rgba(246,216,137,0.45);}
+.steam-badge{
+    display:inline-block;font-size:0.65em;font-weight:700;padding:2px 7px;border-radius:999px;
+    margin-left:4px;vertical-align:middle;text-transform:uppercase;letter-spacing:0.04em;
+}
+.steam-badge.proceed{background:rgba(16,185,129,0.16);color:#047857;border:1px solid rgba(16,185,129,0.36);}
+.steam-badge.scale_up{background:rgba(59,130,246,0.14);color:#1d4ed8;border:1px solid rgba(59,130,246,0.32);}
+.steam-badge.abort,.steam-badge.drift{background:rgba(239,68,68,0.12);color:#b91c1c;border:1px solid rgba(239,68,68,0.28);}
+.steam-badge.unknown{background:rgba(148,163,184,0.14);color:#334155;border:1px dashed rgba(148,163,184,0.35);}
+.off-countdown{font-size:0.72em;color:var(--gold);font-weight:600;margin-left:6px;}
+@media(max-width:720px){
+    .runner-mobile-card{
+        display:block;padding:7px 10px;margin:5px 0;border-radius:10px;
+        border:1px solid var(--border);background:rgba(255,255,255,0.94);
+    }
+    .runner-mobile-card.has-value{border-color:rgba(246,216,137,0.45);}
+    .runner-mobile-card .rm-name{font-weight:700;font-size:0.88em;line-height:1.2;}
+    .runner-mobile-card .rm-meta{font-size:0.72em;color:var(--muted);margin-top:2px;line-height:1.3;}
+    .runner-mobile-card .rm-bars{display:flex;gap:4px;margin-top:5px;}
+    .runner-mobile-card .rm-bar{flex:1;height:4px;border-radius:3px;background:rgba(255,255,255,0.08);overflow:hidden;}
+    .runner-mobile-card .rm-bar > span{display:block;height:100%;background:linear-gradient(90deg,#007A33,#B7F7C8);}
+    .runner-mobile-card .rm-reason{margin-top:6px;font-size:0.7em;color:var(--green);line-height:1.35;}
+    .runner-mobile-card .rm-reason ul{margin:4px 0 0;padding-left:14px;color:var(--text);}
+    .runner-mobile-card .rm-reason li{margin-bottom:2px;}
+}
 .rp-verdict-block{
     margin:0 0 14px;padding:12px 14px;border-radius:10px;
-    background:rgba(0,0,0,0.22);border:1px solid rgba(183,247,200,0.18);
+    background:rgba(255,255,255,0.94);border:1px solid rgba(100,116,139,0.24);
 }
 .rp-verdict-block h4{
     margin:0 0 6px;font-size:0.72em;text-transform:uppercase;letter-spacing:0.08em;
     color:var(--hibs-neon);font-family:'Orbitron',monospace;
 }
-.rp-verdict-block p{margin:0;font-size:0.88em;line-height:1.55;color:#dbeafe;}
+.rp-verdict-block p{margin:0;font-size:0.88em;line-height:1.55;color:#1f2937;}
 .enrich-panel{
     font-size:0.8em;line-height:1.5;min-width:120px;max-width:168px;
-    padding:6px 8px;border-radius:8px;background:rgba(0,0,0,0.2);
-    border:1px solid rgba(183,247,200,0.12);
+    padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.92);
+    border:1px solid rgba(100,116,139,0.22);
 }
 .enrich-panel.is-empty{color:var(--muted);font-size:0.85em;border-style:dashed;}
-.enrich-row{display:block;margin-bottom:4px;color:#e2e8f0;}
+.enrich-row{display:block;margin-bottom:4px;color:#1f2937;}
 .enrich-row:last-child{margin-bottom:0;}
 .enrich-row-label{display:block;font-size:0.72em;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;}
-.enrich-row-value{display:block;font-weight:600;color:#f1f5f9;}
+.enrich-row-value{display:block;font-weight:600;color:#0f172a;}
 .enrich-flag{
     display:inline-block;margin:3px 4px 0 0;padding:2px 6px;border-radius:4px;
-    font-size:0.72em;font-weight:700;background:rgba(0,122,51,0.25);color:var(--hibs-neon);
-    border:1px solid rgba(183,247,200,0.28);cursor:help;
+    font-size:0.72em;font-weight:700;background:rgba(13,148,136,0.25);color:var(--hibs-neon);
+    border:1px solid rgba(94,234,212,0.28);cursor:help;
 }
 .enrich-note{display:block;margin-top:4px;font-size:0.72em;color:var(--gold);font-weight:600;}
 .enrich-meta-line{display:block;margin-top:4px;font-size:0.78em;color:var(--muted);}
@@ -95,7 +143,7 @@
 }
 .scoring-pill{font-size:0.72em;color:var(--muted);}
 .race-drawer > summary .rp-verdict-snippet{
-    flex:1 1 100%;font-size:0.78em;color:#cbd5e1;line-height:1.45;margin-top:4px;
+    flex:1 1 100%;font-size:0.78em;color:#334155;line-height:1.45;margin-top:4px;
 }
 @media(min-width:900px){
     .race-drawer > summary .rp-verdict-snippet{flex:1 1 auto;margin-top:0;margin-left:8px;}
@@ -146,6 +194,225 @@
     font-size:0.68em;line-height:1.45;color:#e2e8f0;white-space:pre-wrap;word-break:break-word;
 }
 .phone-caption{font-size:0.68em;color:#64748b;text-align:center;margin-top:10px;}
+.day-section{margin-bottom:20px;}
+.day-heading{
+    font-family:'Orbitron',monospace;font-size:1.05em;color:var(--hibs-neon);
+    margin:0 0 10px;padding:8px 0;border-bottom:1px solid rgba(94,234,212,0.2);
+}
+.day-heading .day-date{font-size:0.72em;color:var(--muted);font-weight:600;margin-left:8px;}
+.day-picks-row{
+    display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-bottom:12px;
+}
+.day-pick-chip{
+    flex:1 1 200px;max-width:320px;padding:10px 12px;border-radius:10px;
+    border:1px solid rgba(100,116,139,0.22);background:rgba(255,255,255,0.92);font-size:0.8em;
+}
+.day-pick-chip strong{display:block;color:var(--text);margin-bottom:4px;}
+.day-pick-chip .meta{color:var(--muted);font-size:0.9em;line-height:1.4;}
+.day-picks-link{align-self:center;font-size:0.82em;color:var(--hibs-neon);text-decoration:none;white-space:nowrap;}
+.picks-glossary{margin:0 0 12px;border:1px solid rgba(148,163,184,0.22);border-radius:10px;background:rgba(255,255,255,0.9);}
+.picks-glossary-sum{cursor:pointer;font-size:0.78em;font-weight:700;color:var(--hibs-neon);padding:8px 12px;list-style:none;}
+.picks-glossary-sum::-webkit-details-marker{display:none;}
+.picks-glossary-body{padding:0 12px 10px;font-size:0.76em;line-height:1.5;color:var(--muted);}
+.picks-glossary-body p{margin:0 0 8px;}
+.picks-glossary-body strong{color:var(--text);}
+.picks-glossary-note{margin-top:6px;font-size:0.95em;}
+.place-telemetry-item[title]{cursor:help;}
+.value-lane-hero{margin-bottom:14px;border:1px solid rgba(252,211,77,0.35);background:linear-gradient(135deg,rgba(252,211,77,0.12),rgba(15,23,42,0.92));box-shadow:0 0 24px rgba(252,211,77,0.08);}
+.value-lane-hero h2{font-family:'Orbitron',monospace;color:var(--gold);font-size:1em;margin:0 0 4px;}
+.value-lane-hd{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;justify-content:space-between;margin-bottom:12px;}
+.value-lane-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;}
+.value-lane-card{display:flex;gap:10px;padding:12px;border-radius:12px;border:1px solid rgba(252,211,77,0.28);background:rgba(2,6,23,0.55);position:relative;}
+.value-lane-card.is-paper-ready{border-color:rgba(94,234,212,0.45);box-shadow:0 0 12px rgba(13,148,136,0.15);}
+.vlc-rank{font-family:'Orbitron',monospace;color:var(--gold);font-size:1.2em;font-weight:900;min-width:36px;}
+.vlc-body{flex:1;min-width:0;}
+.vlc-title{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px;}
+.vlc-meta{font-size:0.76em;color:var(--muted);margin-bottom:6px;}
+.vlc-roi{font-size:0.88em;color:var(--gold);margin-bottom:6px;}
+.vlc-roi strong{font-size:1.15em;color:var(--neon-value);}
+.vlc-roi-hint{font-size:0.72em;color:var(--muted);margin-left:6px;}
+.vlc-stats{display:flex;flex-wrap:wrap;gap:8px;font-size:0.72em;color:var(--accent);margin-bottom:6px;}
+.vlc-summary{font-size:0.76em;color:var(--neon-value);line-height:1.45;margin:0 0 6px;}
+.vlc-link{font-size:0.72em;color:var(--hibs-neon);font-weight:600;}
+.vlc-copy{align-self:flex-start;padding:4px 8px;font-size:0.72em;}
+.value-lane-blocked{border-color:rgba(251,191,36,0.25);}
+.value-lane-day{margin-bottom:14px;}
+.value-lane-day:last-child{margin-bottom:0;}
+.value-lane-day-title{font-family:'Orbitron',monospace;font-size:0.82em;color:var(--hibs-neon);margin:0 0 8px;display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;}
+.value-lane-day-date{font-size:0.78em;color:var(--muted);font-weight:600;}
+.vlc-day{color:var(--neon-value);font-weight:700;}
+.sniper-lane-hero{margin-bottom:14px;border:1px solid rgba(94,234,212,0.42);background:linear-gradient(135deg,rgba(13,148,136,0.16),rgba(15,23,42,0.94));box-shadow:0 0 24px rgba(13,148,136,0.1);}
+.sniper-lane-hero h2{font-family:'Orbitron',monospace;color:var(--hibs-neon);font-size:1em;margin:0 0 4px;}
+.sniper-lane-card{border-color:rgba(94,234,212,0.35)!important;}
+.sniper-flag{font-size:0.62em;font-weight:900;letter-spacing:0.08em;padding:2px 6px;border-radius:4px;background:rgba(13,148,136,0.35);color:var(--hibs-neon);border:1px solid rgba(94,234,212,0.45);}
+
+/* Racing cockpit layer: compact, grey, high-clarity controls. */
+html[data-hibs-theme="pastel"] .hero-panel,
+html[data-hibs-theme="pastel"] .meetings-shell,
+html[data-hibs-theme="pastel"] .value-lane-hero,
+html[data-hibs-theme="pastel"] .sniper-lane-hero {
+    border-radius:10px;
+    border:1px solid rgba(71,85,105,0.26);
+    background:
+        linear-gradient(180deg, rgba(245,247,250,0.88), rgba(221,227,235,0.86));
+    box-shadow:0 14px 32px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.62);
+}
+html[data-hibs-theme="pastel"] .meetings-toolbar{
+    top:10px;
+    gap:10px 12px;
+    padding:12px 14px;
+    border:1px solid rgba(71,85,105,0.28);
+    border-radius:10px;
+    background:
+        linear-gradient(180deg, rgba(242,245,249,0.94), rgba(210,218,228,0.9));
+    box-shadow:0 12px 28px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.66);
+    margin:0 0 12px;
+}
+html[data-hibs-theme="pastel"] .meetings-toolbar h2,
+html[data-hibs-theme="pastel"] .day-heading,
+html[data-hibs-theme="pastel"] .value-lane-hero h2,
+html[data-hibs-theme="pastel"] .sniper-lane-hero h2 {
+    color:#0f766e;
+    letter-spacing:0.04em;
+}
+html[data-hibs-theme="pastel"] .ctrl-group label{
+    color:#334155;
+    letter-spacing:0.06em;
+}
+html[data-hibs-theme="pastel"] .ctrl-select{
+    min-height:38px;
+    border-radius:8px;
+    background-color:rgba(248,250,252,0.96);
+    border-color:rgba(71,85,105,0.32);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.72);
+}
+html[data-hibs-theme="pastel"] .ctrl-select:hover,
+html[data-hibs-theme="pastel"] .ctrl-select:focus{
+    border-color:rgba(13,148,136,0.55);
+    box-shadow:0 0 0 3px rgba(13,148,136,0.12), inset 0 1px 0 rgba(255,255,255,0.72);
+}
+html[data-hibs-theme="pastel"] .day-section{
+    margin:0 0 16px;
+    padding:10px 12px 12px;
+    border-radius:10px;
+    border:1px solid rgba(71,85,105,0.24);
+    background:rgba(218,224,233,0.58);
+}
+html[data-hibs-theme="pastel"] .day-heading{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:baseline;
+    gap:8px;
+    margin:0 0 10px;
+    padding:4px 0 9px;
+    border-bottom:1px solid rgba(71,85,105,0.22);
+    font-size:0.95em;
+}
+html[data-hibs-theme="pastel"] .day-heading::before{
+    content:'';
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:#0d9488;
+    box-shadow:0 0 0 4px rgba(13,148,136,0.14);
+}
+html[data-hibs-theme="pastel"] .day-heading .day-date{
+    margin-left:0;
+    color:#475569;
+}
+html[data-hibs-theme="pastel"] .meeting-panel{
+    overflow:hidden;
+    border-radius:10px;
+    margin:0 0 12px;
+}
+html[data-hibs-theme="pastel"] .meeting-header{
+    padding:10px 14px;
+    background:
+        linear-gradient(90deg, rgba(13,148,136,0.16), rgba(226,232,240,0.76));
+    border-bottom:1px solid rgba(71,85,105,0.22);
+}
+html[data-hibs-theme="pastel"] .meeting-header .meeting-course{
+    color:#111827;
+    font-weight:800;
+}
+html[data-hibs-theme="pastel"] .race-nav-strip{
+    gap:6px;
+    padding:9px 12px;
+    background:rgba(207,215,226,0.62);
+    border-bottom:1px solid rgba(71,85,105,0.22);
+}
+html[data-hibs-theme="pastel"] .race-tab{
+    min-height:30px;
+    border-radius:8px;
+    padding:5px 10px;
+    background:rgba(247,249,251,0.86);
+    color:#1f2937;
+    border-color:rgba(71,85,105,0.26);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.62);
+}
+html[data-hibs-theme="pastel"] .race-tab:hover{
+    background:rgba(230,244,242,0.94);
+    color:#0f766e;
+}
+html[data-hibs-theme="pastel"] .race-tab.is-active{
+    background:linear-gradient(135deg, rgba(13,148,136,0.22), rgba(37,99,235,0.1));
+    border-color:rgba(13,148,136,0.5);
+    color:#0f766e;
+    box-shadow:0 0 0 3px rgba(13,148,136,0.1), inset 0 1px 0 rgba(255,255,255,0.72);
+}
+html[data-hibs-theme="pastel"] .race-drawer > summary{
+    background:rgba(241,245,249,0.92);
+    border-bottom:1px solid rgba(71,85,105,0.18);
+}
+html[data-hibs-theme="pastel"] .race-drawer[open] > summary{
+    background:rgba(225,232,241,0.94);
+}
+html[data-hibs-theme="pastel"] .race-body{
+    background:rgba(236,240,245,0.74);
+}
+html[data-hibs-theme="pastel"] .race-table-wrap{
+    border-radius:8px;
+    border:1px solid rgba(71,85,105,0.2);
+    background:rgba(229,234,241,0.8);
+}
+html[data-hibs-theme="pastel"] .race-table-wrap th{
+    background:rgba(200,209,221,0.92);
+    color:#111827;
+}
+html[data-hibs-theme="pastel"] .race-table-wrap td{
+    border-bottom-color:rgba(71,85,105,0.16);
+}
+html[data-hibs-theme="pastel"] .runner-value td,
+html[data-hibs-theme="pastel"] .runner-highlight td{
+    background:rgba(250,204,21,0.16)!important;
+}
+html[data-hibs-theme="pastel"] .value-lane-card{
+    background:rgba(246,248,251,0.82);
+    border-color:rgba(154,103,0,0.32);
+}
+html[data-hibs-theme="pastel"] .sniper-lane-card{
+    background:rgba(235,244,244,0.86);
+}
+html[data-hibs-theme="pastel"] .vlc-meta,
+html[data-hibs-theme="pastel"] .vlc-stats,
+html[data-hibs-theme="pastel"] .vlc-roi-hint,
+html[data-hibs-theme="pastel"] .picks-glossary-body{
+    color:#4b5563;
+}
+@media(max-width:720px){
+    html[data-hibs-theme="pastel"] .meetings-toolbar{
+        position:relative;
+        top:0;
+        padding:10px;
+    }
+    html[data-hibs-theme="pastel"] .day-section{
+        padding:8px;
+    }
+    html[data-hibs-theme="pastel"] .race-tab{
+        flex:1 1 64px;
+        text-align:center;
+    }
+}
 {% endblock %}
 
 {% block content %}
@@ -155,112 +422,71 @@
     {% if initial_race %}data-initial-race="{{ initial_race }}"{% endif %}
     {% if highlight_runner %}data-highlight-runner="{{ highlight_runner }}"{% endif %}></div>
 {% endif %}
-<div class="window-banner">
-    <strong>Next {{ window_hours or 24 }}h</strong>
-    <span>UK &amp; Ireland racecards · meetings sorted by first race time</span>
-    {% if card_dates %}
-    <span class="pill">{{ card_dates|join(' · ') }}</span>
-    {% endif %}
-    {% if scoring_method %}<span class="pill ok">Engine: {{ scoring_method }}</span>{% endif %}
-    {% if ranker_profile %}
-    <span class="pill scoring-pill" title="Feature manifest matched to saved ranker">
-        {{ ranker_profile.feature_count or '?' }} features{% if ranker_profile.uses_enrich %} · enrich{% endif %}
-    </span>
-    {% endif %}
-</div>
 
-<div class="smart-portfolio-row">
-<section class="smart-picks-hero brand-panel-framed" id="smart-picks-hero" aria-live="polite">
-    {% from '_hibs_brand.html' import brand_logo_watermark %}
-    {{ brand_logo_watermark(modifier='brand-logo-watermark--corner-tl') }}
-    <h2>Hibs Smart Portfolio Picks</h2>
-    <p class="trk-intro" style="margin:0;font-size:0.82em;color:var(--muted);">
-        Top 3 high-conviction each-way angles — value-flagged, strong data quality, steam gate clear.
-    </p>
-    <div class="smart-picks-grid" id="smart-picks-grid">
-        <div class="smart-pick-card"><span class="sp-meta">Loading smart picks…</span></div>
-    </div>
-</section>
-
-<section class="webhook-preview-card brand-panel-framed" id="webhook-preview-card" aria-label="Automated premium channel stream preview">
-    <h2>Automated Premium Channel Stream</h2>
-    <p class="wp-sub">Exact 06:01 AM Telegram / Discord digest — partner tracking links included.</p>
-    <div class="phone-frame">
-        <div class="phone-notch"></div>
-        <div class="phone-screen">
-            <div class="phone-header">
-                <div class="phone-app-icon">🏇</div>
-                <div class="phone-app-name">Hibs Racing Premium</div>
-                <div class="phone-time">06:01</div>
-            </div>
-            <div class="phone-bubble">
-                <pre id="channel-digest-text">{{ channel_digest or '' }}</pre>
-            </div>
-        </div>
-        <p class="phone-caption">Pushed by notify-daily after morning batch</p>
-    </div>
-</section>
-</div>
-
+{% if engine_top_picks is defined %}
+<script id="engine-top-picks-data" type="application/json">{{ engine_top_picks|tojson }}</script>
+{% endif %}
 {% if pick_candidates is defined %}
 <script id="pick-candidates-data" type="application/json">{{ pick_candidates|tojson }}</script>
 {% endif %}
 {% if card_dates is defined %}
 <script id="card-dates-data" type="application/json">{{ card_dates|tojson }}</script>
 {% endif %}
+{% if value_lane_picks is defined and value_lane_picks %}
+<script id="value-lane-picks-data" type="application/json">{{ value_lane_picks|tojson }}</script>
+{% endif %}
 
-<section class="hero-panel is-open" id="hero-monitor">
-    <div class="hero-head">
-        <div style="flex:1;">
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <h2>Quick picks</h2>
-                <a href="{{ url_for('insights_page') }}" class="hero-toggle" style="text-decoration:none;">Full insights →</a>
-            </div>
-            <div class="monitor-bar" id="monitor-ledger-bar">
-                {% if monitor and monitor.ledger %}
-                <span class="pill">Paper P&L: <strong>{{ '%+.2f'|format(monitor.ledger.total_pnl) }}u</strong></span>
-                <span class="pill">Place hit:
-                    <strong>{% if monitor.ledger.place_hit_pct %}{{ monitor.ledger.place_hit_pct }}%{% elif monitor.ledger.strike_rate %}{{ '%.0f'|format(monitor.ledger.strike_rate * 100) }}%{% else %}—{% endif %}</strong>
-                </span>
-                <span class="pill">Value hit:
-                    <strong>{% if monitor.ledger.value_pick_strike_pct %}{{ monitor.ledger.value_pick_strike_pct }}%{% else %}—{% endif %}</strong>
-                </span>
-                {% endif %}
-            </div>
+{% include 'racing/_racing_lanes_status.html' %}
+<section class="value-picks-teaser card" id="value-picks-teaser" aria-label="Best bets teaser">
+    <div class="value-lane-hd">
+        <div>
+            <h2>Best bets</h2>
+            <p class="section-hint">Each-way picks where our price beats the book — on their own page, with a clear message when nothing qualifies.</p>
         </div>
-        <span class="pill" id="monitor-updated">
-            {% if monitor %}Updated {{ (monitor.updated_at or '')[:19]|replace('T',' ') }} UTC{% endif %}
-        </span>
-    </div>
-    <div class="hero-grid-wrap">
-        <div class="hero-grid" id="hero-top-places" data-poll-seconds="{{ monitor.poll_seconds if monitor else 300 }}">
-            {% for r in top_picks %}
-            <div class="hero-pick">
-                <div class="hero-rank">#{{ r.day_rank or loop.index }}</div>
-                <div class="hero-horse">{{ r.horse_name }}</div>
-                <div class="hero-meta">{{ r.off_time or '—' }} {{ r.course or '' }}<br>{{ r.jockey or '—' }} · {{ r.trainer or '—' }}</div>
-                <div class="hero-prob">{{ (r.model_place_prob or 0)|fmt_pct }}</div>
-                <div class="hero-meta">combo {{ r.combo_bayes_place|fmt_num }} · score {{ r.place_score|fmt_num }}
-                {% if r.win_decimal and r.monetized_link %}
-                · <a class="odds-affiliate-link" href="{{ r.monetized_link }}" target="_blank" rel="noopener sponsored">win {{ r.win_decimal|fmt_num }}</a>
-                {% elif r.win_decimal %}
-                · win {{ r.win_decimal|fmt_num }}
-                {% endif %}
-                </div>
-                {% if r.pick_reasons %}
-                <div class="hero-explain"><strong>Why</strong><ul>{% for reason in r.pick_reasons %}<li>{{ reason }}</li>{% endfor %}</ul></div>
-                {% endif %}
-            </div>
-            {% else %}
-            <div class="hero-pick" style="grid-column:1/-1;"><div class="hero-meta">No card loaded — click <strong>Refresh card</strong>.</div></div>
-            {% endfor %}
-        </div>
+        <a class="btn vlc-link" href="{{ url_for('value_picks_page') }}">Open best bets →</a>
     </div>
 </section>
+{% include 'racing/_sniper_lane_panel.html' %}
+
+{% if pick_candidates is defined and runner_count > 0 %}
+<section class="smart-picks-hero card place-picker-top" id="place-picker-hero" aria-label="Place Picker">
+    <div class="smart-portfolio-row" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+        <div>
+            <h2>Place Picker</h2>
+            <p class="section-hint" style="margin:0;font-size:0.78em;color:var(--muted);max-width:40rem;">Shortlist of place angles — read <strong>Place %</strong> as top-3 chance and the summary line for why. Paper-ready picks are noted on each card.</p>
+        </div>
+        <span class="pill ok">Engine output</span>
+    </div>
+    {% include 'racing/_picks_glossary.html' %}
+    <div id="smart-picks-grid" class="smart-picks-grid" role="list" aria-live="polite"></div>
+</section>
+{% endif %}
+
+<p class="dash-combos-hint">Doubles, Trixies and Lucky 15: <a href="{{ url_for('combinations_page') }}">Combinations</a> (built from best bets or pasted tips).</p>
+
+<details class="dash-fold">
+    <summary>Racecards · next {{ window_hours or 24 }}h{% if card_dates %} · {{ card_dates|join(' · ') }}{% endif %}</summary>
+    <div class="dash-fold-body">
+        <div class="window-banner" style="margin:0;padding:0;border:none;background:transparent;">
+            UK &amp; Ireland · {{ meetings|length if meetings else 0 }} meetings · {{ race_count }} races · {{ value_count }} value
+        </div>
+    </div>
+</details>
+
+{% if ui_data_status and ui_data_status.level == 'error' and ui_data_status.messages %}
+<div class="banner error">
+    {% for msg in ui_data_status.messages %}
+    <div>{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
 
 {% if runner_count == 0 %}
 <div class="banner error">No card in DB for the next {{ window_hours or 24 }}h. Click <strong>Refresh 24h</strong> in the header.</div>
 {% else %}
+<details class="dash-fold">
+    <summary>Card stats</summary>
+    <div class="dash-fold-body">
 <div class="stat-grid">
     <div class="stat-card"><div class="stat-label">Date</div><div class="stat-value">{{ card_date or '—' }}</div></div>
     <div class="stat-card"><div class="stat-label">Meetings</div><div class="stat-value">{{ meetings|length }}</div></div>
@@ -282,13 +508,8 @@
     </div>
     {% endif %}
 </div>
-{% if gate_summary and gate_summary.reason_counts %}
-<p class="data-note" style="margin-top:6px;">
-    Gate reasons:
-    {% for reason, n in gate_summary.reason_counts.items() %}
-    <span class="pill" style="margin-right:4px;">{{ reason|replace('_',' ') }}: {{ n }}</span>
-    {% endfor %}
-</p>
+    </div>
+</details>
 {% endif %}
 
 {% if meetings %}
@@ -301,11 +522,26 @@
         <div class="ctrl-group">
             <label for="meeting-select">Meeting</label>
             <select id="meeting-select" class="ctrl-select" aria-label="Select meeting">
-                {% for meeting in meetings %}
-                <option value="{{ meeting.slug }}" {% if loop.first %}selected{% endif %}
+                {% set sel = namespace(first=true) %}
+                {% for day in meeting_days %}
+                <optgroup label="{{ day.label }} ({{ day.card_date }})">
+                {% for meeting in day.meetings %}
+                <option value="{{ meeting.slug }}" {% if sel.first %}selected{% endif %}
                     data-hint="{{ meeting.race_count }} races · {{ meeting.runner_count }} runners{% if meeting.value_count %} · {{ meeting.value_count }} value{% endif %}">
-                    {{ meeting.label }} · {{ meeting.card_date }} · {{ meeting.first_off }}–{{ meeting.last_off }}
+                    {{ meeting.label }} · {{ meeting.first_off }}–{{ meeting.last_off }}
                 </option>
+                {% set sel.first = false %}
+                {% endfor %}
+                </optgroup>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="ctrl-group">
+            <label for="gate-filter-select">Pick quality</label>
+            <select id="gate-filter-select" class="ctrl-select" aria-label="Filter runners by gate quality"
+                data-default="{{ default_gate_filter|default('all') }}">
+                {% for mode in gate_filter_modes|default([]) %}
+                <option value="{{ mode.id }}" title="{{ mode.hint }}">{{ mode.label }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -325,6 +561,7 @@
             {% if scoring_method %}
             <span class="method-badge {% if scoring_method != 'ranker' %}heuristic{% endif %}" title="Scoring engine">{{ scoring_method }}</span>
             {% endif %}
+            <span class="pill" id="gate-filter-count" hidden></span>
             <span class="pill">{{ runner_count }} runners</span>
             {% if value_count %}<span class="pill warn">{{ value_count }} value</span>{% endif %}
             <button type="button" class="btn btn-secondary" id="btn-expand-races">Expand all</button>
@@ -332,8 +569,23 @@
         </div>
     </div>
 
-    {% for meeting in meetings %}
-    {% set meeting_first = loop.first %}
+    {% set ns = namespace(first=true) %}
+    {% for day in meeting_days %}
+    <div class="day-section" data-card-date="{{ day.card_date }}">
+        <h3 class="day-heading">{{ day.label }}<span class="day-date">{{ day.card_date }}</span></h3>
+        {% if picks_by_day and picks_by_day.get(day.card_date) %}
+        <div class="day-picks-row" aria-label="{{ day.label }} place picks">
+            {% for r in picks_by_day[day.card_date] %}
+            <div class="day-pick-chip">
+                <strong>{{ r.off_time or '—' }} · {{ r.horse_name }}</strong>
+                <div class="meta">{{ r.course or '' }} · place {{ (r.model_place_prob or 0)|fmt_pct }} · score {{ r.place_score|fmt_num }}</div>
+            </div>
+            {% endfor %}
+            <a class="day-picks-link" href="{{ url_for('insights_page') }}">Insights →</a>
+        </div>
+        {% endif %}
+    {% for meeting in day.meetings %}
+    {% set meeting_first = ns.first %}
     <div class="meeting-panel {% if meeting_first %}is-active{% endif %}" id="meeting-{{ meeting.slug }}" data-meeting="{{ meeting.slug }}" {% if not meeting_first %}hidden{% endif %}>
         <div class="meeting-header">
             <span class="meeting-course">{{ meeting.course }}</span>
@@ -402,13 +654,13 @@
                                 <tr>
                                     <th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>OR</th>
                                     <th>Form</th>
-                                    <th><span class="tip-term" tabindex="0" data-tip="Racing Post course, trip and going record for this horse (when RP credentials are set).">Course fit</span></th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="Course, trip and going record from Racing Post when credentials are set.">Course fit</span></th>
                                     <th>Win</th><th>Place</th>
-                                    <th><span class="tip-term" tabindex="0" data-tip="Δ = odds change vs 20 minutes ago. Green steam can mean market confidence; red drift means caution.">Δ</span></th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="Odds change vs ~20 minutes ago. Green = shortening (steam); red = drifting.">Δ</span></th>
                                     <th>RP comment</th><th>Engine view</th>
-                                    <th><span class="tip-term" tabindex="0" data-tip="Place %: estimated chance of finishing in the places (usually top 3) based on our ranker + Harville formula.">Place%</span></th>
-                                    <th><span class="tip-term" tabindex="0" data-tip="Combo: jockey+trainer Bayesian place rate from historical results — how often this pair places.">Combo</span></th>
-                                    <th><span class="tip-term" tabindex="0" data-tip="EV (Expected Value): long-run profit edge on an each-way bet at these odds if the model is accurate.">EV</span></th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="Estimated chance of a place finish (usually top 3). Not the same as win chance.">Place%</span></th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="How often this jockey and trainer place together in past runs.">Combo</span></th>
+                                    <th><span class="tip-term" tabindex="0" data-tip="Expected profit on an each-way bet at these odds if the model is right — paper edge, not a guarantee.">EV</span></th>
                                     <th>Stake</th>
                                 </tr>
                             </thead>
@@ -422,15 +674,30 @@
                                     data-off="{{ race.off_time or '' }}"
                                     data-win-odds="{{ r.win_decimal if r.win_decimal is not none else '' }}"
                                     data-model-win-prob="{{ r.model_win_prob if r.model_win_prob is not none else '' }}"
+                                    data-model-place-prob="{{ r.model_place_prob if r.model_place_prob is not none else '' }}"
+                                    data-model-score="{{ r.model_score if r.model_score is not none else '' }}"
+                                    data-place-edge-pct="{{ r.place_value_edge_pct if r.place_value_edge_pct is not none else '' }}"
+                                    data-place-chip-active="{{ 1 if r.place_value_chip_active else 0 }}"
                                     data-value-flag="{{ 1 if r.value_flag else 0 }}"
+                                    data-pick-gate-tier="{{ r.pick_gate_tier|default('none') }}"
+                                    data-gate-watchlist="{{ 1 if r.pick_gate_watchlist else 0 }}"
+                                    data-gate-value="{{ 1 if r.pick_gate_value else 0 }}"
+                                    data-gate-value-lane="{{ 1 if r.pick_gate_value_lane else 0 }}"
+                                    data-gate-paper-ready="{{ 1 if r.pick_gate_paper_ready else 0 }}"
+                                    data-gate-sniper="{{ 1 if r.pick_gate_sniper else 0 }}"
+                                    data-data-quality="{{ r.data_quality_pct|default(0) }}"
                                     data-steam-gate="{{ g.gate if g else 'proceed' }}"
+                                    data-engine-opinion="{{ r.engine_opinion or '' }}"
+                                    data-engine-reasons="{{ (r.engine_reasons or [])|join('||')|e }}"
                                     data-kelly-mult="{{ g.kelly_multiplier if g and g.kelly_multiplier is not none else 1 }}"
                                     data-stake-units="1"
                                     data-bet-type="each_way">
                                     <td class="num">{{ loop.index }}</td>
-                                    <td class="strong horse-cell">{{ r.horse_name }}{% if r.draw %} <span class="pill" style="font-size:0.7em;">({{ r.draw }})</span>{% endif %}{% if r.value_flag %} <span class="value-flag">VALUE</span>{% endif %}{% if r.value_gate_label %}<span class="gate-reason" title="Value not flagged">{{ r.value_gate_label }}</span>{% endif %}<span class="risk-badge-slot"></span></td>
-                                    <td>{{ r.jockey or '—' }}</td>
-                                    <td>{{ r.trainer or '—' }}</td>
+                                    <td class="strong horse-cell">{{ r.horse_name }}{% if r.draw %} <span class="pill" style="font-size:0.7em;">({{ r.draw }})</span>{% endif %}{% if r.value_flag %} <span class="value-flag">VALUE</span>{% endif %}{% if r.paper_ledger %} <span class="paper-ledger-badge pill" title="Paper ledger {{ r.paper_ledger.status }}">{% if r.paper_ledger.status == 'settled' %}✓{% else %}●{% endif %}</span>{% endif %}{% if r.value_gate_label %}<span class="gate-reason" title="Value not flagged">{{ r.value_gate_label }}</span>{% endif %}<span class="risk-badge-slot"></span>
+                                    {% include 'racing/_runner_place_telemetry.html' %}
+                                    </td>
+                                    <td class="runner-jockey">{{ r.jockey or '—' }}</td>
+                                    <td class="runner-trainer">{{ r.trainer or '—' }}</td>
                                     <td class="num">{% if r.official_rating is not none and r.official_rating == r.official_rating %}{{ r.official_rating|int }}{% else %}—{% endif %}</td>
                                     <td class="num" title="RP form figures">{{ r.form_string or '—' }}</td>
                                     <td class="enrich-cell">
@@ -459,9 +726,22 @@
                                         {% if g and g.drift_delta is not none %}{{ '%+.2f'|format(g.drift_delta) }}{% else %}—{% endif %}
                                     </td>
                                     <td class="rp-comment" title="{{ r.card_comment or '' }}">{{ r.rp_comment_short or '—' }}</td>
-                                    <td class="engine-opinion" title="{% for reason in r.engine_reasons or [] %}{{ reason }} {% endfor %}">{{ r.engine_opinion or '—' }}</td>
+                                    <td class="engine-opinion">
+                                        {% if r.engine_reasons %}
+                                        <details class="pick-reason-drawer">
+                                            <summary class="pick-reason-sum">{{ r.engine_opinion or 'Why this horse' }}</summary>
+                                            <ul class="pick-reason-list">
+                                                {% for reason in r.engine_reasons[:4] %}
+                                                <li>{{ reason }}</li>
+                                                {% endfor %}
+                                            </ul>
+                                        </details>
+                                        {% else %}
+                                        {{ r.engine_opinion or '—' }}
+                                        {% endif %}
+                                    </td>
                                     <td class="num">{{ (r.model_place_prob or 0)|fmt_pct }}</td>
-                                    <td class="num">{{ r.combo_bayes_place|fmt_num }}</td>
+                                    <td class="num">{{ r.combo_bayes_place|fmt_pct }}</td>
                                     <td class="num">{{ r.ew_combined_ev|fmt_num }}</td>
                                     <td class="num stake-cell"><span class="stake-units-label">1.0u</span><span class="stake-cash-hint stake-cash-slot"></span></td>
                                 </tr>
@@ -474,10 +754,16 @@
             {% endfor %}
         </div>
     </div>
+    {% set ns.first = false %}
+    {% endfor %}
+    </div>
     {% endfor %}
 </section>
 {% endif %}
-{% endif %}
 
-<p class="data-note">Scores use ingested history + live card feed + Matchbook odds. RP enrich (course/dist/going W-R, form flags) fills when EMAIL/ACCESS_TOKEN are set — merge-only, never overwrites API fields.</p>
+<p class="data-note">Scores use ingested history + live card feed + Matchbook odds. RP enrich fills when credentials are set.</p>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ static_v('hibs_system_bets.js') }}" defer></script>
 {% endblock %}

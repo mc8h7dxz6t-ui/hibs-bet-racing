@@ -1,32 +1,34 @@
-/* HIBS — Harvested Intelligent Betting Systems (shared neutral theme) */
+/* HIBS — Harvested Intelligent Betting Systems (shared future-pastel theme) */
 :root {
-    --hibs-green: #0d9488;
-    --hibs-green-dark: #0f172a;
-    --hibs-green-mid: #134e4a;
-    --hibs-green-soft: rgba(13, 148, 136, 0.18);
-    --hibs-green-glow: rgba(13, 148, 136, 0.1);
-    --hibs-green-highlight: rgba(148, 163, 184, 0.06);
-    --hibs-navy: #0f172a;
-    --hibs-navy-deep: #0b1220;
-    --hibs-neon: #e2e8f0;
-    --neon-value: #5eead4;
-    --green: #a7f3d0;
-    --green-dim: #64748b;
-    --border: rgba(148, 163, 184, 0.18);
-    --glow: rgba(13, 148, 136, 0.12);
-    --gold: #fcd34d;
-    --gold-dim: rgba(252, 211, 77, 0.1);
-    --accent: #94a3b8;
-    --blue: #7dd3fc;
-    --card: rgba(15, 23, 42, 0.92);
-    --text: #f1f5f9;
-    --muted: #94a3b8;
+    --hibs-green: #8fead2;
+    --hibs-green-dark: #101b2c;
+    --hibs-green-mid: #20364a;
+    --hibs-green-soft: rgba(184, 245, 225, 0.16);
+    --hibs-green-glow: rgba(184, 245, 225, 0.12);
+    --hibs-green-highlight: rgba(210, 246, 255, 0.08);
+    --hibs-navy: #101b2c;
+    --hibs-navy-deep: #08111f;
+    --hibs-neon: #d4fff0;
+    --neon-value: #b8f5e1;
+    --green: #b8f5e1;
+    --green-dim: #a9bbd1;
+    --border: rgba(218, 235, 255, 0.18);
+    --glow: rgba(141, 211, 255, 0.16);
+    --gold: #ffdca8;
+    --gold-dim: rgba(255, 220, 168, 0.12);
+    --accent: #c8d7ff;
+    --blue: #9edcff;
+    --card: rgba(15, 24, 40, 0.86);
+    --text: #f7fbff;
+    --muted: #a9bbd1;
 }
 
 body {
     background-image:
-        radial-gradient(ellipse at 20% 0%, rgba(13, 148, 136, 0.06) 0%, transparent 50%),
-        linear-gradient(180deg, var(--hibs-navy-deep) 0%, #0f172a 100%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 260px),
+        radial-gradient(ellipse at 18% 0%, rgba(184, 245, 225, 0.09) 0%, transparent 48%),
+        radial-gradient(ellipse at 92% 8%, rgba(200, 215, 255, 0.09) 0%, transparent 42%),
+        linear-gradient(135deg, #08111f 0%, #111a2a 46%, #0e2425 100%);
 }
 
 body::before {
@@ -52,16 +54,17 @@ body::before {
 }
 
 .hibs-product-pill.active {
-    background: linear-gradient(135deg, #0d9488, #0f766e);
+    background: linear-gradient(135deg, #b8f5e1, #b8ccff);
+    color: #061521;
 }
 
 .tab-btn.active,
 .sub-tab.active,
 .chip.active {
-    background: rgba(13, 148, 136, 0.14);
-    border-color: rgba(94, 234, 212, 0.28);
-    color: var(--text);
-    box-shadow: none;
+    background: rgba(184, 245, 225, 0.14);
+    border-color: rgba(184, 204, 255, 0.30);
+    color: #f7fbff;
+    box-shadow: 0 6px 18px rgba(129, 212, 250, 0.12);
 }
 
 .stat-pill.gold {
@@ -71,7 +74,52 @@ body::before {
 }
 
 .nav-btn:hover {
-    background: rgba(148, 163, 184, 0.08);
-    border-color: rgba(148, 163, 184, 0.28);
+    background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(218, 235, 255, 0.26);
     color: var(--text);
+}
+
+.site-top,
+.hero-panel,
+.card,
+.stat-card,
+.window-banner,
+.smart-picks-hero,
+.webhook-preview-card,
+.insights-hero,
+.pick-card,
+.lt-head,
+.lt-panel,
+.hx-head,
+.hx-rev,
+.hx-promo,
+.hx-perf,
+.hx-lane,
+.hx-card,
+.hx-insight {
+    border-color: rgba(218, 235, 255, 0.18) !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.045)) !important;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.24) !important;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+.site-top,
+.lt-head,
+.hx-head,
+.insights-hero {
+    border-radius: 14px;
+}
+
+.value-flag,
+.pill.ok,
+.lt-status .ok {
+    color: #b8f5e1;
+    border-color: rgba(184, 245, 225, 0.34);
+}
+
+.pill.warn,
+.lt-status .warn {
+    color: #ffdca8;
+    border-color: rgba(255, 220, 168, 0.34);
 }

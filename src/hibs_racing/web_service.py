@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import os
+import sqlite3
+import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -14,17 +17,37 @@ from hibs_racing.cards.ui_frame import (
     is_value_pick,
     safe_value_mask,
 )
-from hibs_racing.cards.window import filter_next_hours, off_minutes
+from hibs_racing.cards.window import filter_next_hours, off_minutes, primary_card_date
+from hibs_racing.entity.timezone import LONDON
 from hibs_racing.backtest.place_signal import run_place_backtest
 from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.cards.store import load_upcoming_runners
-from hibs_racing.config import db_path, load_config
+from hibs_racing.config import db_path, load_config, parquet_dir
 from hibs_racing.entity.natural_key import generate_natural_key
 from hibs_racing.features.store import connect, init_db
 from hibs_racing.pick_explain import attach_pick_explanations, explain_pick
 from hibs_racing.ingest.rp_verdict import race_verdict_from_runners
 from hibs_racing.live.execution_config import betfair_configured, betfair_enabled
 from hibs_racing.race_insights import build_race_insights
+
+_UI_CONTEXT_CACHE: dict[tuple, tuple[float, dict]] = {}
+_UI_CONTEXT_TTL_SEC = float(os.environ.get("HIBS_RACING_UI_CONTEXT_TTL_SEC", "90"))
+
+
+def _ui_context_get(key: tuple) -> dict | None:
+    cached = _UI_CONTEXT_CACHE.get(key)
+    if not cached:
+        return None
+    ts, payload = cached
+    if time.monotonic() - ts > _UI_CONTEXT_TTL_SEC:
+        _UI_CONTEXT_CACHE.pop(key, None)
+        return None
+    return dict(payload)
+
+
+def _ui_context_put(key: tuple, payload: dict) -> dict:
+    _UI_CONTEXT_CACHE[key] = (time.monotonic(), dict(payload))
+    return dict(payload)
 
 
 @dataclass
@@ -49,9 +72,21 @@ class HealthStatus:
     unscored_runners: int | None = None
     nan_integrity_passed: bool | None = None
     production_value_count: int | None = None
+    db_integrity_ok: bool | None = None
+    matchbook_credentials_configured: bool | None = None
+    value_lane_ready: bool | None = None
+    value_lane_blockers: list[str] | None = None
+    health_notes: list[str] | None = None
     paper: dict | None = None
     cron: dict | None = None
     reliability: dict | None = None
+    place_reliability: dict | None = None
+    sale_gates: dict | None = None
+    backtest_results: dict | None = None
+    evidence_truth: dict | None = None
+    latest_card_date: str | None = None
+    card_fresh: bool | None = None
+    data_producer: dict | None = None
 
     def to_dict(self) -> dict:
         out = {
@@ -85,6 +120,20 @@ class HealthStatus:
             out["unscored_runners"] = self.unscored_runners
         if self.nan_integrity_passed is not None:
             out["nan_integrity_passed"] = self.nan_integrity_passed
+        if self.db_integrity_ok is not None:
+            out["db_integrity_ok"] = self.db_integrity_ok
+        if self.matchbook_credentials_configured is not None:
+            out["matchbook_credentials_configured"] = self.matchbook_credentials_configured
+        if self.value_lane_ready is not None:
+            out["value_lane_ready"] = self.value_lane_ready
+        if self.value_lane_blockers is not None:
+            out["value_lane_blockers"] = self.value_lane_blockers
+        if self.health_notes is not None:
+            out["health_notes"] = self.health_notes
+        out["matchbook_note"] = (
+            "matchbook=false means exchange API credentials are not set in .env — "
+            "not 'no odds on card'. Value lane blockers: unscored_runners, nan_integrity_passed."
+        )
         if self.production_value_count is not None:
             out["production_value_count"] = self.production_value_count
         if self.paper is not None:
@@ -93,6 +142,45 @@ class HealthStatus:
             out["cron"] = self.cron
         if self.reliability is not None:
             out["reliability"] = self.reliability
+        if self.place_reliability is not None:
+            out["place_reliability"] = self.place_reliability
+        if self.sale_gates is not None:
+            out["sale_gates"] = self.sale_gates
+        if self.backtest_results is not None:
+            out["backtest_results"] = self.backtest_results
+        if self.evidence_truth is not None:
+            out["evidence_truth"] = self.evidence_truth
+        if self.latest_card_date is not None:
+            out["latest_card_date"] = self.latest_card_date
+        out["card_fresh"] = self.card_fresh if self.card_fresh is not None else False
+        if self.data_producer is not None:
+            out["data_producer"] = self.data_producer
+        try:
+            from hibs_racing.live.execution_config import execution_summary
+
+            out["execution"] = execution_summary()
+            out["execution"]["institutional_note"] = (
+                "Sub-100ms exchange execution not in analytics license."
+            )
+        except Exception:
+            pass
+        if not _health_light_mode():
+            try:
+                from pathlib import Path
+
+                from hibs_racing.config import db_path
+                from inst_spine.check import run_institutional_check
+
+                spine_db = Path(str(db_path())).parent / "inst_spine.sqlite"
+                if spine_db.is_file():
+                    rep = run_institutional_check(database=spine_db)
+                    out["inst_spine"] = {
+                        "passed": rep.passed,
+                        "message": rep.message,
+                        "n_checks": len(rep.checks),
+                    }
+            except Exception:
+                pass
         return out
 
 
@@ -103,8 +191,82 @@ def _env_ok(*keys: str) -> bool:
     return True
 
 
+def _matchbook_creds_ok() -> bool:
+    user = (
+        os.environ.get("MATCHBOOK_USERNAME", "").strip()
+        or os.environ.get("MATCHBOOK_USER", "").strip()
+    )
+    return bool(user and os.environ.get("MATCHBOOK_PASSWORD", "").strip())
+
+
 def _health_light_mode() -> bool:
-    return os.environ.get("HIBS_HEALTH_LIGHT", "0").strip().lower() in ("1", "true", "yes", "on")
+    raw = os.environ.get("HIBS_HEALTH_LIGHT", "").strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return False
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    return True
+
+
+def shell_health_status() -> HealthStatus:
+    """Fast health for HTML nav — COUNT queries only (no full runner frame)."""
+    from hibs_racing.features.db_repair import integrity_check, value_lane_blockers
+
+    cfg = load_config()
+    db = db_path(cfg)
+    light_mode = _health_light_mode()
+    db_integrity_ok = db.exists()
+    if not light_mode:
+        db_integrity_ok = bool(integrity_check(db).get("ok"))
+    runners_loaded = 0
+    scores_loaded = 0
+    sync = {"unscored_on_card": 0, "in_sync": True}
+    if db_integrity_ok:
+        try:
+            init_db(db)
+            with connect(db) as conn:
+                runners_loaded = int(conn.execute("SELECT COUNT(*) FROM upcoming_runners").fetchone()[0] or 0)
+                scores_loaded = int(conn.execute("SELECT COUNT(*) FROM card_scores").fetchone()[0] or 0)
+            if not light_mode:
+                from hibs_racing.cards.ui_frame import db_ui_sync_report
+
+                sync = db_ui_sync_report(database=db)
+        except Exception:
+            db_integrity_ok = False
+
+    raceform = os.environ.get("RACEFORM_DB_PATH", "").strip() or None
+    if raceform:
+        raceform = str(Path(raceform).expanduser())
+        if not Path(raceform).exists():
+            raceform = None
+    mb_creds = _matchbook_creds_ok()
+    partial = {
+        "db_ok": db.exists() and db_integrity_ok,
+        "db_integrity_ok": db_integrity_ok,
+        "card_fresh": None,
+        "unscored_runners": int(sync.get("unscored_on_card") or 0),
+        "nan_integrity_passed": None,
+        "runners_loaded": runners_loaded,
+    }
+    blockers = value_lane_blockers(partial)
+    return HealthStatus(
+        db_ok=db.exists() and db_integrity_ok,
+        runners_loaded=runners_loaded,
+        scores_loaded=scores_loaded,
+        racing_api=_env_ok("RACING_API_USERNAME", "RACING_API_PASSWORD"),
+        racing_post=_env_ok("EMAIL", "ACCESS_TOKEN"),
+        matchbook=mb_creds,
+        raceform_path=raceform,
+        betfair_enabled=betfair_enabled(),
+        betfair_configured=betfair_configured(),
+        analytics_mode=True,
+        db_integrity_ok=db_integrity_ok,
+        matchbook_credentials_configured=mb_creds,
+        value_lane_ready=len(blockers) == 0,
+        value_lane_blockers=blockers,
+        db_ui_in_sync=bool(sync.get("in_sync")),
+        unscored_runners=int(sync.get("unscored_on_card") or 0),
+    )
 
 
 def _paper_health_summary(database) -> dict:
@@ -120,8 +282,9 @@ def _paper_health_summary(database) -> dict:
                 SELECT
                     COUNT(*) AS n,
                     SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open_n,
-                    SUM(CASE WHEN status = 'settled' THEN 1 ELSE 0 END) AS settled_n
+                    SUM(CASE WHEN status != 'open' THEN 1 ELSE 0 END) AS settled_n
                 FROM paper_bets
+                WHERE backtest = 0
                 """
             ).fetchone()
             if row:
@@ -151,17 +314,35 @@ def health_status() -> HealthStatus:
 
     from hibs_racing.backtest.snapshot_store import scoring_config_hash, snapshot_coverage
     from hibs_racing.cards.engine_profile import build_engine_profile
+    from hibs_racing.features.db_repair import integrity_check, value_lane_blockers
     from hibs_racing.institutional.paper_reconciliation import reconcile_paper_ledger
     from hibs_racing.institutional.run_manifest import latest_manifest_for_date
 
     cfg = load_config()
     db = db_path(cfg)
-    init_db(db)
-    runners = load_upcoming_runners(db)
+    db_integrity = integrity_check(db)
+    db_integrity_ok = bool(db_integrity.get("ok"))
+    runners = pd.DataFrame()
     scores = 0
-    with connect(db) as conn:
-        row = conn.execute("SELECT COUNT(*) FROM card_scores").fetchone()
-        scores = int(row[0]) if row else 0
+    sync = {"unscored_on_card": 0, "in_sync": True}
+    nan_report = None
+    if db_integrity_ok:
+        try:
+            init_db(db)
+            runners = load_upcoming_runners(db)
+            with connect(db) as conn:
+                row = conn.execute("SELECT COUNT(*) FROM card_scores").fetchone()
+                scores = int(row[0]) if row else 0
+            from hibs_racing.cards.ui_frame import db_ui_sync_report
+
+            sync = db_ui_sync_report(database=db)
+            if not _health_light_mode():
+                from hibs_racing.monitoring.nan_alert import run_nan_integrity_check
+
+                nan_report = run_nan_integrity_check(database=db, strict=False)
+        except sqlite3.DatabaseError:
+            db_integrity_ok = False
+
     raceform = os.environ.get("RACEFORM_DB_PATH", "").strip() or None
     if raceform:
         raceform = str(Path(raceform).expanduser())
@@ -170,17 +351,20 @@ def health_status() -> HealthStatus:
     today = datetime.now(timezone.utc).date().isoformat()
     end_dt = datetime.now(timezone.utc).date()
     start_dt = (end_dt - timedelta(days=7)).isoformat()
-    cov = snapshot_coverage(db, start_dt, end_dt.isoformat())
-    manifest = latest_manifest_for_date(today, database=db)
+    cov: dict = {}
+    manifest = None
+    if db_integrity_ok:
+        try:
+            cov = snapshot_coverage(db, start_dt, end_dt.isoformat())
+            manifest = latest_manifest_for_date(today, database=db)
+        except Exception:
+            pass
     telemetry_balance = None
     if manifest:
         from hibs_racing.institutional.telemetry_balance import evaluate_telemetry_balance
+        from hibs_racing.models.ranker_preflight import observation_lane_enabled
 
-        observation_lane = os.environ.get("HIBS_OBSERVATION_LANE", "1").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-        )
+        observation_lane = observation_lane_enabled()
         telemetry_balance = evaluate_telemetry_balance(
             manifest=manifest,
             observation_lane=observation_lane,
@@ -192,32 +376,97 @@ def health_status() -> HealthStatus:
             recon_clean = recon.is_clean
         except Exception:
             recon_clean = None
-    sync = db_ui_sync_report(database=db)
-    from hibs_racing.monitoring.nan_alert import run_nan_integrity_check
-
-    scored = load_scored_cards() if not _health_light_mode() else pd.DataFrame()
-    prod_n = int(safe_value_mask(scored).sum()) if not scored.empty else None
-    nan_report = run_nan_integrity_check(database=db, strict=False) if not _health_light_mode() else None
-    paper_summary = _paper_health_summary(db)
-    cron_summary = _cron_health_summary(db)
+    light = _health_light_mode()
+    scored = load_scored_cards() if not light and db_integrity_ok else pd.DataFrame()
+    prod_n = int(safe_value_mask(scored).sum()) if not scored.empty else 0
+    paper_summary = _paper_health_summary(db) if db_integrity_ok else {"n_rows": 0, "open": 0, "settled": 0}
+    cron_summary = _cron_health_summary(db) if db_integrity_ok else {"steps": 0, "ok": 0, "healthy": False}
     reliability_summary = None
-    if not _health_light_mode():
+    place_reliability = None
+    if not light and db_integrity_ok:
         try:
-            from hibs_racing.analytics.reliability_bins import settled_paper_calibration
+            from hibs_racing.analytics.reliability_bins import (
+                place_reliability_from_ledger,
+                place_reliability_from_snapshots,
+                settled_paper_calibration,
+            )
 
             reliability_summary = settled_paper_calibration(db)
+            with connect(db) as conn:
+                place_reliability = place_reliability_from_ledger(conn, days=60, backtest=False)
+                if int(place_reliability.get("n") or 0) < 20:
+                    snap = place_reliability_from_snapshots(conn, days=60)
+                    if int(snap.get("n") or 0) > int(place_reliability.get("n") or 0):
+                        place_reliability = snap
         except Exception:
             reliability_summary = None
+            place_reliability = None
+    from hibs_racing.sale_gates import sale_gate_status
+
+    try:
+        from hibs_racing.analytics.backtest_results import backtest_results_summary
+
+        backtest_results = backtest_results_summary()
+    except Exception:
+        backtest_results = None
+    evidence_truth = None
+    if not light:
+        try:
+            from hibs_racing.analytics.evidence_truth_plane import build_evidence_truth_plane
+
+            partial_health = {
+                "reliability": reliability_summary,
+                "place_reliability": place_reliability,
+            }
+            evidence_truth = build_evidence_truth_plane(health=partial_health, days=90)
+        except Exception:
+            evidence_truth = None
     tel = telemetry_balance if isinstance(telemetry_balance, dict) else {}
     if cov.get("coverage_pct") is not None and "coverage_pct" not in tel:
         tel = {**tel, "coverage_pct": float(cov.get("coverage_pct"))}
+    latest_card_date = None
+    card_fresh = None
+    if runners is not None and len(runners) > 0 and "card_date" in runners.columns:
+        try:
+            from hibs_racing.cards.window import latest_iso_card_date, primary_card_date
+
+            latest_card_date = primary_card_date(runners) or latest_iso_card_date(runners)
+            if latest_card_date:
+                card_fresh = str(latest_card_date)[:10] >= today
+            else:
+                card_fresh = False
+        except Exception:
+            latest_card_date = None
+            card_fresh = False
+    elif manifest is not None:
+        latest_card_date = manifest.card_date
+        card_fresh = str(latest_card_date) >= today if latest_card_date else False
+    data_producer = None
+    if not light:
+        try:
+            from hibs_racing.data_producer_slo import build_data_producer_snapshot
+
+            data_producer = build_data_producer_snapshot()
+        except Exception:
+            data_producer = None
+    mb_creds = _matchbook_creds_ok()
+    partial = {
+        "db_ok": db.exists() and db_integrity_ok,
+        "db_integrity_ok": db_integrity_ok,
+        "card_fresh": card_fresh,
+        "unscored_runners": int(sync.get("unscored_on_card") or 0),
+        "nan_integrity_passed": nan_report.passed if nan_report is not None else None,
+        "runners_loaded": len(runners),
+    }
+    blockers = value_lane_blockers(partial)
+    lane_ready = len(blockers) == 0
     return HealthStatus(
-        db_ok=db.exists(),
+        db_ok=db.exists() and db_integrity_ok,
         runners_loaded=len(runners),
         scores_loaded=scores,
         racing_api=_env_ok("RACING_API_USERNAME", "RACING_API_PASSWORD"),
         racing_post=_env_ok("EMAIL", "ACCESS_TOKEN"),
-        matchbook=_env_ok("MATCHBOOK_USERNAME", "MATCHBOOK_PASSWORD"),
+        matchbook=mb_creds,
         raceform_path=raceform,
         betfair_enabled=betfair_enabled(),
         betfair_configured=betfair_configured(),
@@ -232,9 +481,24 @@ def health_status() -> HealthStatus:
         unscored_runners=int(sync.get("unscored_on_card") or 0),
         nan_integrity_passed=nan_report.passed if nan_report is not None else None,
         production_value_count=prod_n,
+        db_integrity_ok=db_integrity_ok,
+        matchbook_credentials_configured=mb_creds,
+        value_lane_ready=lane_ready,
+        value_lane_blockers=blockers,
+        health_notes=[
+            "matchbook=false means MATCHBOOK_USERNAME/PASSWORD unset — not missing card odds",
+            "value lane blockers: unscored_runners, nan_integrity_passed, card_fresh",
+        ],
         paper=paper_summary,
         cron=cron_summary,
         reliability=reliability_summary,
+        place_reliability=place_reliability,
+        sale_gates=sale_gate_status(),
+        backtest_results=backtest_results,
+        evidence_truth=evidence_truth,
+        latest_card_date=latest_card_date,
+        card_fresh=card_fresh,
+        data_producer=data_producer,
     )
 
 
@@ -256,7 +520,7 @@ def _offered_place_decimal(row: dict | pd.Series, *, default_fraction: float = 0
     return round(1.0 + (win_f - 1.0) * pf, 2)
 
 
-def _enrich_runner(row: dict, peers: pd.DataFrame) -> dict:
+def _enrich_runner(row: dict, peers: pd.DataFrame, *, paper_status: dict | None = None) -> dict:
     explained = explain_pick(row, race_peers=peers)
     row["engine_opinion"] = explained.get("pick_summary")
     row["engine_reasons"] = explained.get("pick_reasons") or []
@@ -267,12 +531,19 @@ def _enrich_runner(row: dict, peers: pd.DataFrame) -> dict:
     comment = raw_comment.strip() if isinstance(raw_comment, str) else ""
     row["rp_comment_short"] = (comment[:120] + "…") if len(comment) > 120 else comment
     row.update(build_enrich_display(row))
+    rid = str(row.get("runner_id") or "")
+    if paper_status and rid in paper_status:
+        row["paper_ledger"] = paper_status[rid]
     return row
 
 
 def group_meetings(frame: pd.DataFrame) -> list[dict]:
     if frame.empty:
         return []
+    from hibs_racing.place.paper_ledger import paper_bet_status_by_runner
+
+    card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if "card_date" in frame.columns else []
+    paper_status = paper_bet_status_by_runner(card_dates=card_dates) if card_dates else {}
     meetings: list[dict] = []
     group_cols = ["card_date", "course"]
     if "region" in frame.columns and frame["region"].notna().any():
@@ -289,7 +560,7 @@ def group_meetings(frame: pd.DataFrame) -> list[dict]:
         for race_id, race_df in course_df.groupby("race_id", sort=False):
             race_df = race_df.sort_values("model_place_prob", ascending=False, na_position="last")
             peers = race_df.copy()
-            runners = [_enrich_runner(rec, peers) for rec in race_df.to_dict(orient="records")]
+            runners = [_enrich_runner(rec, peers, paper_status=paper_status) for rec in race_df.to_dict(orient="records")]
             first = race_df.iloc[0]
             insights = build_race_insights(race_df)
             rp_verdict = race_verdict_from_runners(race_df)
@@ -338,19 +609,135 @@ def group_meetings(frame: pd.DataFrame) -> list[dict]:
             }
         )
 
+    _finalize_meeting_slugs(meetings)
+    _attach_market_gauges(meetings)
+    from hibs_racing.pick_quality import attach_pick_quality_flags
+
+    attach_pick_quality_flags(meetings)
+    return meetings
+
+
+def _finalize_meeting_slugs(meetings: list[dict], *, label_fields: bool = True) -> None:
     meetings.sort(key=lambda m: (m.get("card_date", ""), m.get("first_off_minutes") or 9999, str(m.get("course") or "")))
     for idx, meeting in enumerate(meetings):
         base = f"{meeting.get('card_date', '')}-{meeting.get('course') or 'meeting'}".lower()
         slug = "".join(ch if ch.isalnum() or ch == "-" else "-" for ch in base.replace(" ", "-"))
         slug = "-".join(part for part in slug.split("-") if part)[:48] or "meeting"
         meeting["slug"] = f"{idx + 1}-{slug}"
-        off_times = [str(r.get("off_time") or "") for r in meeting["races"] if r.get("off_time")]
+        if not label_fields:
+            continue
+        off_times = [str(r.get("off_time") or "") for r in meeting.get("races") or [] if r.get("off_time")]
         meeting["first_off"] = off_times[0] if off_times else "—"
         meeting["last_off"] = off_times[-1] if off_times else "—"
         region_tag = meeting.get("region") or ""
         meeting["label"] = f"{meeting['course']}" + (f" ({region_tag})" if region_tag else "")
-    _attach_market_gauges(meetings)
+
+
+def race_deep_link_index(frame: pd.DataFrame) -> list[dict]:
+    """Race/meeting slugs for deep links — no per-runner enrichment or race insights."""
+    if frame.empty:
+        return []
+    meetings: list[dict] = []
+    group_cols = ["card_date", "course"]
+    if "region" in frame.columns and frame["region"].notna().any():
+        group_cols = ["card_date", "course", "region"]
+
+    for keys, course_df in frame.groupby(group_cols, sort=False):
+        if len(group_cols) == 3:
+            card_date, course, region = keys
+        else:
+            card_date, course = keys
+            region = course_df["region"].iloc[0] if "region" in course_df.columns else ""
+
+        races: list[dict] = []
+        for race_id, race_df in course_df.groupby("race_id", sort=False):
+            first = race_df.iloc[0]
+            races.append(
+                {
+                    "race_id": race_id,
+                    "race_slug": "",
+                    "off_time": first.get("off_time"),
+                    "off_minutes": off_minutes(first.get("off_time")),
+                }
+            )
+        races.sort(key=lambda r: (r.get("off_minutes") or 9999,))
+        for idx, race in enumerate(races):
+            race["race_slug"] = f"r{idx + 1}"
+        meetings.append(
+            {
+                "course": course,
+                "card_date": str(card_date),
+                "region": str(region or "").upper(),
+                "slug": "",
+                "races": races,
+                "first_off_minutes": races[0]["off_minutes"] if races else 9999,
+            }
+        )
+
+    _finalize_meeting_slugs(meetings, label_fields=False)
     return meetings
+
+
+def day_label(card_date: str, *, now: datetime | None = None) -> str:
+    """Human label for a card_date — Today / Tomorrow / ISO date."""
+    now = now or datetime.now(LONDON)
+    today = now.date().isoformat()
+    tomorrow = (now.date() + timedelta(days=1)).isoformat()
+    d = str(card_date)[:10]
+    if d == today:
+        return "Today"
+    if d == tomorrow:
+        return "Tomorrow"
+    return d
+
+
+def group_meetings_by_day(meetings: list[dict], *, now: datetime | None = None) -> list[dict]:
+    """Group meeting dicts under card_date with display labels."""
+    if not meetings:
+        return []
+    buckets: dict[str, list[dict]] = {}
+    for meeting in meetings:
+        d = str(meeting.get("card_date") or "")[:10]
+        buckets.setdefault(d, []).append(meeting)
+    return meeting_days_from_card_dates(list(buckets.keys()), now=now, meetings_by_date=buckets)
+
+
+def meeting_days_from_card_dates(
+    card_dates: list[str],
+    *,
+    now: datetime | None = None,
+    meetings_by_date: dict[str, list[dict]] | None = None,
+) -> list[dict]:
+    """Day headers for templates — optional meeting lists per date."""
+    buckets = meetings_by_date or {}
+    return [
+        {
+            "card_date": card_date,
+            "label": day_label(card_date, now=now),
+            "meetings": buckets.get(card_date, []),
+        }
+        for card_date in sorted({str(d)[:10] for d in card_dates if d})
+    ]
+
+
+def top_picks_by_day(
+    frame: pd.DataFrame,
+    meetings: list[dict],
+    *,
+    top_n: int = 6,
+) -> dict[str, list[dict]]:
+    """Best place picks per card_date (today vs tomorrow separated)."""
+    from hibs_racing.monitor import top_places_of_day
+
+    if frame.empty or "card_date" not in frame.columns:
+        return {}
+    out: dict[str, list[dict]] = {}
+    for card_date in sorted(frame["card_date"].astype(str).str[:10].unique()):
+        day_frame = frame[frame["card_date"].astype(str).str[:10] == card_date]
+        picks = attach_deep_links_to_picks(top_places_of_day(day_frame, top_n=top_n), meetings)
+        if picks:
+            out[str(card_date)[:10]] = picks
+    return out
 
 
 def race_dom_id(meeting_slug: str, race_slug: str) -> str:
@@ -434,39 +821,246 @@ def _attach_market_gauges(meetings: list[dict]) -> None:
                 runner["market_gauge"] = gauges.get(rid)
 
 
-def _base_frame(*, card_date: str | None = None, window_hours: int | None = 24) -> pd.DataFrame:
+def _backfill_win_decimal_from_cache(frame: pd.DataFrame) -> pd.DataFrame:
+    """Attach stale-but-usable exchange quotes when live odds ingest is gated."""
+    if frame.empty or "runner_id" not in frame.columns:
+        return frame
+    out = frame.copy()
+    if "win_decimal" not in out.columns:
+        out["win_decimal"] = None
+    missing = out["win_decimal"].isna() | (pd.to_numeric(out["win_decimal"], errors="coerce") <= 1.0)
+    if not missing.any():
+        return out
+    try:
+        from hibs_racing.odds.exchange_quotes import load_cached_exchange_odds
+
+        cached = load_cached_exchange_odds(out.loc[missing])
+    except Exception:
+        return out
+    if cached is None or cached.empty:
+        return out
+    price_map = dict(zip(cached["runner_id"].astype(str), cached["win_decimal"]))
+    for idx in out.index[missing]:
+        rid = str(out.at[idx, "runner_id"] or "")
+        price = price_map.get(rid)
+        if price is not None:
+            try:
+                if float(price) > 1.0:
+                    out.at[idx, "win_decimal"] = float(price)
+            except (TypeError, ValueError):
+                continue
+    return out
+
+
+def _base_frame(*, card_date: str | None = None, window_hours: int | None = 48) -> pd.DataFrame:
     frame = load_scored_cards()
-    if card_date and not frame.empty:
-        frame = frame[frame["card_date"].astype(str) == card_date]
+    if not frame.empty and "card_date" in frame.columns:
+        dates = sorted(str(d)[:10] for d in frame["card_date"].dropna().astype(str).unique())
+        if card_date:
+            keep_dates = {str(card_date)[:10]}
+        else:
+            today_d = datetime.now(LONDON).date()
+            today = today_d.isoformat()
+            tomorrow = (today_d + timedelta(days=1)).isoformat()
+            keep_dates = {d for d in dates if d in {today, tomorrow}}
+            if not keep_dates:
+                future_dates = [d for d in dates if d >= today]
+                keep_dates = set(future_dates[:2] if future_dates else dates[-1:])
+        if keep_dates:
+            frame = frame[frame["card_date"].astype(str).str[:10].isin(keep_dates)]
     if window_hours and not frame.empty:
-        frame = filter_next_hours(frame, hours=window_hours)
-    return frame
+        narrowed = filter_next_hours(frame, hours=window_hours)
+        if narrowed.empty and window_hours < 48:
+            widened = filter_next_hours(frame, hours=48)
+            if not widened.empty:
+                frame = widened
+            else:
+                frame = narrowed
+        else:
+            frame = narrowed
+    return _backfill_win_decimal_from_cache(frame)
+
+
+def _summary_display_frame(frame: pd.DataFrame, *, per_day: int = 90) -> pd.DataFrame:
+    """Bound expensive summary/pick widgets while keeping full racecards available."""
+    if frame.empty or "card_date" not in frame.columns or len(frame) <= per_day:
+        return frame
+    sort_cols = ["card_date"]
+    ascending = [True]
+    if "value_flag" in frame.columns:
+        sort_cols.append("value_flag")
+        ascending.append(False)
+    if "model_place_prob" in frame.columns:
+        sort_cols.append("model_place_prob")
+        ascending.append(False)
+    ordered = frame.sort_values(sort_cols, ascending=ascending, na_position="last")
+    return ordered.groupby(ordered["card_date"].astype(str).str[:10], group_keys=False).head(per_day).copy()
+
+
+def _cap_dashboard_frame(frame: pd.DataFrame, *, max_runners: int = 1200) -> pd.DataFrame:
+    """Keep the racecard UI bounded when the DB holds many future card_dates."""
+    if frame.empty or len(frame) <= max_runners:
+        return frame
+    dates = sorted(frame["card_date"].astype(str).str[:10].unique()) if "card_date" in frame.columns else []
+    if not dates:
+        return frame.head(max_runners).copy()
+    primary = primary_card_date(frame)
+    keep = [d for d in dates if d >= (primary or dates[0])][:3]
+    trimmed = frame[frame["card_date"].astype(str).str[:10].isin(keep)]
+    if trimmed.empty:
+        return frame.head(max_runners).copy()
+    if len(trimmed) > max_runners:
+        return trimmed.head(max_runners).copy()
+    return trimmed
+
+
+def _ui_data_status(frame: pd.DataFrame) -> dict:
+    from hibs_racing.matchbook_guard import status_payload as matchbook_status
+    from hibs_racing.scrapers.racing_scrape_api import odds_coverage_summary
+    from hibs_racing.scrapers.scrape_resilience import circuit_status
+    from hibs_racing.scrape_first import scrape_first_status
+
+    cov = odds_coverage_summary(frame)
+    scrape = scrape_first_status()
+    mb = matchbook_status()
+    oc = circuit_status().get("oddschecker") or {}
+
+    messages: list[str] = []
+    level = "ok"
+    if frame.empty:
+        level = "error"
+        messages.append("No runners loaded for this window — click Refresh 24h.")
+    elif not cov.get("ok"):
+        level = "warn"
+        # Operator telemetry only — surfaced on /status, not dashboard banners.
+
+    return {
+        "level": level,
+        "messages": messages,
+        "odds_coverage": cov,
+        "scrape_first": scrape,
+        "matchbook": mb,
+        "oddschecker_circuit": oc,
+        "odds_source": os.getenv("HIBS_ODDS_SOURCE", "auto"),
+        "cards_source": os.getenv("HIBS_RACING_CARD_SOURCE", "auto"),
+    }
 
 
 def insights_context(*, top_n: int = 10, window_hours: int = 24) -> dict:
+    from hibs_racing.daily.pick_display import (
+        build_engine_display_picks,
+        build_sniper_lane_display_picks,
+        build_value_lane_display_picks,
+    )
     from hibs_racing.models.feature_impact import load_feature_impact_report
     from hibs_racing.monitor import top_places_of_day
+    from hibs_racing.pick_quality import summarize_gate_blocks_from_frame, summarize_gate_tiers_from_frame
+    from hibs_racing.racing_lanes_status import build_racing_lanes_status
 
     frame = _base_frame(window_hours=window_hours)
-    meetings = group_meetings(frame) if not frame.empty else []
-    picks = attach_deep_links_to_picks(top_places_of_day(frame, top_n=top_n), meetings)
+    link_index = race_deep_link_index(frame) if not frame.empty else []
+    health = shell_health_status()
+    picks = attach_deep_links_to_picks(top_places_of_day(frame, top_n=top_n), link_index)
+    picks_by_day = top_picks_by_day(frame, link_index, top_n=top_n)
+    engine_top_picks = build_engine_display_picks(None, frame, top_n=6, deep_links=link_index)
+    value_lane_picks = build_value_lane_display_picks(None, frame, top_n=8, deep_links=link_index)
+    sniper_lane_picks = build_sniper_lane_display_picks(None, frame, top_n=6, deep_links=link_index)
+    gate_tiers = summarize_gate_tiers_from_frame(frame)
+    gate_blocks = summarize_gate_blocks_from_frame(frame)
+    value_n = int(safe_value_mask(frame).sum()) if not frame.empty else 0
+    racing_lanes_status = build_racing_lanes_status(
+        health=health,
+        value_lane_picks=value_lane_picks,
+        sniper_lane_picks=sniper_lane_picks,
+        engine_top_picks=engine_top_picks,
+        value_count=value_n,
+        runner_count=len(frame),
+        ui_data_status=_ui_data_status(frame),
+        gate_tier_counts=gate_tiers,
+        gate_blocks=gate_blocks,
+    )
+    card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else []
+    pick_dates = sorted(picks_by_day.keys())
+    day_dates = sorted(set(card_dates) | set(pick_dates))
     feature_impact = load_feature_impact_report()
-    pick_candidates = novice_pick_candidates(meetings)
     scoring_method = None
     if not frame.empty and "scoring_method" in frame.columns:
         modes = frame["scoring_method"].dropna().unique().tolist()
         scoring_method = modes[0] if len(modes) == 1 else "mixed"
     return {
         "top_picks": picks,
-        "pick_candidates": pick_candidates,
+        "value_lane_picks": value_lane_picks,
+        "sniper_lane_picks": sniper_lane_picks,
+        "racing_lanes_status": racing_lanes_status,
+        "picks_by_day": picks_by_day,
+        "meeting_days": meeting_days_from_card_dates(day_dates),
         "pick_count": len(picks),
         "runner_count": len(frame),
         "race_count": int(frame["race_id"].nunique()) if not frame.empty else 0,
-        "card_dates": sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else [],
+        "card_dates": card_dates,
         "scoring_method": scoring_method,
         "feature_impact": feature_impact,
         "window_hours": window_hours,
+        "ui_data_status": _ui_data_status(frame),
+        "health": health,
     }
+
+
+def value_picks_context(*, window_hours: int = 24) -> dict:
+    """Dedicated value-lane producer page — picks, quiet state, last-scan metadata."""
+    cache_key = ("value_picks", int(window_hours or 0))
+    cached = _ui_context_get(cache_key)
+    if cached is not None:
+        return cached
+    from hibs_racing.daily.pick_display import build_value_lane_display_picks
+    from hibs_racing.data_producer_slo import build_data_producer_snapshot
+    from hibs_racing.pick_quality import summarize_gate_blocks_from_frame, summarize_gate_tiers_from_frame
+    from hibs_racing.racing_lanes_status import build_racing_lanes_status
+
+    frame = _base_frame(window_hours=window_hours)
+    link_index = race_deep_link_index(frame) if not frame.empty else []
+    health = shell_health_status()
+    value_lane_picks = build_value_lane_display_picks(None, frame, top_n=12, deep_links=link_index)
+    value_n = int(safe_value_mask(frame).sum()) if not frame.empty else 0
+    ui_status = _ui_data_status(frame)
+    gate_tiers = summarize_gate_tiers_from_frame(frame)
+    gate_blocks = summarize_gate_blocks_from_frame(frame)
+    racing_lanes_status = build_racing_lanes_status(
+        health=health,
+        value_lane_picks=value_lane_picks,
+        sniper_lane_picks=[],
+        value_count=value_n,
+        runner_count=len(frame),
+        ui_data_status=ui_status,
+        gate_tier_counts=gate_tiers,
+        gate_blocks=gate_blocks,
+    )
+    producer_snap = build_data_producer_snapshot()
+    cards_prod = (producer_snap.get("producers") or {}).get("racing_cards") or {}
+    scrape_prod = (producer_snap.get("producers") or {}).get("robust_scrape") or {}
+    value_lane_producer = {
+        "runners_scanned": int(racing_lanes_status.get("runner_count") or 0),
+        "raw_value_count": int(racing_lanes_status.get("raw_value_count") or 0),
+        "picks_emitted": len(value_lane_picks),
+        "latest_card_date": cards_prod.get("latest_card_date"),
+        "card_fresh": cards_prod.get("card_fresh"),
+        "odds_coverage_pct": cards_prod.get("odds_coverage_pct"),
+        "last_scrape_ok": scrape_prod.get("ok"),
+        "last_scrape_message": scrape_prod.get("message") or scrape_prod.get("last_message"),
+        "producer_ok": bool(producer_snap.get("ok")),
+    }
+    card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else []
+    ctx = {
+        "value_lane_picks": value_lane_picks,
+        "racing_lanes_status": racing_lanes_status,
+        "value_lane_producer": value_lane_producer,
+        "health": health,
+        "runner_count": len(frame),
+        "card_dates": card_dates,
+        "window_hours": window_hours,
+        "ui_data_status": ui_status,
+    }
+    return _ui_context_put(cache_key, ctx)
 
 
 def _ui_data_completeness(row: dict) -> int:
@@ -476,7 +1070,7 @@ def _ui_data_completeness(row: dict) -> int:
     return runner_data_quality_pct(row)
 
 
-def novice_pick_candidates(meetings: list[dict]) -> list[dict]:
+def novice_pick_candidates(meetings: list[dict], *, max_candidates: int | None = None) -> list[dict]:
     """Flatten card rows for client-side Smart Portfolio / slip copy (UI layer only)."""
     from hibs_racing.utils.monetization import generate_monetized_link
 
@@ -486,6 +1080,8 @@ def novice_pick_candidates(meetings: list[dict]) -> list[dict]:
         for race in meeting.get("races") or []:
             off_time = race.get("off_time")
             for row in race.get("runners") or []:
+                if max_candidates is not None and len(out) >= max_candidates:
+                    return out
                 gauge = row.get("market_gauge") or {}
                 win = row.get("win_decimal")
                 try:
@@ -503,6 +1099,7 @@ def novice_pick_candidates(meetings: list[dict]) -> list[dict]:
                         "runner_id": row.get("runner_id"),
                         "horse_name": row.get("horse_name"),
                         "course": course,
+                        "card_date": str(meeting.get("card_date") or "")[:10],
                         "off_time": off_time,
                         "race_name": race.get("race_name"),
                         "win_decimal": win_f,
@@ -535,33 +1132,71 @@ def novice_pick_candidates(meetings: list[dict]) -> list[dict]:
     return out
 
 
-def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -> dict:
-    frame = _base_frame(card_date=card_date, window_hours=window_hours)
-    health = health_status()
+def dashboard_context(*, card_date: str | None = None, window_hours: int = 48, heavy: bool = False) -> dict:
+    cache_key = ("dashboard", card_date or "", int(window_hours or 0), bool(heavy))
+    cached = _ui_context_get(cache_key)
+    if cached is not None:
+        return cached
+    frame = _cap_dashboard_frame(_base_frame(card_date=card_date, window_hours=window_hours))
+    health = shell_health_status() if not heavy else health_status()
     value = frame[safe_value_mask(frame)] if not frame.empty else frame.iloc[0:0]
-    from hibs_racing.monitor import monitor_snapshot, top_places_of_day
+    from hibs_racing.monitor import monitor_snapshot
 
-    monitor = monitor_snapshot(refresh=False, settle=True)
-    try:
-        backtest = run_place_backtest().to_dict()
-    except Exception:
-        backtest = None
+    monitor = monitor_snapshot(refresh=False, settle=heavy)
+    backtest = None
+    gate_summary = None
+    if heavy:
+        try:
+            backtest = run_place_backtest().to_dict()
+        except Exception:
+            backtest = None
     scoring_method = None
     if not frame.empty and "scoring_method" in frame.columns:
         modes = frame["scoring_method"].dropna().unique().tolist()
         scoring_method = modes[0] if len(modes) == 1 else "mixed"
     from hibs_racing.odds.market_steam import latest_gauges
     from hibs_racing.ranker_features import ranker_feature_profile
-    from hibs_racing.backtest.gate_compare import compare_value_gates
 
     card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else []
     meetings = group_meetings(frame) if not frame.empty else []
-    pick_candidates = novice_pick_candidates(meetings)
-    try:
-        gate_summary = compare_value_gates(days=14).to_dict()
-    except Exception:
-        gate_summary = None
-    return {
+    meeting_days = group_meetings_by_day(meetings)
+    summary_frame = _summary_display_frame(frame)
+    summary_meetings = group_meetings(summary_frame) if not summary_frame.empty else []
+    pick_candidates = novice_pick_candidates(summary_meetings, max_candidates=180)
+    picks_by_day = top_picks_by_day(summary_frame, summary_meetings, top_n=6)
+    from hibs_racing.daily.pick_display import build_engine_display_picks, build_sniper_lane_display_picks, build_value_lane_display_picks
+    from hibs_racing.pick_quality import (
+        gate_filter_modes,
+        summarize_gate_blocks_from_frame,
+        summarize_gate_tiers_from_frame,
+    )
+    from hibs_racing.racing_lanes_status import build_racing_lanes_status
+
+    engine_top_picks = build_engine_display_picks(summary_meetings, summary_frame, top_n=6)
+    value_lane_picks = build_value_lane_display_picks(summary_meetings, summary_frame, top_n=8)
+    sniper_lane_picks = build_sniper_lane_display_picks(summary_meetings, summary_frame, top_n=6)
+    gate_tiers = summarize_gate_tiers_from_frame(frame)
+    gate_blocks = summarize_gate_blocks_from_frame(frame)
+    racing_lanes_status = build_racing_lanes_status(
+        health=health,
+        value_lane_picks=value_lane_picks,
+        sniper_lane_picks=sniper_lane_picks,
+        engine_top_picks=engine_top_picks,
+        value_count=len(value),
+        runner_count=len(frame),
+        ui_data_status=_ui_data_status(frame),
+        gate_tier_counts=gate_tiers,
+        gate_blocks=gate_blocks,
+    )
+    if heavy:
+        from hibs_racing.backtest.gate_compare import compare_value_gates
+
+        try:
+            gate_summary = compare_value_gates(days=14).to_dict()
+        except Exception:
+            gate_summary = None
+
+    ctx = {
         "health": health,
         "card_date": card_date or (card_dates[0] if len(card_dates) == 1 else None),
         "card_dates": card_dates,
@@ -570,13 +1205,22 @@ def dashboard_context(*, card_date: str | None = None, window_hours: int = 24) -
         "race_count": int(frame["race_id"].nunique()) if not frame.empty else 0,
         "value_count": len(value),
         "meetings": meetings,
-        "top_picks": attach_deep_links_to_picks(top_places_of_day(frame, top_n=10), meetings),
+        "meeting_days": meeting_days,
+        "picks_by_day": picks_by_day,
+        "top_picks": [],
         "pick_candidates": pick_candidates,
+        "engine_top_picks": engine_top_picks,
+        "value_lane_picks": value_lane_picks,
+        "sniper_lane_picks": sniper_lane_picks,
+        "racing_lanes_status": racing_lanes_status,
         "monitor": monitor,
         "backtest": backtest,
         "scoring_method": scoring_method,
         "ranker_profile": ranker_feature_profile(),
         "gate_summary": gate_summary,
+        "gate_filter_modes": gate_filter_modes(),
         "market_gauges": latest_gauges(limit=100),
-        "parquet_path": str(Path(load_config()["paths"]["parquet_dir"]) / "card_scores.parquet"),
+        "parquet_path": str(parquet_dir() / "card_scores.parquet"),
+        "ui_data_status": _ui_data_status(frame),
     }
+    return _ui_context_put(cache_key, ctx)

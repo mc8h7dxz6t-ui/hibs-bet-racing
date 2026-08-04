@@ -6,9 +6,10 @@ import re
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, jsonify, redirect, render_template, request
 
 from hibs_racing.hibs_brand import hibs_brand_context
+from hibs_racing.product_links import product_bar_context
 from hibs_racing.models.feature_impact import impact_artifact_paths, load_feature_impact_report
 from hibs_racing.models.ranker_attribution import live_ranker_attribution
 from hibs_racing.monitor import monitor_snapshot
@@ -21,11 +22,20 @@ from hibs_racing.place.public_tracker import (
     public_tracker_enabled,
 )
 from hibs_racing.portfolio.racing import build_racing_portfolio
-from hibs_racing.portfolio.summary_bar import portfolio_summary_dict
 from hibs_racing.cards.refresh import refresh_cards
 from hibs_racing.config import db_path, load_config
 from hibs_racing.web_format import fmt_num, fmt_pct
-from hibs_racing.web_service import cards_deep_link_context, dashboard_context, health_status, insights_context
+from hibs_racing.web_service import (
+    cards_deep_link_context,
+    _base_frame,
+    dashboard_context,
+    health_status,
+    insights_context,
+    shell_health_status,
+    value_picks_context,
+)
+from hibs_racing.win_lane import build_win_lane_context, win_lane_health
+from hibs_racing.middleware.auth import require_api_key, validate_auth_config
 from hibs_racing.utils.ui_settings import (
     apply_saved_ui_env,
     monetization_form_payload,
@@ -37,6 +47,29 @@ FAQ_PATH = ROOT / "docs" / "TECHNICAL_DUE_DILIGENCE_FAQ.md"
 
 _HEALTH_CACHE: dict = {"t": 0.0, "payload": None}
 _HEALTH_TTL_SEC = float(os.environ.get("HIBS_RACING_HEALTH_TTL_SEC", "20"))
+_SHELL_HEALTH_CACHE: dict = {"t": 0.0, "status": None}
+_SHELL_HEALTH_TTL_SEC = float(os.environ.get("HIBS_SHELL_HEALTH_TTL_SEC", "30"))
+
+
+def _safe_portfolio_payload(*, racing_limit: int = 200, history_days: int | None = None) -> dict:
+    try:
+        return build_racing_portfolio(racing_limit=racing_limit, history_days=history_days)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "mode": "analytics",
+            "error": str(exc)[:200],
+            "summary": {
+                "total_rows": 0,
+                "racing_rows": 0,
+                "racing_pnl_units": 0.0,
+                "combined_pnl_units": 0.0,
+                "racing_settled": 0,
+                "open_bets": 0,
+            },
+            "ledger": [],
+            "links": {"racing_tracker": "/tracker"},
+        }
 
 
 def _channel_digest_preview(ctx: dict | None = None) -> str:
@@ -49,14 +82,19 @@ def _channel_digest_preview(ctx: dict | None = None) -> str:
             ctx = dashboard_context()
         candidates = novice_pick_candidates(ctx.get("meetings") or [])
         picks = filter_smart_picks(candidates, limit=3)
+        engine = ctx.get("engine_top_picks") or []
         return format_digest_message(
-            {"picks": picks, "card_dates": ctx.get("card_dates") or []},
+            {
+                "picks": picks,
+                "engine_top_picks": engine,
+                "card_dates": ctx.get("card_dates") or [],
+            },
         )
     except Exception:
         return (
             "🏇 Hibs Racing Intelligence — Daily Value Sheet\n"
             "Cards: today\n\n"
-            "No value picks passed filters today (value + DQ≥75% + steam gate).\n"
+            "Engine refresh pending — cards loading for today's meeting window.\n"
             "Tracker: /tracker"
         )
 
@@ -122,6 +160,7 @@ def _render_markdown_simple(text: str) -> str:
 def create_app() -> Flask:
     load_dotenv(ROOT / ".env")
     apply_saved_ui_env()
+    validate_auth_config()
     app = Flask(
         __name__,
         template_folder=str(ROOT / "templates"),
@@ -130,16 +169,33 @@ def create_app() -> Flask:
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "hibs-racing-dev")
     app.add_template_filter(fmt_num, "fmt_num")
     app.add_template_filter(fmt_pct, "fmt_pct")
+    from hibs_racing.ui_shell import static_v
+
+    app.jinja_env.globals["static_v"] = static_v
+
+    def _cached_shell_health():
+        import time as _time
+
+        now = _time.monotonic()
+        if (
+            _SHELL_HEALTH_CACHE["status"] is not None
+            and (now - float(_SHELL_HEALTH_CACHE["t"])) < _SHELL_HEALTH_TTL_SEC
+        ):
+            return _SHELL_HEALTH_CACHE["status"]
+        hs = shell_health_status()
+        _SHELL_HEALTH_CACHE["t"] = now
+        _SHELL_HEALTH_CACHE["status"] = hs
+        return hs
 
     @app.context_processor
     def inject_brand() -> dict:
-        from hibs_racing.product_links import product_bar_context
+        from hibs_racing.ui_shell import ui_shell_context
 
         ctx = hibs_brand_context()
+        ctx.update(ui_shell_context())
         ctx.update(product_bar_context(active="racing"))
-        ctx["portfolio_api_url"] = "/api/portfolio/summary"
         ctx["portfolio_full_url"] = "/portfolio"
-        ctx["health"] = health_status()
+        ctx["health"] = _cached_shell_health()
         return ctx
 
     def _cors_summary(resp):
@@ -148,8 +204,13 @@ def create_app() -> Flask:
         return resp
 
     def _render_cards():
+        from hibs_racing.pick_quality import normalize_gate_filter_mode
+
         ctx = dashboard_context()
-        ctx["channel_digest"] = _channel_digest_preview(ctx)
+        ctx["channel_digest"] = ""
+        if request.args.get("digest") in {"1", "true", "yes"}:
+            ctx["channel_digest"] = _channel_digest_preview(ctx)
+        ctx["default_gate_filter"] = normalize_gate_filter_mode(request.args.get("gate"))
         ctx.update(
             cards_deep_link_context(
                 ctx["meetings"],
@@ -162,15 +223,24 @@ def create_app() -> Flask:
         return render_template("dashboard.html", **ctx)
 
     @app.route("/")
-    @app.route("/cards")
     def index():
+        return redirect("value-picks", code=302)
+
+    @app.route("/cards")
+    def cards_page():
         return _render_cards()
 
     @app.route("/insights")
     def insights_page():
-        ctx = dashboard_context()
-        ctx.update(insights_context(top_n=10))
-        return render_template("insights.html", **ctx)
+        return render_template("insights.html", **insights_context(top_n=10))
+
+    @app.route("/value-picks")
+    def value_picks_page():
+        return render_template("value_picks.html", **value_picks_context())
+
+    @app.route("/combinations")
+    def combinations_page():
+        return render_template("combinations.html", **value_picks_context())
 
     @app.route("/api/picks")
     def api_picks():
@@ -179,7 +249,7 @@ def create_app() -> Flask:
 
     @app.route("/backtest")
     def backtest_page():
-        ctx = dashboard_context()
+        ctx = dashboard_context(heavy=True)
         return render_template("backtest.html", **ctx)
 
     def _tracker_days() -> int:
@@ -247,6 +317,7 @@ def create_app() -> Flask:
         return resp
 
     @app.route("/api/settle-paper", methods=["POST"])
+    @require_api_key
     def api_settle_paper():
         try:
             result = settle_paper_bets()
@@ -257,16 +328,128 @@ def create_app() -> Flask:
     @app.route("/portfolio")
     def portfolio_page():
         ctx = dashboard_context()
-        ctx["portfolio"] = build_racing_portfolio()
+        ctx["portfolio"] = _safe_portfolio_payload()
         return render_template("portfolio.html", **ctx)
 
     @app.route("/api/portfolio")
     def api_portfolio():
-        return jsonify(build_racing_portfolio())
+        return jsonify(_safe_portfolio_payload())
 
     @app.route("/api/portfolio/summary")
     def api_portfolio_summary():
-        return _cors_summary(jsonify(portfolio_summary_dict()))
+        payload = _safe_portfolio_payload(racing_limit=100)
+        s = payload.get("summary") or {}
+        racing_stats = payload.get("racing_stats") or {}
+        summary_block = payload.get("summary") or {}
+        pnl = summary_block.get("racing_pnl_units")
+        if pnl is None:
+            pnl = s.get("racing_pnl_units")
+        summary = {
+            "ok": payload.get("ok", True),
+            "mode": "analytics",
+            "updated_at": payload.get("updated_at"),
+            "pnl_plane": payload.get("pnl_plane", "forward_value_picks"),
+            "combined_pnl_units": pnl,
+            "racing_pnl_units": pnl,
+            "all_paper_pnl_units": summary_block.get("all_paper_pnl_units"),
+            "racing_settled": summary_block.get("racing_settled", s.get("racing_settled")),
+            "racing_open": summary_block.get("open_bets", racing_stats.get("value_pick_open", racing_stats.get("open_bets", 0))),
+            "value_pick_count": summary_block.get("value_pick_count", racing_stats.get("value_pick_count")),
+            "value_pick_open": summary_block.get("value_pick_open", racing_stats.get("value_pick_open")),
+            "links": payload.get("links") or {},
+        }
+        if payload.get("error"):
+            summary["error"] = payload["error"]
+        return _cors_summary(jsonify(summary))
+
+    @app.route("/api/place/gates/pnl")
+    def api_place_gate_pnl():
+        """Forward paper P&L by place-engine lane; production is the value-lane ledger."""
+        import sqlite3
+
+        db = db_path(load_config())
+        lanes = [
+            "gate1",
+            "gate2",
+            "gate3",
+            "gate4",
+            "gate5",
+            "gate6",
+            "gate7",
+            "gate8",
+            "gate9",
+            "gate10",
+            "gate11",
+            "production",
+        ]
+        conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5.0)
+        conn.row_factory = sqlite3.Row
+        try:
+            rows = conn.execute(
+                """
+                SELECT
+                    COALESCE(paper_lane, 'production') AS lane,
+                    COUNT(*) AS picks,
+                    SUM(CASE WHEN status != 'open' THEN 1 ELSE 0 END) AS settled,
+                    SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open,
+                    SUM(CASE WHEN status != 'open' THEN COALESCE(result_pnl, 0) ELSE 0 END) AS pnl_units,
+                    SUM(CASE WHEN status != 'open' THEN COALESCE(stake_units, 0) ELSE 0 END) AS staked_units,
+                    SUM(CASE WHEN status != 'open' AND clv_beat IS NOT NULL THEN 1 ELSE 0 END) AS clv_n,
+                    SUM(CASE WHEN status != 'open' AND clv_beat = 1 THEN 1 ELSE 0 END) AS clv_beat_n,
+                    SUM(CASE WHEN offered_place IS NULL THEN 1 ELSE 0 END) AS missing_offered_place,
+                    SUM(CASE WHEN evidence_json IS NULL OR evidence_json = '' THEN 1 ELSE 0 END) AS missing_evidence,
+                    SUM(CASE WHEN model_place_prob IS NULL THEN 1 ELSE 0 END) AS missing_model_place,
+                    SUM(CASE WHEN place_ev IS NULL THEN 1 ELSE 0 END) AS missing_place_ev,
+                    SUM(CASE WHEN status != 'open' AND closing_sp IS NULL THEN 1 ELSE 0 END) AS missing_closing_sp,
+                    SUM(CASE WHEN status != 'open' AND clv_beat IS NULL THEN 1 ELSE 0 END) AS missing_clv
+                FROM paper_bets
+                WHERE backtest = 0
+                  AND is_value_pick = 1
+                GROUP BY COALESCE(paper_lane, 'production')
+                """
+            ).fetchall()
+        finally:
+            conn.close()
+
+        by_lane = {str(r["lane"]): dict(r) for r in rows}
+        out = []
+        for lane in lanes:
+            row = by_lane.get(lane, {})
+            staked = float(row.get("staked_units") or 0.0)
+            pnl = float(row.get("pnl_units") or 0.0)
+            clv_n = int(row.get("clv_n") or 0)
+            clv_beat_n = int(row.get("clv_beat_n") or 0)
+            missing = {
+                "offered_place": int(row.get("missing_offered_place") or 0),
+                "evidence": int(row.get("missing_evidence") or 0),
+                "model_place": int(row.get("missing_model_place") or 0),
+                "place_ev": int(row.get("missing_place_ev") or 0),
+                "closing_sp": int(row.get("missing_closing_sp") or 0),
+                "clv": int(row.get("missing_clv") or 0),
+            }
+            out.append(
+                {
+                    "lane": lane,
+                    "plane": "value_lane" if lane == "production" else "parallel_gate",
+                    "picks": int(row.get("picks") or 0),
+                    "settled": int(row.get("settled") or 0),
+                    "open": int(row.get("open") or 0),
+                    "pnl_units": round(pnl, 2),
+                    "roi_pct": round(100.0 * pnl / staked, 2) if staked > 0 else None,
+                    "clv_n": clv_n,
+                    "clv_beat_pct": round(100.0 * clv_beat_n / clv_n, 2) if clv_n else None,
+                    "missing": missing,
+                    "evidence_complete": not any(missing.values()),
+                }
+            )
+        return jsonify(
+            {
+                "ok": True,
+                "lane": "racing_place",
+                "pnl_plane_note": "production is the active value-lane paper ledger; gate1-gate11 are parallel forward paper lanes.",
+                "lanes": out,
+            }
+        )
 
     @app.route("/api/market-steam")
     def api_market_steam():
@@ -333,6 +516,7 @@ def create_app() -> Flask:
         )
 
     @app.route("/api/settings/monetization", methods=["GET", "POST"])
+    @require_api_key(methods=("POST",))
     def api_settings_monetization():
         if request.method == "GET":
             return jsonify(monetization_form_payload())
@@ -345,11 +529,25 @@ def create_app() -> Flask:
         except OSError as exc:
             return jsonify({"ok": False, "error": str(exc)}), 500
 
+    @app.route("/api/monetization/venues")
+    def api_monetization_venues():
+        from hibs_racing.utils.monetization import public_monetization_payload
+
+        return jsonify(public_monetization_payload())
+
+    @app.route("/api/monetization/status")
+    def api_monetization_status():
+        from hibs_racing.monetization_status import build_monetization_status
+
+        return jsonify(build_monetization_status())
+
     @app.route("/status")
     def status_page():
+        hs = health_status()
         return render_template(
             "status.html",
-            health=health_status(),
+            health=hs,
+            evidence_truth=hs.evidence_truth,
             feature_impact=load_feature_impact_report(),
             ranker_attribution=live_ranker_attribution(),
             market_gauges=latest_gauges(limit=40),
@@ -370,6 +568,7 @@ def create_app() -> Flask:
         )
 
     @app.route("/api/tips/paste", methods=["POST"])
+    @require_api_key
     def api_tips_paste():
         from hibs_racing.tips.ingest import ingest_pasted_text
 
@@ -386,6 +585,7 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "error": str(exc)}), 500
 
     @app.route("/api/tips/fetch-imap", methods=["POST"])
+    @require_api_key
     def api_tips_fetch_imap():
         from hibs_racing.tips.imap_fetch import imap_configured
         from hibs_racing.tips.ingest import ingest_from_imap
@@ -406,15 +606,203 @@ def create_app() -> Flask:
         db = db_path(load_config())
         return jsonify({"tips": load_tips(db, limit=100), "summary": tipster_summary(db)})
 
+    @app.route("/api/tips/combinations")
+    def api_tips_combinations():
+        from hibs_racing.tips.combinations_api import combinations_for_date
+
+        db = db_path(load_config())
+        card_date = (request.args.get("date") or "").strip() or None
+        return jsonify(combinations_for_date(db, card_date=card_date))
+
+    @app.route("/api/win-engine/predictions")
+    def api_win_engine_predictions():
+        from hibs_racing.features.store import connect
+        from hibs_racing.models.win_engine_circuit import public_release_allowed
+        from hibs_racing.models.win_engine_insights import build_runner_insights
+        from hibs_racing.models.win_engine_store import load_calibration_state
+
+        if not public_release_allowed(db_path(load_config())):
+            return jsonify({"ok": False, "error": "win_engine_inactive"}), 404
+        db = db_path(load_config())
+        card_date = (request.args.get("date") or "").strip() or None
+        if not card_date:
+            from datetime import date
+
+            card_date = date.today().isoformat()
+        insights = build_runner_insights(db, card_date)
+        with connect(db) as conn:
+            cal = load_calibration_state(conn)
+        return jsonify(
+            {
+                "ok": True,
+                "card_date": card_date,
+                "calibration": cal,
+                "insights": insights or {},
+            }
+        )
+
+    @app.route("/api/trading/sandbox")
+    def api_trading_sandbox():
+        """Read-only racing execution sandbox — no order dispatch."""
+        from hibs_racing.trading.status_plane import read_status
+        from hibs_racing.trading.liquidity_router import recent_hedged_events, recent_routing_decisions
+        from hibs_racing.trading.store import recent_simulated_trades
+
+        limit = min(int(request.args.get("limit", 20)), 50)
+        status = read_status()
+        return jsonify(
+            {
+                **status,
+                "recent_simulated_trades": recent_simulated_trades(limit=limit),
+                "recent_routing_decisions": recent_routing_decisions(limit=limit),
+                "recent_hedged_events": recent_hedged_events(limit=limit),
+            }
+        )
+
+    @app.route("/api/trading/dispatch", methods=["POST"])
+    @require_api_key(methods=("POST",))
+    def api_trading_dispatch():
+        """Workspace order dispatch — routes through execution governor (simulated when live disabled)."""
+        from hibs_racing.trading.delta_cache import MarketDeltaCache
+        from hibs_racing.trading.execution_governor import ExecutionGovernor, build_order_payload
+        from hibs_racing.trading.status_plane import daemon_active
+
+        if not daemon_active():
+            return jsonify({"ok": False, "error": "trading_daemon_inactive"}), 503
+        body = request.get_json(silent=True) or {}
+        selection = str(body.get("selection") or "").strip()
+        odds = float(body.get("odds") or 2.0)
+        stake = float(body.get("stake") or 2.0)
+        market_id = str(body.get("market_id") or body.get("runner_id") or selection or "ws")
+        runner_id = str(body.get("runner_id") or selection or "ws")
+        governor = ExecutionGovernor(cache=MarketDeltaCache())
+        payload = build_order_payload(
+            market_id=market_id,
+            runner_id=runner_id,
+            odds=odds,
+            stake=stake,
+        )
+        payload["selection"] = selection
+        payload["source"] = str(body.get("source") or "api_trading_dispatch")
+        result = governor.dispatch(payload).to_dict()
+        try:
+            from hibs_racing.trading.execution_intent_ledger import append_execution_intent
+
+            append_execution_intent(verdict=result, source="api_trading_dispatch", trace_id=str(body.get("trace_id") or ""))
+        except Exception:
+            pass
+        return jsonify({"ok": bool(result.get("allowed")), "verdict": result})
+
+    @app.route("/api/stream/deltas")
+    def api_stream_deltas():
+        """SSE trading status stream — low-latency UI feed from daemon heartbeat."""
+        import json
+        import time as _time
+
+        from flask import Response
+
+        from hibs_racing.trading.status_plane import read_status
+
+        def generate():
+            last_ts = 0.0
+            while True:
+                status = read_status(max_age_sec=60.0)
+                ts = float(status.get("ts") or 0)
+                if ts != last_ts:
+                    last_ts = ts
+                    yield f"data: {json.dumps({'type': 'trading_status', 'status': status}, default=str)}\n\n"
+                yield ": keepalive\n\n"
+                _time.sleep(1.0)
+
+        return Response(
+            generate(),
+            mimetype="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     @app.route("/api/ping")
     def api_ping():
         return jsonify({"ok": True, "product": "hibs-racing"})
+
+    @app.route("/api/live")
+    def api_live():
+        from hibs_racing.config import db_path, load_config
+        from hibs_racing.features.store import connect
+
+        try:
+            with connect(db_path(load_config())) as conn:
+                conn.execute("SELECT 1").fetchone()
+            return jsonify({"ok": True, "tier": "liveness"})
+        except Exception as exc:
+            return jsonify({"ok": False, "error": str(exc)[:120]}), 503
+
+    @app.route("/api/ready")
+    def api_ready():
+        from hibs_racing.config import db_path, load_config
+
+        db_ok = False
+        db_err = ""
+        cfg_db = ""
+        runners = 0
+        try:
+            cfg_db = str(db_path(load_config()))
+            import sqlite3
+
+            conn = sqlite3.connect(f"file:{cfg_db}?mode=ro", uri=True, timeout=5.0)
+            try:
+                conn.execute("SELECT 1").fetchone()
+                row = conn.execute("SELECT COUNT(*) FROM upcoming_runners").fetchone()
+                runners = int(row[0] or 0) if row else 0
+                db_ok = True
+            finally:
+                conn.close()
+        except Exception as exc:
+            db_err = str(exc)[:120]
+
+        ok = db_ok and runners > 0
+        return jsonify(
+            {
+                "ok": ok,
+                "tier": "readiness",
+                "db_ok": db_ok,
+                "db_path": cfg_db,
+                "runners_loaded": runners,
+                "error": db_err or None,
+            }
+        ), (200 if ok else 503)
 
     @app.route("/api/scrapers/catalog")
     def api_scrapers_catalog():
         from hibs_racing.cards.runner_field_api import scraper_catalog_payload
 
         return jsonify(scraper_catalog_payload())
+
+    @app.route("/api/scrape/status")
+    def api_scrape_status():
+        from hibs_racing.scrapers.racing_scrape_api import scrape_status_payload
+
+        return jsonify(scrape_status_payload())
+
+    @app.route("/api/scrape/cards")
+    def api_scrape_cards():
+        from hibs_racing.scrapers.racing_scrape_api import list_cards_payload
+
+        enrich = request.args.get("enrich", "0") == "1"
+        rescue = request.args.get("rescue", "0") == "1"
+        return jsonify(list_cards_payload(slim=not enrich, rescue=rescue))
+
+    @app.route("/api/scrape/resilience")
+    def api_scrape_resilience():
+        from hibs_racing.scrapers.robust_scrape_cycle import read_robust_scrape_status
+        from hibs_racing.scrapers.scrape_resilience import scrape_resilience_status
+
+        return jsonify(
+            {
+                "ok": True,
+                "resilience": scrape_resilience_status(),
+                "last_cycle": read_robust_scrape_status(),
+            }
+        )
 
     @app.route("/api/runner/<runner_id>")
     def api_runner_fields(runner_id: str):
@@ -426,11 +814,69 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "error": "runner_not_found", "runner_id": runner_id}), 404
         return jsonify({"ok": True, **payload})
 
+    @app.route("/api/runner/<runner_id>/price-ticks")
+    def api_runner_price_ticks(runner_id: str):
+        """Last N exchange_quotes ticks — HTTP boundary for hibs-bet drift_gate."""
+        from hibs_racing.odds.exchange_quotes import load_runner_price_ticks
+
+        try:
+            limit = max(1, min(20, int(request.args.get("limit", "3"))))
+        except (TypeError, ValueError):
+            limit = 3
+        try:
+            window_sec = max(1.0, min(600.0, float(request.args.get("window_sec", "45"))))
+        except (TypeError, ValueError):
+            window_sec = 45.0
+        ticks = load_runner_price_ticks(
+            str(runner_id),
+            limit=limit,
+            max_age_seconds=window_sec,
+        )
+        return jsonify(
+            {
+                "ok": True,
+                "runner_id": str(runner_id),
+                "limit": limit,
+                "window_sec": window_sec,
+                "ticks": ticks,
+            }
+        )
+
+    @app.route("/api/trading/disarm", methods=["POST"])
+    def api_trading_disarm():
+        """Fail-closed runner disarm — HTTP boundary for hibs-bet drift_gate."""
+        from hibs_racing.trading.runner_disarm_registry import disarm_runner, disarmed_snapshot
+
+        data = request.get_json(silent=True) if request.is_json else {}
+        if not isinstance(data, dict):
+            data = {}
+        runner_id = (data.get("runner_id") or request.args.get("runner_id") or "").strip()
+        reason = str(data.get("reason") or request.args.get("reason") or "drift_gate")
+        if not runner_id:
+            return jsonify({"ok": False, "error": "missing_runner_id"}), 400
+        disarm_runner(runner_id, reason=reason)
+        return jsonify(
+            {
+                "ok": True,
+                "runner_id": runner_id,
+                "reason": reason,
+                "disarmed": disarmed_snapshot(),
+            }
+        )
+
+    @app.route("/api/evidence")
+    def api_racing_evidence():
+        from hibs_racing.evidence_gates import racing_evidence_gates
+
+        return jsonify(racing_evidence_gates())
+
     @app.route("/api/health")
     def api_health():
         import time as _time
 
-        force = request.args.get("full", "0") == "1"
+        light_env = os.environ.get("HIBS_HEALTH_LIGHT", "").strip().lower()
+        light_mode = light_env in ("1", "true", "yes", "on")
+        force = request.args.get("full", "0") == "1" and not light_mode
         now = _time.monotonic()
         if (
             not force
@@ -438,19 +884,25 @@ def create_app() -> Flask:
             and (now - float(_HEALTH_CACHE["t"])) < _HEALTH_TTL_SEC
         ):
             return jsonify(_HEALTH_CACHE["payload"])
-        payload = health_status().to_dict()
+        try:
+            status_fn = health_status if force else shell_health_status
+            payload = status_fn().to_dict()
+        except Exception as exc:
+            return jsonify({"ok": False, "tier": "deep", "error": str(exc)[:120]}), 503
         _HEALTH_CACHE["t"] = now
         _HEALTH_CACHE["payload"] = payload
         return jsonify(payload)
 
     @app.route("/api/dashboard")
     def api_dashboard():
+        frame = _base_frame(window_hours=24)
+        card_dates = sorted(frame["card_date"].astype(str).unique().tolist()) if not frame.empty else []
         return jsonify(
             {
-                "health": health_status().to_dict(),
-                "card_date": dashboard_context().get("card_date"),
-                "runner_count": dashboard_context().get("runner_count"),
-                "race_count": dashboard_context().get("race_count"),
+                "health": shell_health_status().to_dict(),
+                "card_date": card_dates[0] if len(card_dates) == 1 else None,
+                "runner_count": len(frame),
+                "race_count": int(frame["race_id"].nunique()) if not frame.empty else 0,
             }
         )
 
@@ -461,30 +913,133 @@ def create_app() -> Flask:
         return jsonify(payload)
 
     @app.route("/api/refresh", methods=["POST", "GET"])
+    @require_api_key
     def api_refresh():
-        source = request.args.get("source", "racing_api")
+        from hibs_racing.scrapers.racing_scrape_api import (
+            odds_coverage_summary,
+            resolve_cards_source,
+            run_thin_rescue_pass,
+        )
+
+        source = resolve_cards_source(request.args.get("source", "auto"))
         region = request.args.get("region", "gb")
         day = int(request.args.get("day", "1"))
         odds_source = os.environ.get("HIBS_ODDS_SOURCE") or request.args.get("odds_source", "auto")
         window = request.args.get("window", "24")
         window_hours = int(window) if window.isdigit() else 24
-        try:
-            paper_on_refresh = bool(load_config().get("paper", {}).get("log_on_refresh", True))
-            stats = refresh_cards(
-                source=source,
+        paper_on_refresh = bool(load_config().get("paper", {}).get("log_on_refresh", True))
+
+        def _do_refresh(src: str) -> dict:
+            return refresh_cards(
+                source=src,
                 region=region,
                 day=day,
                 odds_source=odds_source,
                 window_hours=window_hours if window_hours > 0 else None,
                 paper=paper_on_refresh,
             )
-            monitor = monitor_snapshot(refresh=False, settle=True)
-            payload = {"ok": True, **stats, "monitor": monitor}
-            if paper_on_refresh and not stats.get("paper_recon_clean", True):
-                return jsonify(payload), 503
-            return jsonify(payload)
+
+        stats: dict | None = None
+        err: Exception | None = None
+        try:
+            stats = _do_refresh(source)
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            err = exc
+            if source == "racing_api":
+                from hibs_racing.racing_api_guard import record_forbidden, should_record_api_forbidden
+
+                if should_record_api_forbidden(exc):
+                    record_forbidden(http_status=403, reason=str(exc)[:80])
+                fallback = resolve_cards_source("rpscrape")
+                if fallback != source:
+                    try:
+                        stats = _do_refresh(fallback)
+                        stats["cards_source_fallback"] = fallback
+                        err = None
+                    except Exception as exc2:
+                        err = exc2
+
+        if err is not None or stats is None:
+            return jsonify({"ok": False, "error": str(err)}), 500
+
+        rescue: dict | None = None
+        cov = odds_coverage_summary()
+        if not cov.get("ok") and os.getenv("HIBS_RACING_ROBUST_RESCUE", "1").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        ):
+            try:
+                rescue = run_thin_rescue_pass()
+                stats["thin_rescue"] = rescue
+                cov = rescue.get("coverage") or cov
+            except Exception as exc:
+                stats["thin_rescue_error"] = str(exc)[:120]
+
+        monitor = monitor_snapshot(refresh=False, settle=True)
+        payload = {"ok": True, **stats, "monitor": monitor, "odds_coverage": cov}
+        if paper_on_refresh and not stats.get("paper_recon_clean", True):
+            return jsonify(payload), 503
+        return jsonify(payload)
+
+    @app.route("/win")
+    def win_lane_page():
+        top_n = max(1, min(50, int(request.args.get("top", "12"))))
+        window_hours = max(
+            1,
+            min(
+                168,
+                int(
+                    request.args.get(
+                        "window",
+                        os.environ.get("HIBS_RACING_WIN_WINDOW_HOURS", "48"),
+                    )
+                ),
+            ),
+        )
+        return render_template(
+            "win_lane.html",
+            **build_win_lane_context(top_n=top_n, window_hours=window_hours),
+        )
+
+    @app.route("/api/win/picks")
+    def api_win_picks():
+        top_n = max(1, min(50, int(request.args.get("top", "12"))))
+        window_hours = max(
+            1,
+            min(
+                168,
+                int(
+                    request.args.get(
+                        "window",
+                        os.environ.get("HIBS_RACING_WIN_WINDOW_HOURS", "48"),
+                    )
+                ),
+            ),
+        )
+        return jsonify(build_win_lane_context(top_n=top_n, window_hours=window_hours))
+
+    @app.route("/api/win/health")
+    def api_win_health():
+        payload = win_lane_health()
+        return jsonify(payload), (200 if payload.get("ok") else 503)
+
+    from hibs_racing.url_prefix import apply_url_prefix
+
+    apply_url_prefix(app)
+
+    @app.errorhandler(404)
+    def _win_engine_404(exc):  # noqa: ARG001
+        if request.path.startswith("/api/win-engine"):
+            return jsonify({"ok": False, "error": "win_engine_unavailable"}), 404
+        return jsonify({"ok": False, "error": "not_found"}), 404
+
+    @app.errorhandler(500)
+    def _win_engine_safe_500(exc):  # noqa: ARG001
+        if request.path.startswith("/api/win-engine"):
+            return jsonify({"ok": False, "error": "win_engine_unavailable"}), 404
+        return jsonify({"ok": False, "error": "internal_error"}), 500
 
     return app
 
