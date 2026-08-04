@@ -36,7 +36,7 @@ def main() -> int:
     ]
     print("\n".join(lines))
     if not h.racing_api:
-        print("\n→ Set RACING_API_USERNAME + RACING_API_PASSWORD (required for Refresh 24h)", file=sys.stderr)
+        print("\n→ Set RACING_API_USERNAME + RACING_API_PASSWORD (required for Refresh 48h)", file=sys.stderr)
     if not h.matchbook:
         print("→ Set MATCHBOOK_USERNAME + MATCHBOOK_PASSWORD for exchange odds", file=sys.stderr)
     if not rf_ok:

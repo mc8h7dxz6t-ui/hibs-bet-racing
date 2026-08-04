@@ -1,5 +1,5 @@
 #!/bin/bash
-# Daily: sync recent results, refresh 24h GB+IRE cards, score, odds, paper settle.
+# Daily: sync recent results, refresh 48h GB+IRE cards, score, odds, paper settle.
 # Does NOT retrain the ranker (see weekly_retrain.sh).
 set -euo pipefail
 
@@ -44,7 +44,7 @@ export HIBS_POLL_MILESTONE=baseline
 run_logged "daily-refresh-cards" \
   hibs-racing refresh-cards \
     --source racing_api \
-    --window 24 \
+    --window "${HIBS_RACING_WINDOW_HOURS:-48}" \
     --regions gb,ire \
     --workers 1 \
     --odds-source "${HIBS_ODDS_SOURCE:-matchbook}" \

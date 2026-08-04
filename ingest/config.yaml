@@ -162,8 +162,8 @@ cards:
   default_region: gb
   fetch_timeout_sec: 120
   parallel_workers: 4
-  include_tomorrow: false
-  primary_date_only: true
+  include_tomorrow: true
+  primary_date_only: false
   dual_source_enrich: true
   enrich_fetch_stats: true
 rate_limits:
@@ -185,7 +185,7 @@ monitor:
   auto_refresh_seconds: 300
   card_source: racing_api
   card_day: 1
-  window_hours: 24
+  window_hours: 48
 oddschecker:
   enabled: true
   base_url: https://www.oddschecker.com
